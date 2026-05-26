@@ -45,6 +45,11 @@ STRIPE_PRICE_LIFETIME=price_1TbIcsHluwdGuEsNpFGJYSXV
 ADMIN_PASSWORD=
 FRONTEND_URL=https://fimamacro.com
 API_BASE_URL=https://api.fimamacro.com
+DISCORD_INVITE_URL=
+SUPPORT_EMAIL=support@fimamacro.com
+DOWNLOAD_MANIFEST_URL=https://fimamacro.com/latest.json
+DOWNLOAD_FALLBACK_URL=https://fimamacro.com/downloads/
+CORS_ORIGINS=https://fimamacro.com,https://www.fimamacro.com
 ```
 
 Use Render PostgreSQL's Internal Database URL for `DATABASE_URL`.
@@ -65,7 +70,7 @@ Do not enable any separate proxy. Render provides HTTPS/TLS for the verified cus
 
 ## Stripe Webhook
 
-In Stripe test mode, create a webhook endpoint:
+In Stripe live mode, create a webhook endpoint:
 
 ```text
 https://api.fimamacro.com/api/webhooks/stripe
@@ -84,13 +89,14 @@ Copy the generated Stripe webhook signing secret into Render as `STRIPE_WEBHOOK_
 1. `GET https://api.fimamacro.com/health`
 2. `POST https://api.fimamacro.com/api/checkout/create-session`
 3. Confirm Stripe Checkout URL is returned.
-4. Pay with Stripe test card.
+4. In live mode, do not expect Stripe test card `4242` to work.
 5. Confirm webhook creates order and license.
 6. Confirm `https://fimamacro.com/success.html?session_id=...` shows the license key.
-7. Validate license with `POST /api/license/validate`.
-8. Confirm first HWID locks.
-9. Confirm second HWID returns `hwid_mismatch`.
-10. Open `https://api.fimamacro.com/admin`.
-11. Test HWID reset and ban/unban.
+7. Confirm success page download calls `GET /api/download?licenseKey=...`.
+8. Validate license with `POST /api/license/validate`.
+9. Confirm first HWID locks.
+10. Confirm second HWID returns `hwid_mismatch`.
+11. Open `https://api.fimamacro.com/admin`.
+12. Test HWID reset and ban/unban.
 
-Live mode is blocked until explicitly approved.
+Live mode depends on Render `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and live `STRIPE_PRICE_*` values.

@@ -18,12 +18,21 @@ model License {
   lifetime              Boolean   @default(false)
   stripeSessionId       String?   @unique @map("stripe_session_id")
   stripePaymentIntentId String?   @map("stripe_payment_intent_id")
+  validationCount       Int       @default(0) @map("validation_count")
+  downloadCount         Int       @default(0) @map("download_count")
+  lastValidatedAt       DateTime? @map("last_validated_at")
+  lastDownloadedAt      DateTime? @map("last_downloaded_at")
+  notes                 String?
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
   orders                Order[]
+  validationLogs        ValidationLog[]
+  downloadLogs          DownloadLog[]
 
   @@index([customerEmail])
   @@index([plan, status])
+  @@index([hwid])
+  @@index([expiresAt])
   @@map("licenses")
 }
 
@@ -36,6 +45,10 @@ model Order {
   amount                Int
   currency              String
   status                String
+  mode                  String   @default("unknown")
+  country               String?
+  locale                String?
+  notes                 String?
   licenseId             String?  @map("license_id")
   license               License? @relation(fields: [licenseId], references: [id])
   createdAt             DateTime @default(now()) @map("created_at")
@@ -43,5 +56,131 @@ model Order {
 
   @@index([customerEmail])
   @@index([plan, status])
+  @@index([currency])
+  @@index([mode])
+  @@index([createdAt])
   @@map("orders")
+}
+
+model Customer {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  totalSpent      Int      @default(0) @map("total_spent")
+  totalOrders     Int      @default(0) @map("total_orders")
+  firstPurchaseAt DateTime? @map("first_purchase_at")
+  lastPurchaseAt  DateTime? @map("last_purchase_at")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("customers")
+}
+
+model ValidationLog {
+  id          String   @id @default(cuid())
+  licenseId   String?  @map("license_id")
+  license     License? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  licenseKey  String   @map("license_key")
+  result      String
+  reason      String?
+  hwidHash    String?  @map("hwid_hash")
+  appVersion  String?  @map("app_version")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([licenseId])
+  @@index([licenseKey])
+  @@index([result, reason])
+  @@index([createdAt])
+  @@map("validation_logs")
+}
+
+model DownloadLog {
+  id         String   @id @default(cuid())
+  licenseId  String?  @map("license_id")
+  license    License? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  licenseKey String   @map("license_key")
+  result     String
+  reason     String?
+  version    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([licenseId])
+  @@index([licenseKey])
+  @@index([result, reason])
+  @@index([createdAt])
+  @@map("download_logs")
+}
+
+model WebhookEvent {
+  id               String   @id @default(cuid())
+  stripeEventId    String   @unique @map("stripe_event_id")
+  type             String
+  processed        Boolean  @default(false)
+  errorMessage     String?  @map("error_message")
+  relatedOrderId   String?  @map("related_order_id")
+  relatedLicenseId String?  @map("related_license_id")
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([processed])
+  @@index([createdAt])
+  @@map("webhook_events")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  type      String
+  plan      String?
+  amount    Int?
+  currency  String?
+  mode      String?
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([plan])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
+
+model Coupon {
+  id                    String   @id @default(cuid())
+  stripePromotionCodeId String?  @map("stripe_promotion_code_id")
+  code                  String   @unique
+  percentOff            Int?     @map("percent_off")
+  amountOff             Int?     @map("amount_off")
+  currency              String?
+  active                Boolean  @default(true)
+  expiresAt             DateTime? @map("expires_at")
+  maxRedemptions        Int?     @map("max_redemptions")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@map("coupons")
 }

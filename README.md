@@ -5,8 +5,9 @@ Node.js + Express + PostgreSQL + Prisma backend for:
 - Stripe Checkout one-time payments
 - Automatic license generation
 - License validation with first-HWID lock
+- Licensed downloads from the success page
 - Stripe webhook fulfillment
-- Admin license panel
+- Premium admin panel for sales, licenses, downloads, settings, analytics and audit logs
 
 No Stripe secret, webhook secret, database URL, or admin password belongs in `/public`.
 
@@ -41,7 +42,7 @@ STRIPE_PRICE_LIFETIME=price_...
 
 Copy those values into `.env`.
 
-Live Stripe keys are refused by the backend until live mode is explicitly approved later. Never paste Stripe keys into frontend files or public hosting.
+Live Stripe mode is controlled by the deployed environment variables. Never paste Stripe keys into frontend files or public hosting.
 
 ## Required Environment
 
@@ -58,6 +59,11 @@ STRIPE_PRICE_LIFETIME=price_1TbIcsHluwdGuEsNpFGJYSXV
 ADMIN_PASSWORD=
 FRONTEND_URL=https://fimamacro.com
 API_BASE_URL=https://api.fimamacro.com
+DISCORD_INVITE_URL=
+SUPPORT_EMAIL=support@fimamacro.com
+DOWNLOAD_MANIFEST_URL=https://fimamacro.com/latest.json
+DOWNLOAD_FALLBACK_URL=https://fimamacro.com/downloads/
+CORS_ORIGINS=https://fimamacro.com,https://www.fimamacro.com
 ```
 
 ## API
@@ -78,7 +84,7 @@ Creates a Stripe Checkout Session.
 Returns:
 
 ```json
-{ "url": "https://checkout.stripe.com/...", "mode": "test", "checkoutSessionPrefix": "cs_test" }
+{ "url": "https://checkout.stripe.com/...", "mode": "live", "checkoutSessionPrefix": "cs_live" }
 ```
 
 The response and server logs expose only Stripe mode/prefix diagnostics, never secret values. On startup and checkout, each configured `STRIPE_PRICE_*` env is validated against the active Stripe mode. If one is missing, inactive, has the wrong amount/currency, or is not found in the current Stripe mode, the log names the env key and falls back to inline USD `price_data` for the same plan amount.
@@ -107,6 +113,24 @@ Returns the generated license, or `processing` while the webhook is still catchi
 
 The first successful validation locks the license to the provided HWID.
 
+### `GET /api/download?licenseKey=FIMA-...`
+
+Checks the license status, expiry and ban state, logs the download attempt, and returns the latest installer URL.
+
+```json
+{
+  "success": true,
+  "downloadUrl": "https://fimamacro.com/downloads/...",
+  "version": "1.0.0"
+}
+```
+
+The endpoint reads `DOWNLOAD_MANIFEST_URL` first, then falls back to `DOWNLOAD_FALLBACK_URL`.
+
+### `GET /api/public/site-settings`
+
+Returns public, non-secret site settings such as Discord invite URL, support email, maintenance state and checkout/download switches.
+
 ## Admin Panel
 
 Open:
@@ -117,13 +141,15 @@ https://api.fimamacro.com/admin
 
 Features:
 
-- list and search licenses
-- filter by plan/status
-- manual license creation
-- extend license
-- ban/unban via status
-- reset HWID
-- view recent orders
+- dashboard revenue and system health cards
+- orders with Stripe IDs, plan, amount, mode and linked license
+- licenses with HWID, validation/download counts and admin actions
+- customers with spend/order history
+- downloads / versions view from `latest.json`
+- site settings for Discord, support email and checkout/download switches
+- coupons / discounts preparation
+- analytics, webhook logs and audit logs
+- manual license creation, extend, ban/unban and HWID reset
 
 There is no delete action by design.
 

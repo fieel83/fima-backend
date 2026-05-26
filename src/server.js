@@ -32,7 +32,20 @@ let lastStripePriceValidation = {
 
 const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const validateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
+const downloadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
+
+const defaultSiteSettings = {
+  discordInviteUrl: env("DISCORD_INVITE_URL", ""),
+  supportEmail: env("SUPPORT_EMAIL", "support@fimamacro.com"),
+  brandName: env("APP_NAME", "Fima Macro"),
+  maintenanceMode: false,
+  announcementBannerText: "",
+  announcementBannerEnabled: false,
+  pricingVisible: true,
+  checkoutEnabled: true,
+  downloadEnabled: true
+};
 
 app.set("trust proxy", 1);
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -63,6 +76,7 @@ app.get("/healthz", (_req, res) => {
 
 app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
+  let webhookRecord;
   try {
     const signature = req.headers["stripe-signature"];
     event = stripe().webhooks.constructEvent(req.body, signature, requiredEnv("STRIPE_WEBHOOK_SECRET"));
@@ -71,12 +85,48 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
   }
 
   try {
-    if (event.type === "checkout.session.completed") {
-      await fulfillCheckoutSession(event.data.object);
+    webhookRecord = await prisma.webhookEvent.upsert({
+      where: { stripeEventId: event.id },
+      create: {
+        stripeEventId: event.id,
+        type: event.type,
+        processed: false,
+        metadata: {
+          livemode: Boolean(event.livemode),
+          object: event.data?.object?.object,
+          sessionId: event.data?.object?.id,
+          paymentStatus: event.data?.object?.payment_status
+        }
+      },
+      update: {}
+    });
+
+    if (webhookRecord.processed) {
+      return res.json({ received: true, duplicate: true });
     }
+
+    let fulfillment = null;
+    if (event.type === "checkout.session.completed") {
+      fulfillment = await fulfillCheckoutSession(event.data.object);
+    }
+    await prisma.webhookEvent.update({
+      where: { stripeEventId: event.id },
+      data: {
+        processed: true,
+        errorMessage: null,
+        relatedOrderId: fulfillment?.id || null,
+        relatedLicenseId: fulfillment?.license?.id || fulfillment?.licenseId || null
+      }
+    });
     return res.json({ received: true });
   } catch (error) {
     console.error("Stripe webhook fulfillment failed", { type: event.type, message: error.message });
+    if (event?.id) {
+      await prisma.webhookEvent.update({
+        where: { stripeEventId: event.id },
+        data: { processed: false, errorMessage: error.message }
+      }).catch(() => {});
+    }
     return res.status(500).json({ error: "webhook_fulfillment_failed" });
   }
 });
@@ -84,8 +134,18 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
 
+app.get("/api/public/site-settings", async (_req, res) => {
+  const settings = await getSiteSettings();
+  res.json({ success: true, settings: publicSiteSettings(settings) });
+});
+
 app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
   try {
+    const settings = await getSiteSettings();
+    if (settings.maintenanceMode || settings.checkoutEnabled === false) {
+      return res.status(503).json({ error: "checkout_disabled" });
+    }
+
     const plan = getPlan(req.body?.plan);
     if (!plan) return res.status(400).json({ error: "invalid_plan", plans: planIds() });
 
@@ -101,6 +161,13 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       language: String(req.body?.language || "en").slice(0, 8)
     });
     const session = checkout.session;
+    await createAnalyticsEvent("checkout_created", {
+      plan: plan.id,
+      amount: plan.priceCents,
+      currency: "usd",
+      mode: session.livemode ? "live" : "test",
+      metadata: { priceSource: checkout.priceSource }
+    });
 
     const checkoutMode = session.livemode ? "live" : "test";
     const checkoutSessionPrefix = stripeSessionPrefix(session.id);
@@ -116,6 +183,9 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     return res.json({ url: session.url, mode: checkoutMode, checkoutSessionPrefix, priceSource: checkout.priceSource });
   } catch (error) {
     console.error("Checkout session creation failed", { ...publicError(error), stripe: stripeStatus() });
+    await createAnalyticsEvent("checkout_failed", {
+      metadata: { code: error.code, type: error.type }
+    });
     return res.status(error.code === "missing_env" ? 503 : 500).json({ error: "checkout_failed" });
   }
 });
@@ -144,21 +214,88 @@ app.get("/api/checkout/result", async (req, res) => {
   }
 });
 
-app.post("/api/license/validate", validateLimiter, async (req, res) => {
-  try {
-    const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
-    const hwid = normalizeHwid(req.body?.hwid);
+app.get("/api/download", downloadLimiter, async (req, res) => {
+  const licenseKey = normalizeLicenseKey(req.query?.licenseKey);
+  const settings = await getSiteSettings();
 
+  if (settings.downloadEnabled === false) {
+    await logDownload(null, licenseKey || "-", "failed", "download_disabled");
+    return res.status(403).json({ success: false, reason: "download_disabled", message: "Downloads are currently disabled." });
+  }
+
+  if (!licenseKey) {
+    await logDownload(null, "-", "failed", "invalid_license");
+    return res.status(400).json({ success: false, reason: "invalid_license", message: "Invalid or expired license." });
+  }
+
+  const license = await prisma.license.findUnique({ where: { licenseKey } });
+  const access = licenseAccessState(license);
+  if (!access.valid) {
+    await logDownload(license, licenseKey, "failed", access.reason);
+    return res.status(403).json({ success: false, reason: access.reason, message: "Invalid or expired license." });
+  }
+
+  const downloadInfo = await resolveDownloadInfo();
+  await prisma.$transaction([
+    prisma.license.update({
+      where: { id: license.id },
+      data: {
+        downloadCount: { increment: 1 },
+        lastDownloadedAt: new Date()
+      }
+    }),
+    prisma.downloadLog.create({
+      data: {
+        licenseId: license.id,
+        licenseKey,
+        result: "success",
+        version: downloadInfo.version || null
+      }
+    }),
+    prisma.auditLog.create({
+      data: {
+        action: "download_accessed",
+        targetType: "license",
+        targetId: license.id,
+        metadata: { version: downloadInfo.version || null }
+      }
+    })
+  ]);
+
+  return res.json({
+    success: true,
+    downloadUrl: downloadInfo.downloadUrl,
+    version: downloadInfo.version || null
+  });
+});
+
+app.post("/api/license/validate", validateLimiter, async (req, res) => {
+  const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
+  const hwid = normalizeHwid(req.body?.hwid);
+  const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
+
+  try {
     if (!licenseKey || !hwid) {
+      await logValidation(null, licenseKey || "-", "failed", "invalid", hwid, appVersion);
       return res.status(400).json({ valid: false, reason: "invalid", message: "Invalid license key" });
     }
 
     let license = await prisma.license.findUnique({ where: { licenseKey } });
-    if (!license) return invalid(res, "invalid", "Invalid license key");
-    if (license.status === "banned") return invalid(res, "banned", "This license has been banned");
-    if (license.status !== "active") return invalid(res, "inactive", "This license is inactive");
+    if (!license) {
+      await logValidation(null, licenseKey, "failed", "invalid", hwid, appVersion);
+      return invalid(res, "invalid", "Invalid license key");
+    }
+    if (license.status === "banned") {
+      await incrementValidationFailure(license, licenseKey, "banned", hwid, appVersion);
+      return invalid(res, "banned", "This license has been banned");
+    }
+    if (license.status !== "active") {
+      await incrementValidationFailure(license, licenseKey, "inactive", hwid, appVersion);
+      return invalid(res, "inactive", "This license is inactive");
+    }
     if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
-      return invalid(res, "expired", "Your license has expired");
+      await incrementValidationFailure(license, licenseKey, "expired", hwid, appVersion);
+      return invalid(res, "expired", "Your license has expired.");
     }
 
     if (!license.hwid) {
@@ -170,11 +307,40 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
     }
 
     if (normalizeHwid(license.hwid) !== hwid) {
+      await incrementValidationFailure(license, licenseKey, "hwid_mismatch", hwid, appVersion);
       return invalid(res, "hwid_mismatch", "This license is already used on another device");
     }
 
+    await prisma.$transaction([
+      prisma.license.update({
+        where: { id: license.id },
+        data: {
+          validationCount: { increment: 1 },
+          lastValidatedAt: new Date()
+        }
+      }),
+      prisma.validationLog.create({
+        data: {
+          licenseId: license.id,
+          licenseKey,
+          result: "success",
+          reason: "valid",
+          hwidHash: hashHwid(hwid),
+          appVersion
+        }
+      }),
+      prisma.analyticsEvent.create({
+        data: {
+          type: "license_validation",
+          plan: license.plan,
+          metadata: { result: "success", appVersion }
+        }
+      })
+    ]);
+
     return res.json({
       valid: true,
+      licenseKey,
       plan: license.plan,
       expiresAt: license.expiresAt ? license.expiresAt.toISOString() : null,
       lifetime: license.lifetime,
@@ -182,6 +348,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
     });
   } catch (error) {
     console.error("License validation failed", publicError(error));
+    await logValidation(null, licenseKey || "-", "failed", "server_error", hwid, appVersion);
     return res.status(500).json({ valid: false, reason: "server_error", message: "License validation failed" });
   }
 });
@@ -192,23 +359,108 @@ app.post("/admin/login", adminLoginLimiter, (req, res) => {
   const submitted = String(req.body?.password || "");
   const expected = requiredEnv("ADMIN_PASSWORD");
   if (!timingSafeTextEqual(submitted, expected)) {
+    createAuditLog("admin_login_failed", "admin", null, { reason: "invalid_password" });
     return res.status(401).type("html").send(loginPage("Invalid password"));
   }
+  createAuditLog("admin_login_success", "admin", null, {});
   setAdminCookie(res, createAdminToken());
   return res.redirect("/admin");
 });
 
 app.post("/admin/logout", requireAdmin, (_req, res) => {
+  createAuditLog("admin_logout", "admin", null, {});
   clearAdminCookie(res);
   res.redirect("/admin/login");
 });
 
 app.get("/admin", requireAdmin, (_req, res) => res.type("html").send(adminPage()));
 
+app.get("/admin/api/dashboard", requireAdmin, async (_req, res) => {
+  const now = new Date();
+  const startToday = startOfDay(now);
+  const startWeek = new Date(now);
+  startWeek.setDate(now.getDate() - 6);
+  startWeek.setHours(0, 0, 0, 0);
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  const [
+    orders,
+    totalOrders,
+    totalLicenses,
+    activeLicenses,
+    bannedLicenses,
+    lifetimeLicenses,
+    recentPurchases,
+    recentValidations,
+    failedWebhookCount,
+    failedCheckoutCount,
+    downloadCount,
+    failedValidationCount,
+    hwidMismatchCount,
+    activeValidationUsers
+  ] = await Promise.all([
+    prisma.order.findMany({ orderBy: { createdAt: "asc" }, take: 2000 }),
+    prisma.order.count(),
+    prisma.license.count(),
+    prisma.license.count({ where: { status: "active", OR: [{ lifetime: true }, { expiresAt: null }, { expiresAt: { gt: now } }] } }),
+    prisma.license.count({ where: { status: "banned" } }),
+    prisma.license.count({ where: { lifetime: true } }),
+    prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { license: true } }),
+    prisma.validationLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+    prisma.webhookEvent.count({ where: { OR: [{ processed: false }, { errorMessage: { not: null } }] } }),
+    prisma.analyticsEvent.count({ where: { type: "checkout_failed" } }),
+    prisma.downloadLog.count({ where: { result: "success" } }),
+    prisma.validationLog.count({ where: { result: "failed" } }),
+    prisma.validationLog.count({ where: { reason: "hwid_mismatch" } }),
+    prisma.validationLog.findMany({ where: { result: "success", createdAt: { gte: last24h } }, distinct: ["licenseId"], select: { licenseId: true } })
+  ]);
+
+  const revenue = (from) => orders.filter((order) => !from || order.createdAt >= from).reduce((sum, order) => sum + order.amount, 0);
+  const expiredLicenses = await prisma.license.count({
+    where: { lifetime: false, expiresAt: { lt: now }, status: { not: "banned" } }
+  });
+  const mostSoldPlan = topGroup(orders.map((order) => order.plan));
+  const revenueByDay = groupRevenueByDay(orders, 14);
+  const ordersByPlan = countBy(orders.map((order) => order.plan));
+  const statusRows = await prisma.license.groupBy({ by: ["status"], _count: { _all: true } });
+
+  res.json({
+    cards: {
+      totalRevenue: revenue(null),
+      todayRevenue: revenue(startToday),
+      weekRevenue: revenue(startWeek),
+      monthRevenue: revenue(startMonth),
+      totalOrders,
+      totalLicenses,
+      activeLicenses,
+      expiredLicenses,
+      bannedLicenses,
+      lifetimeLicenses,
+      mostSoldPlan: mostSoldPlan || "-",
+      failedWebhookCount,
+      failedCheckoutCount,
+      downloadCount,
+      activeUsersLast24h: activeValidationUsers.filter((row) => row.licenseId).length,
+      failedValidationCount,
+      hwidMismatchCount
+    },
+    charts: {
+      revenueByDay,
+      ordersByPlan,
+      licenseStatus: Object.fromEntries(statusRows.map((row) => [row.status, row._count._all]))
+    },
+    recentPurchases,
+    recentValidations
+  });
+});
+
 app.get("/admin/api/licenses", requireAdmin, async (req, res) => {
   const search = String(req.query.search || "").trim();
   const plan = String(req.query.plan || "").trim();
   const status = String(req.query.status || "").trim();
+  const hwid = String(req.query.hwid || "").trim();
+  const lifetime = String(req.query.lifetime || "").trim();
   const where = {
     AND: [
       search
@@ -220,7 +472,10 @@ app.get("/admin/api/licenses", requireAdmin, async (req, res) => {
           }
         : {},
       plan ? { plan } : {},
-      status ? { status } : {}
+      status ? { status } : {},
+      hwid ? { hwid: { contains: hwid } } : {},
+      lifetime === "true" ? { lifetime: true } : {},
+      lifetime === "false" ? { lifetime: false } : {}
     ]
   };
 
@@ -235,7 +490,11 @@ app.get("/admin/api/licenses", requireAdmin, async (req, res) => {
 app.get("/admin/api/licenses/:id", requireAdmin, async (req, res) => {
   const license = await prisma.license.findUnique({
     where: { id: req.params.id },
-    include: { orders: { orderBy: { createdAt: "desc" } } }
+    include: {
+      orders: { orderBy: { createdAt: "desc" } },
+      validationLogs: { orderBy: { createdAt: "desc" }, take: 50 },
+      downloadLogs: { orderBy: { createdAt: "desc" }, take: 50 }
+    }
   });
   if (!license) return res.status(404).json({ error: "not_found" });
   return res.json({ license });
@@ -254,6 +513,8 @@ app.post("/admin/api/licenses/manual", requireAdmin, async (req, res) => {
       plan
     })
   });
+  await ensureCustomer(customerEmail);
+  await createAuditLog("manual_license_created", "license", license.id, { plan: plan.id, customerEmail });
   return res.json({ license });
 });
 
@@ -274,6 +535,7 @@ app.post("/admin/api/licenses/:id/extend", requireAdmin, async (req, res) => {
       status: "active"
     }
   });
+  await createAuditLog("license_extended", "license", license.id, { plan: plan.id });
   return res.json({ license });
 });
 
@@ -281,21 +543,197 @@ app.post("/admin/api/licenses/:id/status", requireAdmin, async (req, res) => {
   const status = String(req.body?.status || "").trim().toLowerCase();
   if (!["active", "inactive", "banned"].includes(status)) return res.status(400).json({ error: "invalid_status" });
   const license = await prisma.license.update({ where: { id: req.params.id }, data: { status } });
+  await createAuditLog(status === "banned" ? "license_banned" : "license_status_changed", "license", license.id, { status });
   return res.json({ license });
 });
 
 app.post("/admin/api/licenses/:id/reset-hwid", requireAdmin, async (req, res) => {
   const license = await prisma.license.update({ where: { id: req.params.id }, data: { hwid: null } });
+  await createAuditLog("license_hwid_reset", "license", license.id, {});
   return res.json({ license });
 });
 
-app.get("/admin/api/orders", requireAdmin, async (_req, res) => {
+app.post("/admin/api/licenses/:id/notes", requireAdmin, async (req, res) => {
+  const notes = String(req.body?.notes || "").slice(0, 5000);
+  const license = await prisma.license.update({ where: { id: req.params.id }, data: { notes } });
+  await createAuditLog("license_notes_updated", "license", license.id, {});
+  return res.json({ license });
+});
+
+app.post("/admin/api/licenses/:id/lifetime", requireAdmin, async (req, res) => {
+  const lifetime = Boolean(req.body?.lifetime);
+  const license = await prisma.license.update({
+    where: { id: req.params.id },
+    data: { lifetime, expiresAt: lifetime ? null : undefined }
+  });
+  await createAuditLog(lifetime ? "license_marked_lifetime" : "license_lifetime_removed", "license", license.id, {});
+  return res.json({ license });
+});
+
+app.get("/admin/api/orders", requireAdmin, async (req, res) => {
+  const search = String(req.query.search || "").trim();
+  const plan = String(req.query.plan || "").trim();
+  const status = String(req.query.status || "").trim();
+  const currency = String(req.query.currency || "").trim().toLowerCase();
+  const mode = String(req.query.mode || "").trim().toLowerCase();
+  const where = {
+    AND: [
+      search
+        ? {
+            OR: [
+              { customerEmail: { contains: search, mode: "insensitive" } },
+              { stripeSessionId: { contains: search } },
+              { stripePaymentIntentId: { contains: search } }
+            ]
+          }
+        : {},
+      plan ? { plan } : {},
+      status ? { status } : {},
+      currency ? { currency } : {},
+      mode ? { mode } : {}
+    ]
+  };
   const orders = await prisma.order.findMany({
+    where,
     orderBy: { createdAt: "desc" },
-    take: 100,
+    take: 200,
     include: { license: true }
   });
   res.json({ orders });
+});
+
+app.get("/admin/api/orders/:id", requireAdmin, async (req, res) => {
+  const order = await prisma.order.findUnique({
+    where: { id: req.params.id },
+    include: { license: true }
+  });
+  if (!order) return res.status(404).json({ error: "not_found" });
+  const webhooks = await prisma.webhookEvent.findMany({
+    where: {
+      OR: [
+        { relatedOrderId: order.id },
+        { metadata: { path: ["sessionId"], equals: order.stripeSessionId } }
+      ]
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+  return res.json({ order, webhooks });
+});
+
+app.post("/admin/api/orders/:id/notes", requireAdmin, async (req, res) => {
+  const notes = String(req.body?.notes || "").slice(0, 5000);
+  const order = await prisma.order.update({ where: { id: req.params.id }, data: { notes } });
+  await createAuditLog("order_notes_updated", "order", order.id, {});
+  return res.json({ order });
+});
+
+app.get("/admin/api/customers", requireAdmin, async (req, res) => {
+  const search = String(req.query.search || "").trim();
+  const customers = await prisma.customer.findMany({
+    where: search ? { email: { contains: search, mode: "insensitive" } } : {},
+    orderBy: { lastPurchaseAt: "desc" },
+    take: 200
+  });
+  res.json({ customers });
+});
+
+app.get("/admin/api/customers/:email", requireAdmin, async (req, res) => {
+  const email = String(req.params.email || "").trim().toLowerCase();
+  const [customer, orders, licenses] = await Promise.all([
+    prisma.customer.findUnique({ where: { email } }),
+    prisma.order.findMany({ where: { customerEmail: email }, orderBy: { createdAt: "desc" }, include: { license: true } }),
+    prisma.license.findMany({ where: { customerEmail: email }, orderBy: { createdAt: "desc" } })
+  ]);
+  if (!customer && !orders.length && !licenses.length) return res.status(404).json({ error: "not_found" });
+  res.json({ customer, orders, licenses });
+});
+
+app.post("/admin/api/customers/:email/notes", requireAdmin, async (req, res) => {
+  const email = String(req.params.email || "").trim().toLowerCase();
+  const notes = String(req.body?.notes || "").slice(0, 5000);
+  const customer = await prisma.customer.upsert({
+    where: { email },
+    create: { email, notes },
+    update: { notes }
+  });
+  await createAuditLog("customer_notes_updated", "customer", customer.id, { email });
+  res.json({ customer });
+});
+
+app.get("/admin/api/downloads", requireAdmin, async (_req, res) => {
+  const info = await resolveDownloadInfo();
+  const recent = await prisma.downloadLog.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { license: true } });
+  res.json({ current: info, recent });
+});
+
+app.get("/admin/api/settings", requireAdmin, async (_req, res) => {
+  res.json({ settings: await getSiteSettings() });
+});
+
+app.post("/admin/api/settings", requireAdmin, async (req, res) => {
+  const current = await getSiteSettings();
+  const next = sanitizeSettings({ ...current, ...(req.body || {}) });
+  await prisma.setting.upsert({
+    where: { key: "site" },
+    create: { key: "site", value: next },
+    update: { value: next }
+  });
+  await createAuditLog("settings_changed", "settings", "site", { changedKeys: Object.keys(req.body || {}) });
+  res.json({ settings: next });
+});
+
+app.get("/admin/api/coupons", requireAdmin, async (_req, res) => {
+  const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
+  res.json({ coupons });
+});
+
+app.post("/admin/api/coupons", requireAdmin, async (req, res) => {
+  const code = String(req.body?.code || "").trim().toUpperCase();
+  if (!code) return res.status(400).json({ error: "invalid_code" });
+  const coupon = await prisma.coupon.upsert({
+    where: { code },
+    create: {
+      code,
+      stripePromotionCodeId: String(req.body?.stripePromotionCodeId || "").trim() || null,
+      percentOff: toOptionalInt(req.body?.percentOff),
+      amountOff: toOptionalInt(req.body?.amountOff),
+      currency: String(req.body?.currency || "").trim().toLowerCase() || null,
+      active: req.body?.active !== false,
+      maxRedemptions: toOptionalInt(req.body?.maxRedemptions),
+      notes: String(req.body?.notes || "").slice(0, 1000) || null
+    },
+    update: {
+      stripePromotionCodeId: String(req.body?.stripePromotionCodeId || "").trim() || null,
+      percentOff: toOptionalInt(req.body?.percentOff),
+      amountOff: toOptionalInt(req.body?.amountOff),
+      currency: String(req.body?.currency || "").trim().toLowerCase() || null,
+      active: req.body?.active !== false,
+      maxRedemptions: toOptionalInt(req.body?.maxRedemptions),
+      notes: String(req.body?.notes || "").slice(0, 1000) || null
+    }
+  });
+  await createAuditLog("coupon_saved", "coupon", coupon.id, { code });
+  res.json({ coupon });
+});
+
+app.get("/admin/api/analytics", requireAdmin, async (_req, res) => {
+  const events = await prisma.analyticsEvent.findMany({ orderBy: { createdAt: "desc" }, take: 500 });
+  res.json({
+    events,
+    byType: countBy(events.map((event) => event.type)),
+    byPlan: countBy(events.map((event) => event.plan || "none"))
+  });
+});
+
+app.get("/admin/api/webhooks", requireAdmin, async (_req, res) => {
+  const events = await prisma.webhookEvent.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
+  res.json({ events });
+});
+
+app.get("/admin/api/audit", requireAdmin, async (_req, res) => {
+  const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
+  res.json({ logs });
 });
 
 app.use((_req, res) => res.status(404).json({ error: "not_found" }));
@@ -494,6 +932,261 @@ function sanitizePriceCheck(check) {
   };
 }
 
+async function getSiteSettings() {
+  const row = await prisma.setting.findUnique({ where: { key: "site" } }).catch(() => null);
+  return sanitizeSettings({ ...defaultSiteSettings, ...(row?.value || {}) });
+}
+
+function sanitizeSettings(input) {
+  return {
+    discordInviteUrl: safeUrl(input.discordInviteUrl),
+    supportEmail: String(input.supportEmail || defaultSiteSettings.supportEmail).trim().slice(0, 160),
+    brandName: String(input.brandName || defaultSiteSettings.brandName).trim().slice(0, 80),
+    maintenanceMode: Boolean(input.maintenanceMode),
+    announcementBannerText: String(input.announcementBannerText || "").slice(0, 240),
+    announcementBannerEnabled: Boolean(input.announcementBannerEnabled),
+    pricingVisible: input.pricingVisible !== false,
+    checkoutEnabled: input.checkoutEnabled !== false,
+    downloadEnabled: input.downloadEnabled !== false
+  };
+}
+
+function publicSiteSettings(settings) {
+  return {
+    discordInviteUrl: settings.discordInviteUrl,
+    supportEmail: settings.supportEmail,
+    brandName: settings.brandName,
+    maintenanceMode: settings.maintenanceMode,
+    announcementBannerText: settings.announcementBannerText,
+    announcementBannerEnabled: settings.announcementBannerEnabled,
+    pricingVisible: settings.pricingVisible,
+    checkoutEnabled: settings.checkoutEnabled,
+    downloadEnabled: settings.downloadEnabled
+  };
+}
+
+function safeUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  try {
+    const url = new URL(text);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+async function resolveDownloadInfo() {
+  const fallbackUrl = absoluteFrontendUrl(env("DOWNLOAD_FALLBACK_URL", `${frontendUrl()}/downloads/`));
+  const manifestUrl = env("DOWNLOAD_MANIFEST_URL", `${frontendUrl()}/latest.json`);
+  try {
+    const response = await fetch(manifestUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error("manifest_not_found");
+    const manifest = await response.json();
+    const selected = pickDownloadUrl(manifest);
+    return {
+      source: "latest_json",
+      manifestUrl,
+      downloadUrl: selected ? absoluteFrontendUrl(selected) : fallbackUrl,
+      version: manifest.version || manifest.latest || manifest.latestVersion || manifest.tag || manifest.name || null,
+      fileName: manifest.fileName || manifest.filename || manifest.file || null,
+      fileSize: manifest.fileSize || manifest.size || null,
+      releaseNotes: manifest.releaseNotes || manifest.notes || manifest.changelog || null,
+      manifest
+    };
+  } catch (error) {
+    return {
+      source: "fallback",
+      manifestUrl,
+      downloadUrl: fallbackUrl,
+      version: null,
+      fileName: null,
+      fileSize: null,
+      releaseNotes: null,
+      manifest: null
+    };
+  }
+}
+
+function pickDownloadUrl(manifest) {
+  if (!manifest || typeof manifest !== "object") return "";
+  const keys = ["download", "downloadUrl", "download_url", "url", "installer", "file"];
+  for (const key of keys) {
+    const value = manifest[key];
+    if (typeof value === "string" && value.trim()) return value;
+    if (value && typeof value === "object") {
+      const nested = value.url || value.href || value.file || value.path || value.download;
+      if (nested) return nested;
+    }
+  }
+  for (const key of ["windows", "win", "latestDownload", "asset", "assets", "files", "downloads"]) {
+    const value = manifest[key];
+    if (typeof value === "string" && value.trim()) return value;
+    if (Array.isArray(value)) {
+      const item = value.find((entry) => typeof entry === "string" || entry?.url || entry?.href || entry?.file || entry?.path);
+      if (typeof item === "string") return item;
+      if (item) return item.url || item.href || item.file || item.path;
+    }
+    if (value && typeof value === "object") {
+      const nested = value.url || value.href || value.file || value.path || value.download;
+      if (nested) return nested;
+    }
+  }
+  return "";
+}
+
+function absoluteFrontendUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return `${frontendUrl()}/downloads/`;
+  try {
+    return new URL(text, `${frontendUrl()}/`).toString();
+  } catch {
+    return `${frontendUrl()}/downloads/`;
+  }
+}
+
+function licenseAccessState(license) {
+  if (!license) return { valid: false, reason: "invalid_license" };
+  if (license.status === "banned") return { valid: false, reason: "banned" };
+  if (license.status !== "active") return { valid: false, reason: "inactive" };
+  if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
+    return { valid: false, reason: "expired" };
+  }
+  return { valid: true, reason: "valid" };
+}
+
+async function logDownload(license, licenseKey, result, reason, version = null) {
+  await prisma.downloadLog.create({
+    data: {
+      licenseId: license?.id || null,
+      licenseKey,
+      result,
+      reason,
+      version
+    }
+  }).catch(() => {});
+}
+
+async function incrementValidationFailure(license, licenseKey, reason, hwid, appVersion) {
+  await prisma.$transaction([
+    prisma.license.update({
+      where: { id: license.id },
+      data: {
+        validationCount: { increment: 1 },
+        lastValidatedAt: new Date()
+      }
+    }),
+    prisma.validationLog.create({
+      data: {
+        licenseId: license.id,
+        licenseKey,
+        result: "failed",
+        reason,
+        hwidHash: hashHwid(hwid),
+        appVersion
+      }
+    }),
+    prisma.analyticsEvent.create({
+      data: {
+        type: "license_validation_failed",
+        plan: license.plan,
+        metadata: { reason, appVersion }
+      }
+    })
+  ]);
+}
+
+async function logValidation(license, licenseKey, result, reason, hwid, appVersion) {
+  await prisma.validationLog.create({
+    data: {
+      licenseId: license?.id || null,
+      licenseKey,
+      result,
+      reason,
+      hwidHash: hashHwid(hwid),
+      appVersion
+    }
+  }).catch(() => {});
+}
+
+function hashHwid(hwid) {
+  const value = normalizeHwid(hwid);
+  if (!value) return null;
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+async function ensureCustomer(email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!isValidEmail(normalized)) return null;
+  return prisma.customer.upsert({
+    where: { email: normalized },
+    create: { email: normalized },
+    update: {}
+  });
+}
+
+async function createAnalyticsEvent(type, data = {}) {
+  await prisma.analyticsEvent.create({
+    data: {
+      type,
+      plan: data.plan || null,
+      amount: data.amount ?? null,
+      currency: data.currency || null,
+      mode: data.mode || null,
+      metadata: data.metadata || null
+    }
+  }).catch(() => {});
+}
+
+async function createAuditLog(action, targetType = null, targetId = null, metadata = null) {
+  await prisma.auditLog.create({
+    data: { action, targetType, targetId, metadata }
+  }).catch(() => {});
+}
+
+function startOfDay(date) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function countBy(values) {
+  return values.reduce((acc, value) => {
+    const key = String(value || "unknown");
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function topGroup(values) {
+  const counts = countBy(values);
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
+function groupRevenueByDay(orders, days) {
+  const today = startOfDay(new Date());
+  const buckets = new Map();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - i);
+    buckets.set(day.toISOString().slice(0, 10), { date: day.toISOString().slice(0, 10), revenue: 0, orders: 0 });
+  }
+  orders.forEach((order) => {
+    const key = order.createdAt.toISOString().slice(0, 10);
+    const row = buckets.get(key);
+    if (!row) return;
+    row.revenue += order.amount;
+    row.orders += 1;
+  });
+  return Array.from(buckets.values());
+}
+
+function toOptionalInt(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.trunc(number) : null;
+}
+
 async function fulfillCheckoutSession(session) {
   const plan = getPlan(session.metadata?.plan);
   if (!plan) throw new Error("Invalid or missing session metadata plan");
@@ -537,16 +1230,48 @@ async function fulfillCheckoutSession(session) {
           amount: session.amount_total ?? plan.priceCents,
           currency: String(session.currency || "usd").toLowerCase(),
           status: session.payment_status || "paid",
+          mode: session.livemode ? "live" : "test",
+          locale: session.locale || null,
           licenseId: license.id
         },
         update: {
           stripePaymentIntentId: paymentIntentId,
           customerEmail: email,
           status: session.payment_status || "paid",
+          mode: session.livemode ? "live" : "test",
+          locale: session.locale || null,
           licenseId: license.id
         },
         include: { license: true }
       });
+
+      if (!again) {
+        await tx.customer.upsert({
+          where: { email },
+          create: {
+            email,
+            totalSpent: order.amount,
+            totalOrders: 1,
+            firstPurchaseAt: new Date(),
+            lastPurchaseAt: new Date()
+          },
+          update: {
+            totalSpent: { increment: order.amount },
+            totalOrders: { increment: 1 },
+            lastPurchaseAt: new Date()
+          }
+        });
+        await tx.analyticsEvent.create({
+          data: {
+            type: "checkout_completed",
+            plan: plan.id,
+            amount: order.amount,
+            currency: order.currency,
+            mode: order.mode,
+            metadata: { priceSource: "stripe_webhook" }
+          }
+        });
+      }
 
       return order;
     });
