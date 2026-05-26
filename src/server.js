@@ -355,16 +355,22 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
 
 app.get("/admin/login", (_req, res) => res.type("html").send(loginPage()));
 
-app.post("/admin/login", adminLoginLimiter, (req, res) => {
-  const submitted = String(req.body?.password || "");
-  const expected = requiredEnv("ADMIN_PASSWORD");
-  if (!timingSafeTextEqual(submitted, expected)) {
-    createAuditLog("admin_login_failed", "admin", null, { reason: "invalid_password" });
-    return res.status(401).type("html").send(loginPage("Invalid password"));
+app.post("/admin/login", adminLoginLimiter, async (req, res) => {
+  try {
+    const submitted = String(req.body?.password || "");
+    const expected = requiredEnv("ADMIN_PASSWORD");
+    if (!timingSafeTextEqual(submitted, expected)) {
+      await createAuditLog("admin_login_failed", "admin", null, { reason: "invalid_password" });
+      return res.status(401).type("html").send(loginPage("Invalid password"));
+    }
+
+    await createAuditLog("admin_login_success", "admin", null, {});
+    setAdminCookie(res, createAdminToken());
+    return sendAdminPage(res);
+  } catch (error) {
+    console.error("Admin login route failed", publicError(error));
+    return res.status(500).type("html").send(loginPage("Admin login failed. Check backend environment variables and Render logs."));
   }
-  createAuditLog("admin_login_success", "admin", null, {});
-  setAdminCookie(res, createAdminToken());
-  return res.redirect("/admin");
 });
 
 app.post("/admin/logout", requireAdmin, (_req, res) => {
@@ -373,7 +379,7 @@ app.post("/admin/logout", requireAdmin, (_req, res) => {
   res.redirect("/admin/login");
 });
 
-app.get("/admin", requireAdmin, (_req, res) => res.type("html").send(adminPage()));
+app.get("/admin", requireAdmin, (_req, res) => sendAdminPage(res));
 
 app.get("/admin/api/dashboard", requireAdmin, async (_req, res) => {
   const now = new Date();
@@ -1142,6 +1148,21 @@ async function createAuditLog(action, targetType = null, targetId = null, metada
   await prisma.auditLog.create({
     data: { action, targetType, targetId, metadata }
   }).catch(() => {});
+}
+
+function sendAdminPage(res) {
+  try {
+    return res
+      .type("html")
+      .set("Cache-Control", "no-store")
+      .send(adminPage());
+  } catch (error) {
+    console.error("Admin page render failed", publicError(error));
+    return res
+      .status(500)
+      .type("html")
+      .send(loginPage("Admin panel could not render. Check Render logs."));
+  }
 }
 
 function startOfDay(date) {

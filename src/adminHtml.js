@@ -106,6 +106,10 @@ export function adminPage() {
       return data;
     }
     function setLoading(id){ $(id).innerHTML='<div class="panel panel-pad loading">Loading...</div>'; }
+    function showSectionError(id, error){
+      const message = error && error.message ? error.message : 'Request failed';
+      $(id).innerHTML='<div class="panel panel-pad"><h3>Admin data could not load</h3><p class="muted">'+esc(message)+'</p><button class="btn primary" onclick="refreshCurrent()">Try again</button></div>';
+    }
     function empty(text){ return '<div class="empty">'+esc(text)+'</div>'; }
     function table(headers, rows, emptyText='No records yet.') {
       if(!rows.length) return empty(emptyText);
@@ -114,7 +118,10 @@ export function adminPage() {
     function showModal(title, data){ $('modalTitle').textContent=title; $('modalBody').textContent=typeof data==='string'?data:JSON.stringify(data,null,2); $('modal').classList.add('show'); }
     function closeModal(){ $('modal').classList.remove('show'); }
     function switchTo(id){ current=id; document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id)); document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.id===id)); const meta=sections.find(s=>s[0]===id); $('pageTitle').textContent=meta[1]; $('pageSubtitle').textContent=meta[2]; refreshCurrent(); }
-    function refreshCurrent(){ ({dashboard:loadDashboard,orders:loadOrders,licenses:loadLicenses,customers:loadCustomers,downloads:loadDownloads,settings:loadSettings,coupons:loadCoupons,analytics:loadAnalytics,webhooks:loadWebhooks,audit:loadAudit,tools:loadTools}[current])(); }
+    function refreshCurrent(){
+      const loader = ({dashboard:loadDashboard,orders:loadOrders,licenses:loadLicenses,customers:loadCustomers,downloads:loadDownloads,settings:loadSettings,coupons:loadCoupons,analytics:loadAnalytics,webhooks:loadWebhooks,audit:loadAudit,tools:loadTools}[current]);
+      Promise.resolve(loader()).catch((error)=>showSectionError(current,error));
+    }
     $('nav').innerHTML = sections.map(([id,label]) => '<button data-id="'+id+'" class="'+(id==='dashboard'?'active':'')+'" onclick="switchTo(\\''+id+'\\')">'+label+'</button>').join('');
 
     async function loadDashboard(){
