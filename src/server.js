@@ -46,6 +46,10 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, app: env("APP_NAME", "Fima Macro"), mode: env("NODE_ENV", "development"), apiBaseUrl: apiBaseUrl() });
 });
 
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
   try {

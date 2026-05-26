@@ -25,7 +25,7 @@ npm start
 Health check path:
 
 ```text
-/health
+/healthz
 ```
 
 ## Required Environment Variables
