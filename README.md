@@ -47,6 +47,7 @@ Live Stripe keys are refused by the backend until live mode is explicitly approv
 
 ```text
 DATABASE_URL=
+STRIPE_MODE=auto
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
@@ -77,8 +78,10 @@ Creates a Stripe Checkout Session.
 Returns:
 
 ```json
-{ "url": "https://checkout.stripe.com/..." }
+{ "url": "https://checkout.stripe.com/...", "mode": "test", "checkoutSessionPrefix": "cs_test" }
 ```
+
+The response and server logs expose only Stripe mode/prefix diagnostics, never secret values.
 
 ### `POST /api/webhooks/stripe`
 

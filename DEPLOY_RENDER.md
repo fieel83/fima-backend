@@ -34,6 +34,7 @@ Enter these in Render Environment settings. Keep secrets out of `/public`, GitHu
 
 ```text
 DATABASE_URL=
+STRIPE_MODE=auto
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=

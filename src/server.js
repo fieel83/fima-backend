@@ -11,7 +11,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
 import { PLANS, getPlan, getPlanExpiry, planIds } from "./plans.js";
-import { assertStripeTestKey } from "./stripeSafety.js";
 import {
   buildLicenseData,
   generateUniqueLicenseKey,
@@ -21,9 +20,11 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { clearAdminCookie, createAdminToken, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeSessionPrefix } from "./stripeSafety.js";
 
 const app = express();
 const port = Number(env("PORT", "8080"));
+const stripePriceEnvNames = Object.values(PLANS).map((plan) => plan.priceEnv);
 
 const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const validateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
@@ -43,7 +44,13 @@ app.use(cors({
 }));
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, app: env("APP_NAME", "Fima Macro"), mode: env("NODE_ENV", "development"), apiBaseUrl: apiBaseUrl() });
+  res.json({
+    ok: true,
+    app: env("APP_NAME", "Fima Macro"),
+    mode: env("NODE_ENV", "development"),
+    apiBaseUrl: apiBaseUrl(),
+    stripe: stripeStatus()
+  });
 });
 
 app.get("/healthz", (_req, res) => {
@@ -100,9 +107,19 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       }
     });
 
-    return res.json({ url: session.url });
+    const checkoutMode = session.livemode ? "live" : "test";
+    const checkoutSessionPrefix = stripeSessionPrefix(session.id);
+    console.info("Stripe checkout session created", {
+      plan: plan.id,
+      stripeMode: checkoutMode,
+      checkoutSessionPrefix,
+      priceEnv: plan.priceEnv,
+      stripe: stripeStatus()
+    });
+
+    return res.json({ url: session.url, mode: checkoutMode, checkoutSessionPrefix });
   } catch (error) {
-    console.error("Checkout session creation failed", publicError(error));
+    console.error("Checkout session creation failed", { ...publicError(error), stripe: stripeStatus() });
     return res.status(error.code === "missing_env" ? 503 : 500).json({ error: "checkout_failed" });
   }
 });
@@ -289,12 +306,17 @@ app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 
 app.listen(port, () => {
   console.log(`Fima payments API listening on ${port}`);
+  console.info("Stripe configuration", stripeStatus());
 });
 
 function stripe() {
   const key = requiredEnv("STRIPE_SECRET_KEY").trim();
-  assertStripeTestKey(key);
+  assertStripeSecretKeyAllowed(key, env("STRIPE_MODE", "auto"));
   return new Stripe(key);
+}
+
+function stripeStatus() {
+  return stripeConfigSummary(stripePriceEnvNames);
 }
 
 async function fulfillCheckoutSession(session) {

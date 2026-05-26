@@ -1,7 +1,7 @@
 import "dotenv/config";
 import Stripe from "stripe";
 import { PLANS } from "../src/plans.js";
-import { assertStripeTestKey } from "../src/stripeSafety.js";
+import { assertStripeSecretKeyAllowed } from "../src/stripeSafety.js";
 
 const secretKey = process.env.STRIPE_SECRET_KEY;
 
@@ -9,7 +9,7 @@ if (!secretKey) {
   throw new Error("STRIPE_SECRET_KEY is required in backend/.env");
 }
 
-assertStripeTestKey(secretKey);
+assertStripeSecretKeyAllowed(secretKey, process.env.STRIPE_MODE || "test");
 
 const stripe = new Stripe(secretKey);
 
