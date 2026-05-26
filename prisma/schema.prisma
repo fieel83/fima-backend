@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model License {
+  id                    String    @id @default(cuid())
+  licenseKey            String    @unique @map("license_key")
+  customerEmail         String    @map("customer_email")
+  plan                  String
+  status                String    @default("active")
+  hwid                  String?
+  expiresAt             DateTime? @map("expires_at")
+  lifetime              Boolean   @default(false)
+  stripeSessionId       String?   @unique @map("stripe_session_id")
+  stripePaymentIntentId String?   @map("stripe_payment_intent_id")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  orders                Order[]
+
+  @@index([customerEmail])
+  @@index([plan, status])
+  @@map("licenses")
+}
+
+model Order {
+  id                    String   @id @default(cuid())
+  stripeSessionId       String   @unique @map("stripe_session_id")
+  stripePaymentIntentId String?  @map("stripe_payment_intent_id")
+  customerEmail         String   @map("customer_email")
+  plan                  String
+  amount                Int
+  currency              String
+  status                String
+  licenseId             String?  @map("license_id")
+  license               License? @relation(fields: [licenseId], references: [id])
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@index([customerEmail])
+  @@index([plan, status])
+  @@map("orders")
+}

@@ -1,0 +1,32 @@
+{
+  "name": "fima-macro-payments-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "stripe:setup": "node scripts/setup-stripe-products.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.3",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "stripe": "^18.5.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.16.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

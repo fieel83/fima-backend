@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: fima-backend
+    runtime: node
+    buildCommand: npm install && npm run prisma:generate && npm run prisma:deploy
+    startCommand: npm start
+    healthCheckPath: /health
