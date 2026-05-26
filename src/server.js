@@ -366,7 +366,7 @@ app.post("/admin/login", adminLoginLimiter, async (req, res) => {
 
     await createAuditLog("admin_login_success", "admin", null, {});
     setAdminCookie(res, createAdminToken());
-    return sendAdminPage(res);
+    return res.redirect(303, "/admin");
   } catch (error) {
     console.error("Admin login route failed", publicError(error));
     return res.status(500).type("html").send(loginPage("Admin login failed. Check backend environment variables and Render logs."));
