@@ -25,6 +25,10 @@ import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeSessionPrefix 
 const app = express();
 const port = Number(env("PORT", "8080"));
 const stripePriceEnvNames = Object.values(PLANS).map((plan) => plan.priceEnv);
+let lastStripePriceValidation = {
+  checkedAt: null,
+  results: Object.fromEntries(stripePriceEnvNames.map((name) => [name, { status: "unchecked" }]))
+};
 
 const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const validateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
@@ -299,6 +303,9 @@ app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 app.listen(port, () => {
   console.log(`Fima payments API listening on ${port}`);
   console.info("Stripe configuration", stripeStatus());
+  validateConfiguredStripePrices().catch((error) => {
+    console.warn("Stripe price env validation failed", publicError(error));
+  });
 });
 
 function stripe() {
@@ -308,7 +315,10 @@ function stripe() {
 }
 
 function stripeStatus() {
-  return stripeConfigSummary(stripePriceEnvNames);
+  return {
+    ...stripeConfigSummary(stripePriceEnvNames),
+    priceValidation: lastStripePriceValidation
+  };
 }
 
 async function createCheckoutSession({ plan, customerEmail, priceId, selectedCurrency, language }) {
@@ -323,22 +333,27 @@ async function createCheckoutSession({ plan, customerEmail, priceId, selectedCur
   };
 
   if (priceId) {
-    try {
+    const priceCheck = await validateStripePriceForPlan(stripeClient, plan, priceId);
+    recordStripePriceCheck(priceCheck);
+    if (priceCheck.ok) {
       const session = await stripeClient.checkout.sessions.create({
         ...baseSession,
         line_items: [{ price: priceId, quantity: 1 }]
       });
       return { session, priceSource: "price_id" };
-    } catch (error) {
-      if (!isMissingStripePrice(error)) throw error;
-      console.warn("Stripe price ID unavailable for current mode, using inline price data", {
-        plan: plan.id,
-        priceEnv: plan.priceEnv,
-        stripe: stripeStatus(),
-        stripeErrorCode: error.code,
-        stripeErrorType: error.type
-      });
     }
+
+    console.warn("Stripe price env invalid, using inline price data", sanitizePriceCheck(priceCheck));
+  } else {
+    const priceCheck = {
+      ok: false,
+      plan: plan.id,
+      priceEnv: plan.priceEnv,
+      status: "missing_env",
+      expected: expectedPriceForPlan(plan)
+    };
+    recordStripePriceCheck(priceCheck);
+    console.warn("Stripe price env missing, using inline price data", sanitizePriceCheck(priceCheck));
   }
 
   const session = await stripeClient.checkout.sessions.create({
@@ -371,8 +386,112 @@ function checkoutMetadata(plan, selectedCurrency, language) {
   };
 }
 
-function isMissingStripePrice(error) {
-  return error?.code === "resource_missing" && String(error?.message || "").toLowerCase().includes("price");
+async function validateConfiguredStripePrices() {
+  let stripeClient;
+  try {
+    stripeClient = stripe();
+  } catch (error) {
+    console.warn("Stripe price env validation skipped", {
+      reason: error.code || "stripe_not_configured",
+      message: error.message,
+      stripe: stripeStatus()
+    });
+    return;
+  }
+
+  const results = [];
+  for (const plan of Object.values(PLANS)) {
+    const check = await validateStripePriceForPlan(stripeClient, plan, env(plan.priceEnv));
+    recordStripePriceCheck(check);
+    results.push(sanitizePriceCheck(check));
+    if (check.ok) {
+      console.info("Stripe price env valid", sanitizePriceCheck(check));
+    } else {
+      console.warn("Stripe price env invalid", sanitizePriceCheck(check));
+    }
+  }
+  console.info("Stripe price env validation complete", {
+    stripeMode: stripeStatus().effectiveMode,
+    results
+  });
+}
+
+async function validateStripePriceForPlan(stripeClient, plan, priceId) {
+  const base = {
+    plan: plan.id,
+    priceEnv: plan.priceEnv,
+    expected: expectedPriceForPlan(plan)
+  };
+
+  if (!priceId) {
+    return { ...base, ok: false, status: "missing_env" };
+  }
+
+  try {
+    const price = await stripeClient.prices.retrieve(priceId);
+    const actual = {
+      active: price.active,
+      currency: String(price.currency || "").toLowerCase(),
+      unitAmount: price.unit_amount,
+      type: price.type
+    };
+
+    if (actual.active === false) return { ...base, ok: false, status: "inactive_price", actual };
+    if (actual.type !== "one_time") return { ...base, ok: false, status: "not_one_time_price", actual };
+    if (actual.currency !== "usd") return { ...base, ok: false, status: "currency_mismatch", actual };
+    if (actual.unitAmount !== plan.priceCents) return { ...base, ok: false, status: "amount_mismatch", actual };
+
+    return { ...base, ok: true, status: "valid", actual };
+  } catch (error) {
+    if (error?.code === "resource_missing") {
+      return {
+        ...base,
+        ok: false,
+        status: "not_found_for_current_stripe_mode",
+        stripeErrorCode: error.code,
+        stripeErrorType: error.type
+      };
+    }
+    return {
+      ...base,
+      ok: false,
+      status: "stripe_price_check_failed",
+      stripeErrorCode: error?.code,
+      stripeErrorType: error?.type
+    };
+  }
+}
+
+function expectedPriceForPlan(plan) {
+  return {
+    currency: "usd",
+    unitAmount: plan.priceCents,
+    type: "one_time"
+  };
+}
+
+function recordStripePriceCheck(check) {
+  lastStripePriceValidation = {
+    checkedAt: new Date().toISOString(),
+    results: {
+      ...lastStripePriceValidation.results,
+      [check.priceEnv]: sanitizePriceCheck(check)
+    }
+  };
+}
+
+function sanitizePriceCheck(check) {
+  return {
+    ok: Boolean(check.ok),
+    status: check.status,
+    plan: check.plan,
+    priceEnv: check.priceEnv,
+    expected: check.expected,
+    actual: check.actual,
+    stripeErrorCode: check.stripeErrorCode,
+    stripeErrorType: check.stripeErrorType,
+    stripeMode: stripeConfigSummary().effectiveMode
+  };
 }
 
 async function fulfillCheckoutSession(session) {

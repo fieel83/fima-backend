@@ -81,7 +81,7 @@ Returns:
 { "url": "https://checkout.stripe.com/...", "mode": "test", "checkoutSessionPrefix": "cs_test" }
 ```
 
-The response and server logs expose only Stripe mode/prefix diagnostics, never secret values. If a configured Price ID is not available in the active Stripe mode, checkout falls back to inline USD `price_data` for the same plan amount.
+The response and server logs expose only Stripe mode/prefix diagnostics, never secret values. On startup and checkout, each configured `STRIPE_PRICE_*` env is validated against the active Stripe mode. If one is missing, inactive, has the wrong amount/currency, or is not found in the current Stripe mode, the log names the env key and falls back to inline USD `price_data` for the same plan amount.
 
 ### `POST /api/webhooks/stripe`
 
