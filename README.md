@@ -81,7 +81,7 @@ Returns:
 { "url": "https://checkout.stripe.com/...", "mode": "test", "checkoutSessionPrefix": "cs_test" }
 ```
 
-The response and server logs expose only Stripe mode/prefix diagnostics, never secret values.
+The response and server logs expose only Stripe mode/prefix diagnostics, never secret values. If a configured Price ID is not available in the active Stripe mode, checkout falls back to inline USD `price_data` for the same plan amount.
 
 ### `POST /api/webhooks/stripe`
 

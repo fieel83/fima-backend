@@ -89,23 +89,14 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
     const priceId = env(plan.priceEnv);
-    if (!priceId) return res.status(503).json({ error: "stripe_price_not_configured", missing: plan.priceEnv });
-
-    const session = await stripe().checkout.sessions.create({
-      mode: "payment",
-      customer_email: customerEmail,
-      line_items: [{ price: priceId, quantity: 1 }],
-      allow_promotion_codes: true,
-      success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl()}/#pricing`,
-      metadata: {
-        plan: plan.id,
-        durationDays: plan.durationDays === null ? "0" : String(plan.durationDays),
-        productName: env("APP_NAME", "Fima Macro"),
-        selectedCurrency: String(req.body?.currency || "USD").toUpperCase(),
-        language: String(req.body?.language || "en").slice(0, 8)
-      }
+    const checkout = await createCheckoutSession({
+      plan,
+      customerEmail,
+      priceId,
+      selectedCurrency: String(req.body?.currency || "USD").toUpperCase(),
+      language: String(req.body?.language || "en").slice(0, 8)
     });
+    const session = checkout.session;
 
     const checkoutMode = session.livemode ? "live" : "test";
     const checkoutSessionPrefix = stripeSessionPrefix(session.id);
@@ -114,10 +105,11 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       stripeMode: checkoutMode,
       checkoutSessionPrefix,
       priceEnv: plan.priceEnv,
+      priceSource: checkout.priceSource,
       stripe: stripeStatus()
     });
 
-    return res.json({ url: session.url, mode: checkoutMode, checkoutSessionPrefix });
+    return res.json({ url: session.url, mode: checkoutMode, checkoutSessionPrefix, priceSource: checkout.priceSource });
   } catch (error) {
     console.error("Checkout session creation failed", { ...publicError(error), stripe: stripeStatus() });
     return res.status(error.code === "missing_env" ? 503 : 500).json({ error: "checkout_failed" });
@@ -317,6 +309,70 @@ function stripe() {
 
 function stripeStatus() {
   return stripeConfigSummary(stripePriceEnvNames);
+}
+
+async function createCheckoutSession({ plan, customerEmail, priceId, selectedCurrency, language }) {
+  const stripeClient = stripe();
+  const baseSession = {
+    mode: "payment",
+    customer_email: customerEmail,
+    allow_promotion_codes: true,
+    success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${frontendUrl()}/#pricing`,
+    metadata: checkoutMetadata(plan, selectedCurrency, language)
+  };
+
+  if (priceId) {
+    try {
+      const session = await stripeClient.checkout.sessions.create({
+        ...baseSession,
+        line_items: [{ price: priceId, quantity: 1 }]
+      });
+      return { session, priceSource: "price_id" };
+    } catch (error) {
+      if (!isMissingStripePrice(error)) throw error;
+      console.warn("Stripe price ID unavailable for current mode, using inline price data", {
+        plan: plan.id,
+        priceEnv: plan.priceEnv,
+        stripe: stripeStatus(),
+        stripeErrorCode: error.code,
+        stripeErrorType: error.type
+      });
+    }
+  }
+
+  const session = await stripeClient.checkout.sessions.create({
+    ...baseSession,
+    line_items: [{
+      quantity: 1,
+      price_data: {
+        currency: "usd",
+        unit_amount: plan.priceCents,
+        product_data: {
+          name: plan.name,
+          metadata: {
+            fima_plan: plan.id,
+            app: env("APP_NAME", "Fima Macro")
+          }
+        }
+      }
+    }]
+  });
+  return { session, priceSource: "inline_price_data" };
+}
+
+function checkoutMetadata(plan, selectedCurrency, language) {
+  return {
+    plan: plan.id,
+    durationDays: plan.durationDays === null ? "0" : String(plan.durationDays),
+    productName: env("APP_NAME", "Fima Macro"),
+    selectedCurrency,
+    language
+  };
+}
+
+function isMissingStripePrice(error) {
+  return error?.code === "resource_missing" && String(error?.message || "").toLowerCase().includes("price");
 }
 
 async function fulfillCheckoutSession(session) {
