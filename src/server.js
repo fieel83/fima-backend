@@ -10,7 +10,7 @@ import Stripe from "stripe";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
-import { PLANS, getPlan, getPlanExpiry, planIds } from "./plans.js";
+import { PLANS, getPlan, getPlanCommerce, getPlanExpiry, getPlanPriceOptions, planIds } from "./plans.js";
 import {
   buildLicenseData,
   generateUniqueLicenseKey,
@@ -24,7 +24,7 @@ import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeSessionPrefix 
 
 const app = express();
 const port = Number(env("PORT", "8080"));
-const stripePriceEnvNames = Object.values(PLANS).map((plan) => plan.priceEnv);
+const stripePriceEnvNames = [...new Set(Object.values(PLANS).flatMap((plan) => getPlanPriceOptions(plan).map((option) => option.priceEnv)))];
 let lastStripePriceValidation = {
   checkedAt: null,
   results: Object.fromEntries(stripePriceEnvNames.map((name) => [name, { status: "unchecked" }]))
@@ -384,19 +384,21 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     const customerEmail = String(req.body?.customerEmail || "").trim().toLowerCase();
     if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
-    const priceId = env(plan.priceEnv);
+    const commerce = getPlanCommerce(plan);
+    const priceId = env(commerce.priceEnv);
     const checkout = await createCheckoutSession({
       plan,
+      commerce,
       customerEmail,
       priceId,
-      selectedCurrency: String(req.body?.currency || "USD").toUpperCase(),
+      selectedCurrency: String(req.body?.currency || commerce.currency).toUpperCase(),
       language: String(req.body?.language || "en").slice(0, 8)
     });
     const session = checkout.session;
     await createAnalyticsEvent("checkout_created", {
       plan: plan.id,
-      amount: plan.priceCents,
-      currency: "usd",
+      amount: commerce.priceCents,
+      currency: commerce.currency,
       mode: session.livemode ? "live" : "test",
       metadata: { priceSource: checkout.priceSource }
     });
@@ -407,7 +409,8 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       plan: plan.id,
       stripeMode: checkoutMode,
       checkoutSessionPrefix,
-      priceEnv: plan.priceEnv,
+      priceEnv: commerce.priceEnv,
+      saleActive: commerce.saleActive,
       priceSource: checkout.priceSource,
       stripe: stripeStatus()
     });
@@ -1242,7 +1245,7 @@ async function createProductCheckoutSession({ user, product, price }) {
   });
 }
 
-async function createCheckoutSession({ plan, customerEmail, priceId, selectedCurrency, language }) {
+async function createCheckoutSession({ plan, commerce, customerEmail, priceId, selectedCurrency, language }) {
   const stripeClient = stripe();
   const baseSession = {
     mode: "payment",
@@ -1250,11 +1253,11 @@ async function createCheckoutSession({ plan, customerEmail, priceId, selectedCur
     allow_promotion_codes: true,
     success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${frontendUrl()}/#pricing`,
-    metadata: checkoutMetadata(plan, selectedCurrency, language)
+    metadata: checkoutMetadata(plan, commerce, selectedCurrency, language)
   };
 
   if (priceId) {
-    const priceCheck = await validateStripePriceForPlan(stripeClient, plan, priceId);
+    const priceCheck = await validateStripePriceForPlan(stripeClient, plan, priceId, commerce);
     recordStripePriceCheck(priceCheck);
     if (priceCheck.ok) {
       const session = await stripeClient.checkout.sessions.create({
@@ -1269,9 +1272,9 @@ async function createCheckoutSession({ plan, customerEmail, priceId, selectedCur
     const priceCheck = {
       ok: false,
       plan: plan.id,
-      priceEnv: plan.priceEnv,
+      priceEnv: commerce.priceEnv,
       status: "missing_env",
-      expected: expectedPriceForPlan(plan)
+      expected: expectedPriceForPlan(plan, commerce)
     };
     recordStripePriceCheck(priceCheck);
     console.warn("Stripe price env missing, using inline price data", sanitizePriceCheck(priceCheck));
@@ -1282,8 +1285,8 @@ async function createCheckoutSession({ plan, customerEmail, priceId, selectedCur
     line_items: [{
       quantity: 1,
       price_data: {
-        currency: "usd",
-        unit_amount: plan.priceCents,
+        currency: commerce.currency,
+        unit_amount: commerce.priceCents,
         product_data: {
           name: plan.name,
           metadata: {
@@ -1297,11 +1300,15 @@ async function createCheckoutSession({ plan, customerEmail, priceId, selectedCur
   return { session, priceSource: "inline_price_data" };
 }
 
-function checkoutMetadata(plan, selectedCurrency, language) {
+function checkoutMetadata(plan, commerce, selectedCurrency, language) {
   return {
     plan: plan.id,
     durationDays: plan.durationDays === null ? "0" : String(plan.durationDays),
     productName: env("APP_NAME", "Fima Macro"),
+    checkoutCurrency: commerce.currency,
+    checkoutAmount: String(commerce.priceCents),
+    saleActive: commerce.saleActive ? "true" : "false",
+    saleEndAt: commerce.saleEndAt,
     selectedCurrency,
     language
   };
@@ -1322,13 +1329,15 @@ async function validateConfiguredStripePrices() {
 
   const results = [];
   for (const plan of Object.values(PLANS)) {
-    const check = await validateStripePriceForPlan(stripeClient, plan, env(plan.priceEnv));
-    recordStripePriceCheck(check);
-    results.push(sanitizePriceCheck(check));
-    if (check.ok) {
-      console.info("Stripe price env valid", sanitizePriceCheck(check));
-    } else {
-      console.warn("Stripe price env invalid", sanitizePriceCheck(check));
+    for (const option of getPlanPriceOptions(plan)) {
+      const check = await validateStripePriceForPlan(stripeClient, plan, env(option.priceEnv), option);
+      recordStripePriceCheck(check);
+      results.push(sanitizePriceCheck(check));
+      if (check.ok) {
+        console.info("Stripe price env valid", sanitizePriceCheck(check));
+      } else {
+        console.warn("Stripe price env invalid", sanitizePriceCheck(check));
+      }
     }
   }
   console.info("Stripe price env validation complete", {
@@ -1337,11 +1346,11 @@ async function validateConfiguredStripePrices() {
   });
 }
 
-async function validateStripePriceForPlan(stripeClient, plan, priceId) {
+async function validateStripePriceForPlan(stripeClient, plan, priceId, commerce = getPlanCommerce(plan)) {
   const base = {
     plan: plan.id,
-    priceEnv: plan.priceEnv,
-    expected: expectedPriceForPlan(plan)
+    priceEnv: commerce.priceEnv,
+    expected: expectedPriceForPlan(plan, commerce)
   };
 
   if (!priceId) {
@@ -1359,8 +1368,8 @@ async function validateStripePriceForPlan(stripeClient, plan, priceId) {
 
     if (actual.active === false) return { ...base, ok: false, status: "inactive_price", actual };
     if (actual.type !== "one_time") return { ...base, ok: false, status: "not_one_time_price", actual };
-    if (actual.currency !== "usd") return { ...base, ok: false, status: "currency_mismatch", actual };
-    if (actual.unitAmount !== plan.priceCents) return { ...base, ok: false, status: "amount_mismatch", actual };
+    if (actual.currency !== commerce.currency) return { ...base, ok: false, status: "currency_mismatch", actual };
+    if (actual.unitAmount !== commerce.priceCents) return { ...base, ok: false, status: "amount_mismatch", actual };
 
     return { ...base, ok: true, status: "valid", actual };
   } catch (error) {
@@ -1383,10 +1392,10 @@ async function validateStripePriceForPlan(stripeClient, plan, priceId) {
   }
 }
 
-function expectedPriceForPlan(plan) {
+function expectedPriceForPlan(plan, commerce = getPlanCommerce(plan)) {
   return {
-    currency: "usd",
-    unitAmount: plan.priceCents,
+    currency: commerce.currency,
+    unitAmount: commerce.priceCents,
     type: "one_time"
   };
 }
@@ -1999,8 +2008,8 @@ async function fulfillCheckoutSession(session) {
           stripePaymentIntentId: paymentIntentId,
           customerEmail: email,
           plan: plan.id,
-          amount: session.amount_total ?? plan.priceCents,
-          currency: String(session.currency || "usd").toLowerCase(),
+          amount: session.amount_total ?? getPlanCommerce(plan).priceCents,
+          currency: String(session.currency || getPlanCommerce(plan).currency).toLowerCase(),
           status: session.payment_status || "paid",
           mode: session.livemode ? "live" : "test",
           locale: session.locale || null,

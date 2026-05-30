@@ -1,6 +1,6 @@
 import "dotenv/config";
 import Stripe from "stripe";
-import { PLANS } from "../src/plans.js";
+import { PLANS, getPlanPriceOptions } from "../src/plans.js";
 import { assertStripeSecretKeyAllowed } from "../src/stripeSafety.js";
 
 const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -13,17 +13,12 @@ assertStripeSecretKeyAllowed(secretKey, process.env.STRIPE_MODE || "test");
 
 const stripe = new Stripe(secretKey);
 
-const envNames = {
-  "2weeks": "STRIPE_PRICE_2WEEKS",
-  "1month": "STRIPE_PRICE_1MONTH",
-  "3months": "STRIPE_PRICE_3MONTHS",
-  "lifetime": "STRIPE_PRICE_LIFETIME"
-};
-
 for (const plan of Object.values(PLANS)) {
   const product = await findOrCreateProduct(plan);
-  const price = await findOrCreatePrice(product.id, plan);
-  console.log(`${envNames[plan.id]}=${price.id}`);
+  for (const option of getPlanPriceOptions(plan)) {
+    const price = await findOrCreatePrice(product.id, plan, option);
+    console.log(`${option.priceEnv}=${price.id}`);
+  }
 }
 
 async function findOrCreateProduct(plan) {
@@ -40,21 +35,22 @@ async function findOrCreateProduct(plan) {
   });
 }
 
-async function findOrCreatePrice(productId, plan) {
+async function findOrCreatePrice(productId, plan, option) {
   const prices = await stripe.prices.list({ product: productId, active: true, limit: 100 });
   const existing = prices.data.find((price) =>
-    price.currency === "usd" &&
-    price.unit_amount === plan.priceCents &&
+    price.currency === option.currency &&
+    price.unit_amount === option.priceCents &&
     price.type === "one_time"
   );
   if (existing) return existing;
 
   return stripe.prices.create({
     product: productId,
-    unit_amount: plan.priceCents,
-    currency: "usd",
+    unit_amount: option.priceCents,
+    currency: option.currency,
     metadata: {
       fima_plan: plan.id,
+      price_kind: option.label,
       duration_days: plan.durationDays === null ? "0" : String(plan.durationDays)
     }
   });

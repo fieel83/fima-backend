@@ -23,20 +23,25 @@ npm run dev
 
 Set `DATABASE_URL` to PostgreSQL before running migrations.
 
-## Stripe Test Mode
+## Stripe Price Setup
 
-Use test mode only. Put the Stripe test secret key in `.env` as `STRIPE_SECRET_KEY`, then run:
+Put the Stripe secret/restricted key in `.env` as `STRIPE_SECRET_KEY`, then run:
 
 ```powershell
 npm run stripe:setup
 ```
 
-The script creates/reuses four one-time USD Prices and prints:
+The script creates/reuses one-time EUR Prices and prints the env names to copy:
 
 ```text
+STRIPE_PRICE_1DAY=price_...
+STRIPE_SALE_PRICE_1DAY=price_...
 STRIPE_PRICE_2WEEKS=price_...
+STRIPE_SALE_PRICE_2WEEKS=price_...
 STRIPE_PRICE_1MONTH=price_...
+STRIPE_SALE_PRICE_1MONTH=price_...
 STRIPE_PRICE_3MONTHS=price_...
+STRIPE_SALE_PRICE_3MONTHS=price_...
 STRIPE_PRICE_LIFETIME=price_...
 ```
 
@@ -52,10 +57,15 @@ STRIPE_MODE=auto
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
-STRIPE_PRICE_2WEEKS=price_1TbIcpHluwdGuEsNKes35HgO
-STRIPE_PRICE_1MONTH=price_1TbIcqHluwdGuEsNYqyfBuRo
-STRIPE_PRICE_3MONTHS=price_1TbIcrHluwdGuEsNqGZwCIkt
-STRIPE_PRICE_LIFETIME=price_1TbIcsHluwdGuEsNpFGJYSXV
+STRIPE_PRICE_1DAY=price_1Tcvj9HluwdGuEsNu8C6Pb0Z
+STRIPE_SALE_PRICE_1DAY=price_1TcvjAHluwdGuEsNaMlOv3ZV
+STRIPE_PRICE_2WEEKS=price_1TcvjAHluwdGuEsNvO97mkOO
+STRIPE_SALE_PRICE_2WEEKS=price_1TcvjAHluwdGuEsNx341iL1Z
+STRIPE_PRICE_1MONTH=price_1TcvjBHluwdGuEsNENJtFbEs
+STRIPE_SALE_PRICE_1MONTH=price_1TcvjBHluwdGuEsNQT2dR92l
+STRIPE_PRICE_3MONTHS=price_1TcvjBHluwdGuEsNhQbV6i61
+STRIPE_SALE_PRICE_3MONTHS=price_1TcvjBHluwdGuEsNtpogLJ5P
+STRIPE_PRICE_LIFETIME=price_1TcvjCHluwdGuEsN5mjPd8eN
 ADMIN_PASSWORD=
 FRONTEND_URL=https://fimamacro.com
 API_BASE_URL=https://api.fimamacro.com
@@ -76,7 +86,7 @@ Creates a Stripe Checkout Session.
 {
   "plan": "1month",
   "customerEmail": "user@example.com",
-  "currency": "USD",
+  "currency": "EUR",
   "language": "en"
 }
 ```
@@ -87,7 +97,7 @@ Returns:
 { "url": "https://checkout.stripe.com/...", "mode": "live", "checkoutSessionPrefix": "cs_live" }
 ```
 
-The response and server logs expose only Stripe mode/prefix diagnostics, never secret values. On startup and checkout, each configured `STRIPE_PRICE_*` env is validated against the active Stripe mode. If one is missing, inactive, has the wrong amount/currency, or is not found in the current Stripe mode, the log names the env key and falls back to inline USD `price_data` for the same plan amount.
+The response and server logs expose only Stripe mode/prefix diagnostics, never secret values. On startup and checkout, each configured regular and sale price env is validated against the active Stripe mode. If one is missing, inactive, has the wrong amount/currency, or is not found in the current Stripe mode, the log names the env key and falls back to inline EUR `price_data` for the same plan amount.
 
 ### `POST /api/webhooks/stripe`
 
