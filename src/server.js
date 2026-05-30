@@ -34,6 +34,10 @@ const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standar
 const validateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const downloadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false });
+const passwordResetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
+const storeCheckoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 25, standardHeaders: true, legacyHeaders: false });
+const USER_SESSION_COOKIE = "fima_user_session";
 
 const defaultSiteSettings = {
   discordInviteUrl: env("DISCORD_INVITE_URL", ""),
@@ -115,14 +119,17 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
 
     let fulfillment = null;
     if (event.type === "checkout.session.completed") {
-      fulfillment = await fulfillCheckoutSession(event.data.object);
+      const session = event.data.object;
+      fulfillment = isProductCheckoutSession(session)
+        ? await fulfillProductCheckoutSession(session)
+        : await fulfillCheckoutSession(session);
     }
     await prisma.webhookEvent.update({
       where: { stripeEventId: event.id },
       data: {
         processed: true,
         errorMessage: null,
-        relatedOrderId: fulfillment?.id || null,
+        relatedOrderId: fulfillment?.order?.id || fulfillment?.id || null,
         relatedLicenseId: fulfillment?.license?.id || fulfillment?.licenseId || null
       }
     });
@@ -145,6 +152,223 @@ app.use(express.urlencoded({ extended: false }));
 app.get("/api/public/site-settings", async (_req, res) => {
   const settings = await getSiteSettings();
   res.json({ success: true, settings: publicSiteSettings(settings) });
+});
+
+app.post("/api/auth/register", authLimiter, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_email" });
+    if (!isStrongPassword(password)) return res.status(400).json({ error: "weak_password" });
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ error: "email_already_registered" });
+
+    const stripeCustomerId = await createStripeCustomerIfPossible(email);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await hashPassword(password),
+        stripeCustomerId
+      }
+    });
+    await ensureCustomer(email);
+    await createAuditLog("user_registered", "user", user.id, { email });
+    await issueUserSession(res, user.id);
+    return res.status(201).json({ success: true, user: publicUser(user) });
+  } catch (error) {
+    console.error("User registration failed", publicError(error));
+    return res.status(500).json({ error: "registration_failed" });
+  }
+});
+
+app.post("/api/auth/login", authLimiter, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      await createAuditLog("user_login_failed", "user", null, { email });
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
+
+    const hydrated = await ensureUserStripeCustomer(user);
+    await issueUserSession(res, hydrated.id);
+    await createAuditLog("user_login_success", "user", hydrated.id, {});
+    return res.json({ success: true, user: publicUser(hydrated) });
+  } catch (error) {
+    console.error("User login failed", publicError(error));
+    return res.status(500).json({ error: "login_failed" });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  const tokenHash = hashToken(req.cookies?.[USER_SESSION_COOKIE]);
+  if (tokenHash) {
+    await prisma.userSession.deleteMany({ where: { tokenHash } }).catch(() => {});
+  }
+  clearUserCookie(res);
+  return res.json({ success: true });
+});
+
+app.get("/api/auth/me", requireUser, async (req, res) => {
+  return res.json({ success: true, user: publicUser(req.user) });
+});
+
+app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  try {
+    const user = isValidEmail(email) ? await prisma.user.findUnique({ where: { email } }) : null;
+    let devResetToken = null;
+    if (user) {
+      const token = randomToken();
+      devResetToken = token;
+      await prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: hashToken(token),
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+        }
+      });
+      await createAuditLog("password_reset_requested", "user", user.id, {});
+    }
+
+    const response = {
+      success: true,
+      message: "If that email exists, a password reset link will be prepared."
+    };
+    if (env("NODE_ENV", "development") !== "production" && devResetToken) {
+      response.resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(devResetToken)}`;
+    }
+    return res.json(response);
+  } catch (error) {
+    console.error("Password reset request failed", publicError(error));
+    return res.status(500).json({ error: "password_reset_failed" });
+  }
+});
+
+app.post("/api/auth/reset-password", passwordResetLimiter, async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+    const password = String(req.body?.password || "");
+    if (!token || !isStrongPassword(password)) return res.status(400).json({ error: "invalid_reset_request" });
+
+    const tokenHash = hashToken(token);
+    const reset = await prisma.passwordResetToken.findUnique({ where: { tokenHash }, include: { user: true } });
+    if (!reset || reset.usedAt || reset.expiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ error: "invalid_or_expired_token" });
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: reset.userId },
+        data: { passwordHash: await hashPassword(password) }
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: reset.id },
+        data: { usedAt: new Date() }
+      }),
+      prisma.userSession.deleteMany({ where: { userId: reset.userId } })
+    ]);
+    await createAuditLog("password_reset_completed", "user", reset.userId, {});
+    clearUserCookie(res);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Password reset failed", publicError(error));
+    return res.status(500).json({ error: "password_reset_failed" });
+  }
+});
+
+app.get("/api/store/products", async (_req, res) => {
+  const products = await prisma.product.findMany({
+    where: { active: true },
+    orderBy: { createdAt: "desc" },
+    include: { prices: { where: { active: true }, orderBy: { createdAt: "desc" }, take: 1 } }
+  });
+  return res.json({ success: true, products: products.map(publicProduct) });
+});
+
+app.post("/api/store/checkout", storeCheckoutLimiter, requireUser, async (req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    if (settings.maintenanceMode || settings.checkoutEnabled === false) {
+      return res.status(503).json({ error: "checkout_disabled" });
+    }
+
+    const productId = String(req.body?.productId || "").trim();
+    const product = await prisma.product.findFirst({
+      where: { id: productId, active: true },
+      include: { prices: { where: { active: true }, orderBy: { createdAt: "desc" }, take: 1 } }
+    });
+    if (!product || !product.prices[0]) return res.status(404).json({ error: "product_not_available" });
+
+    const user = await ensureUserStripeCustomer(req.user);
+    const session = await createProductCheckoutSession({ user, product, price: product.prices[0] });
+    await createAnalyticsEvent("product_checkout_created", {
+      amount: product.prices[0].amount,
+      currency: product.prices[0].currency,
+      mode: session.livemode ? "live" : "test",
+      metadata: { productId: product.id }
+    });
+    return res.json({ success: true, url: session.url, mode: session.livemode ? "live" : "test", checkoutSessionPrefix: stripeSessionPrefix(session.id) });
+  } catch (error) {
+    console.error("Product checkout failed", publicError(error));
+    await createAnalyticsEvent("product_checkout_failed", { metadata: publicError(error) });
+    return res.status(500).json({ error: "checkout_failed" });
+  }
+});
+
+app.get("/api/me/products", requireUser, async (req, res) => {
+  const purchases = await prisma.purchase.findMany({
+    where: { userId: req.user.id },
+    orderBy: { createdAt: "desc" },
+    include: { product: { include: { prices: { where: { active: true }, take: 1, orderBy: { createdAt: "desc" } } } } }
+  });
+  return res.json({ success: true, purchases: purchases.map(publicPurchase) });
+});
+
+app.get("/api/store/result", requireUser, async (req, res) => {
+  try {
+    const sessionId = String(req.query.session_id || "");
+    if (!sessionId.startsWith("cs_")) return res.status(400).json({ success: false, status: "invalid_session" });
+
+    let purchase = await prisma.purchase.findFirst({
+      where: { stripeCheckoutSessionId: sessionId, userId: req.user.id },
+      include: { product: { include: { prices: { where: { active: true }, take: 1, orderBy: { createdAt: "desc" } } } } }
+    });
+
+    if (!purchase) {
+      const session = await stripe().checkout.sessions.retrieve(sessionId);
+      if (session.payment_status === "paid" && String(session.metadata?.user_id) === req.user.id) {
+        await fulfillProductCheckoutSession(session);
+        purchase = await prisma.purchase.findFirst({
+          where: { stripeCheckoutSessionId: sessionId, userId: req.user.id },
+          include: { product: { include: { prices: { where: { active: true }, take: 1, orderBy: { createdAt: "desc" } } } } }
+        });
+      }
+    }
+
+    if (!purchase) return res.json({ success: false, status: "processing" });
+    return res.json({ success: true, status: purchase.status, purchase: publicPurchase(purchase) });
+  } catch (error) {
+    console.error("Store result failed", publicError(error));
+    return res.status(500).json({ success: false, status: "error" });
+  }
+});
+
+app.get("/api/me/dashboard", requireUser, async (req, res) => {
+  const [purchases, licenses] = await Promise.all([
+    prisma.purchase.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: "desc" },
+      include: { product: true }
+    }),
+    prisma.license.findMany({
+      where: { customerEmail: req.user.email },
+      orderBy: { createdAt: "desc" }
+    })
+  ]);
+  return res.json({ success: true, user: publicUser(req.user), purchases: purchases.map(publicPurchase), licenses: licenses.map(licensePayload) });
 });
 
 app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
@@ -697,38 +921,255 @@ app.post("/admin/api/settings", requireAdmin, async (req, res) => {
   res.json({ settings: next });
 });
 
+app.get("/admin/api/products", requireAdmin, async (_req, res) => {
+  const products = await prisma.product.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { prices: { orderBy: { createdAt: "desc" } }, purchases: { take: 5, orderBy: { createdAt: "desc" }, include: { user: true } } }
+  });
+  res.json({ products });
+});
+
+app.post("/admin/api/products", requireAdmin, async (req, res) => {
+  try {
+    const input = sanitizeProductInput(req.body || {});
+    if (!input.name) return res.status(400).json({ error: "invalid_product_name" });
+    const amount = toPositiveInt(req.body?.amount);
+    if (!amount) return res.status(400).json({ error: "invalid_price_amount" });
+
+    const stripeProduct = await stripe().products.create({
+      name: input.name,
+      description: input.description || undefined,
+      images: input.image ? [input.image] : undefined,
+      active: input.active,
+      metadata: {
+        category: input.category || "",
+        app: env("APP_NAME", "Fima Macro")
+      }
+    });
+    const stripePrice = await stripe().prices.create({
+      product: stripeProduct.id,
+      currency: "eur",
+      unit_amount: amount
+    });
+
+    const product = await prisma.product.create({
+      data: {
+        ...input,
+        stripeProductId: stripeProduct.id,
+        prices: {
+          create: {
+            stripePriceId: stripePrice.id,
+            amount,
+            currency: "eur",
+            active: true
+          }
+        }
+      },
+      include: { prices: true }
+    });
+    await createAuditLog("product_created", "product", product.id, { stripeProductId: stripeProduct.id, stripePriceId: stripePrice.id });
+    res.status(201).json({ product });
+  } catch (error) {
+    console.error("Admin product create failed", publicError(error));
+    res.status(500).json({ error: "product_create_failed" });
+  }
+});
+
+app.post("/admin/api/products/:id", requireAdmin, async (req, res) => {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!product) return res.status(404).json({ error: "not_found" });
+    const input = sanitizeProductInput(req.body || {});
+    if (!input.name) return res.status(400).json({ error: "invalid_product_name" });
+
+    if (product.stripeProductId) {
+      await stripe().products.update(product.stripeProductId, {
+        name: input.name,
+        description: input.description || undefined,
+        images: input.image ? [input.image] : [],
+        active: input.active,
+        metadata: {
+          category: input.category || "",
+          app: env("APP_NAME", "Fima Macro")
+        }
+      });
+    }
+
+    const updated = await prisma.product.update({
+      where: { id: product.id },
+      data: input,
+      include: { prices: { orderBy: { createdAt: "desc" } } }
+    });
+    await createAuditLog("product_updated", "product", updated.id, {});
+    res.json({ product: updated });
+  } catch (error) {
+    console.error("Admin product update failed", publicError(error));
+    res.status(500).json({ error: "product_update_failed" });
+  }
+});
+
+app.post("/admin/api/products/:id/price", requireAdmin, async (req, res) => {
+  try {
+    const amount = toPositiveInt(req.body?.amount);
+    if (!amount) return res.status(400).json({ error: "invalid_price_amount" });
+    const product = await prisma.product.findUnique({ where: { id: req.params.id }, include: { prices: { where: { active: true } } } });
+    if (!product || !product.stripeProductId) return res.status(404).json({ error: "not_found" });
+
+    const stripePrice = await stripe().prices.create({
+      product: product.stripeProductId,
+      currency: "eur",
+      unit_amount: amount
+    });
+
+    await Promise.all(product.prices.map((price) =>
+      price.stripePriceId
+        ? stripe().prices.update(price.stripePriceId, { active: false }).catch(() => null)
+        : Promise.resolve(null)
+    ));
+
+    const price = await prisma.$transaction(async (tx) => {
+      await tx.productPrice.updateMany({ where: { productId: product.id, active: true }, data: { active: false } });
+      return tx.productPrice.create({
+        data: {
+          productId: product.id,
+          stripePriceId: stripePrice.id,
+          amount,
+          currency: "eur",
+          active: true
+        }
+      });
+    });
+    await createAuditLog("product_price_changed", "product", product.id, { stripePriceId: stripePrice.id, amount });
+    res.json({ price });
+  } catch (error) {
+    console.error("Admin price change failed", publicError(error));
+    res.status(500).json({ error: "price_change_failed" });
+  }
+});
+
 app.get("/admin/api/coupons", requireAdmin, async (_req, res) => {
   const coupons = await prisma.coupon.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
   res.json({ coupons });
 });
 
 app.post("/admin/api/coupons", requireAdmin, async (req, res) => {
-  const code = String(req.body?.code || "").trim().toUpperCase();
-  if (!code) return res.status(400).json({ error: "invalid_code" });
-  const coupon = await prisma.coupon.upsert({
-    where: { code },
-    create: {
-      code,
-      stripePromotionCodeId: String(req.body?.stripePromotionCodeId || "").trim() || null,
-      percentOff: toOptionalInt(req.body?.percentOff),
-      amountOff: toOptionalInt(req.body?.amountOff),
-      currency: String(req.body?.currency || "").trim().toLowerCase() || null,
-      active: req.body?.active !== false,
-      maxRedemptions: toOptionalInt(req.body?.maxRedemptions),
-      notes: String(req.body?.notes || "").slice(0, 1000) || null
-    },
-    update: {
-      stripePromotionCodeId: String(req.body?.stripePromotionCodeId || "").trim() || null,
-      percentOff: toOptionalInt(req.body?.percentOff),
-      amountOff: toOptionalInt(req.body?.amountOff),
-      currency: String(req.body?.currency || "").trim().toLowerCase() || null,
-      active: req.body?.active !== false,
-      maxRedemptions: toOptionalInt(req.body?.maxRedemptions),
-      notes: String(req.body?.notes || "").slice(0, 1000) || null
+  try {
+    const code = String(req.body?.code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+    if (!code) return res.status(400).json({ error: "invalid_code" });
+    const percentOff = toOptionalInt(req.body?.percentOff);
+    const amountOff = toOptionalInt(req.body?.amountOff);
+    if (!percentOff && !amountOff) return res.status(400).json({ error: "discount_required" });
+    if (percentOff && (percentOff < 1 || percentOff > 100)) return res.status(400).json({ error: "invalid_percent_off" });
+
+    const active = req.body?.active !== false;
+    const expiresAt = parseOptionalDate(req.body?.expiresAt);
+    const maxRedemptions = toOptionalInt(req.body?.maxRedemptions);
+    const stripeCoupon = await stripe().coupons.create({
+      duration: "once",
+      percent_off: percentOff || undefined,
+      amount_off: amountOff || undefined,
+      currency: amountOff ? "eur" : undefined,
+      max_redemptions: maxRedemptions || undefined,
+      redeem_by: expiresAt ? Math.floor(expiresAt.getTime() / 1000) : undefined,
+      metadata: { app: env("APP_NAME", "Fima Macro"), code }
+    });
+
+    let stripePromotionCode = null;
+    try {
+      stripePromotionCode = await stripe().promotionCodes.create({
+        coupon: stripeCoupon.id,
+        code,
+        active,
+        max_redemptions: maxRedemptions || undefined,
+        expires_at: expiresAt ? Math.floor(expiresAt.getTime() / 1000) : undefined
+      });
+    } catch (promotionError) {
+      console.warn("Stripe promotion code create failed; coupon was still created", publicError(promotionError));
     }
-  });
-  await createAuditLog("coupon_saved", "coupon", coupon.id, { code });
+
+    const coupon = await prisma.coupon.upsert({
+      where: { code },
+      create: {
+        code,
+        stripeCouponId: stripeCoupon.id,
+        stripePromotionCodeId: stripePromotionCode?.id || null,
+        percentOff,
+        amountOff,
+        currency: amountOff ? "eur" : null,
+        active,
+        expiresAt,
+        maxRedemptions,
+        notes: String(req.body?.notes || "").slice(0, 1000) || null
+      },
+      update: {
+        stripeCouponId: stripeCoupon.id,
+        stripePromotionCodeId: stripePromotionCode?.id || null,
+        percentOff,
+        amountOff,
+        currency: amountOff ? "eur" : null,
+        active,
+        expiresAt,
+        maxRedemptions,
+        notes: String(req.body?.notes || "").slice(0, 1000) || null
+      }
+    });
+    await createAuditLog("coupon_saved", "coupon", coupon.id, { code, stripeCouponId: stripeCoupon.id, stripePromotionCodeId: stripePromotionCode?.id || null });
+    res.json({ coupon });
+  } catch (error) {
+    console.error("Admin coupon save failed", publicError(error));
+    res.status(500).json({ error: "coupon_save_failed" });
+  }
+});
+
+app.post("/admin/api/coupons/:id/status", requireAdmin, async (req, res) => {
+  const active = Boolean(req.body?.active);
+  const coupon = await prisma.coupon.update({ where: { id: req.params.id }, data: { active } });
+  if (coupon.stripePromotionCodeId) {
+    await stripe().promotionCodes.update(coupon.stripePromotionCodeId, { active }).catch((error) => {
+      console.warn("Stripe promotion code status update failed", publicError(error));
+    });
+  }
+  await createAuditLog("coupon_status_changed", "coupon", coupon.id, { active });
   res.json({ coupon });
+});
+
+app.get("/admin/api/users", requireAdmin, async (req, res) => {
+  const search = String(req.query.search || "").trim();
+  const users = await prisma.user.findMany({
+    where: search
+      ? { OR: [{ email: { contains: search, mode: "insensitive" } }, { stripeCustomerId: { contains: search } }] }
+      : {},
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: { purchases: { include: { product: true }, orderBy: { createdAt: "desc" }, take: 5 } }
+  });
+  res.json({ users: users.map((user) => ({ ...publicUser(user), purchases: user.purchases })) });
+});
+
+app.get("/admin/api/purchases", requireAdmin, async (req, res) => {
+  const search = String(req.query.search || "").trim();
+  const status = String(req.query.status || "").trim();
+  const purchases = await prisma.purchase.findMany({
+    where: {
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { stripeCheckoutSessionId: { contains: search } },
+                { stripePaymentIntentId: { contains: search } },
+                { user: { email: { contains: search, mode: "insensitive" } } },
+                { product: { name: { contains: search, mode: "insensitive" } } }
+              ]
+            }
+          : {}
+      ]
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: { user: true, product: true }
+  });
+  res.json({ purchases });
 });
 
 app.get("/admin/api/analytics", requireAdmin, async (_req, res) => {
@@ -771,6 +1212,34 @@ function stripeStatus() {
     ...stripeConfigSummary(stripePriceEnvNames),
     priceValidation: lastStripePriceValidation
   };
+}
+
+function isProductCheckoutSession(session) {
+  return session?.metadata?.purchase_type === "product" ||
+    (Boolean(session?.metadata?.user_id) && Boolean(session?.metadata?.product_id));
+}
+
+async function createProductCheckoutSession({ user, product, price }) {
+  if (!price.stripePriceId) {
+    const error = new Error("Active product price is missing Stripe Price ID");
+    error.code = "missing_stripe_price_id";
+    throw error;
+  }
+
+  return stripe().checkout.sessions.create({
+    mode: "payment",
+    customer: user.stripeCustomerId,
+    allow_promotion_codes: true,
+    success_url: `${frontendUrl()}/payment-success.html?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${frontendUrl()}/payment-cancelled.html`,
+    line_items: [{ price: price.stripePriceId, quantity: 1 }],
+    metadata: {
+      purchase_type: "product",
+      user_id: user.id,
+      product_id: product.id,
+      product_price_id: price.id
+    }
+  });
 }
 
 async function createCheckoutSession({ plan, customerEmail, priceId, selectedCurrency, language }) {
@@ -1139,6 +1608,206 @@ async function ensureCustomer(email) {
   });
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isStrongPassword(value) {
+  return typeof value === "string" && value.length >= 8 && value.length <= 200;
+}
+
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("base64url");
+  const key = await scrypt(password, salt, 64);
+  return `scrypt$16384$8$1$${salt}$${key.toString("base64url")}`;
+}
+
+async function verifyPassword(password, storedHash) {
+  const parts = String(storedHash || "").split("$");
+  if (parts.length !== 6 || parts[0] !== "scrypt") return false;
+  const [, n, r, p, salt, expected] = parts;
+  const key = await scrypt(password, salt, Buffer.from(expected, "base64url").length, {
+    N: Number(n),
+    r: Number(r),
+    p: Number(p)
+  });
+  const a = Buffer.from(expected, "base64url");
+  return a.length === key.length && crypto.timingSafeEqual(a, key);
+}
+
+function scrypt(password, salt, keyLength, options = { N: 16384, r: 8, p: 1 }) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, keyLength, options, (error, key) => {
+      if (error) reject(error);
+      else resolve(key);
+    });
+  });
+}
+
+function randomToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function hashToken(token) {
+  const value = String(token || "").trim();
+  if (!value) return "";
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+async function issueUserSession(res, userId) {
+  const token = randomToken();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await prisma.userSession.create({
+    data: {
+      userId,
+      tokenHash: hashToken(token),
+      expiresAt
+    }
+  });
+  res.cookie(USER_SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: apiBaseUrl().startsWith("https"),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 30 * 24 * 60 * 60 * 1000
+  });
+}
+
+function clearUserCookie(res) {
+  res.clearCookie(USER_SESSION_COOKIE, {
+    httpOnly: true,
+    secure: apiBaseUrl().startsWith("https"),
+    sameSite: "lax",
+    path: "/"
+  });
+}
+
+async function requireUser(req, res, next) {
+  try {
+    const tokenHash = hashToken(req.cookies?.[USER_SESSION_COOKIE]);
+    if (!tokenHash) return res.status(401).json({ error: "unauthorized" });
+
+    const session = await prisma.userSession.findUnique({
+      where: { tokenHash },
+      include: { user: true }
+    });
+    if (!session || session.expiresAt.getTime() < Date.now()) {
+      if (session) await prisma.userSession.delete({ where: { id: session.id } }).catch(() => {});
+      clearUserCookie(res);
+      return res.status(401).json({ error: "unauthorized" });
+    }
+
+    req.user = session.user;
+    prisma.userSession.update({
+      where: { id: session.id },
+      data: { lastUsedAt: new Date() }
+    }).catch(() => {});
+    return next();
+  } catch (error) {
+    console.error("User auth failed", publicError(error));
+    return res.status(500).json({ error: "auth_failed" });
+  }
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    stripeCustomerId: user.stripeCustomerId || null,
+    role: user.role,
+    createdAt: user.createdAt
+  };
+}
+
+async function createStripeCustomerIfPossible(email) {
+  try {
+    const customer = await stripe().customers.create({
+      email,
+      metadata: {
+        app: env("APP_NAME", "Fima Macro"),
+        account_email: email
+      }
+    });
+    return customer.id;
+  } catch (error) {
+    if (error.code === "missing_env") return null;
+    console.warn("Stripe customer create failed", publicError(error));
+    return null;
+  }
+}
+
+async function ensureUserStripeCustomer(user) {
+  if (user.stripeCustomerId) return user;
+  const stripeCustomerId = await createStripeCustomerIfPossible(user.email);
+  if (!stripeCustomerId) return user;
+  return prisma.user.update({
+    where: { id: user.id },
+    data: { stripeCustomerId }
+  });
+}
+
+function publicProduct(product) {
+  const activePrice = product.prices?.find((price) => price.active) || product.prices?.[0] || null;
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    category: product.category,
+    image: product.image,
+    active: product.active,
+    price: activePrice
+      ? {
+          id: activePrice.id,
+          amount: activePrice.amount,
+          currency: activePrice.currency,
+          active: activePrice.active
+        }
+      : null
+  };
+}
+
+function publicPurchase(purchase) {
+  return {
+    id: purchase.id,
+    productId: purchase.productId,
+    product: purchase.product ? {
+      id: purchase.product.id,
+      name: purchase.product.name,
+      description: purchase.product.description,
+      category: purchase.product.category,
+      image: purchase.product.image,
+      active: purchase.product.active,
+      price: purchase.product.prices ? publicProduct(purchase.product).price : undefined
+    } : null,
+    amountTotal: purchase.amountTotal,
+    currency: purchase.currency,
+    status: purchase.status,
+    createdAt: purchase.createdAt
+  };
+}
+
+function sanitizeProductInput(input) {
+  return {
+    name: String(input.name || "").trim().slice(0, 120),
+    description: String(input.description || "").trim().slice(0, 2000) || null,
+    category: String(input.category || "").trim().slice(0, 80) || null,
+    image: safeUrl(input.image),
+    active: input.active !== false
+  };
+}
+
+function toPositiveInt(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.trunc(number) : null;
+}
+
+function parseOptionalDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 async function createAnalyticsEvent(type, data = {}) {
   await prisma.analyticsEvent.create({
     data: {
@@ -1214,6 +1883,80 @@ function toOptionalInt(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? Math.trunc(number) : null;
+}
+
+async function fulfillProductCheckoutSession(session) {
+  if (session.payment_status && session.payment_status !== "paid") throw new Error("Session is not paid");
+  const userId = String(session.metadata?.user_id || "").trim();
+  const productId = String(session.metadata?.product_id || "").trim();
+  if (!userId || !productId) throw new Error("Product checkout missing metadata");
+
+  const existing = await prisma.purchase.findUnique({ where: { stripeCheckoutSessionId: session.id } });
+  if (existing) return { purchase: existing };
+
+  const paymentIntentId = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id || null;
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const again = await tx.purchase.findUnique({ where: { stripeCheckoutSessionId: session.id } });
+      if (again) return { purchase: again };
+
+      const [user, product] = await Promise.all([
+        tx.user.findUnique({ where: { id: userId } }),
+        tx.product.findUnique({ where: { id: productId } })
+      ]);
+      if (!user) throw new Error("Product checkout user not found");
+      if (!product) throw new Error("Product checkout product not found");
+
+      const purchase = await tx.purchase.create({
+        data: {
+          userId,
+          productId,
+          stripeCheckoutSessionId: session.id,
+          stripePaymentIntentId: paymentIntentId,
+          amountTotal: session.amount_total ?? 0,
+          currency: String(session.currency || "eur").toLowerCase(),
+          status: session.payment_status || "paid"
+        }
+      });
+
+      await tx.customer.upsert({
+        where: { email: user.email },
+        create: {
+          email: user.email,
+          totalSpent: purchase.amountTotal,
+          totalOrders: 1,
+          firstPurchaseAt: new Date(),
+          lastPurchaseAt: new Date()
+        },
+        update: {
+          totalSpent: { increment: purchase.amountTotal },
+          totalOrders: { increment: 1 },
+          lastPurchaseAt: new Date()
+        }
+      });
+
+      await tx.analyticsEvent.create({
+        data: {
+          type: "product_checkout_completed",
+          amount: purchase.amountTotal,
+          currency: purchase.currency,
+          mode: session.livemode ? "live" : "test",
+          metadata: { userId, productId, productName: product.name }
+        }
+      });
+
+      return { purchase };
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const purchase = await prisma.purchase.findUnique({ where: { stripeCheckoutSessionId: session.id } });
+      if (purchase) return { purchase };
+    }
+    throw error;
+  }
 }
 
 async function fulfillCheckoutSession(session) {
