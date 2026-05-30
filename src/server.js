@@ -53,9 +53,17 @@ app.use(compression());
 app.use(cookieParser());
 app.use(cors({
   origin(origin, callback) {
-    const allowed = listEnv("CORS_ORIGINS", `${frontendUrl()},https://www.fimamacro.com`);
-    if (!origin || allowed.includes(origin)) return callback(null, true);
-    return callback(new Error("Not allowed by CORS"));
+    const allowed = new Set([
+      ...listEnv("CORS_ORIGINS", `${frontendUrl()},https://www.fimamacro.com`),
+      apiBaseUrl()
+    ].filter(Boolean).map((value) => value.replace(/\/+$/, "")));
+    const normalizedOrigin = origin ? origin.replace(/\/+$/, "") : "";
+
+    if (!origin || normalizedOrigin === "null" || normalizedOrigin.startsWith("file://") || allowed.has(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(null, false);
   },
   credentials: true
 }));
