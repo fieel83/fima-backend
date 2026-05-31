@@ -460,10 +460,14 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       return res.status(503).json({ error: "checkout_disabled" });
     }
 
+    const user = await getOptionalUser(req, res);
+    if (!user) return res.status(401).json({ error: "account_required" });
+
     const plan = getPlan(req.body?.plan);
     if (!plan) return res.status(400).json({ error: "invalid_plan", plans: planIds() });
 
-    const customerEmail = String(req.body?.customerEmail || "").trim().toLowerCase();
+    const account = await ensureUserStripeCustomer(user);
+    const customerEmail = String(account.email || "").trim().toLowerCase();
     if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
     const commerce = getPlanCommerce(plan);
@@ -472,9 +476,14 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       plan,
       commerce,
       customerEmail,
+      customerId: account.stripeCustomerId,
       priceId,
       selectedCurrency: String(req.body?.currency || commerce.currency).toUpperCase(),
-      language: String(req.body?.language || "en").slice(0, 8)
+      language: String(req.body?.language || "en").slice(0, 8),
+      extraMetadata: {
+        userId: account.id,
+        accountEmail: account.email
+      }
     });
     const session = checkout.session;
     await createAnalyticsEvent("checkout_created", {
@@ -887,9 +896,9 @@ app.post("/admin/api/licenses/:id/extend", requireAdmin, async (req, res) => {
 
 app.post(["/admin/api/licenses/:id/status", "/api/admin/licenses/:id/status"], requireAdmin, async (req, res) => {
   const status = String(req.body?.status || "").trim().toLowerCase();
-  if (!["active", "inactive", "banned"].includes(status)) return res.status(400).json({ error: "invalid_status" });
+  if (!["active", "inactive", "banned", "disabled", "revoked"].includes(status)) return res.status(400).json({ error: "invalid_status" });
   const license = await prisma.license.update({ where: { id: req.params.id }, data: { status } });
-  await createAuditLog(status === "banned" ? "license_banned" : "license_status_changed", "license", license.id, { status });
+  await createAuditLog(status === "banned" ? "license_banned" : status === "revoked" ? "license_revoked" : "license_status_changed", "license", license.id, { status });
   return res.json({ license });
 });
 
@@ -1358,16 +1367,21 @@ async function createProductCheckoutSession({ user, product, price }) {
   });
 }
 
-async function createCheckoutSession({ plan, commerce, customerEmail, priceId, selectedCurrency, language, extraMetadata = {} }) {
+async function createCheckoutSession({ plan, commerce, customerEmail, customerId, priceId, selectedCurrency, language, extraMetadata = {} }) {
   const stripeClient = stripe();
   const baseSession = {
     mode: "payment",
-    customer_email: customerEmail,
     allow_promotion_codes: true,
     success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${frontendUrl()}/#pricing`,
     metadata: checkoutMetadata(plan, commerce, selectedCurrency, language, extraMetadata)
   };
+  const normalizedCustomerId = String(customerId || "").trim();
+  if (normalizedCustomerId.startsWith("cus_")) {
+    baseSession.customer = normalizedCustomerId;
+  } else {
+    baseSession.customer_email = customerEmail;
+  }
 
   const normalizedPriceId = String(priceId || "").trim();
   if (normalizedPriceId) {
@@ -1966,6 +1980,27 @@ async function requireUser(req, res, next) {
     console.error("User auth failed", publicError(error));
     return res.status(500).json({ error: "auth_failed" });
   }
+}
+
+async function getOptionalUser(req, res) {
+  const tokenHash = hashToken(req.cookies?.[USER_SESSION_COOKIE]);
+  if (!tokenHash) return null;
+
+  const session = await prisma.userSession.findUnique({
+    where: { tokenHash },
+    include: { user: true }
+  });
+  if (!session || session.expiresAt.getTime() < Date.now()) {
+    if (session) await prisma.userSession.delete({ where: { id: session.id } }).catch(() => {});
+    clearUserCookie(res);
+    return null;
+  }
+
+  prisma.userSession.update({
+    where: { id: session.id },
+    data: { lastUsedAt: new Date() }
+  }).catch(() => {});
+  return session.user;
 }
 
 function publicUser(user) {
