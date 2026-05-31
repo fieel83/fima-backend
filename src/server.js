@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import dns from "node:dns/promises";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -158,22 +159,38 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_email" });
+    const emailCheck = await validateSignupEmail(email);
+    if (!emailCheck.valid) return res.status(400).json({ error: emailCheck.reason });
     if (!isStrongPassword(password)) return res.status(400).json({ error: "weak_password" });
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const emailNormalized = normalizeAccountEmail(email);
+    const existing = await prisma.user.findFirst({
+      where: { OR: [{ email }, { emailNormalized }] }
+    });
     if (existing) return res.status(409).json({ error: "email_already_registered" });
 
+    const wantsRobloxProfile = String(req.body?.robloxUsername || "").trim().length > 0;
+    const robloxProfile = await resolveRobloxProfile(req.body?.robloxUsername);
+    if (wantsRobloxProfile && !robloxProfile) return res.status(400).json({ error: "invalid_roblox_username" });
     const stripeCustomerId = await createStripeCustomerIfPossible(email);
     const user = await prisma.user.create({
       data: {
         email,
+        emailNormalized,
         passwordHash: await hashPassword(password),
-        stripeCustomerId
+        stripeCustomerId,
+        robloxUsername: robloxProfile?.username || null,
+        robloxUserId: robloxProfile?.id || null,
+        robloxAvatarUrl: robloxProfile?.avatarUrl || null,
+        emailVerifiedAt: null
       }
     });
     await ensureCustomer(email);
-    await createAuditLog("user_registered", "user", user.id, { email });
+    await createAuditLog("user_registered", "user", user.id, {
+      email,
+      emailDomainChecked: emailCheck.mxVerified,
+      robloxLinked: Boolean(robloxProfile)
+    });
     await issueUserSession(res, user.id);
     return res.status(201).json({ success: true, user: publicUser(user) });
   } catch (error) {
@@ -182,11 +199,23 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
   }
 });
 
+app.post("/api/auth/roblox-preview", authLimiter, async (req, res) => {
+  try {
+    const profile = await resolveRobloxProfile(req.body?.robloxUsername);
+    if (!profile) return res.status(404).json({ success: false, error: "roblox_user_not_found" });
+    return res.json({ success: true, profile });
+  } catch (error) {
+    console.warn("Roblox profile preview failed", publicError(error));
+    return res.status(502).json({ success: false, error: "roblox_lookup_failed" });
+  }
+});
+
 app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
-    const user = await prisma.user.findUnique({ where: { email } });
+    const emailNormalized = normalizeAccountEmail(email);
+    const user = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       await createAuditLog("user_login_failed", "user", null, { email });
       return res.status(401).json({ error: "invalid_credentials" });
@@ -218,7 +247,10 @@ app.get("/api/auth/me", requireUser, async (req, res) => {
 app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   try {
-    const user = isValidEmail(email) ? await prisma.user.findUnique({ where: { email } }) : null;
+    const emailNormalized = normalizeAccountEmail(email);
+    const user = isValidEmail(email)
+      ? await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } })
+      : null;
     let devResetToken = null;
     if (user) {
       const token = randomToken();
@@ -319,12 +351,13 @@ app.post("/api/store/checkout", storeCheckoutLimiter, requireUser, async (req, r
 });
 
 app.get("/api/me/products", requireUser, async (req, res) => {
-  const purchases = await prisma.purchase.findMany({
-    where: { userId: req.user.id },
-    orderBy: { createdAt: "desc" },
-    include: { product: { include: { prices: { where: { active: true }, take: 1, orderBy: { createdAt: "desc" } } } } }
+  const [purchases, licenses] = await getAccountAccess(req.user);
+  return res.json({
+    success: true,
+    purchases: purchases.map(publicPurchase),
+    licenses: licenses.map(publicLicense),
+    products: buildAccountProducts(purchases, licenses)
   });
-  return res.json({ success: true, purchases: purchases.map(publicPurchase) });
 });
 
 app.get("/api/store/result", requireUser, async (req, res) => {
@@ -357,18 +390,67 @@ app.get("/api/store/result", requireUser, async (req, res) => {
 });
 
 app.get("/api/me/dashboard", requireUser, async (req, res) => {
-  const [purchases, licenses] = await Promise.all([
-    prisma.purchase.findMany({
-      where: { userId: req.user.id },
-      orderBy: { createdAt: "desc" },
-      include: { product: true }
-    }),
-    prisma.license.findMany({
-      where: { customerEmail: req.user.email },
-      orderBy: { createdAt: "desc" }
-    })
-  ]);
-  return res.json({ success: true, user: publicUser(req.user), purchases: purchases.map(publicPurchase), licenses: licenses.map(licensePayload) });
+  const [purchases, licenses] = await getAccountAccess(req.user);
+  return res.json({
+    success: true,
+    user: publicUser(req.user),
+    purchases: purchases.map(publicPurchase),
+    licenses: licenses.map(publicLicense),
+    products: buildAccountProducts(purchases, licenses)
+  });
+});
+
+app.post("/api/me/licenses/:licenseKey/extend-checkout", storeCheckoutLimiter, requireUser, async (req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    if (settings.maintenanceMode || settings.checkoutEnabled === false) {
+      return res.status(503).json({ error: "checkout_disabled" });
+    }
+
+    const licenseKey = normalizeLicenseKey(req.params.licenseKey || req.body?.licenseKey);
+    const license = await prisma.license.findFirst({
+      where: { licenseKey, customerEmail: req.user.email }
+    });
+    if (!license) return res.status(404).json({ error: "license_not_found" });
+    if (license.status === "banned") return res.status(403).json({ error: "license_banned" });
+
+    const plan = getPlan(req.body?.plan || license.plan);
+    if (!plan) return res.status(400).json({ error: "invalid_plan" });
+
+    const commerce = getPlanCommerce(plan);
+    const checkout = await createCheckoutSession({
+      plan,
+      commerce,
+      customerEmail: req.user.email,
+      priceId: env(commerce.priceEnv),
+      selectedCurrency: String(req.body?.currency || commerce.currency).toUpperCase(),
+      language: String(req.body?.language || "en").slice(0, 8),
+      extraMetadata: {
+        checkoutType: "license_extension",
+        extendLicenseKey: license.licenseKey,
+        userId: req.user.id
+      }
+    });
+
+    await createAnalyticsEvent("license_extension_checkout_created", {
+      plan: plan.id,
+      amount: commerce.priceCents,
+      currency: commerce.currency,
+      mode: checkout.session.livemode ? "live" : "test",
+      metadata: { licenseKey: license.licenseKey, priceSource: checkout.priceSource }
+    });
+
+    return res.json({
+      success: true,
+      url: checkout.session.url,
+      mode: checkout.session.livemode ? "live" : "test",
+      checkoutSessionPrefix: stripeSessionPrefix(checkout.session.id),
+      priceSource: checkout.priceSource
+    });
+  } catch (error) {
+    console.error("License extension checkout failed", publicError(error));
+    return res.status(500).json({ error: "checkout_failed" });
+  }
 });
 
 app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
@@ -1245,7 +1327,7 @@ async function createProductCheckoutSession({ user, product, price }) {
   });
 }
 
-async function createCheckoutSession({ plan, commerce, customerEmail, priceId, selectedCurrency, language }) {
+async function createCheckoutSession({ plan, commerce, customerEmail, priceId, selectedCurrency, language, extraMetadata = {} }) {
   const stripeClient = stripe();
   const baseSession = {
     mode: "payment",
@@ -1253,7 +1335,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, priceId, s
     allow_promotion_codes: true,
     success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${frontendUrl()}/#pricing`,
-    metadata: checkoutMetadata(plan, commerce, selectedCurrency, language)
+    metadata: checkoutMetadata(plan, commerce, selectedCurrency, language, extraMetadata)
   };
 
   if (priceId) {
@@ -1300,7 +1382,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, priceId, s
   return { session, priceSource: "inline_price_data" };
 }
 
-function checkoutMetadata(plan, commerce, selectedCurrency, language) {
+function checkoutMetadata(plan, commerce, selectedCurrency, language, extraMetadata = {}) {
   return {
     plan: plan.id,
     durationDays: plan.durationDays === null ? "0" : String(plan.durationDays),
@@ -1310,7 +1392,8 @@ function checkoutMetadata(plan, commerce, selectedCurrency, language) {
     saleActive: commerce.saleActive ? "true" : "false",
     saleEndAt: commerce.saleEndAt,
     selectedCurrency,
-    language
+    language,
+    ...Object.fromEntries(Object.entries(extraMetadata).map(([key, value]) => [key, String(value)]))
   };
 }
 
@@ -1621,6 +1704,87 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeAccountEmail(value) {
+  const email = normalizeEmail(value);
+  const [localPart, domainPart] = email.split("@");
+  const domain = domainPart === "googlemail.com" ? "gmail.com" : domainPart;
+  if (!localPart || !domain) return email;
+
+  if (domain === "gmail.com") {
+    const baseLocal = localPart.split("+")[0].replace(/\./g, "");
+    return `${baseLocal}@${domain}`;
+  }
+
+  return `${localPart}@${domain}`;
+}
+
+async function validateSignupEmail(email) {
+  if (!isValidEmail(email)) return { valid: false, reason: "invalid_email" };
+  const domain = email.split("@")[1];
+  if (!domain || domain.length > 253) return { valid: false, reason: "invalid_email" };
+
+  try {
+    const mx = await dns.resolveMx(domain);
+    if (!mx.length) return { valid: false, reason: "email_domain_has_no_mail" };
+    return { valid: true, mxVerified: true };
+  } catch (error) {
+    if (["ENODATA", "ENOTFOUND", "ESERVFAIL"].includes(error.code)) {
+      return { valid: false, reason: "email_domain_has_no_mail" };
+    }
+    return { valid: true, mxVerified: false };
+  }
+}
+
+function normalizeRobloxUsername(value) {
+  const username = String(value || "").trim();
+  if (!username) return "";
+  return /^[A-Za-z0-9_]{3,20}$/.test(username) ? username : "";
+}
+
+async function resolveRobloxProfile(value) {
+  const username = normalizeRobloxUsername(value);
+  if (!username) return null;
+
+  const userResponse = await fetchWithAbort("https://users.roblox.com/v1/usernames/users", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ usernames: [username], excludeBannedUsers: true })
+  }, 4500).catch(() => null);
+  if (!userResponse?.ok) return null;
+  const userData = await userResponse.json().catch(() => ({}));
+  const user = userData?.data?.[0];
+  if (!user?.id) return null;
+
+  let avatarUrl = null;
+  const avatarUrlRequest = new URL("https://thumbnails.roblox.com/v1/users/avatar-headshot");
+  avatarUrlRequest.searchParams.set("userIds", String(user.id));
+  avatarUrlRequest.searchParams.set("size", "150x150");
+  avatarUrlRequest.searchParams.set("format", "Png");
+  avatarUrlRequest.searchParams.set("isCircular", "true");
+  const avatarResponse = await fetchWithAbort(avatarUrlRequest, {}, 3500).catch(() => null);
+  if (avatarResponse?.ok) {
+    const avatarData = await avatarResponse.json().catch(() => ({}));
+    avatarUrl = safeUrl(avatarData?.data?.[0]?.imageUrl);
+  }
+
+  return {
+    id: String(user.id),
+    username: user.name || username,
+    displayName: user.displayName || user.name || username,
+    avatarUrl
+  };
+}
+
+async function fetchWithAbort(url, options = {}, timeoutMs = 4000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function isStrongPassword(value) {
   return typeof value === "string" && value.length >= 8 && value.length <= 200;
 }
@@ -1723,6 +1887,10 @@ function publicUser(user) {
     id: user.id,
     email: user.email,
     stripeCustomerId: user.stripeCustomerId || null,
+    robloxUsername: user.robloxUsername || null,
+    robloxUserId: user.robloxUserId || null,
+    robloxAvatarUrl: user.robloxAvatarUrl || null,
+    emailVerifiedAt: user.emailVerifiedAt || null,
     role: user.role,
     createdAt: user.createdAt
   };
@@ -1793,6 +1961,80 @@ function publicPurchase(purchase) {
     status: purchase.status,
     createdAt: purchase.createdAt
   };
+}
+
+async function getAccountAccess(user) {
+  return Promise.all([
+    prisma.purchase.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: { product: { include: { prices: { where: { active: true }, take: 1, orderBy: { createdAt: "desc" } } } } }
+    }),
+    prisma.license.findMany({
+      where: { customerEmail: user.email },
+      orderBy: { createdAt: "desc" }
+    })
+  ]);
+}
+
+function publicLicense(license) {
+  const plan = getPlan(license.plan);
+  const expiresAt = license.expiresAt ? license.expiresAt.toISOString() : null;
+  const remainingSeconds = license.lifetime
+    ? null
+    : Math.max(0, Math.floor(((license.expiresAt?.getTime() || Date.now()) - Date.now()) / 1000));
+
+  return {
+    ...licensePayload(license),
+    id: license.id,
+    status: license.status,
+    planLabel: plan?.name?.replace(/^Fima Macro\s+/i, "") || license.plan,
+    durationDays: plan?.durationDays ?? null,
+    expiresAt,
+    remainingSeconds,
+    expired: !license.lifetime && Boolean(license.expiresAt) && license.expiresAt.getTime() < Date.now(),
+    canExtend: license.status !== "banned" && !license.lifetime,
+    validationCount: license.validationCount || 0,
+    downloadCount: license.downloadCount || 0,
+    lastValidatedAt: license.lastValidatedAt ? license.lastValidatedAt.toISOString() : null,
+    lastDownloadedAt: license.lastDownloadedAt ? license.lastDownloadedAt.toISOString() : null,
+    createdAt: license.createdAt ? license.createdAt.toISOString() : null
+  };
+}
+
+function buildAccountProducts(purchases, licenses) {
+  const purchaseCards = purchases.map((purchase) => ({
+    id: `purchase:${purchase.id}`,
+    type: "purchase",
+    name: purchase.product?.name || "Fima Product",
+    category: purchase.product?.category || "Product",
+    status: purchase.status,
+    amountTotal: purchase.amountTotal,
+    currency: purchase.currency,
+    createdAt: purchase.createdAt,
+    product: purchase.product ? publicProduct(purchase.product) : null,
+    license: null
+  }));
+
+  const licenseCards = licenses.map((license) => {
+    const plan = getPlan(license.plan);
+    return {
+      id: `license:${license.id}`,
+      type: "license",
+      name: plan?.name || `Fima Macro ${license.plan}`,
+      category: "License",
+      status: license.status,
+      amountTotal: null,
+      currency: "eur",
+      createdAt: license.createdAt,
+      product: null,
+      license: publicLicense(license)
+    };
+  });
+
+  return [...licenseCards, ...purchaseCards].sort((left, right) =>
+    new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
+  );
 }
 
 function sanitizeProductInput(input) {
@@ -1982,6 +2224,8 @@ async function fulfillCheckoutSession(session) {
   const paymentIntentId = typeof session.payment_intent === "string"
     ? session.payment_intent
     : session.payment_intent?.id || null;
+  const extensionKey = normalizeLicenseKey(session.metadata?.extendLicenseKey);
+  const isExtension = session.metadata?.checkoutType === "license_extension" && extensionKey;
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -1991,15 +2235,34 @@ async function fulfillCheckoutSession(session) {
       });
       if (again?.license) return again;
 
-      const license = await tx.license.create({
-        data: buildLicenseData({
-          licenseKey: await generateUniqueLicenseKey(tx),
-          email,
-          plan,
-          stripeSessionId: session.id,
-          stripePaymentIntentId: paymentIntentId
-        })
-      });
+      let license;
+      if (isExtension) {
+        const current = await tx.license.findFirst({
+          where: { licenseKey: extensionKey, customerEmail: email }
+        });
+        if (!current) throw new Error("Extension target license not found");
+        const baseDate = current.expiresAt && current.expiresAt > new Date() ? current.expiresAt : new Date();
+        license = await tx.license.update({
+          where: { id: current.id },
+          data: {
+            plan: plan.id,
+            lifetime: plan.lifetime,
+            expiresAt: plan.lifetime ? null : getPlanExpiry(plan, baseDate),
+            stripePaymentIntentId: paymentIntentId,
+            status: "active"
+          }
+        });
+      } else {
+        license = await tx.license.create({
+          data: buildLicenseData({
+            licenseKey: await generateUniqueLicenseKey(tx),
+            email,
+            plan,
+            stripeSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId
+          })
+        });
+      }
 
       const order = await tx.order.upsert({
         where: { stripeSessionId: session.id },
@@ -2044,12 +2307,12 @@ async function fulfillCheckoutSession(session) {
         });
         await tx.analyticsEvent.create({
           data: {
-            type: "checkout_completed",
+            type: isExtension ? "license_extension_completed" : "checkout_completed",
             plan: plan.id,
             amount: order.amount,
             currency: order.currency,
             mode: order.mode,
-            metadata: { priceSource: "stripe_webhook" }
+            metadata: { priceSource: "stripe_webhook", extended: Boolean(isExtension) }
           }
         });
       }

@@ -79,8 +79,13 @@ model Customer {
 model User {
   id               String    @id @default(cuid())
   email            String    @unique
+  emailNormalized  String?   @unique @map("email_normalized")
   passwordHash     String    @map("password_hash")
   stripeCustomerId String?   @unique @map("stripe_customer_id")
+  robloxUsername   String?   @map("roblox_username")
+  robloxUserId     String?   @map("roblox_user_id")
+  robloxAvatarUrl  String?   @map("roblox_avatar_url")
+  emailVerifiedAt  DateTime? @map("email_verified_at")
   role             String    @default("user")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
