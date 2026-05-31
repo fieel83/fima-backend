@@ -31,6 +31,15 @@ export function stripeSessionPrefix(sessionId) {
   return "unknown";
 }
 
+export function stripePriceEnvState(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "missing";
+  const lowered = normalized.toLowerCase();
+  if (["value", "undefined", "null", "todo", "changeme", "replace_me"].includes(lowered)) return "placeholder";
+  if (!normalized.startsWith("price_")) return "invalid_format";
+  return "set";
+}
+
 export function stripeConfigSummary(priceEnvNames = []) {
   const secretKeyMode = stripeKeyMode(process.env.STRIPE_SECRET_KEY);
   const publishableKeyMode = stripeKeyMode(process.env.STRIPE_PUBLISHABLE_KEY);
@@ -39,6 +48,6 @@ export function stripeConfigSummary(priceEnvNames = []) {
     effectiveMode: secretKeyMode === "live" || secretKeyMode === "test" ? secretKeyMode : "unknown",
     secretKeyMode,
     publishableKeyMode,
-    priceIds: Object.fromEntries(priceEnvNames.map((name) => [name, process.env[name] ? "set" : "missing"]))
+    priceIds: Object.fromEntries(priceEnvNames.map((name) => [name, stripePriceEnvState(process.env[name])]))
   };
 }

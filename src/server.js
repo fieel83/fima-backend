@@ -21,7 +21,7 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { clearAdminCookie, createAdminToken, requireAdmin, setAdminCookie } from "./adminAuth.js";
-import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeSessionPrefix } from "./stripeSafety.js";
+import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
 
 const app = express();
 const port = Number(env("PORT", "8080"));
@@ -625,7 +625,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
 
     if (normalizeHwid(license.hwid) !== hwid) {
       await incrementValidationFailure(license, licenseKey, "hwid_mismatch", hwid, appVersion);
-      return invalid(res, "hwid_mismatch", "This license is already used on another device");
+      return invalid(res, "hwid_mismatch", "This license key is already bound to another device. Please open a support ticket if this is your key.");
     }
 
     await prisma.$transaction([
@@ -778,7 +778,7 @@ app.get("/admin/api/dashboard", requireAdmin, async (_req, res) => {
   });
 });
 
-app.get("/admin/api/licenses", requireAdmin, async (req, res) => {
+async function adminLicensesHandler(req, res) {
   const search = String(req.query.search || "").trim();
   const plan = String(req.query.plan || "").trim();
   const status = String(req.query.status || "").trim();
@@ -804,13 +804,36 @@ app.get("/admin/api/licenses", requireAdmin, async (req, res) => {
 
   const licenses = await prisma.license.findMany({
     where,
+    include: {
+      orders: { orderBy: { createdAt: "desc" }, take: 3 }
+    },
     orderBy: { createdAt: "desc" },
     take: 200
   });
-  res.json({ licenses });
-});
 
-app.get("/admin/api/licenses/:id", requireAdmin, async (req, res) => {
+  const emails = [...new Set(licenses.map((license) => normalizeEmail(license.customerEmail)).filter(Boolean))];
+  const users = emails.length
+    ? await prisma.user.findMany({
+        where: { email: { in: emails } },
+        select: {
+          email: true,
+          robloxUsername: true,
+          robloxUserId: true,
+          robloxAvatarUrl: true,
+          stripeCustomerId: true
+        }
+      })
+    : [];
+  const userByEmail = new Map(users.map((user) => [normalizeEmail(user.email), user]));
+
+  res.json({
+    licenses: licenses.map((license) => adminLicensePayload(license, userByEmail.get(normalizeEmail(license.customerEmail))))
+  });
+}
+
+app.get(["/admin/api/licenses", "/api/admin/licenses"], requireAdmin, adminLicensesHandler);
+
+app.get(["/admin/api/licenses/:id", "/api/admin/licenses/:id"], requireAdmin, async (req, res) => {
   const license = await prisma.license.findUnique({
     where: { id: req.params.id },
     include: {
@@ -862,7 +885,7 @@ app.post("/admin/api/licenses/:id/extend", requireAdmin, async (req, res) => {
   return res.json({ license });
 });
 
-app.post("/admin/api/licenses/:id/status", requireAdmin, async (req, res) => {
+app.post(["/admin/api/licenses/:id/status", "/api/admin/licenses/:id/status"], requireAdmin, async (req, res) => {
   const status = String(req.body?.status || "").trim().toLowerCase();
   if (!["active", "inactive", "banned"].includes(status)) return res.status(400).json({ error: "invalid_status" });
   const license = await prisma.license.update({ where: { id: req.params.id }, data: { status } });
@@ -870,9 +893,17 @@ app.post("/admin/api/licenses/:id/status", requireAdmin, async (req, res) => {
   return res.json({ license });
 });
 
-app.post("/admin/api/licenses/:id/reset-hwid", requireAdmin, async (req, res) => {
+app.post(["/admin/api/licenses/:id/reset-hwid", "/api/admin/licenses/:id/reset-hwid"], requireAdmin, async (req, res) => {
   const license = await prisma.license.update({ where: { id: req.params.id }, data: { hwid: null } });
   await createAuditLog("license_hwid_reset", "license", license.id, {});
+  return res.json({ license });
+});
+
+app.post(["/admin/api/licenses/:id/bind-hwid", "/api/admin/licenses/:id/bind-hwid"], requireAdmin, async (req, res) => {
+  const hwid = normalizeHwid(req.body?.hwid);
+  if (!hwid) return res.status(400).json({ error: "invalid_hwid" });
+  const license = await prisma.license.update({ where: { id: req.params.id }, data: { hwid } });
+  await createAuditLog("license_hwid_bound", "license", license.id, { hwidHash: hashHwid(hwid) });
   return res.json({ license });
 });
 
@@ -1338,13 +1369,14 @@ async function createCheckoutSession({ plan, commerce, customerEmail, priceId, s
     metadata: checkoutMetadata(plan, commerce, selectedCurrency, language, extraMetadata)
   };
 
-  if (priceId) {
-    const priceCheck = await validateStripePriceForPlan(stripeClient, plan, priceId, commerce);
+  const normalizedPriceId = String(priceId || "").trim();
+  if (normalizedPriceId) {
+    const priceCheck = await validateStripePriceForPlan(stripeClient, plan, normalizedPriceId, commerce);
     recordStripePriceCheck(priceCheck);
     if (priceCheck.ok) {
       const session = await stripeClient.checkout.sessions.create({
         ...baseSession,
-        line_items: [{ price: priceId, quantity: 1 }]
+        line_items: [{ price: normalizedPriceId, quantity: 1 }]
       });
       return { session, priceSource: "price_id" };
     }
@@ -1436,12 +1468,19 @@ async function validateStripePriceForPlan(stripeClient, plan, priceId, commerce 
     expected: expectedPriceForPlan(plan, commerce)
   };
 
-  if (!priceId) {
+  const normalizedPriceId = String(priceId || "").trim();
+  const priceEnvState = stripePriceEnvState(normalizedPriceId);
+  if (priceEnvState !== "set") {
+    const status = priceEnvState === "missing" ? "missing_env" : "invalid_env_value";
+    return { ...base, ok: false, status, priceEnvState };
+  }
+
+  if (!normalizedPriceId) {
     return { ...base, ok: false, status: "missing_env" };
   }
 
   try {
-    const price = await stripeClient.prices.retrieve(priceId);
+    const price = await stripeClient.prices.retrieve(normalizedPriceId);
     const actual = {
       active: price.active,
       currency: String(price.currency || "").toLowerCase(),
@@ -1501,6 +1540,7 @@ function sanitizePriceCheck(check) {
     priceEnv: check.priceEnv,
     expected: check.expected,
     actual: check.actual,
+    priceEnvState: check.priceEnvState,
     stripeErrorCode: check.stripeErrorCode,
     stripeErrorType: check.stripeErrorType,
     stripeMode: stripeConfigSummary().effectiveMode
@@ -1628,6 +1668,52 @@ function licenseAccessState(license) {
     return { valid: false, reason: "expired" };
   }
   return { valid: true, reason: "valid" };
+}
+
+function licenseSource(license) {
+  if (license?.stripeSessionId) return "Stripe/Website";
+  const notes = String(license?.notes || "").toLowerCase();
+  if (notes.includes("trial")) return "Trial";
+  if (notes.includes("extension")) return "Extension";
+  return "Manual";
+}
+
+function licenseTimeLeft(expiresAt, lifetime) {
+  if (lifetime) return { label: "Lifetime", seconds: null, state: "lifetime" };
+  if (!expiresAt) return { label: "No expiry", seconds: null, state: "unknown" };
+  const seconds = Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000);
+  if (seconds <= 0) return { label: "Expired", seconds, state: "expired" };
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const label = days > 0 ? `${days}d ${hours}h ${minutes}m left` : hours > 0 ? `${hours}h ${minutes}m left` : `${minutes}m left`;
+  return { label, seconds, state: seconds < 86400 ? "warning" : "active" };
+}
+
+function adminLicensePayload(license, user = null) {
+  const order = license.orders?.[0] || null;
+  const timeLeft = licenseTimeLeft(license.expiresAt, license.lifetime);
+  return {
+    ...license,
+    source: licenseSource(license),
+    userEmail: license.customerEmail,
+    robloxUsername: user?.robloxUsername || null,
+    robloxUserId: user?.robloxUserId || null,
+    robloxAvatarUrl: user?.robloxAvatarUrl || null,
+    stripeCustomerId: user?.stripeCustomerId || null,
+    hwidStatus: license.hwid ? "Bound" : "Unbound",
+    enabled: license.status === "active",
+    expires: license.lifetime ? "Lifetime" : license.expiresAt,
+    timeLeft: timeLeft.label,
+    timeLeftSeconds: timeLeft.seconds,
+    timeLeftState: timeLeft.state,
+    paymentSessionId: license.stripeSessionId || order?.stripeSessionId || null,
+    paymentIntentId: license.stripePaymentIntentId || order?.stripePaymentIntentId || null,
+    orderId: order?.id || null,
+    orderAmount: order?.amount || null,
+    orderCurrency: order?.currency || null,
+    orderStatus: order?.status || null
+  };
 }
 
 async function logDownload(license, licenseKey, result, reason, version = null) {

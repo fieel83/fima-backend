@@ -29,10 +29,12 @@ test("launch sale switches license plans to sale EUR prices only during campaign
   const during = new Date("2026-05-31T10:00:00.000Z");
   const after = new Date("2026-06-03T22:00:01.000Z");
 
-  assert.equal(getPlanCommerce(getPlan("1day"), before).priceCents, 299);
-  assert.equal(getPlanCommerce(getPlan("1day"), during).priceCents, 99);
-  assert.equal(getPlanCommerce(getPlan("2weeks"), during).priceCents, 399);
+  assert.equal(getPlanCommerce(getPlan("1day"), before).priceCents, 99);
+  assert.equal(getPlanCommerce(getPlan("1day"), during).priceCents, 74);
+  assert.equal(getPlanCommerce(getPlan("2weeks"), during).priceCents, 299);
+  assert.equal(getPlanCommerce(getPlan("1month"), during).priceCents, 599);
+  assert.equal(getPlanCommerce(getPlan("3months"), during).priceCents, 1349);
   assert.equal(getPlanCommerce(getPlan("3months"), during).currency, "eur");
-  assert.equal(getPlanCommerce(getPlan("lifetime"), during).priceCents, 4999);
-  assert.equal(getPlanCommerce(getPlan("2weeks"), after).priceCents, 999);
+  assert.equal(getPlanCommerce(getPlan("lifetime"), during).priceCents, 3999);
+  assert.equal(getPlanCommerce(getPlan("2weeks"), after).priceCents, 399);
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertStripeSecretKeyAllowed, stripeKeyMode, stripeSessionPrefix } from "../src/stripeSafety.js";
+import { assertStripeSecretKeyAllowed, stripeKeyMode, stripePriceEnvState, stripeSessionPrefix } from "../src/stripeSafety.js";
 
 test("Stripe safety accepts test keys", () => {
   assert.doesNotThrow(() => assertStripeSecretKeyAllowed("sk_test_example"));
@@ -22,4 +22,11 @@ test("Stripe mode helpers expose only mode and prefix data", () => {
   assert.equal(stripeKeyMode("pk_test_example"), "test");
   assert.equal(stripeSessionPrefix("cs_live_example"), "cs_live");
   assert.equal(stripeSessionPrefix("cs_test_example"), "cs_test");
+});
+
+test("Stripe price env state treats placeholders as unsafe fallback values", () => {
+  assert.equal(stripePriceEnvState("price_123"), "set");
+  assert.equal(stripePriceEnvState(""), "missing");
+  assert.equal(stripePriceEnvState("value"), "placeholder");
+  assert.equal(stripePriceEnvState("not-a-price-id"), "invalid_format");
 });
