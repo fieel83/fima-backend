@@ -20,12 +20,26 @@ let readyAt = null;
 let lastError = null;
 
 export function startDiscordBot() {
-  if (started) return;
+  if (started) {
+    console.info("Discord bot startup skipped; already started.");
+    return;
+  }
   started = true;
 
   const token = env("DISCORD_BOT_TOKEN");
+  console.info("Starting Discord bot...", {
+    discordBotTokenExists: Boolean(token),
+    discordGuildIdExists: Boolean(env("DISCORD_GUILD_ID")),
+    intents: ["Guilds", "GuildMembers"]
+  });
+  console.info(`DISCORD_BOT_TOKEN exists: ${Boolean(token)}`);
+
   if (!token) {
     lastError = "DISCORD_BOT_TOKEN is not configured";
+    console.warn("Discord bot login skipped", {
+      discordBotTokenExists: false,
+      message: lastError
+    });
     return;
   }
 
@@ -39,7 +53,11 @@ export function startDiscordBot() {
   client.once("ready", () => {
     readyAt = new Date();
     lastError = null;
-    console.info("Discord bot ready", {
+    console.info("Discord client ready event fired", {
+      botUserTag: client.user?.tag || null,
+      botUserId: client.user?.id || null
+    });
+    console.info("Discord bot login successful as ...", {
       bot: client.user?.tag || client.user?.id || "unknown",
       guildId: env("DISCORD_GUILD_ID", "")
     });
@@ -50,27 +68,36 @@ export function startDiscordBot() {
     console.warn("Discord bot error", { message: error.message });
   });
 
-  client.login(token).catch((error) => {
+  client.on("shardError", (error) => {
     lastError = error.message;
-    console.warn("Discord bot login failed", { message: error.message });
+    console.warn("Discord bot shard error", { message: error.message });
+  });
+
+  client.login(token).then(() => {
+    console.info("Discord bot login promise resolved; waiting for ready event if not fired yet.");
+  }).catch((error) => {
+    lastError = error.message;
+    console.warn("Discord bot login failed:", {
+      message: error.message,
+      code: error.code || null,
+      name: error.name || null
+    });
   });
 }
 
 export async function discordBotHealth() {
-  const configured = Boolean(env("DISCORD_BOT_TOKEN") && env("DISCORD_GUILD_ID"));
+  const botConfigured = Boolean(env("DISCORD_BOT_TOKEN") && env("DISCORD_GUILD_ID"));
+  const botReady = Boolean(client?.isReady?.());
   const guild = await getGuild().catch(() => null);
   const me = guild?.members?.me || (guild ? await guild.members.fetchMe().catch(() => null) : null);
   const permissions = me?.permissions || null;
-  const canManageRoles = permissions ? permissions.has(PermissionsBitField.Flags.ManageRoles) : false;
+  const manageRolesPermission = permissions ? permissions.has(PermissionsBitField.Flags.ManageRoles) : false;
   const roleChecks = {};
 
   for (const [type, config] of Object.entries(ROLE_TYPES)) {
-    const configuredRoleId = env(config.envName);
-    const role = configuredRoleId
-      ? await guild?.roles.fetch(configuredRoleId).catch(() => null)
-      : guild?.roles.cache.find((item) => item.name === config.fallbackName);
+    const role = guild ? await findRole(guild, config) : null;
     roleChecks[type] = {
-      configuredRoleId: configuredRoleId || null,
+      configuredRoleId: env(config.envName) || null,
       fallbackName: config.fallbackName,
       found: Boolean(role),
       roleId: role?.id || null
@@ -78,13 +105,27 @@ export async function discordBotHealth() {
   }
 
   return {
-    configured,
-    ready: Boolean(client?.isReady?.()),
-    readyAt: readyAt ? readyAt.toISOString() : null,
-    botUser: client?.user ? { id: client.user.id, tag: client.user.tag } : null,
+    botConfigured,
+    tokenConfigured: Boolean(env("DISCORD_BOT_TOKEN")),
+    guildConfigured: Boolean(env("DISCORD_GUILD_ID")),
+    botReady,
+    botUserTag: client?.user?.tag || null,
+    botUserId: client?.user?.id || null,
     guildId: env("DISCORD_GUILD_ID", "") || null,
+    guildFound: Boolean(guild),
+    manageRolesPermission,
+    buyerRoleFound: Boolean(roleChecks.buyer?.found),
+    buyerRoleId: roleChecks.buyer?.roleId || null,
+    trialRoleFound: Boolean(roleChecks.trial?.found),
+    trialRoleId: roleChecks.trial?.roleId || null,
+    lastBotError: lastError,
+    readyAt: readyAt ? readyAt.toISOString() : null,
+    started,
+    configured: botConfigured,
+    ready: botReady,
+    botUser: client?.user ? { id: client.user.id, tag: client.user.tag } : null,
     guildAvailable: Boolean(guild),
-    canManageRoles,
+    canManageRoles: manageRolesPermission,
     roles: roleChecks,
     lastError
   };
@@ -158,11 +199,8 @@ async function getOrCreateRole(guild, type) {
     throw error;
   }
 
-  const configuredRoleId = env(config.envName);
-  if (configuredRoleId) {
-    const role = await guild.roles.fetch(configuredRoleId).catch(() => null);
-    if (role) return role;
-  }
+  const role = await findRole(guild, config);
+  if (role) return role;
 
   const existing = guild.roles.cache.find((role) => role.name === config.fallbackName);
   if (existing) return existing;
@@ -179,6 +217,17 @@ async function getOrCreateRole(guild, type) {
     color: config.color,
     reason: "Fima Macro role sync"
   });
+}
+
+async function findRole(guild, config) {
+  const configuredRoleId = env(config.envName);
+  if (configuredRoleId) {
+    const role = await guild.roles.fetch(configuredRoleId).catch(() => null);
+    if (role) return role;
+  }
+
+  await guild.roles.fetch().catch(() => null);
+  return guild.roles.cache.find((role) => role.name === config.fallbackName) || null;
 }
 
 async function getGuild() {
