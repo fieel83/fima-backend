@@ -313,7 +313,7 @@ app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
     setOAuthCookie(res, OAUTH_PKCE_COOKIE, pkce.verifier);
 
     const discovery = await getRobloxOidcDiscovery();
-    const redirectUri = env("ROBLOX_REDIRECT_URI", `${apiBaseUrl()}/auth/roblox/callback`);
+    const redirectUri = robloxRedirectUri();
     const url = new URL(discovery.authorization_endpoint);
     url.searchParams.set("client_id", requiredEnv("ROBLOX_CLIENT_ID"));
     url.searchParams.set("redirect_uri", redirectUri);
@@ -332,24 +332,27 @@ app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
 
 app.get("/auth/roblox/callback", oauthLimiter, async (req, res) => {
   try {
-    const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "roblox");
-    const currentUser = await getOptionalUser(req, res);
-    if (!currentUser || currentUser.id !== state.userId) throw new Error("roblox_link_requires_login");
-
-    const code = String(req.query?.code || "").trim();
-    const verifier = String(req.cookies?.[OAUTH_PKCE_COOKIE] || "");
-    if (!code || !verifier) throw new Error("missing_roblox_oauth_data");
-
-    const token = await exchangeRobloxCode(code, verifier);
-    const profile = await fetchRobloxOidcProfile(token.access_token);
-    const user = await linkRobloxAccount(currentUser.id, profile, token);
-    await createAuditLog("roblox_account_linked", "user", user.id, { robloxUserId: profile.sub });
-    clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard.html"}?roblox=connected`);
+    const result = await finishRobloxOAuth(req, res, req.query || {});
+    return res.redirect(result.redirectUrl);
   } catch (error) {
     console.error("Roblox OAuth callback failed", publicError(error));
     clearOAuthCookies(res);
     return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_failed`);
+  }
+});
+
+app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
+  try {
+    const result = await finishRobloxOAuth(req, res, req.body || {});
+    return res.json({ success: true, redirectUrl: result.redirectUrl, user: publicUser(result.user) });
+  } catch (error) {
+    console.error("Roblox OAuth finish failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.status(400).json({
+      success: false,
+      error: error.code || "roblox_oauth_failed",
+      redirectUrl: `${frontendUrl()}/dashboard.html?error=roblox_oauth_failed`
+    });
   }
 });
 
@@ -1511,13 +1514,16 @@ app.get("/admin/api/audit", requireAdmin, async (_req, res) => {
 });
 
 function oauthCookieOptions() {
-  return {
+  const options = {
     httpOnly: true,
     secure: apiBaseUrl().startsWith("https"),
     sameSite: "lax",
     path: "/auth",
     maxAge: 10 * 60 * 1000
   };
+  const domain = oauthCookieDomain();
+  if (domain) options.domain = domain;
+  return options;
 }
 
 function setOAuthCookie(res, name, value) {
@@ -1527,6 +1533,24 @@ function setOAuthCookie(res, name, value) {
 function clearOAuthCookies(res) {
   res.clearCookie(OAUTH_STATE_COOKIE, { path: "/auth" });
   res.clearCookie(OAUTH_PKCE_COOKIE, { path: "/auth" });
+  const domain = oauthCookieDomain();
+  if (domain) {
+    res.clearCookie(OAUTH_STATE_COOKIE, { path: "/auth", domain });
+    res.clearCookie(OAUTH_PKCE_COOKIE, { path: "/auth", domain });
+  }
+}
+
+function oauthCookieDomain() {
+  const configured = String(env("OAUTH_COOKIE_DOMAIN", "") || "").trim();
+  if (configured) return configured;
+  try {
+    const apiHost = new URL(apiBaseUrl()).hostname;
+    const frontHost = new URL(frontendUrl()).hostname;
+    if (apiHost.endsWith(".fimamacro.com") && frontHost === "fimamacro.com") return ".fimamacro.com";
+  } catch {
+    return "";
+  }
+  return "";
 }
 
 function oauthSecret() {
@@ -1570,6 +1594,34 @@ function createPkcePair() {
   const verifier = crypto.randomBytes(32).toString("base64url");
   const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
   return { verifier, challenge };
+}
+
+async function finishRobloxOAuth(req, res, input) {
+  const state = verifyOAuthState(input?.state, req.cookies?.[OAUTH_STATE_COOKIE], "roblox");
+  const currentUser = await getOptionalUser(req, res);
+  if (!currentUser || currentUser.id !== state.userId) {
+    const error = new Error("roblox_link_requires_login");
+    error.code = "roblox_link_requires_login";
+    throw error;
+  }
+
+  const code = String(input?.code || "").trim();
+  const verifier = String(req.cookies?.[OAUTH_PKCE_COOKIE] || "");
+  if (!code || !verifier) {
+    const error = new Error("missing_roblox_oauth_data");
+    error.code = "missing_roblox_oauth_data";
+    throw error;
+  }
+
+  const token = await exchangeRobloxCode(code, verifier);
+  const profile = await fetchRobloxOidcProfile(token.access_token);
+  const user = await linkRobloxAccount(currentUser.id, profile, token);
+  await createAuditLog("roblox_account_linked", "user", user.id, { robloxUserId: profile.sub });
+  clearOAuthCookies(res);
+  return {
+    user,
+    redirectUrl: `${frontendUrl()}${state.returnTo || "/dashboard.html"}?roblox=connected`
+  };
 }
 
 async function exchangeDiscordCode(code) {
@@ -1690,7 +1742,7 @@ async function getRobloxOidcDiscovery() {
 
 async function exchangeRobloxCode(code, verifier) {
   const discovery = await getRobloxOidcDiscovery();
-  const redirectUri = env("ROBLOX_REDIRECT_URI", `${apiBaseUrl()}/auth/roblox/callback`);
+  const redirectUri = robloxRedirectUri();
   const body = new URLSearchParams({
     client_id: requiredEnv("ROBLOX_CLIENT_ID"),
     client_secret: requiredEnv("ROBLOX_CLIENT_SECRET"),
@@ -1706,6 +1758,10 @@ async function exchangeRobloxCode(code, verifier) {
   }, 8000);
   if (!response.ok) throw new Error(`roblox_token_exchange_failed_${response.status}`);
   return response.json();
+}
+
+function robloxRedirectUri() {
+  return env("ROBLOX_REDIRECT_URI", `${frontendUrl()}/auth/roblox/callback`);
 }
 
 async function fetchRobloxOidcProfile(accessToken) {

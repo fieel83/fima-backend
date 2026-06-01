@@ -12,9 +12,9 @@ This backend keeps Stripe as the automatic card payment system and adds account 
 Use these callback URLs in provider dashboards:
 
 - Discord: `https://api.fimamacro.com/auth/discord/callback`
-- Roblox: `https://api.fimamacro.com/auth/roblox/callback`
+- Roblox: `https://fimamacro.com/auth/roblox/callback`
 
-Discord can create or log in an account using the verified email from Discord. Roblox linking requires the user to already be logged in, then it attaches the Roblox identity to that Fima account.
+Discord can create or log in an account using the verified email from Discord. Roblox linking requires the user to already be logged in, then it attaches the Roblox identity to that Fima account. While the Roblox OAuth app is under review, the frontend callback page at `fimamacro.com` forwards the `code` and `state` to `POST https://api.fimamacro.com/auth/roblox/finish`; the `redirect_uri` used for both authorize and token exchange remains exactly `https://fimamacro.com/auth/roblox/callback`.
 
 ## Admin and role routes
 
@@ -54,5 +54,6 @@ Keep all values in Render environment variables only:
 - `ROBLOX_CLIENT_SECRET`
 - `ROBLOX_REDIRECT_URI`
 - `ROBLOX_OIDC_ISSUER`
+- `OAUTH_COOKIE_DOMAIN`
 
 If `APP_ENCRYPTION_KEY` is not set, OAuth access/refresh tokens are not stored. No secret values should be committed to the repo.
