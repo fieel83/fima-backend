@@ -47,9 +47,12 @@ const passwordResetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, sta
 const storeCheckoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 25, standardHeaders: true, legacyHeaders: false });
 const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
+const trialLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
+const MONTHLY_TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
+const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 
 const defaultSiteSettings = {
   discordInviteUrl: env("DISCORD_INVITE_URL", ""),
@@ -515,14 +518,188 @@ app.get("/api/store/result", requireUser, async (req, res) => {
 });
 
 app.get("/api/me/dashboard", requireUser, async (req, res) => {
-  const [purchases, licenses] = await getAccountAccess(req.user);
+  const integrations = await buildIntegrationSummary(req.user);
+  const [access, trial] = await Promise.all([
+    getAccountAccess(req.user),
+    buildMonthlyTrialSummary(req.user, new Date(), integrations)
+  ]);
+  const [purchases, licenses] = access;
   return res.json({
     success: true,
     user: publicUser(req.user),
+    integrations,
+    trial,
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
     products: buildAccountProducts(purchases, licenses)
   });
+});
+
+app.get("/api/me/integrations", requireUser, async (req, res) => {
+  const integrations = await buildIntegrationSummary(req.user);
+  return res.json({
+    success: true,
+    integrations,
+    trial: await buildMonthlyTrialSummary(req.user, new Date(), integrations)
+  });
+});
+
+app.post(["/auth/discord/disconnect", "/api/auth/discord/disconnect"], requireUser, async (req, res) => {
+  const previousDiscordUserId = req.user.discordUserId;
+  try {
+    const activeTrial = await findActiveMonthlyTrial(req.user);
+    if (previousDiscordUserId && activeTrial) {
+      removeDiscordRole(previousDiscordUserId, "trial").catch((error) => {
+        console.warn("Discord trial role removal after disconnect failed", publicError(error));
+      });
+    }
+
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "discord" } });
+      return tx.user.update({
+        where: { id: req.user.id },
+        data: {
+          discordUserId: null,
+          discordUsername: null,
+          discordEmail: null,
+          discordAvatarUrl: null
+        }
+      });
+    });
+    await createAuditLog("discord_account_disconnected", "user", user.id, { previousDiscordUserId });
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      integrations: await buildIntegrationSummary(user),
+      trial: await buildMonthlyTrialSummary(user)
+    });
+  } catch (error) {
+    console.error("Discord disconnect failed", publicError(error));
+    return res.status(500).json({ error: "discord_disconnect_failed" });
+  }
+});
+
+app.post(["/auth/roblox/disconnect", "/api/auth/roblox/disconnect"], requireUser, async (req, res) => {
+  const previousRobloxUserId = req.user.robloxUserId;
+  try {
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "roblox" } });
+      return tx.user.update({
+        where: { id: req.user.id },
+        data: {
+          robloxUserId: null,
+          robloxUsername: null,
+          robloxAvatarUrl: null
+        }
+      });
+    });
+    await createAuditLog("roblox_account_disconnected", "user", user.id, { previousRobloxUserId });
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      integrations: await buildIntegrationSummary(user),
+      trial: await buildMonthlyTrialSummary(user)
+    });
+  } catch (error) {
+    console.error("Roblox disconnect failed", publicError(error));
+    return res.status(500).json({ error: "roblox_disconnect_failed" });
+  }
+});
+
+app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, async (req, res) => {
+  const user = await getOptionalUser(req, res);
+  if (!user) return res.status(401).json({ error: "not_logged_in" });
+
+  try {
+    const freshUser = await prisma.user.findUnique({ where: { id: user.id } });
+    if (!freshUser) return res.status(401).json({ error: "not_logged_in" });
+    const integrations = await buildIntegrationSummary(freshUser);
+    if (!integrations.discord.connected) return res.status(403).json({ error: "discord_not_connected" });
+    if (!integrations.roblox.connected) return res.status(403).json({ error: "roblox_not_connected" });
+
+    const now = new Date();
+    const activeTrial = await findActiveMonthlyTrial(freshUser, now);
+    if (activeTrial) {
+      return res.status(409).json({
+        error: "trial_already_active",
+        trial: await buildMonthlyTrialSummary(freshUser)
+      });
+    }
+    if (freshUser.nextTrialAvailableAt && freshUser.nextTrialAvailableAt > now) {
+      return res.status(429).json({
+        error: "trial_cooldown_active",
+        nextTrialAvailableAt: freshUser.nextTrialAvailableAt.toISOString(),
+        trial: await buildMonthlyTrialSummary(freshUser)
+      });
+    }
+
+    const plan = getPlan("1day");
+    if (!plan) return res.status(500).json({ error: "trial_plan_missing" });
+    const expiresAt = new Date(now.getTime() + MONTHLY_TRIAL_DURATION_MS);
+    const nextTrialAvailableAt = addCalendarMonth(now);
+    const { license, updatedUser } = await prisma.$transaction(async (tx) => {
+      const licenseKey = await generateUniqueLicenseKey(tx);
+      const createdLicense = await tx.license.create({
+        data: {
+          licenseKey,
+          customerEmail: freshUser.email,
+          plan: plan.id,
+          status: "active",
+          hwid: null,
+          expiresAt,
+          lifetime: false,
+          notes: `monthly_trial user:${freshUser.id} discord:${freshUser.discordUserId} roblox:${freshUser.robloxUserId}`
+        }
+      });
+      const nextUser = await tx.user.update({
+        where: { id: freshUser.id },
+        data: {
+          trialUsedAt: now,
+          trialExpiresAt: expiresAt,
+          nextTrialAvailableAt,
+          trialStatus: "active",
+          monthlyTrialClaimCount: { increment: 1 }
+        }
+      });
+      await tx.analyticsEvent.create({
+        data: {
+          type: "monthly_trial_claimed",
+          plan: plan.id,
+          amount: 0,
+          currency: "eur",
+          mode: "trial",
+          metadata: { userId: freshUser.id, discordUserId: freshUser.discordUserId, robloxUserId: freshUser.robloxUserId }
+        }
+      });
+      await tx.auditLog.create({
+        data: {
+          action: "monthly_trial_claimed",
+          targetType: "license",
+          targetId: createdLicense.id,
+          metadata: { userId: freshUser.id, expiresAt: expiresAt.toISOString(), nextTrialAvailableAt: nextTrialAvailableAt.toISOString() }
+        }
+      });
+      return { license: createdLicense, updatedUser: nextUser };
+    });
+
+    const discordRole = await giveDiscordRole(freshUser.discordUserId, "trial").catch((error) => ({
+      success: false,
+      error: error.code || error.message
+    }));
+    if (discordRole?.success === false) {
+      console.warn("Discord Trial role grant failed after monthly trial claim", { userId: freshUser.id, error: discordRole.error });
+    }
+
+    return res.status(201).json({
+      success: true,
+      license: publicLicense(license),
+      trial: await buildMonthlyTrialSummary(updatedUser),
+      discordRole
+    });
+  } catch (error) {
+    console.error("Monthly trial claim failed", publicError(error));
+    return res.status(500).json({ error: "trial_claim_failed" });
+  }
 });
 
 app.post("/api/me/licenses/:licenseKey/extend-checkout", storeCheckoutLimiter, requireUser, async (req, res) => {
@@ -2028,10 +2205,41 @@ async function userAccessSummary(user) {
   );
   const trial = licenses.some((license) =>
     license.status === "active" &&
-    (license.plan === "1day" || String(license.notes || "").toLowerCase().includes("trial")) &&
+    String(license.notes || "").toLowerCase().includes("trial") &&
     (license.lifetime || !license.expiresAt || license.expiresAt > now)
   );
   return { buyer, trial };
+}
+
+async function cleanupExpiredMonthlyTrials() {
+  const now = new Date();
+  const users = await prisma.user.findMany({
+    where: {
+      trialStatus: "active",
+      trialExpiresAt: { lte: now }
+    },
+    take: 100
+  }).catch((error) => {
+    console.warn("Monthly trial cleanup query failed", publicError(error));
+    return [];
+  });
+
+  for (const user of users) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { trialStatus: "expired" }
+    }).catch((error) => {
+      console.warn("Monthly trial cleanup status update failed", { userId: user.id, ...publicError(error) });
+    });
+    if (user.discordUserId) {
+      await removeDiscordRole(user.discordUserId, "trial").catch((error) => {
+        console.warn("Monthly trial cleanup Discord role removal failed", { userId: user.id, ...publicError(error) });
+      });
+    }
+    await createAuditLog("monthly_trial_expired", "user", user.id, {
+      trialExpiresAt: user.trialExpiresAt?.toISOString?.() || null
+    });
+  }
 }
 
 app.use((_req, res) => res.status(404).json({ error: "not_found" }));
@@ -2040,6 +2248,14 @@ app.listen(port, () => {
   console.log(`Fima payments API listening on ${port}`);
   console.info("Stripe configuration", stripeStatus());
   startDiscordBot();
+  cleanupExpiredMonthlyTrials().catch((error) => {
+    console.warn("Monthly trial cleanup failed", publicError(error));
+  });
+  setInterval(() => {
+    cleanupExpiredMonthlyTrials().catch((error) => {
+      console.warn("Monthly trial cleanup failed", publicError(error));
+    });
+  }, MONTHLY_TRIAL_CLEANUP_MS).unref?.();
   validateConfiguredStripePrices().catch((error) => {
     console.warn("Stripe price env validation failed", publicError(error));
   });
@@ -2735,9 +2951,127 @@ function publicUser(user) {
     robloxUserId: user.robloxUserId || null,
     robloxAvatarUrl: user.robloxAvatarUrl || null,
     emailVerifiedAt: user.emailVerifiedAt || null,
+    trialUsedAt: user.trialUsedAt || null,
+    trialExpiresAt: user.trialExpiresAt || null,
+    nextTrialAvailableAt: user.nextTrialAvailableAt || null,
+    trialStatus: user.trialStatus || null,
+    monthlyTrialClaimCount: user.monthlyTrialClaimCount || 0,
     role: user.role,
     createdAt: user.createdAt
   };
+}
+
+async function buildIntegrationSummary(user) {
+  const links = user?.id
+    ? await prisma.oAuthLink.findMany({
+        where: { userId: user.id, provider: { in: ["discord", "roblox"] } },
+        orderBy: { updatedAt: "desc" }
+      }).catch(() => [])
+    : [];
+  const byProvider = Object.fromEntries(links.map((link) => [link.provider, link]));
+  const discordConnected = Boolean(user?.discordUserId && byProvider.discord);
+  const robloxConnected = Boolean(user?.robloxUserId && byProvider.roblox);
+
+  return {
+    discord: {
+      connected: discordConnected,
+      id: user?.discordUserId || null,
+      username: user?.discordUsername || null,
+      email: user?.discordEmail || null,
+      avatar: user?.discordAvatarUrl || null,
+      connectedAt: byProvider.discord?.createdAt || null,
+      updatedAt: byProvider.discord?.updatedAt || null
+    },
+    roblox: {
+      connected: robloxConnected,
+      id: user?.robloxUserId || null,
+      username: user?.robloxUsername || null,
+      displayName: byProvider.roblox?.metadata?.displayName || user?.robloxUsername || null,
+      avatar: user?.robloxAvatarUrl || null,
+      connectedAt: byProvider.roblox?.createdAt || null,
+      updatedAt: byProvider.roblox?.updatedAt || null
+    }
+  };
+}
+
+async function buildMonthlyTrialSummary(user, now = new Date(), integrations = null) {
+  const linked = integrations || await buildIntegrationSummary(user);
+  const activeTrial = await findActiveMonthlyTrial(user, now);
+  const requirements = [
+    { id: "account", label: "Fima account logged in", complete: Boolean(user?.id), action: null },
+    { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" },
+    { id: "roblox", label: "Roblox connected", complete: Boolean(linked.roblox?.connected), action: "connect_roblox" }
+  ];
+  const missing = requirements.filter((item) => !item.complete).map((item) => item.id);
+  const nextTrialAvailableAt = user?.nextTrialAvailableAt || null;
+  const cooldownActive = Boolean(nextTrialAvailableAt && nextTrialAvailableAt > now);
+  const cooldownSeconds = cooldownActive ? Math.ceil((nextTrialAvailableAt.getTime() - now.getTime()) / 1000) : 0;
+  const activeSeconds = activeTrial?.expiresAt ? Math.max(0, Math.ceil((activeTrial.expiresAt.getTime() - now.getTime()) / 1000)) : 0;
+  const paidAccessActive = await hasActivePaidLicense(user, now);
+
+  let disabledReason = null;
+  if (activeTrial) disabledReason = "trial_already_active";
+  else if (missing.includes("discord")) disabledReason = "discord_not_connected";
+  else if (missing.includes("roblox")) disabledReason = "roblox_not_connected";
+  else if (cooldownActive) disabledReason = "trial_cooldown_active";
+
+  return {
+    requirements,
+    missing,
+    eligible: requirements.every((item) => item.complete) && !activeTrial && !cooldownActive,
+    disabledReason,
+    active: Boolean(activeTrial),
+    activeLicense: activeTrial ? publicLicense(activeTrial) : null,
+    expiresAt: activeTrial?.expiresAt ? activeTrial.expiresAt.toISOString() : user?.trialExpiresAt?.toISOString?.() || null,
+    activeSeconds,
+    nextTrialAvailableAt: nextTrialAvailableAt ? nextTrialAvailableAt.toISOString() : null,
+    cooldownActive,
+    cooldownSeconds,
+    status: activeTrial ? "active" : cooldownActive ? "cooldown" : requirements.every((item) => item.complete) ? "available" : "locked",
+    claimCount: user?.monthlyTrialClaimCount || 0,
+    paidAccessActive,
+    priorityRule: paidAccessActive ? "paid_access_has_priority; monthly trial remains optional" : "trial_access"
+  };
+}
+
+async function findActiveMonthlyTrial(user, now = new Date()) {
+  if (!user?.email) return null;
+  return prisma.license.findFirst({
+    where: {
+      customerEmail: user.email,
+      status: "active",
+      expiresAt: { gt: now },
+      notes: { contains: "monthly_trial", mode: "insensitive" }
+    },
+    orderBy: { expiresAt: "desc" }
+  });
+}
+
+async function hasActivePaidLicense(user, now = new Date()) {
+  if (!user?.email) return false;
+  const license = await prisma.license.findFirst({
+    where: {
+      customerEmail: user.email,
+      status: "active",
+      OR: [{ lifetime: true }, { expiresAt: null }, { expiresAt: { gt: now } }],
+      AND: [
+        {
+          OR: [
+            { notes: null },
+            { NOT: { notes: { contains: "monthly_trial", mode: "insensitive" } } }
+          ]
+        }
+      ]
+    },
+    select: { id: true }
+  });
+  return Boolean(license);
+}
+
+function addCalendarMonth(date) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + 1);
+  return next;
 }
 
 async function createStripeCustomerIfPossible(email) {
