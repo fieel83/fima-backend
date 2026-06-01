@@ -21,6 +21,13 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { clearAdminCookie, createAdminToken, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import {
+  discordBotHealth,
+  giveDiscordRole,
+  removeDiscordRole,
+  sendPaymentSubmissionLog,
+  startDiscordBot
+} from "./discordBot.js";
 import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
 
 const app = express();
@@ -38,7 +45,11 @@ const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, stand
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false });
 const passwordResetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
 const storeCheckoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 25, standardHeaders: true, legacyHeaders: false });
+const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
+const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const USER_SESSION_COOKIE = "fima_user_session";
+const OAUTH_STATE_COOKIE = "fima_oauth_state";
+const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 
 const defaultSiteSettings = {
   discordInviteUrl: env("DISCORD_INVITE_URL", ""),
@@ -242,6 +253,117 @@ app.post("/api/auth/logout", async (req, res) => {
 
 app.get("/api/auth/me", requireUser, async (req, res) => {
   return res.json({ success: true, user: publicUser(req.user) });
+});
+
+app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
+  try {
+    const currentUser = await getOptionalUser(req, res);
+    const state = createOAuthState("discord", {
+      userId: currentUser?.id || null,
+      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard.html")
+    });
+    setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
+
+    const redirectUri = env("DISCORD_REDIRECT_URI", `${apiBaseUrl()}/auth/discord/callback`);
+    const url = new URL("https://discord.com/oauth2/authorize");
+    url.searchParams.set("client_id", requiredEnv("DISCORD_CLIENT_ID"));
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("scope", "identify email");
+    url.searchParams.set("state", state);
+    return res.redirect(url.toString());
+  } catch (error) {
+    console.error("Discord OAuth start failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}/login.html?error=discord_oauth_unavailable`);
+  }
+});
+
+app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
+  try {
+    const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "discord");
+    const code = String(req.query?.code || "").trim();
+    if (!code) throw new Error("missing_discord_code");
+
+    const token = await exchangeDiscordCode(code);
+    const profile = await fetchDiscordProfile(token.access_token);
+    const linked = await loginOrLinkDiscordAccount(profile, token, state.userId);
+    await issueUserSession(res, linked.user.id);
+    await createAuditLog(state.userId ? "discord_account_linked" : "discord_login_success", "user", linked.user.id, {
+      discordUserId: profile.id,
+      created: linked.created
+    });
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard.html"}?discord=connected`);
+  } catch (error) {
+    console.error("Discord OAuth callback failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}/login.html?error=discord_oauth_failed`);
+  }
+});
+
+app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
+  try {
+    const pkce = createPkcePair();
+    const state = createOAuthState("roblox", {
+      userId: req.user.id,
+      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard.html")
+    });
+    setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
+    setOAuthCookie(res, OAUTH_PKCE_COOKIE, pkce.verifier);
+
+    const discovery = await getRobloxOidcDiscovery();
+    const redirectUri = env("ROBLOX_REDIRECT_URI", `${apiBaseUrl()}/auth/roblox/callback`);
+    const url = new URL(discovery.authorization_endpoint);
+    url.searchParams.set("client_id", requiredEnv("ROBLOX_CLIENT_ID"));
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("scope", "openid profile");
+    url.searchParams.set("state", state);
+    url.searchParams.set("code_challenge", pkce.challenge);
+    url.searchParams.set("code_challenge_method", "S256");
+    return res.redirect(url.toString());
+  } catch (error) {
+    console.error("Roblox OAuth start failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_unavailable`);
+  }
+});
+
+app.get("/auth/roblox/callback", oauthLimiter, async (req, res) => {
+  try {
+    const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "roblox");
+    const currentUser = await getOptionalUser(req, res);
+    if (!currentUser || currentUser.id !== state.userId) throw new Error("roblox_link_requires_login");
+
+    const code = String(req.query?.code || "").trim();
+    const verifier = String(req.cookies?.[OAUTH_PKCE_COOKIE] || "");
+    if (!code || !verifier) throw new Error("missing_roblox_oauth_data");
+
+    const token = await exchangeRobloxCode(code, verifier);
+    const profile = await fetchRobloxOidcProfile(token.access_token);
+    const user = await linkRobloxAccount(currentUser.id, profile, token);
+    await createAuditLog("roblox_account_linked", "user", user.id, { robloxUserId: profile.sub });
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard.html"}?roblox=connected`);
+  } catch (error) {
+    console.error("Roblox OAuth callback failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_failed`);
+  }
+});
+
+app.post("/payments/robux/manual/submit", manualPaymentLimiter, requireUser, async (req, res) => {
+  try {
+    const submission = await createManualRobuxSubmission(req.user, req.body || {});
+    await sendPaymentSubmissionLog(submission).catch((error) => {
+      console.warn("Discord payment log send failed", publicError(error));
+    });
+    return res.status(201).json({ success: true, submission: publicPaymentSubmission(submission) });
+  } catch (error) {
+    console.error("Manual Robux submission failed", publicError(error));
+    return res.status(error.statusCode || 500).json({ error: error.code || "manual_payment_submit_failed" });
+  }
 });
 
 app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => {
@@ -706,6 +828,78 @@ app.post("/admin/logout", requireAdmin, (_req, res) => {
 });
 
 app.get("/admin", requireAdmin, (_req, res) => sendAdminPage(res));
+
+app.get(["/admin/health/bot", "/admin/api/bot/health"], requireAdmin, async (_req, res) => {
+  res.json({ success: true, bot: await discordBotHealth() });
+});
+
+app.post("/admin/roles/sync", requireAdmin, async (req, res) => {
+  try {
+    const result = await syncDiscordRoles(req.body || {});
+    await createAuditLog("discord_roles_synced", "discord", null, { count: result.results.length });
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("Discord role sync failed", publicError(error));
+    return res.status(500).json({ error: error.code || "discord_role_sync_failed", message: error.message });
+  }
+});
+
+app.post("/admin/roles/give-buyer", requireAdmin, async (req, res) => {
+  return adminDiscordRoleAction(req, res, "buyer", "add");
+});
+
+app.post("/admin/roles/remove-buyer", requireAdmin, async (req, res) => {
+  return adminDiscordRoleAction(req, res, "buyer", "remove");
+});
+
+app.post("/admin/roles/give-trial", requireAdmin, async (req, res) => {
+  return adminDiscordRoleAction(req, res, "trial", "add");
+});
+
+app.post("/admin/roles/remove-trial", requireAdmin, async (req, res) => {
+  return adminDiscordRoleAction(req, res, "trial", "remove");
+});
+
+app.get("/admin/api/payments/robux/manual", requireAdmin, async (req, res) => {
+  const status = String(req.query.status || "").trim().toLowerCase();
+  const search = String(req.query.search || "").trim();
+  const submissions = await prisma.paymentSubmission.findMany({
+    where: {
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { customerEmail: { contains: search, mode: "insensitive" } },
+                { discordUserId: { contains: search } },
+                { discordUsername: { contains: search, mode: "insensitive" } },
+                { robloxUsername: { contains: search, mode: "insensitive" } },
+                { plan: { contains: search, mode: "insensitive" } }
+              ]
+            }
+          : {}
+      ]
+    },
+    include: { user: true },
+    orderBy: { createdAt: "desc" },
+    take: 200
+  });
+  res.json({ submissions: submissions.map(publicPaymentSubmission) });
+});
+
+app.post([
+  "/admin/api/payments/robux/manual/:id/approve",
+  "/payments/robux/manual/:id/approve"
+], requireAdmin, async (req, res) => {
+  return reviewManualRobuxSubmission(req, res, "approved");
+});
+
+app.post([
+  "/admin/api/payments/robux/manual/:id/reject",
+  "/payments/robux/manual/:id/reject"
+], requireAdmin, async (req, res) => {
+  return reviewManualRobuxSubmission(req, res, "rejected");
+});
 
 app.get("/admin/api/dashboard", requireAdmin, async (_req, res) => {
   const now = new Date();
@@ -1316,11 +1510,476 @@ app.get("/admin/api/audit", requireAdmin, async (_req, res) => {
   res.json({ logs });
 });
 
+function oauthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: apiBaseUrl().startsWith("https"),
+    sameSite: "lax",
+    path: "/auth",
+    maxAge: 10 * 60 * 1000
+  };
+}
+
+function setOAuthCookie(res, name, value) {
+  res.cookie(name, value, oauthCookieOptions());
+}
+
+function clearOAuthCookies(res) {
+  res.clearCookie(OAUTH_STATE_COOKIE, { path: "/auth" });
+  res.clearCookie(OAUTH_PKCE_COOKIE, { path: "/auth" });
+}
+
+function oauthSecret() {
+  return env("SESSION_SECRET") || env("ADMIN_PASSWORD") || env("APP_ENCRYPTION_KEY") || "fima-dev-oauth-state";
+}
+
+function createOAuthState(provider, data = {}) {
+  const payload = {
+    provider,
+    nonce: crypto.randomBytes(16).toString("base64url"),
+    iat: Date.now(),
+    exp: Date.now() + 10 * 60 * 1000,
+    userId: data.userId || null,
+    returnTo: safeFrontendPath(data.returnTo, "/dashboard.html")
+  };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", oauthSecret()).update(encoded).digest("base64url");
+  return `${encoded}.${signature}`;
+}
+
+function verifyOAuthState(queryState, cookieState, provider) {
+  const state = String(queryState || "");
+  if (!state || state !== String(cookieState || "")) throw new Error("invalid_oauth_state");
+  const [encoded, signature] = state.split(".");
+  if (!encoded || !signature) throw new Error("invalid_oauth_state_format");
+  const expected = crypto.createHmac("sha256", oauthSecret()).update(encoded).digest("base64url");
+  if (!timingSafeTextEqual(signature, expected)) throw new Error("invalid_oauth_state_signature");
+  const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  if (payload.provider !== provider || payload.exp < Date.now()) throw new Error("expired_oauth_state");
+  return payload;
+}
+
+function safeFrontendPath(value, fallback = "/dashboard.html") {
+  const text = String(value || "").trim();
+  if (!text || !text.startsWith("/") || text.startsWith("//")) return fallback;
+  if (/[\r\n]/.test(text)) return fallback;
+  return text.slice(0, 240);
+}
+
+function createPkcePair() {
+  const verifier = crypto.randomBytes(32).toString("base64url");
+  const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+  return { verifier, challenge };
+}
+
+async function exchangeDiscordCode(code) {
+  const redirectUri = env("DISCORD_REDIRECT_URI", `${apiBaseUrl()}/auth/discord/callback`);
+  const body = new URLSearchParams({
+    client_id: requiredEnv("DISCORD_CLIENT_ID"),
+    client_secret: requiredEnv("DISCORD_CLIENT_SECRET"),
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri
+  });
+  const response = await fetchWithAbort("https://discord.com/api/v10/oauth2/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body
+  }, 8000);
+  if (!response.ok) throw new Error(`discord_token_exchange_failed_${response.status}`);
+  return response.json();
+}
+
+async function fetchDiscordProfile(accessToken) {
+  const response = await fetchWithAbort("https://discord.com/api/v10/users/@me", {
+    headers: { authorization: `Bearer ${accessToken}` }
+  }, 8000);
+  if (!response.ok) throw new Error(`discord_profile_failed_${response.status}`);
+  const profile = await response.json();
+  if (!profile?.id) throw new Error("discord_profile_missing_id");
+  return profile;
+}
+
+async function loginOrLinkDiscordAccount(profile, token, preferredUserId = null) {
+  const discordUserId = String(profile.id);
+  const discordUsername = profile.global_name || profile.username || discordUserId;
+  const discordEmail = isValidEmail(profile.email) ? normalizeEmail(profile.email) : null;
+  const discordAvatarUrl = profile.avatar
+    ? `https://cdn.discordapp.com/avatars/${discordUserId}/${profile.avatar}.png?size=128`
+    : null;
+
+  let user = preferredUserId
+    ? await prisma.user.findUnique({ where: { id: preferredUserId } })
+    : await prisma.user.findFirst({
+        where: {
+          OR: [
+            { discordUserId },
+            ...(discordEmail ? [{ email: discordEmail }, { emailNormalized: normalizeAccountEmail(discordEmail) }] : [])
+          ]
+        }
+      });
+
+  let created = false;
+  if (!user) {
+    if (!discordEmail) {
+      const error = new Error("discord_email_required");
+      error.code = "discord_email_required";
+      throw error;
+    }
+    user = await prisma.user.create({
+      data: {
+        email: discordEmail,
+        emailNormalized: normalizeAccountEmail(discordEmail),
+        passwordHash: await hashPassword(randomToken()),
+        stripeCustomerId: await createStripeCustomerIfPossible(discordEmail),
+        discordUserId,
+        discordUsername,
+        discordEmail,
+        discordAvatarUrl,
+        emailVerifiedAt: profile.verified ? new Date() : null
+      }
+    });
+    created = true;
+    await ensureCustomer(discordEmail);
+  } else {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        discordUserId,
+        discordUsername,
+        discordEmail,
+        discordAvatarUrl,
+        emailVerifiedAt: user.emailVerifiedAt || (profile.verified ? new Date() : undefined)
+      }
+    });
+  }
+
+  await upsertOAuthLink(user.id, "discord", discordUserId, {
+    providerUsername: discordUsername,
+    providerEmail: discordEmail,
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token,
+    expiresIn: token.expires_in,
+    scopes: token.scope,
+    metadata: { verified: Boolean(profile.verified), avatar: profile.avatar || null }
+  });
+
+  return { user, created };
+}
+
+async function getRobloxOidcDiscovery() {
+  const issuer = env("ROBLOX_OIDC_ISSUER", "https://apis.roblox.com/oauth").replace(/\/+$/, "");
+  const fallback = {
+    authorization_endpoint: `${issuer}/v1/authorize`,
+    token_endpoint: `${issuer}/v1/token`,
+    userinfo_endpoint: `${issuer}/v1/userinfo`
+  };
+  try {
+    const response = await fetchWithAbort(`${issuer}/.well-known/openid-configuration`, {}, 4000);
+    if (!response.ok) return fallback;
+    const discovery = await response.json();
+    return {
+      authorization_endpoint: discovery.authorization_endpoint || fallback.authorization_endpoint,
+      token_endpoint: discovery.token_endpoint || fallback.token_endpoint,
+      userinfo_endpoint: discovery.userinfo_endpoint || fallback.userinfo_endpoint
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+async function exchangeRobloxCode(code, verifier) {
+  const discovery = await getRobloxOidcDiscovery();
+  const redirectUri = env("ROBLOX_REDIRECT_URI", `${apiBaseUrl()}/auth/roblox/callback`);
+  const body = new URLSearchParams({
+    client_id: requiredEnv("ROBLOX_CLIENT_ID"),
+    client_secret: requiredEnv("ROBLOX_CLIENT_SECRET"),
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri,
+    code_verifier: verifier
+  });
+  const response = await fetchWithAbort(discovery.token_endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body
+  }, 8000);
+  if (!response.ok) throw new Error(`roblox_token_exchange_failed_${response.status}`);
+  return response.json();
+}
+
+async function fetchRobloxOidcProfile(accessToken) {
+  const discovery = await getRobloxOidcDiscovery();
+  const response = await fetchWithAbort(discovery.userinfo_endpoint, {
+    headers: { authorization: `Bearer ${accessToken}` }
+  }, 8000);
+  if (!response.ok) throw new Error(`roblox_profile_failed_${response.status}`);
+  const profile = await response.json();
+  if (!profile?.sub) throw new Error("roblox_profile_missing_sub");
+  return profile;
+}
+
+async function linkRobloxAccount(userId, profile, token) {
+  const robloxUserId = String(profile.sub);
+  const robloxUsername = profile.preferred_username || profile.nickname || profile.name || robloxUserId;
+  const avatarUrl = await resolveRobloxAvatarUrl(robloxUserId).catch(() => null);
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      robloxUserId,
+      robloxUsername,
+      robloxAvatarUrl: avatarUrl
+    }
+  });
+
+  await upsertOAuthLink(user.id, "roblox", robloxUserId, {
+    providerUsername: robloxUsername,
+    providerEmail: null,
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token,
+    expiresIn: token.expires_in,
+    scopes: token.scope,
+    metadata: { name: profile.name || null }
+  });
+
+  return user;
+}
+
+async function resolveRobloxAvatarUrl(robloxUserId) {
+  const url = new URL("https://thumbnails.roblox.com/v1/users/avatar-headshot");
+  url.searchParams.set("userIds", String(robloxUserId));
+  url.searchParams.set("size", "150x150");
+  url.searchParams.set("format", "Png");
+  url.searchParams.set("isCircular", "true");
+  const response = await fetchWithAbort(url, {}, 3500);
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => ({}));
+  return safeUrl(data?.data?.[0]?.imageUrl);
+}
+
+async function upsertOAuthLink(userId, provider, providerSubject, data) {
+  const expiresAt = data.expiresIn ? new Date(Date.now() + Number(data.expiresIn) * 1000) : null;
+  return prisma.oAuthLink.upsert({
+    where: { provider_providerSubject: { provider, providerSubject } },
+    create: {
+      userId,
+      provider,
+      providerSubject,
+      providerUsername: data.providerUsername || null,
+      providerEmail: data.providerEmail || null,
+      accessTokenCipher: encryptToken(data.accessToken),
+      refreshTokenCipher: encryptToken(data.refreshToken),
+      tokenExpiresAt: expiresAt,
+      scopes: data.scopes || null,
+      metadata: data.metadata || null
+    },
+    update: {
+      userId,
+      providerUsername: data.providerUsername || null,
+      providerEmail: data.providerEmail || null,
+      accessTokenCipher: encryptToken(data.accessToken),
+      refreshTokenCipher: encryptToken(data.refreshToken),
+      tokenExpiresAt: expiresAt,
+      scopes: data.scopes || null,
+      metadata: data.metadata || null
+    }
+  });
+}
+
+function encryptToken(value) {
+  const text = String(value || "");
+  const keySource = env("APP_ENCRYPTION_KEY");
+  if (!text || !keySource) return null;
+  const key = crypto.createHash("sha256").update(keySource).digest();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
+}
+
+async function createManualRobuxSubmission(user, body) {
+  const plan = getPlan(body?.plan);
+  if (!plan) {
+    const error = new Error("invalid_plan");
+    error.code = "invalid_plan";
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const premiumPlus = typeof body?.premiumPlus === "boolean" ? body.premiumPlus : null;
+  const robuxAmount = toOptionalInt(body?.robuxAmount);
+  const discordUserId = String(body?.discordUserId || user.discordUserId || "").trim() || null;
+  const robloxUsername = String(body?.robloxUsername || user.robloxUsername || "").trim().slice(0, 80) || null;
+
+  const submission = await prisma.paymentSubmission.create({
+    data: {
+      userId: user.id,
+      plan: plan.id,
+      customerEmail: user.email,
+      discordUserId,
+      discordUsername: String(body?.discordUsername || user.discordUsername || "").trim().slice(0, 80) || null,
+      robloxUserId: String(body?.robloxUserId || user.robloxUserId || "").trim().slice(0, 80) || null,
+      robloxUsername,
+      premiumPlus,
+      robuxAmount,
+      proofUrl: safeUrl(body?.proofUrl) || null,
+      proofText: String(body?.proofText || "").trim().slice(0, 3000) || null,
+      notes: String(body?.notes || "").trim().slice(0, 1000) || null
+    },
+    include: { user: true }
+  });
+
+  await createAuditLog("manual_robux_submitted", "payment_submission", submission.id, {
+    userId: user.id,
+    plan: plan.id,
+    discordLinked: Boolean(discordUserId),
+    robloxUsername
+  });
+  return submission;
+}
+
+function publicPaymentSubmission(submission) {
+  return {
+    id: submission.id,
+    userId: submission.userId,
+    type: submission.type,
+    status: submission.status,
+    plan: submission.plan,
+    customerEmail: submission.customerEmail,
+    discordUserId: submission.discordUserId,
+    discordUsername: submission.discordUsername,
+    robloxUserId: submission.robloxUserId,
+    robloxUsername: submission.robloxUsername,
+    premiumPlus: submission.premiumPlus,
+    robuxAmount: submission.robuxAmount,
+    proofUrl: submission.proofUrl,
+    proofText: submission.proofText,
+    notes: submission.notes,
+    reviewedBy: submission.reviewedBy,
+    reviewedAt: submission.reviewedAt,
+    createdAt: submission.createdAt,
+    user: submission.user ? publicUser(submission.user) : null
+  };
+}
+
+async function reviewManualRobuxSubmission(req, res, status) {
+  try {
+    const submission = await prisma.paymentSubmission.update({
+      where: { id: req.params.id },
+      data: {
+        status,
+        reviewedBy: "admin",
+        reviewedAt: new Date(),
+        notes: req.body?.notes ? String(req.body.notes).slice(0, 1000) : undefined
+      },
+      include: { user: true }
+    });
+
+    let roleResult = null;
+    if (status === "approved" && submission.discordUserId) {
+      roleResult = await giveDiscordRole(submission.discordUserId, "buyer").catch((error) => ({
+        success: false,
+        error: error.code || error.message
+      }));
+    }
+
+    await createAuditLog(`manual_robux_${status}`, "payment_submission", submission.id, {
+      discordRole: roleResult,
+      plan: submission.plan
+    });
+    return res.json({ success: true, submission: publicPaymentSubmission(submission), discordRole: roleResult });
+  } catch (error) {
+    console.error("Manual Robux review failed", publicError(error));
+    return res.status(500).json({ error: error.code || "manual_payment_review_failed", message: error.message });
+  }
+}
+
+async function adminDiscordRoleAction(req, res, type, action) {
+  try {
+    const discordUserId = await resolveDiscordUserIdFromBody(req.body || {});
+    const result = action === "add"
+      ? await giveDiscordRole(discordUserId, type)
+      : await removeDiscordRole(discordUserId, type);
+    await createAuditLog(`discord_${type}_role_${action}`, "discord_user", discordUserId, result);
+    return res.json({ success: true, result });
+  } catch (error) {
+    console.error("Discord role action failed", publicError(error));
+    return res.status(500).json({ error: error.code || "discord_role_action_failed", message: error.message });
+  }
+}
+
+async function resolveDiscordUserIdFromBody(body) {
+  const direct = String(body?.discordUserId || "").trim();
+  if (direct) return direct;
+  const userId = String(body?.userId || "").trim();
+  const email = normalizeEmail(body?.email);
+  const user = userId
+    ? await prisma.user.findUnique({ where: { id: userId } })
+    : email
+      ? await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized: normalizeAccountEmail(email) }] } })
+      : null;
+  if (user?.discordUserId) return user.discordUserId;
+  const error = new Error("discord_user_not_linked");
+  error.code = "discord_user_not_linked";
+  throw error;
+}
+
+async function syncDiscordRoles(body) {
+  const singleDiscordUserId = String(body?.discordUserId || "").trim();
+  const singleUserId = String(body?.userId || "").trim();
+  const users = singleDiscordUserId
+    ? [{ id: null, discordUserId: singleDiscordUserId, email: null }]
+    : await prisma.user.findMany({
+        where: {
+          discordUserId: { not: null },
+          ...(singleUserId ? { id: singleUserId } : {})
+        },
+        take: singleUserId ? 1 : 200
+      });
+
+  const results = [];
+  for (const user of users) {
+    const discordUserId = user.discordUserId;
+    if (!discordUserId) continue;
+    const access = user.id ? await userAccessSummary(user) : { buyer: true, trial: false };
+    const row = { userId: user.id, discordUserId, buyer: null, trial: null };
+
+    if (access.buyer) row.buyer = await giveDiscordRole(discordUserId, "buyer").catch((error) => ({ success: false, error: error.code || error.message }));
+    else row.buyer = await removeDiscordRole(discordUserId, "buyer").catch((error) => ({ success: false, error: error.code || error.message }));
+
+    if (access.trial) row.trial = await giveDiscordRole(discordUserId, "trial").catch((error) => ({ success: false, error: error.code || error.message }));
+    else row.trial = await removeDiscordRole(discordUserId, "trial").catch((error) => ({ success: false, error: error.code || error.message }));
+
+    results.push(row);
+  }
+  return { results };
+}
+
+async function userAccessSummary(user) {
+  const now = new Date();
+  const licenses = await prisma.license.findMany({
+    where: { customerEmail: user.email },
+    select: { plan: true, status: true, lifetime: true, expiresAt: true, notes: true }
+  });
+  const buyer = licenses.some((license) =>
+    license.status === "active" &&
+    (license.lifetime || !license.expiresAt || license.expiresAt > now)
+  );
+  const trial = licenses.some((license) =>
+    license.status === "active" &&
+    (license.plan === "1day" || String(license.notes || "").toLowerCase().includes("trial")) &&
+    (license.lifetime || !license.expiresAt || license.expiresAt > now)
+  );
+  return { buyer, trial };
+}
+
 app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 
 app.listen(port, () => {
   console.log(`Fima payments API listening on ${port}`);
   console.info("Stripe configuration", stripeStatus());
+  startDiscordBot();
   validateConfiguredStripePrices().catch((error) => {
     console.warn("Stripe price env validation failed", publicError(error));
   });
@@ -2008,6 +2667,10 @@ function publicUser(user) {
     id: user.id,
     email: user.email,
     stripeCustomerId: user.stripeCustomerId || null,
+    discordUserId: user.discordUserId || null,
+    discordUsername: user.discordUsername || null,
+    discordEmail: user.discordEmail || null,
+    discordAvatarUrl: user.discordAvatarUrl || null,
     robloxUsername: user.robloxUsername || null,
     robloxUserId: user.robloxUserId || null,
     robloxAvatarUrl: user.robloxAvatarUrl || null,

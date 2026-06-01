@@ -45,11 +45,12 @@ export function setAdminCookie(res, token) {
     secure: env("NODE_ENV") === "production",
     sameSite: "lax",
     maxAge: SESSION_TTL_MS,
-    path: "/admin"
+    path: "/"
   });
 }
 
 export function clearAdminCookie(res) {
+  res.clearCookie(COOKIE_NAME, { path: "/" });
   res.clearCookie(COOKIE_NAME, { path: "/admin" });
 }
 

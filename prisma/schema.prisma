@@ -8,23 +8,23 @@ datasource db {
 }
 
 model License {
-  id                    String    @id @default(cuid())
-  licenseKey            String    @unique @map("license_key")
-  customerEmail         String    @map("customer_email")
+  id                    String          @id @default(cuid())
+  licenseKey            String          @unique @map("license_key")
+  customerEmail         String          @map("customer_email")
   plan                  String
-  status                String    @default("active")
+  status                String          @default("active")
   hwid                  String?
-  expiresAt             DateTime? @map("expires_at")
-  lifetime              Boolean   @default(false)
-  stripeSessionId       String?   @unique @map("stripe_session_id")
-  stripePaymentIntentId String?   @map("stripe_payment_intent_id")
-  validationCount       Int       @default(0) @map("validation_count")
-  downloadCount         Int       @default(0) @map("download_count")
-  lastValidatedAt       DateTime? @map("last_validated_at")
-  lastDownloadedAt      DateTime? @map("last_downloaded_at")
+  expiresAt             DateTime?       @map("expires_at")
+  lifetime              Boolean         @default(false)
+  stripeSessionId       String?         @unique @map("stripe_session_id")
+  stripePaymentIntentId String?         @map("stripe_payment_intent_id")
+  validationCount       Int             @default(0) @map("validation_count")
+  downloadCount         Int             @default(0) @map("download_count")
+  lastValidatedAt       DateTime?       @map("last_validated_at")
+  lastDownloadedAt      DateTime?       @map("last_downloaded_at")
   notes                 String?
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
   orders                Order[]
   validationLogs        ValidationLog[]
   downloadLogs          DownloadLog[]
@@ -63,38 +63,99 @@ model Order {
 }
 
 model Customer {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  totalSpent      Int      @default(0) @map("total_spent")
-  totalOrders     Int      @default(0) @map("total_orders")
+  id              String    @id @default(cuid())
+  email           String    @unique
+  totalSpent      Int       @default(0) @map("total_spent")
+  totalOrders     Int       @default(0) @map("total_orders")
   firstPurchaseAt DateTime? @map("first_purchase_at")
   lastPurchaseAt  DateTime? @map("last_purchase_at")
   notes           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("customers")
 }
 
 model User {
-  id               String    @id @default(cuid())
-  email            String    @unique
-  emailNormalized  String?   @unique @map("email_normalized")
-  passwordHash     String    @map("password_hash")
-  stripeCustomerId String?   @unique @map("stripe_customer_id")
-  robloxUsername   String?   @map("roblox_username")
-  robloxUserId     String?   @map("roblox_user_id")
-  robloxAvatarUrl  String?   @map("roblox_avatar_url")
-  emailVerifiedAt  DateTime? @map("email_verified_at")
-  role             String    @default("user")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-  sessions         UserSession[]
-  resetTokens      PasswordResetToken[]
-  purchases        Purchase[]
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  emailNormalized    String?              @unique @map("email_normalized")
+  passwordHash       String               @map("password_hash")
+  stripeCustomerId   String?              @unique @map("stripe_customer_id")
+  discordUserId      String?              @unique @map("discord_user_id")
+  discordUsername    String?              @map("discord_username")
+  discordEmail       String?              @map("discord_email")
+  discordAvatarUrl   String?              @map("discord_avatar_url")
+  robloxUsername     String?              @map("roblox_username")
+  robloxUserId       String?              @map("roblox_user_id")
+  robloxAvatarUrl    String?              @map("roblox_avatar_url")
+  emailVerifiedAt    DateTime?            @map("email_verified_at")
+  role               String               @default("user")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  sessions           UserSession[]
+  resetTokens        PasswordResetToken[]
+  purchases          Purchase[]
+  oauthLinks         OAuthLink[]
+  paymentSubmissions PaymentSubmission[]
 
   @@index([role])
+  @@index([discordUserId])
+  @@index([robloxUserId])
   @@map("users")
+}
+
+model OAuthLink {
+  id                 String    @id @default(cuid())
+  userId             String    @map("user_id")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider           String
+  providerSubject    String    @map("provider_subject")
+  providerUsername   String?   @map("provider_username")
+  providerEmail      String?   @map("provider_email")
+  accessTokenCipher  String?   @map("access_token_cipher")
+  refreshTokenCipher String?   @map("refresh_token_cipher")
+  tokenExpiresAt     DateTime? @map("token_expires_at")
+  scopes             String?
+  metadata           Json?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@index([provider])
+  @@map("oauth_links")
+}
+
+model PaymentSubmission {
+  id              String    @id @default(cuid())
+  userId          String?   @map("user_id")
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type            String    @default("robux_manual")
+  status          String    @default("pending")
+  plan            String
+  customerEmail   String?   @map("customer_email")
+  discordUserId   String?   @map("discord_user_id")
+  discordUsername String?   @map("discord_username")
+  robloxUserId    String?   @map("roblox_user_id")
+  robloxUsername  String?   @map("roblox_username")
+  premiumPlus     Boolean?  @map("premium_plus")
+  robuxAmount     Int?      @map("robux_amount")
+  proofUrl        String?   @map("proof_url")
+  proofText       String?   @map("proof_text")
+  notes           String?
+  reviewedBy      String?   @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([plan])
+  @@index([discordUserId])
+  @@index([robloxUsername])
+  @@index([createdAt])
+  @@map("payment_submissions")
 }
 
 model UserSession {
@@ -180,15 +241,15 @@ model Purchase {
 }
 
 model ValidationLog {
-  id          String   @id @default(cuid())
-  licenseId   String?  @map("license_id")
-  license     License? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
-  licenseKey  String   @map("license_key")
-  result      String
-  reason      String?
-  hwidHash    String?  @map("hwid_hash")
-  appVersion  String?  @map("app_version")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  licenseId  String?  @map("license_id")
+  license    License? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  licenseKey String   @map("license_key")
+  result     String
+  reason     String?
+  hwidHash   String?  @map("hwid_hash")
+  appVersion String?  @map("app_version")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([licenseId])
   @@index([licenseKey])
@@ -271,19 +332,19 @@ model AnalyticsEvent {
 }
 
 model Coupon {
-  id                    String   @id @default(cuid())
-  stripeCouponId        String?  @map("stripe_coupon_id")
-  stripePromotionCodeId String?  @map("stripe_promotion_code_id")
-  code                  String   @unique
-  percentOff            Int?     @map("percent_off")
-  amountOff             Int?     @map("amount_off")
+  id                    String    @id @default(cuid())
+  stripeCouponId        String?   @map("stripe_coupon_id")
+  stripePromotionCodeId String?   @map("stripe_promotion_code_id")
+  code                  String    @unique
+  percentOff            Int?      @map("percent_off")
+  amountOff             Int?      @map("amount_off")
   currency              String?
-  active                Boolean  @default(true)
+  active                Boolean   @default(true)
   expiresAt             DateTime? @map("expires_at")
-  maxRedemptions        Int?     @map("max_redemptions")
+  maxRedemptions        Int?      @map("max_redemptions")
   notes                 String?
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   @@index([active])
   @@map("coupons")
