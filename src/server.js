@@ -832,7 +832,11 @@ app.post("/admin/logout", requireAdmin, (_req, res) => {
 
 app.get("/admin", requireAdmin, (_req, res) => sendAdminPage(res));
 
-app.get(["/admin/health/bot", "/admin/api/bot/health"], requireAdmin, async (_req, res) => {
+app.get("/admin/health/bot", async (_req, res) => {
+  res.json({ success: true, bot: await discordBotHealth() });
+});
+
+app.get("/admin/api/bot/health", requireAdmin, async (_req, res) => {
   res.json({ success: true, bot: await discordBotHealth() });
 });
 
