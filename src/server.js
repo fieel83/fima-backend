@@ -3490,6 +3490,15 @@ function randomReferralSuffix(length = 4) {
   return out;
 }
 
+function preferredReferralCodeForUser(user) {
+  const robloxUsername = String(user?.robloxUsername || "").trim().toLowerCase();
+  const robloxUserId = String(user?.robloxUserId || "").trim();
+  if (robloxUsername === "fieelcomplex" || robloxUserId === "549482728") {
+    return "FIMA-FIEELCOMPL-SMGS";
+  }
+  return null;
+}
+
 function privacyHash(value) {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -3512,7 +3521,27 @@ async function ensureReferralCodeForUser(userOrId, tx = prisma) {
   if (!user?.id) throw new Error("referral_user_missing");
 
   const existing = await tx.referralCode.findUnique({ where: { userId: user.id } });
-  if (existing) return existing;
+  const preferredCode = preferredReferralCodeForUser(user);
+  if (existing) {
+    if (preferredCode && existing.code !== preferredCode && /^FIMA-KAAN-/i.test(existing.code)) {
+      const taken = await tx.referralCode.findUnique({ where: { code: preferredCode } });
+      if (!taken || taken.userId === user.id) {
+        return await tx.referralCode.update({ where: { userId: user.id }, data: { code: preferredCode } });
+      }
+    }
+    return existing;
+  }
+
+  if (preferredCode) {
+    const taken = await tx.referralCode.findUnique({ where: { code: preferredCode } });
+    if (!taken || taken.userId === user.id) {
+      return await tx.referralCode.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, code: preferredCode },
+        update: { code: preferredCode }
+      });
+    }
+  }
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const code = normalizeReferralCode(`FIMA-${referralCodePrefix(user)}-${randomReferralSuffix(4)}`);
