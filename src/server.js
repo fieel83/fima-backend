@@ -48,6 +48,7 @@ const storeCheckoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 25, st
 const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const trialLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
+const giftRecipientSearchLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
@@ -542,6 +543,17 @@ app.get("/api/me/integrations", requireUser, async (req, res) => {
     integrations,
     trial: await buildMonthlyTrialSummary(req.user, new Date(), integrations)
   });
+});
+
+app.get(["/users/search-gift-recipient", "/api/users/search-gift-recipient"], giftRecipientSearchLimiter, requireUser, async (req, res) => {
+  try {
+    const query = String(req.query?.q || "").trim();
+    const results = await searchGiftRecipients(query, req.user.id);
+    return res.json({ success: true, results });
+  } catch (error) {
+    console.error("Gift recipient search failed", publicError(error));
+    return res.status(500).json({ error: "gift_recipient_search_failed" });
+  }
 });
 
 app.post(["/auth/discord/disconnect", "/api/auth/discord/disconnect"], requireUser, async (req, res) => {
@@ -2962,7 +2974,9 @@ function publicUser(user) {
 }
 
 async function buildIntegrationSummary(user) {
-  const links = user?.id
+  const links = Array.isArray(user?.oauthLinks)
+    ? user.oauthLinks
+    : user?.id
     ? await prisma.oAuthLink.findMany({
         where: { userId: user.id, provider: { in: ["discord", "roblox"] } },
         orderBy: { updatedAt: "desc" }
@@ -2992,6 +3006,148 @@ async function buildIntegrationSummary(user) {
       updatedAt: byProvider.roblox?.updatedAt || null
     }
   };
+}
+
+async function searchGiftRecipients(query, requesterUserId) {
+  const raw = String(query || "").trim();
+  const normalized = normalizeGiftSearch(raw);
+  if (normalized.length < 2) return [];
+
+  const lowerEmail = normalizeEmail(raw);
+  const normalizedEmail = normalizeAccountEmail(raw);
+  const textWhere = [
+    { email: { contains: lowerEmail, mode: "insensitive" } },
+    { emailNormalized: { contains: normalizedEmail, mode: "insensitive" } },
+    { discordUsername: { contains: raw, mode: "insensitive" } },
+    { discordUserId: { contains: raw } },
+    { discordEmail: { contains: lowerEmail, mode: "insensitive" } },
+    { robloxUsername: { contains: raw, mode: "insensitive" } },
+    { robloxUserId: { contains: raw } }
+  ];
+  const userInclude = {
+    oauthLinks: {
+      where: { provider: { in: ["discord", "roblox"] } },
+      orderBy: { updatedAt: "desc" }
+    }
+  };
+
+  const directUsers = await prisma.user.findMany({
+    where: {
+      id: { not: requesterUserId },
+      OR: textWhere
+    },
+    include: userInclude,
+    orderBy: { updatedAt: "desc" },
+    take: 20
+  });
+
+  const oauthLinkMatches = await prisma.oAuthLink.findMany({
+    where: {
+      provider: { in: ["discord", "roblox"] },
+      OR: [
+        { providerUsername: { contains: raw, mode: "insensitive" } },
+        { providerEmail: { contains: lowerEmail, mode: "insensitive" } },
+        { providerSubject: { contains: raw } }
+      ]
+    },
+    include: { user: { include: userInclude } },
+    orderBy: { updatedAt: "desc" },
+    take: 20
+  });
+
+  const robloxDisplayMatches = await prisma.oAuthLink.findMany({
+    where: {
+      provider: "roblox",
+      OR: [
+        { metadata: { path: ["name"], string_contains: raw, mode: "insensitive" } },
+        { metadata: { path: ["displayName"], string_contains: raw, mode: "insensitive" } }
+      ]
+    },
+    include: { user: { include: userInclude } },
+    orderBy: { updatedAt: "desc" },
+    take: 20
+  }).catch(() => []);
+
+  const byId = new Map();
+  for (const user of directUsers) byId.set(user.id, user);
+  for (const link of oauthLinkMatches) {
+    if (link.user?.id && link.user.id !== requesterUserId) byId.set(link.user.id, link.user);
+  }
+  for (const link of robloxDisplayMatches) {
+    if (link.user?.id && link.user.id !== requesterUserId) byId.set(link.user.id, link.user);
+  }
+
+  return Array.from(byId.values())
+    .filter((user) => giftRecipientMatches(user, normalized))
+    .slice(0, 12)
+    .map(publicGiftRecipient);
+}
+
+function normalizeGiftSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0131/g, "i")
+    .trim();
+}
+
+function giftRecipientMatches(user, normalizedQuery) {
+  const integrations = giftRecipientIntegrationData(user);
+  const haystack = [
+    user.email,
+    user.emailNormalized,
+    user.discordUsername,
+    user.discordUserId,
+    user.discordEmail,
+    user.robloxUsername,
+    user.robloxUserId,
+    integrations.discord.username,
+    integrations.discord.id,
+    integrations.roblox.username,
+    integrations.roblox.displayName,
+    integrations.roblox.id
+  ].map(normalizeGiftSearch).join(" ");
+  return haystack.includes(normalizedQuery);
+}
+
+function giftRecipientIntegrationData(user) {
+  const links = Array.isArray(user?.oauthLinks) ? user.oauthLinks : [];
+  const byProvider = Object.fromEntries(links.map((link) => [link.provider, link]));
+  return {
+    discord: {
+      connected: Boolean(user?.discordUserId && byProvider.discord),
+      username: user?.discordUsername || byProvider.discord?.providerUsername || null,
+      id: user?.discordUserId || byProvider.discord?.providerSubject || null,
+      avatar: user?.discordAvatarUrl || null
+    },
+    roblox: {
+      connected: Boolean(user?.robloxUserId && byProvider.roblox),
+      username: user?.robloxUsername || byProvider.roblox?.providerUsername || null,
+      displayName: byProvider.roblox?.metadata?.displayName || byProvider.roblox?.metadata?.name || user?.robloxUsername || null,
+      id: user?.robloxUserId || byProvider.roblox?.providerSubject || null,
+      avatar: user?.robloxAvatarUrl || null
+    }
+  };
+}
+
+function publicGiftRecipient(user) {
+  const integrations = giftRecipientIntegrationData(user);
+  return {
+    id: user.id,
+    maskedEmail: maskEmail(user.email),
+    discord: integrations.discord,
+    roblox: integrations.roblox
+  };
+}
+
+function maskEmail(email) {
+  const text = normalizeEmail(email);
+  const [local, domain] = text.split("@");
+  if (!local || !domain) return "";
+  const first = local.slice(0, 1);
+  const last = local.length > 2 ? local.slice(-1) : "";
+  return `${first}***${last}@${domain}`;
 }
 
 async function buildMonthlyTrialSummary(user, now = new Date(), integrations = null) {
