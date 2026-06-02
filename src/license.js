@@ -53,7 +53,7 @@ export function licensePayload(license) {
   };
 }
 
-export function buildLicenseData({ licenseKey, email, plan, stripeSessionId = null, stripePaymentIntentId = null }) {
+export function buildLicenseData({ licenseKey, email, plan, stripeSessionId = null, stripePaymentIntentId = null, notes = null }) {
   return {
     licenseKey,
     customerEmail: email,
@@ -63,6 +63,7 @@ export function buildLicenseData({ licenseKey, email, plan, stripeSessionId = nu
     expiresAt: getPlanExpiry(plan),
     lifetime: plan.lifetime,
     stripeSessionId,
-    stripePaymentIntentId
+    stripePaymentIntentId,
+    notes
   };
 }

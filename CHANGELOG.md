@@ -2,6 +2,12 @@
 
 ## 2026-06-02
 
+- Added gift checkout metadata support:
+  - checkout accepts a selected registered gift recipient
+  - Stripe metadata stores buyer and recipient ids
+  - webhook fulfillment creates the license for the selected recipient account
+  - admin license source now marks gift purchases as `Gift/Website`
+- Kept the gift flow account-only and recipient-only, so licenses cannot be gifted to arbitrary unregistered emails.
 - Added the referral / invite rewards database schema:
   - referral codes
   - referral records

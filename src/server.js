@@ -883,6 +883,14 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     const customerEmail = String(account.email || "").trim().toLowerCase();
     if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
+    const giftRecipientUserId = String(req.body?.giftRecipientUserId || "").trim();
+    let giftRecipient = null;
+    if (giftRecipientUserId) {
+      if (giftRecipientUserId === account.id) return res.status(400).json({ error: "gift_recipient_self" });
+      giftRecipient = await prisma.user.findUnique({ where: { id: giftRecipientUserId } });
+      if (!giftRecipient) return res.status(404).json({ error: "gift_recipient_not_found" });
+    }
+
     const commerce = getPlanCommerce(plan);
     const priceId = env(commerce.priceEnv);
     const checkout = await createCheckoutSession({
@@ -895,7 +903,9 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       language: String(req.body?.language || "en").slice(0, 8),
       extraMetadata: {
         userId: account.id,
-        accountEmail: account.email
+        accountEmail: account.email,
+        giftRecipientUserId: giftRecipient?.id || "",
+        giftRecipientEmail: giftRecipient?.email || ""
       }
     });
     const session = checkout.session;
@@ -916,10 +926,17 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       priceEnv: commerce.priceEnv,
       saleActive: commerce.saleActive,
       priceSource: checkout.priceSource,
+      gift: Boolean(giftRecipient),
       stripe: stripeStatus()
     });
 
-    return res.json({ url: session.url, mode: checkoutMode, checkoutSessionPrefix, priceSource: checkout.priceSource });
+    return res.json({
+      url: session.url,
+      mode: checkoutMode,
+      checkoutSessionPrefix,
+      priceSource: checkout.priceSource,
+      giftRecipient: giftRecipient ? publicGiftRecipient(giftRecipient) : null
+    });
   } catch (error) {
     console.error("Checkout session creation failed", { ...publicError(error), stripe: stripeStatus() });
     await createAnalyticsEvent("checkout_failed", {
@@ -2797,8 +2814,10 @@ function licenseAccessState(license) {
 }
 
 function licenseSource(license) {
-  if (license?.stripeSessionId) return "Stripe/Website";
   const notes = String(license?.notes || "").toLowerCase();
+  if (notes.includes("gift_purchase")) return "Gift/Website";
+  if (license?.stripeSessionId) return "Stripe/Website";
+  if (notes.includes("referral_reward")) return "Referral reward";
   if (notes.includes("trial")) return "Trial";
   if (notes.includes("extension")) return "Extension";
   return "Manual";
@@ -4271,6 +4290,18 @@ async function fulfillCheckoutSession(session) {
   const email = String(session.customer_details?.email || session.customer_email || "").trim().toLowerCase();
   if (!isValidEmail(email)) throw new Error("Checkout session missing customer email");
 
+  const buyerUserId = String(session.metadata?.userId || session.metadata?.user_id || "").trim();
+  const giftRecipientUserId = String(session.metadata?.giftRecipientUserId || "").trim();
+  let recipientEmail = email;
+  let recipientUser = null;
+  let giftNote = null;
+  if (giftRecipientUserId) {
+    recipientUser = await prisma.user.findUnique({ where: { id: giftRecipientUserId } });
+    if (!recipientUser || !isValidEmail(recipientUser.email)) throw new Error("Gift recipient user not found");
+    recipientEmail = normalizeEmail(recipientUser.email);
+    giftNote = `gift_purchase buyer:${email} buyerUser:${buyerUserId || "unknown"} recipientUser:${giftRecipientUserId}`;
+  }
+
   const paymentIntentId = typeof session.payment_intent === "string"
     ? session.payment_intent
     : session.payment_intent?.id || null;
@@ -4306,10 +4337,11 @@ async function fulfillCheckoutSession(session) {
         license = await tx.license.create({
           data: buildLicenseData({
             licenseKey: await generateUniqueLicenseKey(tx),
-            email,
+            email: recipientEmail,
             plan,
             stripeSessionId: session.id,
-            stripePaymentIntentId: paymentIntentId
+            stripePaymentIntentId: paymentIntentId,
+            notes: giftNote
           })
         });
       }
@@ -4319,21 +4351,23 @@ async function fulfillCheckoutSession(session) {
         create: {
           stripeSessionId: session.id,
           stripePaymentIntentId: paymentIntentId,
-          customerEmail: email,
+          customerEmail: recipientEmail,
           plan: plan.id,
           amount: session.amount_total ?? getPlanCommerce(plan).priceCents,
           currency: String(session.currency || getPlanCommerce(plan).currency).toLowerCase(),
           status: session.payment_status || "paid",
           mode: session.livemode ? "live" : "test",
           locale: session.locale || null,
+          notes: giftNote,
           licenseId: license.id
         },
         update: {
           stripePaymentIntentId: paymentIntentId,
-          customerEmail: email,
+          customerEmail: recipientEmail,
           status: session.payment_status || "paid",
           mode: session.livemode ? "live" : "test",
           locale: session.locale || null,
+          notes: giftNote,
           licenseId: license.id
         },
         include: { license: true }
@@ -4341,9 +4375,9 @@ async function fulfillCheckoutSession(session) {
 
       if (!again) {
         await tx.customer.upsert({
-          where: { email },
+          where: { email: recipientEmail },
           create: {
-            email,
+            email: recipientEmail,
             totalSpent: order.amount,
             totalOrders: 1,
             firstPurchaseAt: new Date(),
@@ -4362,7 +4396,14 @@ async function fulfillCheckoutSession(session) {
             amount: order.amount,
             currency: order.currency,
             mode: order.mode,
-            metadata: { priceSource: "stripe_webhook", extended: Boolean(isExtension) }
+            metadata: {
+              priceSource: "stripe_webhook",
+              extended: Boolean(isExtension),
+              gift: Boolean(giftRecipientUserId),
+              buyerEmail: email,
+              buyerUserId: buyerUserId || null,
+              recipientUserId: giftRecipientUserId || null
+            }
           }
         });
       }
