@@ -382,21 +382,27 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
       : null;
     let devResetToken = null;
     if (user) {
-      const token = randomToken();
+      const token = await generateUniquePasswordResetCode();
       devResetToken = token;
       await prisma.passwordResetToken.create({
         data: {
           userId: user.id,
           tokenHash: hashToken(token),
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000)
         }
+      });
+      await sendPasswordResetEmail(user.email, token).catch((error) => {
+        console.warn("Password reset email could not be sent", {
+          email: maskEmail(user.email),
+          ...publicError(error)
+        });
       });
       await createAuditLog("password_reset_requested", "user", user.id, {});
     }
 
     const response = {
       success: true,
-      message: "If that email exists, a password reset link will be prepared."
+      message: "If that email exists, a password reset code will be sent."
     };
     if (env("NODE_ENV", "development") !== "production" && devResetToken) {
       response.resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(devResetToken)}`;
@@ -2868,10 +2874,67 @@ function randomToken() {
   return crypto.randomBytes(32).toString("base64url");
 }
 
+async function generateUniquePasswordResetCode() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = String(crypto.randomInt(100000, 1000000));
+    const existing = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashToken(code) } });
+    if (!existing) return code;
+  }
+  return randomToken();
+}
+
 function hashToken(token) {
   const value = String(token || "").trim();
   if (!value) return "";
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+async function sendPasswordResetEmail(email, code) {
+  const resendKey = env("RESEND_API_KEY", "");
+  if (!resendKey) return { configured: false };
+
+  const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(code)}`;
+  const from = env("MAIL_FROM", "Fima Macro <support@fimamacro.com>");
+  const subject = "Your Fima Macro password reset code";
+  const text = [
+    "Your Fima Macro password reset code is:",
+    "",
+    code,
+    "",
+    "This code expires in 15 minutes.",
+    `Reset link: ${resetUrl}`,
+    "",
+    "If you did not request this, you can ignore this email."
+  ].join("\n");
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;background:#070711;color:#f6f2ff;padding:24px">
+      <div style="max-width:560px;margin:0 auto;border:1px solid rgba(190,150,255,.28);border-radius:12px;background:#121020;padding:24px">
+        <p style="margin:0 0 8px;color:#c79cff;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Fima Macro</p>
+        <h1 style="margin:0 0 14px;font-size:28px">Password reset code</h1>
+        <p style="color:#b7adc9">Use this code to reset your Fima account password. It expires in 15 minutes.</p>
+        <div style="margin:20px 0;padding:16px;border-radius:10px;background:#080713;border:1px solid rgba(199,156,255,.35);font-size:30px;font-weight:900;letter-spacing:.18em;text-align:center">${code}</div>
+        <a href="${resetUrl}" style="display:inline-block;padding:12px 16px;border-radius:8px;background:linear-gradient(135deg,#c79cff,#42d9ff);color:#080713;font-weight:900;text-decoration:none">Reset password</a>
+        <p style="margin-top:18px;color:#8f84a5;font-size:13px">If you did not request this, ignore this email.</p>
+      </div>
+    </div>
+  `;
+
+  const response = await fetchWithAbort("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${resendKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ from, to: email, subject, text, html })
+  }, 8000);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    const error = new Error(`Resend email failed with status ${response.status}`);
+    error.code = "email_send_failed";
+    error.type = body.slice(0, 160);
+    throw error;
+  }
+  return { configured: true };
 }
 
 async function issueUserSession(res, userId) {
