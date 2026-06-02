@@ -44,6 +44,7 @@ const downloadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 60, standar
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false });
 const passwordResetLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
+const emailVerificationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
 const storeCheckoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 25, standardHeaders: true, legacyHeaders: false });
 const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
@@ -205,6 +206,9 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       }
     });
     const createdReferralCode = await ensureReferralCodeForUser(user);
+    await createAndSendEmailVerification(user).catch((error) => {
+      console.warn("Email verification send failed", { email: maskEmail(user.email), ...publicError(error) });
+    });
     let referral = null;
     if (referralCode) {
       referral = await applyReferralCodeToUser({
@@ -462,6 +466,46 @@ app.post("/api/auth/reset-password", passwordResetLimiter, async (req, res) => {
   } catch (error) {
     console.error("Password reset failed", publicError(error));
     return res.status(500).json({ error: "password_reset_failed" });
+  }
+});
+
+app.post("/api/auth/email-verification/send", emailVerificationLimiter, requireUser, async (req, res) => {
+  try {
+    if (req.user.emailVerifiedAt) return res.json({ success: true, verified: true });
+    await createAndSendEmailVerification(req.user);
+    await createAuditLog("email_verification_requested", "user", req.user.id, {});
+    return res.json({ success: true, message: "If email delivery is configured, a verification code has been sent." });
+  } catch (error) {
+    console.error("Email verification send failed", publicError(error));
+    return res.status(500).json({ error: "email_verification_send_failed" });
+  }
+});
+
+app.post("/api/auth/email-verification/confirm", emailVerificationLimiter, requireUser, async (req, res) => {
+  try {
+    const code = String(req.body?.code || "").trim();
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: "invalid_verification_code" });
+    const tokenHash = hashToken(code);
+    const token = await prisma.emailVerificationToken.findUnique({ where: { tokenHash } });
+    if (!token || token.userId !== req.user.id || token.usedAt || token.expiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ error: "invalid_or_expired_verification_code" });
+    }
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.emailVerificationToken.update({ where: { id: token.id }, data: { usedAt: new Date() } });
+      return tx.user.update({ where: { id: req.user.id }, data: { emailVerifiedAt: new Date() } });
+    });
+    await evaluateReferralForUser(user.id).catch((error) => {
+      console.warn("Referral evaluation after email verification failed", { userId: user.id, ...publicError(error) });
+    });
+    await createAuditLog("email_verified", "user", user.id, {});
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      referrals: await buildReferralSummary(user.id, { evaluate: true })
+    });
+  } catch (error) {
+    console.error("Email verification confirm failed", publicError(error));
+    return res.status(500).json({ error: "email_verification_failed" });
   }
 });
 
@@ -2998,6 +3042,15 @@ async function generateUniquePasswordResetCode() {
   return randomToken();
 }
 
+async function generateUniqueEmailVerificationCode() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const code = String(crypto.randomInt(100000, 1000000));
+    const existing = await prisma.emailVerificationToken.findUnique({ where: { tokenHash: hashToken(code) } });
+    if (!existing) return code;
+  }
+  return String(crypto.randomInt(100000, 1000000));
+}
+
 function hashToken(token) {
   const value = String(token || "").trim();
   if (!value) return "";
@@ -3030,6 +3083,66 @@ async function sendPasswordResetEmail(email, code) {
         <div style="margin:20px 0;padding:16px;border-radius:10px;background:#080713;border:1px solid rgba(199,156,255,.35);font-size:30px;font-weight:900;letter-spacing:.18em;text-align:center">${code}</div>
         <a href="${resetUrl}" style="display:inline-block;padding:12px 16px;border-radius:8px;background:linear-gradient(135deg,#c79cff,#42d9ff);color:#080713;font-weight:900;text-decoration:none">Reset password</a>
         <p style="margin-top:18px;color:#8f84a5;font-size:13px">If you did not request this, ignore this email.</p>
+      </div>
+    </div>
+  `;
+
+  const response = await fetchWithAbort("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${resendKey}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ from, to: email, subject, text, html })
+  }, 8000);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    const error = new Error(`Resend email failed with status ${response.status}`);
+    error.code = "email_send_failed";
+    error.type = body.slice(0, 160);
+    throw error;
+  }
+  return { configured: true };
+}
+
+async function createAndSendEmailVerification(user) {
+  if (!user?.id || user.emailVerifiedAt) return { skipped: true };
+  const code = await generateUniqueEmailVerificationCode();
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashToken(code),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+    }
+  });
+  await sendEmailVerificationEmail(user.email, code);
+  return { sent: true };
+}
+
+async function sendEmailVerificationEmail(email, code) {
+  const resendKey = env("RESEND_API_KEY", "");
+  if (!resendKey) return { configured: false };
+
+  const from = env("MAIL_FROM", "Fima Macro <support@fimamacro.com>");
+  const subject = "Verify your Fima Macro email";
+  const text = [
+    "Your Fima Macro email verification code is:",
+    "",
+    code,
+    "",
+    "This code expires in 30 minutes.",
+    "After verifying, referrals can count toward invite rewards.",
+    "",
+    "If you did not create a Fima account, you can ignore this email."
+  ].join("\n");
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;background:#070711;color:#f6f2ff;padding:24px">
+      <div style="max-width:560px;margin:0 auto;border:1px solid rgba(190,150,255,.28);border-radius:12px;background:#121020;padding:24px">
+        <p style="margin:0 0 8px;color:#c79cff;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Fima Macro</p>
+        <h1 style="margin:0 0 14px;font-size:28px">Verify your email</h1>
+        <p style="color:#b7adc9">Use this code to verify your Fima account email. Referrals require verified email, Discord and Roblox.</p>
+        <div style="margin:20px 0;padding:16px;border-radius:10px;background:#080713;border:1px solid rgba(199,156,255,.35);font-size:30px;font-weight:900;letter-spacing:.18em;text-align:center">${code}</div>
+        <p style="margin-top:18px;color:#8f84a5;font-size:13px">If you did not create this account, ignore this email.</p>
       </div>
     </div>
   `;
@@ -3140,6 +3253,7 @@ function publicUser(user) {
     robloxUsername: user.robloxUsername || null,
     robloxUserId: user.robloxUserId || null,
     robloxAvatarUrl: user.robloxAvatarUrl || null,
+    emailVerified: Boolean(user.emailVerifiedAt),
     emailVerifiedAt: user.emailVerifiedAt || null,
     trialUsedAt: user.trialUsedAt || null,
     trialExpiresAt: user.trialExpiresAt || null,
@@ -3449,7 +3563,7 @@ async function evaluateReferralForUser(userId) {
   if (["rejected"].includes(referral.status)) return referral;
 
   const integrations = await buildIntegrationSummary(referral.referred);
-  const emailVerified = Boolean(referral.referred.emailVerifiedAt || referral.referred.email);
+  const emailVerified = Boolean(referral.referred.emailVerifiedAt);
   const discordConnected = Boolean(integrations.discord.connected && integrations.discord.id);
   const robloxConnected = Boolean(integrations.roblox.connected && integrations.roblox.id);
   const [discordDuplicateCount, robloxDuplicateCount, sameIpCount] = await Promise.all([

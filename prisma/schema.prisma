@@ -101,6 +101,7 @@ model User {
   updatedAt              DateTime             @updatedAt @map("updated_at")
   sessions               UserSession[]
   resetTokens            PasswordResetToken[]
+  verificationTokens     EmailVerificationToken[]
   purchases              Purchase[]
   oauthLinks             OAuthLink[]
   paymentSubmissions     PaymentSubmission[]
@@ -277,6 +278,20 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
 }
 
 model Product {

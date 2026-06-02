@@ -18,4 +18,8 @@
 - Added admin referral review actions for approve, reject and flag.
 - Added dashboard referral UI support for code, link, progress, recent invites and applying an invite code.
 - Added register-page referral-code prefill from `?ref=...`.
-
+- Added email verification tokens and dashboard verification APIs:
+  - `POST /api/auth/email-verification/send`
+  - `POST /api/auth/email-verification/confirm`
+- Tightened referral validation so rewards require verified email + connected Discord + connected Roblox.
+- Added referral re-evaluation after email verification completes.
