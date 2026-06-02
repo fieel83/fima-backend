@@ -49,11 +49,14 @@ const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHe
 const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const trialLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
 const giftRecipientSearchLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
+const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const MONTHLY_TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
+const REFERRAL_REWARD_VALID_INVITES = 3;
+const REFERRAL_REWARD_DAYS = 15;
 
 const defaultSiteSettings = {
   discordInviteUrl: env("DISCORD_INVITE_URL", ""),
@@ -174,6 +177,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
+    const referralCode = normalizeReferralCode(req.body?.referralCode);
     const emailCheck = await validateSignupEmail(email);
     if (!emailCheck.valid) return res.status(400).json({ error: emailCheck.reason });
     if (!isStrongPassword(password)) return res.status(400).json({ error: "weak_password" });
@@ -200,14 +204,26 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
         emailVerifiedAt: null
       }
     });
+    const createdReferralCode = await ensureReferralCodeForUser(user);
+    let referral = null;
+    if (referralCode) {
+      referral = await applyReferralCodeToUser({
+        code: referralCode,
+        referredUserId: user.id,
+        req,
+        softFail: true
+      });
+    }
     await ensureCustomer(email);
     await createAuditLog("user_registered", "user", user.id, {
       email,
       emailDomainChecked: emailCheck.mxVerified,
-      robloxLinked: Boolean(robloxProfile)
+      robloxLinked: Boolean(robloxProfile),
+      referralCode: referralCode || null,
+      ownReferralCode: createdReferralCode.code
     });
     await issueUserSession(res, user.id);
-    return res.status(201).json({ success: true, user: publicUser(user) });
+    return res.status(201).json({ success: true, user: publicUser(user), referral });
   } catch (error) {
     console.error("User registration failed", publicError(error));
     return res.status(500).json({ error: "registration_failed" });
@@ -292,6 +308,9 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
     const token = await exchangeDiscordCode(code);
     const profile = await fetchDiscordProfile(token.access_token);
     const linked = await loginOrLinkDiscordAccount(profile, token, state.userId);
+    await evaluateReferralForUser(linked.user.id).catch((error) => {
+      console.warn("Referral evaluation after Discord link failed", { userId: linked.user.id, ...publicError(error) });
+    });
     await issueUserSession(res, linked.user.id);
     await createAuditLog(state.userId ? "discord_account_linked" : "discord_login_success", "user", linked.user.id, {
       discordUserId: profile.id,
@@ -526,9 +545,10 @@ app.get("/api/store/result", requireUser, async (req, res) => {
 
 app.get("/api/me/dashboard", requireUser, async (req, res) => {
   const integrations = await buildIntegrationSummary(req.user);
-  const [access, trial] = await Promise.all([
+  const [access, trial, referrals] = await Promise.all([
     getAccountAccess(req.user),
-    buildMonthlyTrialSummary(req.user, new Date(), integrations)
+    buildMonthlyTrialSummary(req.user, new Date(), integrations),
+    buildReferralSummary(req.user.id, { evaluate: true })
   ]);
   const [purchases, licenses] = access;
   return res.json({
@@ -536,6 +556,7 @@ app.get("/api/me/dashboard", requireUser, async (req, res) => {
     user: publicUser(req.user),
     integrations,
     trial,
+    referrals,
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
     products: buildAccountProducts(purchases, licenses)
@@ -559,6 +580,34 @@ app.get(["/users/search-gift-recipient", "/api/users/search-gift-recipient"], gi
   } catch (error) {
     console.error("Gift recipient search failed", publicError(error));
     return res.status(500).json({ error: "gift_recipient_search_failed" });
+  }
+});
+
+app.get("/api/referrals/me", referralLimiter, requireUser, async (req, res) => {
+  try {
+    return res.json({ success: true, referrals: await buildReferralSummary(req.user.id, { evaluate: true }) });
+  } catch (error) {
+    console.error("Referral summary failed", publicError(error));
+    return res.status(500).json({ error: "referral_summary_failed" });
+  }
+});
+
+app.post("/api/referrals/apply", referralLimiter, requireUser, async (req, res) => {
+  try {
+    const result = await applyReferralCodeToUser({
+      code: req.body?.code,
+      referredUserId: req.user.id,
+      req,
+      softFail: false
+    });
+    return res.status(result.applied ? 201 : 200).json({
+      success: Boolean(result.applied),
+      referral: result,
+      referrals: await buildReferralSummary(req.user.id, { evaluate: true })
+    });
+  } catch (error) {
+    console.error("Referral apply failed", publicError(error));
+    return res.status(error.statusCode || 500).json({ error: error.code || "referral_apply_failed" });
   }
 });
 
@@ -1667,6 +1716,69 @@ app.get("/admin/api/users", requireAdmin, async (req, res) => {
   res.json({ users: users.map((user) => ({ ...publicUser(user), purchases: user.purchases })) });
 });
 
+app.get("/admin/api/referrals", requireAdmin, async (req, res) => {
+  const status = String(req.query.status || "").trim();
+  const search = String(req.query.search || "").trim();
+  const referrals = await prisma.referral.findMany({
+    where: {
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { referralCode: { is: { code: { contains: normalizeReferralCode(search) } } } },
+                { referrer: { is: { email: { contains: normalizeEmail(search), mode: "insensitive" } } } },
+                { referred: { is: { email: { contains: normalizeEmail(search), mode: "insensitive" } } } },
+                { referrer: { is: { discordUsername: { contains: search, mode: "insensitive" } } } },
+                { referred: { is: { discordUsername: { contains: search, mode: "insensitive" } } } },
+                { referrer: { is: { robloxUsername: { contains: search, mode: "insensitive" } } } },
+                { referred: { is: { robloxUsername: { contains: search, mode: "insensitive" } } } }
+              ]
+            }
+          : {}
+      ]
+    },
+    include: {
+      referralCode: true,
+      referrer: true,
+      referred: true,
+      abuseFlags: { orderBy: { createdAt: "desc" }, take: 5 }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200
+  });
+  res.json({ referrals: referrals.map(adminReferralPayload) });
+});
+
+app.post("/admin/api/referrals/:id/status", requireAdmin, async (req, res) => {
+  const status = String(req.body?.status || "").trim().toLowerCase();
+  const allowed = new Set(["pending", "valid", "rejected", "flagged_for_review"]);
+  if (!allowed.has(status)) return res.status(400).json({ error: "invalid_referral_status" });
+  const reason = String(req.body?.reason || "").trim().slice(0, 300) || `manual_${status}`;
+  const notes = String(req.body?.notes || "").trim().slice(0, 1000) || null;
+  try {
+    const referral = await prisma.referral.update({
+      where: { id: req.params.id },
+      data: {
+        status,
+        statusReason: reason,
+        notes,
+        reviewedBy: "admin",
+        reviewedAt: new Date()
+      },
+      include: { referrer: true, referred: true, referralCode: true, abuseFlags: true }
+    });
+    if (status === "valid") {
+      await grantReferralRewardsIfEligible(referral.referrerUserId);
+    }
+    await createAuditLog("referral_status_changed", "referral", referral.id, { status, reason });
+    return res.json({ referral: adminReferralPayload(referral) });
+  } catch (error) {
+    console.error("Admin referral status update failed", publicError(error));
+    return res.status(500).json({ error: "referral_status_update_failed" });
+  }
+});
+
 app.get("/admin/api/purchases", requireAdmin, async (req, res) => {
   const search = String(req.query.search || "").trim();
   const status = String(req.query.status || "").trim();
@@ -1815,6 +1927,9 @@ async function finishRobloxOAuth(req, res, input) {
   const token = await exchangeRobloxCode(code, verifier);
   const profile = await fetchRobloxOidcProfile(token.access_token);
   const user = await linkRobloxAccount(currentUser.id, profile, token);
+  await evaluateReferralForUser(user.id).catch((error) => {
+    console.warn("Referral evaluation after Roblox link failed", { userId: user.id, ...publicError(error) });
+  });
   await createAuditLog("roblox_account_linked", "user", user.id, { robloxUserId: profile.sub });
   clearOAuthCookies(res);
   return {
@@ -3211,6 +3326,430 @@ function maskEmail(email) {
   const first = local.slice(0, 1);
   const last = local.length > 2 ? local.slice(-1) : "";
   return `${first}***${last}@${domain}`;
+}
+
+function normalizeReferralCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
+}
+
+function referralCodePrefix(user) {
+  const base = String(user?.robloxUsername || user?.discordUsername || user?.email?.split("@")[0] || "USER")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10);
+  return base || "USER";
+}
+
+function randomReferralSuffix(length = 4) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let index = 0; index < length; index += 1) {
+    out += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+  return out;
+}
+
+function privacyHash(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  return crypto.createHmac("sha256", oauthSecret()).update(text).digest("hex");
+}
+
+function requestIpHash(req) {
+  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
+  return privacyHash(forwarded || req.ip || req.socket?.remoteAddress || "");
+}
+
+function requestUserAgentHash(req) {
+  return privacyHash(req.headers?.["user-agent"] || "");
+}
+
+async function ensureReferralCodeForUser(userOrId, tx = prisma) {
+  const user = typeof userOrId === "string"
+    ? await tx.user.findUnique({ where: { id: userOrId } })
+    : userOrId;
+  if (!user?.id) throw new Error("referral_user_missing");
+
+  const existing = await tx.referralCode.findUnique({ where: { userId: user.id } });
+  if (existing) return existing;
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const code = normalizeReferralCode(`FIMA-${referralCodePrefix(user)}-${randomReferralSuffix(4)}`);
+    try {
+      return await tx.referralCode.create({ data: { userId: user.id, code } });
+    } catch (error) {
+      if (error?.code !== "P2002") throw error;
+    }
+  }
+  throw new Error("referral_code_generation_failed");
+}
+
+function referralError(code, statusCode = 400, softFail = false) {
+  if (softFail) return { applied: false, error: code };
+  const error = new Error(code);
+  error.code = code;
+  error.statusCode = statusCode;
+  throw error;
+}
+
+async function applyReferralCodeToUser({ code, referredUserId, req, softFail = false }) {
+  const normalizedCode = normalizeReferralCode(code);
+  if (!normalizedCode) return referralError("invalid_referral_code", 400, softFail);
+
+  const [existingReferral, referralCode] = await Promise.all([
+    prisma.referral.findUnique({ where: { referredUserId } }),
+    prisma.referralCode.findUnique({ where: { code: normalizedCode }, include: { user: true } })
+  ]);
+  if (existingReferral) {
+    if (softFail) return { applied: false, error: "referral_already_used", referralId: existingReferral.id, status: existingReferral.status };
+    return referralError("referral_already_used", 409, softFail);
+  }
+  if (!referralCode) return referralError("invalid_referral_code", 404, softFail);
+  if (referralCode.userId === referredUserId) return referralError("self_referral_not_allowed", 400, softFail);
+
+  const referral = await prisma.referral.create({
+    data: {
+      referralCodeId: referralCode.id,
+      referrerUserId: referralCode.userId,
+      referredUserId,
+      status: "pending",
+      statusReason: "waiting_for_discord_and_roblox",
+      ipHash: requestIpHash(req),
+      userAgentHash: requestUserAgentHash(req)
+    }
+  });
+  await createAuditLog("referral_applied", "referral", referral.id, { referrerUserId: referralCode.userId, referredUserId, code: normalizedCode });
+  const evaluated = await evaluateReferralForUser(referredUserId);
+  return {
+    applied: true,
+    referralId: referral.id,
+    status: evaluated?.status || referral.status,
+    code: normalizedCode
+  };
+}
+
+async function evaluateReferralForUser(userId) {
+  const referral = await prisma.referral.findUnique({
+    where: { referredUserId: userId },
+    include: {
+      referred: { include: { oauthLinks: true } },
+      referrer: true,
+      referralCode: true
+    }
+  });
+  if (!referral) return null;
+  if (["rejected"].includes(referral.status)) return referral;
+
+  const integrations = await buildIntegrationSummary(referral.referred);
+  const emailVerified = Boolean(referral.referred.emailVerifiedAt || referral.referred.email);
+  const discordConnected = Boolean(integrations.discord.connected && integrations.discord.id);
+  const robloxConnected = Boolean(integrations.roblox.connected && integrations.roblox.id);
+  const [discordDuplicateCount, robloxDuplicateCount, sameIpCount] = await Promise.all([
+    discordConnected
+      ? prisma.user.count({ where: { discordUserId: integrations.discord.id, id: { not: referral.referredUserId } } })
+      : 0,
+    robloxConnected
+      ? prisma.user.count({ where: { robloxUserId: integrations.roblox.id, id: { not: referral.referredUserId } } })
+      : 0,
+    referral.ipHash
+      ? prisma.referral.count({
+          where: {
+            referrerUserId: referral.referrerUserId,
+            ipHash: referral.ipHash,
+            referredUserId: { not: referral.referredUserId }
+          }
+        })
+      : 0
+  ]);
+
+  const riskFlags = [];
+  if (discordDuplicateCount > 0) riskFlags.push("duplicate_discord");
+  if (robloxDuplicateCount > 0) riskFlags.push("duplicate_roblox");
+  if (sameIpCount >= 3) riskFlags.push("many_referrals_same_ip");
+
+  const missing = [];
+  if (!emailVerified) missing.push("email");
+  if (!discordConnected) missing.push("discord");
+  if (!robloxConnected) missing.push("roblox");
+
+  let nextStatus = "pending";
+  let statusReason = missing.length ? `missing_${missing.join("_")}` : "verified";
+  if (riskFlags.length) {
+    nextStatus = "flagged_for_review";
+    statusReason = riskFlags.join(",");
+  } else if (!missing.length) {
+    nextStatus = "valid";
+  }
+
+  for (const flag of riskFlags) {
+    const existing = await prisma.referralAbuseFlag.findFirst({ where: { referralId: referral.id, type: flag, status: "open" } });
+    if (!existing) {
+      await prisma.referralAbuseFlag.create({
+        data: {
+          referralId: referral.id,
+          type: flag,
+          severity: flag === "many_referrals_same_ip" ? "medium" : "high",
+          metadata: { discordDuplicateCount, robloxDuplicateCount, sameIpCount }
+        }
+      });
+    }
+  }
+
+  const verification = {
+    emailVerified,
+    emailVerifiedAt: referral.referred.emailVerifiedAt?.toISOString?.() || null,
+    discordConnected,
+    discordUserId: integrations.discord.id || null,
+    discordUsername: integrations.discord.username || null,
+    robloxConnected,
+    robloxUserId: integrations.roblox.id || null,
+    robloxUsername: integrations.roblox.username || null,
+    riskFlags,
+    sameIpCount,
+    evaluatedAt: new Date().toISOString()
+  };
+
+  const updated = await prisma.referral.update({
+    where: { id: referral.id },
+    data: {
+      status: nextStatus,
+      statusReason,
+      verification
+    },
+    include: {
+      referralCode: true,
+      referrer: true,
+      referred: true,
+      abuseFlags: { orderBy: { createdAt: "desc" }, take: 5 }
+    }
+  });
+
+  if (nextStatus === "valid") {
+    await grantReferralRewardsIfEligible(referral.referrerUserId);
+  }
+  return updated;
+}
+
+function addDays(date, days) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function appendReferralNote(current, line) {
+  return [String(current || "").trim(), line].filter(Boolean).join("\n").slice(0, 2000);
+}
+
+async function grantReferralRewardsIfEligible(referrerUserId) {
+  const validCount = await prisma.referral.count({ where: { referrerUserId, status: "valid" } });
+  const targetRewardCount = Math.floor(validCount / REFERRAL_REWARD_VALID_INVITES);
+  const existingRewardCount = await prisma.referralReward.count({
+    where: { userId: referrerUserId, status: { notIn: ["revoked", "canceled"] } }
+  });
+  if (targetRewardCount <= existingRewardCount) return [];
+
+  const createdRewards = [];
+  for (let rewardNumber = existingRewardCount + 1; rewardNumber <= targetRewardCount; rewardNumber += 1) {
+    const reward = await prisma.$transaction(async (tx) => {
+      const referrer = await tx.user.findUnique({ where: { id: referrerUserId } });
+      if (!referrer) throw new Error("referrer_missing");
+      const chunk = await tx.referral.findMany({
+        where: { referrerUserId, status: "valid", rewardGranted: false },
+        orderBy: { createdAt: "asc" },
+        take: REFERRAL_REWARD_VALID_INVITES
+      });
+      if (chunk.length < REFERRAL_REWARD_VALID_INVITES) return null;
+
+      const now = new Date();
+      const activeLicense = await tx.license.findFirst({
+        where: {
+          customerEmail: referrer.email,
+          status: "active",
+          lifetime: false,
+          expiresAt: { gt: now }
+        },
+        orderBy: { expiresAt: "desc" }
+      });
+
+      let license;
+      if (activeLicense) {
+        license = await tx.license.update({
+          where: { id: activeLicense.id },
+          data: {
+            expiresAt: addDays(activeLicense.expiresAt || now, REFERRAL_REWARD_DAYS),
+            notes: appendReferralNote(activeLicense.notes, `referral_reward +${REFERRAL_REWARD_DAYS}d reward:${rewardNumber}`)
+          }
+        });
+      } else {
+        const plan = getPlan("2weeks");
+        license = await tx.license.create({
+          data: {
+            licenseKey: await generateUniqueLicenseKey(tx),
+            customerEmail: referrer.email,
+            plan: plan?.id || "2weeks",
+            status: "active",
+            hwid: null,
+            expiresAt: addDays(now, REFERRAL_REWARD_DAYS),
+            lifetime: false,
+            notes: `referral_reward user:${referrer.id} reward:${rewardNumber} invites:${chunk.map((item) => item.id).join(",")}`
+          }
+        });
+      }
+
+      await tx.referral.updateMany({
+        where: { id: { in: chunk.map((item) => item.id) } },
+        data: { rewardGranted: true }
+      });
+
+      const created = await tx.referralReward.create({
+        data: {
+          userId: referrer.id,
+          licenseId: license.id,
+          rewardNumber,
+          validCountAtAward: validCount,
+          days: REFERRAL_REWARD_DAYS,
+          status: "granted",
+          referralIds: chunk.map((item) => item.id),
+          grantedAt: now,
+          notes: activeLicense ? "extended_existing_license" : "created_referral_reward_license"
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: "referral_reward_granted",
+          targetType: "referral_reward",
+          targetId: created.id,
+          metadata: {
+            userId: referrer.id,
+            licenseId: license.id,
+            rewardNumber,
+            days: REFERRAL_REWARD_DAYS,
+            referralIds: chunk.map((item) => item.id)
+          }
+        }
+      });
+      return created;
+    });
+    if (reward) createdRewards.push(reward);
+  }
+  return createdRewards;
+}
+
+async function buildReferralSummary(userId, options = {}) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return null;
+  const code = await ensureReferralCodeForUser(user);
+  if (options.evaluate) {
+    await evaluateReferralForUser(userId).catch((error) => {
+      console.warn("Referral self evaluation failed", { userId, ...publicError(error) });
+    });
+  }
+  const [referrals, rewards, incoming] = await Promise.all([
+    prisma.referral.findMany({
+      where: { referrerUserId: userId },
+      include: { referred: true, abuseFlags: { orderBy: { createdAt: "desc" }, take: 3 } },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    }),
+    prisma.referralReward.findMany({
+      where: { userId },
+      include: { license: true },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    }),
+    prisma.referral.findUnique({
+      where: { referredUserId: userId },
+      include: { referralCode: true, referrer: true, abuseFlags: { orderBy: { createdAt: "desc" }, take: 3 } }
+    })
+  ]);
+  const counts = {
+    total: referrals.length,
+    valid: referrals.filter((item) => item.status === "valid").length,
+    pending: referrals.filter((item) => item.status === "pending").length,
+    rejected: referrals.filter((item) => item.status === "rejected").length,
+    flagged: referrals.filter((item) => item.status === "flagged_for_review").length
+  };
+  const nextProgress = counts.valid % REFERRAL_REWARD_VALID_INVITES;
+  return {
+    code: code.code,
+    link: `${frontendUrl()}/register.html?ref=${encodeURIComponent(code.code)}`,
+    rewardRule: {
+      requiredValidInvites: REFERRAL_REWARD_VALID_INVITES,
+      rewardDays: REFERRAL_REWARD_DAYS
+    },
+    counts,
+    progress: {
+      current: nextProgress,
+      required: REFERRAL_REWARD_VALID_INVITES,
+      remaining: REFERRAL_REWARD_VALID_INVITES - nextProgress
+    },
+    referrals: referrals.map(publicReferral),
+    incoming: incoming ? publicReferral(incoming, { incoming: true }) : null,
+    rewards: rewards.map(publicReferralReward)
+  };
+}
+
+function publicReferral(referral, options = {}) {
+  const user = options.incoming ? referral.referrer : referral.referred;
+  return {
+    id: referral.id,
+    status: referral.status,
+    statusReason: referral.statusReason,
+    code: referral.referralCode?.code || null,
+    rewardGranted: Boolean(referral.rewardGranted),
+    createdAt: referral.createdAt?.toISOString?.() || null,
+    updatedAt: referral.updatedAt?.toISOString?.() || null,
+    user: user ? {
+      maskedEmail: maskEmail(user.email),
+      discordUsername: user.discordUsername || null,
+      robloxUsername: user.robloxUsername || null,
+      robloxAvatarUrl: user.robloxAvatarUrl || null
+    } : null,
+    flags: (referral.abuseFlags || []).map((flag) => ({ type: flag.type, severity: flag.severity, status: flag.status }))
+  };
+}
+
+function publicReferralReward(reward) {
+  return {
+    id: reward.id,
+    rewardNumber: reward.rewardNumber,
+    validCountAtAward: reward.validCountAtAward,
+    days: reward.days,
+    status: reward.status,
+    grantedAt: reward.grantedAt?.toISOString?.() || null,
+    license: reward.license ? publicLicense(reward.license) : null
+  };
+}
+
+function adminReferralPayload(referral) {
+  return {
+    id: referral.id,
+    code: referral.referralCode?.code || null,
+    status: referral.status,
+    statusReason: referral.statusReason,
+    verification: referral.verification || null,
+    rewardGranted: referral.rewardGranted,
+    notes: referral.notes || null,
+    createdAt: referral.createdAt?.toISOString?.() || null,
+    updatedAt: referral.updatedAt?.toISOString?.() || null,
+    referrer: referral.referrer ? publicUser(referral.referrer) : null,
+    referred: referral.referred ? publicUser(referral.referred) : null,
+    flags: (referral.abuseFlags || []).map((flag) => ({
+      id: flag.id,
+      type: flag.type,
+      severity: flag.severity,
+      status: flag.status,
+      metadata: flag.metadata || null,
+      createdAt: flag.createdAt?.toISOString?.() || null
+    }))
+  };
 }
 
 async function buildMonthlyTrialSummary(user, now = new Date(), integrations = null) {

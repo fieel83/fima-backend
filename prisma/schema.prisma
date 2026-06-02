@@ -28,6 +28,7 @@ model License {
   orders                Order[]
   validationLogs        ValidationLog[]
   downloadLogs          DownloadLog[]
+  referralRewards       ReferralReward[]
 
   @@index([customerEmail])
   @@index([plan, status])
@@ -103,6 +104,10 @@ model User {
   purchases              Purchase[]
   oauthLinks             OAuthLink[]
   paymentSubmissions     PaymentSubmission[]
+  referralCode           ReferralCode?
+  referralsMade          Referral[]            @relation("ReferralReferrer")
+  referralReceived       Referral?             @relation("ReferralReferred")
+  referralRewards        ReferralReward[]
 
   @@index([role])
   @@index([discordUserId])
@@ -110,6 +115,87 @@ model User {
   @@index([nextTrialAvailableAt])
   @@index([trialStatus])
   @@map("users")
+}
+
+model ReferralCode {
+  id        String     @id @default(cuid())
+  userId    String     @unique @map("user_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  referrals Referral[]
+
+  @@index([code])
+  @@map("referral_codes")
+}
+
+model Referral {
+  id             String              @id @default(cuid())
+  referralCodeId String              @map("referral_code_id")
+  referralCode   ReferralCode        @relation(fields: [referralCodeId], references: [id], onDelete: Restrict)
+  referrerUserId String              @map("referrer_user_id")
+  referrer       User                @relation("ReferralReferrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referredUserId String              @unique @map("referred_user_id")
+  referred       User                @relation("ReferralReferred", fields: [referredUserId], references: [id], onDelete: Cascade)
+  status         String              @default("pending")
+  statusReason   String?             @map("status_reason")
+  verification   Json?
+  ipHash         String?             @map("ip_hash")
+  userAgentHash  String?             @map("user_agent_hash")
+  rewardGranted  Boolean             @default(false) @map("reward_granted")
+  reviewedBy     String?             @map("reviewed_by")
+  reviewedAt     DateTime?           @map("reviewed_at")
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  abuseFlags     ReferralAbuseFlag[]
+
+  @@index([referralCodeId])
+  @@index([referrerUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("referrals")
+}
+
+model ReferralReward {
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseId         String?   @map("license_id")
+  license           License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  rewardNumber      Int       @map("reward_number")
+  validCountAtAward Int       @map("valid_count_at_award")
+  days              Int       @default(15)
+  status            String    @default("granted")
+  referralIds       Json?     @map("referral_ids")
+  grantedAt         DateTime? @map("granted_at")
+  revokedAt         DateTime? @map("revoked_at")
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, rewardNumber])
+  @@index([userId])
+  @@index([licenseId])
+  @@index([status])
+  @@map("referral_rewards")
+}
+
+model ReferralAbuseFlag {
+  id         String   @id @default(cuid())
+  referralId String   @map("referral_id")
+  referral   Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  type       String
+  severity   String   @default("medium")
+  status     String   @default("open")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([referralId])
+  @@index([type])
+  @@index([status])
+  @@map("referral_abuse_flags")
 }
 
 model OAuthLink {
