@@ -2,6 +2,15 @@
 
 ## 2026-06-03
 
+- Expanded `POST /api/license/validate` diagnostics:
+  - distinguishes `invalid_format`, `license_not_found`, `disabled`, `banned`, `canceled`, `payment_failed`, `expired`, `trial_expired`, `account_not_connected`, `discord_not_connected`, `roblox_not_connected`, `hwid_mismatch` and `server_error`
+  - returns license source, status, plan label, product name, expiry/time-left, HWID binding state and account-link state
+  - keeps first-use HWID binding on the backend as the source of truth
+- Added protected admin dry-run validation endpoint:
+  - `POST /admin/api/licenses/validate`
+  - `POST /api/admin/licenses/validate`
+  - does not bind HWID, useful for debugging website/gift/trial/manual keys
+- Added Cloud Admin Manual Tools UI for License Debug with optional HWID and copyable JSON result.
 - Added account-link enforcement to `POST /api/license/validate`:
   - cloud/website licenses require a matching Fima account
   - Discord must be connected
