@@ -2,6 +2,10 @@
 
 ## 2026-06-03
 
+- Added `scripts/e2e-gift-license-flow.js` for end-to-end gift code, direct package and license validation matrix testing against a real backend/database session.
+- Expanded admin license source labels for old buyer trials, Robux manual orders and legacy imports.
+- Added `inactive`, buyer identity, bound HWID, last validation, and app message preview fields to license validation diagnostics.
+- Upgraded Cloud Admin License Debug from a raw JSON-only output into a readable diagnostic summary with actions for opening the buyer/license, resetting HWID, re-enabling a key and adding notes.
 - Expanded `POST /api/license/validate` diagnostics:
   - distinguishes `invalid_format`, `license_not_found`, `disabled`, `banned`, `canceled`, `payment_failed`, `expired`, `trial_expired`, `account_not_connected`, `discord_not_connected`, `roblox_not_connected`, `hwid_mismatch` and `server_error`
   - returns license source, status, plan label, product name, expiry/time-left, HWID binding state and account-link state

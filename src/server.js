@@ -3180,6 +3180,7 @@ function licenseBlockedReason(license) {
   const status = String(license?.status || "").trim().toLowerCase();
   if (!status || status === "active") return null;
   if (status === "banned") return "banned";
+  if (status === "inactive") return "inactive";
   if (status === "canceled" || status === "cancelled") return "canceled";
   if (status === "payment_failed" || status === "failed") return "payment_failed";
   return "disabled";
@@ -3226,6 +3227,7 @@ function licenseValidationPayload(license, options = {}) {
     valid: Boolean(options.valid),
     reason,
     message: options.message || licenseReasonMessage(reason),
+    appMessagePreview: options.message || licenseReasonMessage(reason),
     licenseKey: license?.licenseKey || options.licenseKey || null,
     licenseId: license?.id || null,
     source: license ? licenseSource(license) : null,
@@ -3238,6 +3240,7 @@ function licenseValidationPayload(license, options = {}) {
     timeLeftSeconds: timeLeft.seconds,
     timeLeftState: timeLeft.state,
     lifetime: Boolean(license?.lifetime),
+    boundHwid: boundHwid || null,
     hwidBound,
     hwidMatches,
     hwidStatus: hwidBound ? "Bound" : "Unbound",
@@ -3247,11 +3250,25 @@ function licenseValidationPayload(license, options = {}) {
     canUseApp: Boolean(options.valid && accountAccess?.canUseApp !== false && hwidMatches),
     missingRequirements,
     hasActiveLicense: Boolean(license && license.status === "active"),
+    buyerEmail: user?.email || license?.customerEmail || null,
     accountEmail: user?.email || license?.customerEmail || null,
     customerEmail: license?.customerEmail || null,
+    buyerDiscord: user ? {
+      connected: Boolean(accountAccess?.discordLinked),
+      id: user.discordUserId || null,
+      username: user.discordUsername || null,
+      avatar: user.discordAvatarUrl || null
+    } : null,
+    buyerRoblox: user ? {
+      connected: Boolean(accountAccess?.robloxLinked),
+      id: user.robloxUserId || null,
+      username: user.robloxUsername || null,
+      avatar: user.robloxAvatarUrl || null
+    } : null,
     robloxUsername: user?.robloxUsername || null,
     robloxAvatarUrl: user?.robloxAvatarUrl || null,
     discordUsername: user?.discordUsername || null,
+    lastValidatedAt: license?.lastValidatedAt ? license.lastValidatedAt.toISOString() : null,
     createdAt: license?.createdAt ? license.createdAt.toISOString() : null
   };
 }
@@ -3316,6 +3333,9 @@ function licenseSource(license) {
   if (notes.includes("direct_gift_package")) return "Direct Gift Package";
   if (notes.includes("gift_code")) return "Gift Code";
   if (notes.includes("gift_purchase")) return "Gift/Website";
+  if (notes.includes("old_buyer")) return "Old Buyer Trial";
+  if (notes.includes("robux_manual")) return "Robux Manual Order";
+  if (notes.includes("legacy_import")) return "Legacy Import";
   if (license?.stripeSessionId) return "Stripe/Website";
   if (notes.includes("referral_reward")) return "Referral reward";
   if (notes.includes("trial")) return "Trial";
