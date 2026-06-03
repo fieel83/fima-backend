@@ -1082,27 +1082,57 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
   const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
 
   try {
-    if (!licenseKey || !hwid) {
-      await logValidation(null, licenseKey || "-", "failed", "invalid", hwid, appVersion);
-      return res.status(400).json({ valid: false, reason: "invalid", message: "Invalid license key" });
+    if (!licenseKey || !isNormalizedCloudLicenseKey(licenseKey)) {
+      await logValidation(null, licenseKey || "-", "failed", "invalid_format", hwid, appVersion);
+      return res.status(400).json(licenseValidationPayload(null, {
+        valid: false,
+        reason: "invalid_format",
+        message: "Invalid license key format.",
+        licenseKey
+      }));
+    }
+
+    if (!hwid) {
+      await logValidation(null, licenseKey, "failed", "invalid_hwid", hwid, appVersion);
+      return res.status(400).json(licenseValidationPayload(null, {
+        valid: false,
+        reason: "invalid_format",
+        message: "Invalid HWID.",
+        licenseKey
+      }));
     }
 
     let license = await prisma.license.findUnique({ where: { licenseKey } });
     if (!license) {
-      await logValidation(null, licenseKey, "failed", "invalid", hwid, appVersion);
-      return invalid(res, "invalid", "Invalid license key");
+      await logValidation(null, licenseKey, "failed", "license_not_found", hwid, appVersion);
+      return invalid(res, "license_not_found", "License key was not found.", licenseValidationPayload(null, {
+        valid: false,
+        reason: "license_not_found",
+        message: "License key was not found.",
+        licenseKey
+      }));
     }
-    if (license.status === "banned") {
-      await incrementValidationFailure(license, licenseKey, "banned", hwid, appVersion);
-      return invalid(res, "banned", "This license has been banned");
+
+    const blockedReason = licenseBlockedReason(license);
+    if (blockedReason) {
+      await incrementValidationFailure(license, licenseKey, blockedReason, hwid, appVersion);
+      return invalid(res, blockedReason, licenseReasonMessage(blockedReason), licenseValidationPayload(license, {
+        valid: false,
+        reason: blockedReason,
+        message: licenseReasonMessage(blockedReason),
+        hwid
+      }));
     }
-    if (license.status !== "active") {
-      await incrementValidationFailure(license, licenseKey, "inactive", hwid, appVersion);
-      return invalid(res, "inactive", "This license is inactive");
-    }
+
     if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
-      await incrementValidationFailure(license, licenseKey, "expired", hwid, appVersion);
-      return invalid(res, "expired", "Your license has expired.");
+      const expiredReason = licenseSource(license) === "Trial" ? "trial_expired" : "expired";
+      await incrementValidationFailure(license, licenseKey, expiredReason, hwid, appVersion);
+      return invalid(res, expiredReason, licenseReasonMessage(expiredReason), licenseValidationPayload(license, {
+        valid: false,
+        reason: expiredReason,
+        message: licenseReasonMessage(expiredReason),
+        hwid
+      }));
     }
 
     const accountAccess = await buildLicenseAccountAccess(license);
@@ -1113,17 +1143,13 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         ? "discord_not_connected"
         : "roblox_not_connected";
       await incrementValidationFailure(license, licenseKey, reason, hwid, appVersion);
-      return invalid(res, reason, accountAccess.message, {
-        hasActiveLicense: true,
-        discordLinked: accountAccess.discordLinked,
-        robloxLinked: accountAccess.robloxLinked,
-        canUseApp: false,
-        missingRequirements: accountAccess.missingRequirements,
-        accountEmail: accountAccess.user?.email || license.customerEmail || null,
-        robloxUsername: accountAccess.user?.robloxUsername || null,
-        robloxAvatarUrl: accountAccess.user?.robloxAvatarUrl || null,
-        discordUsername: accountAccess.user?.discordUsername || null
-      });
+      return invalid(res, reason, accountAccess.message, licenseValidationPayload(license, {
+        valid: false,
+        reason,
+        message: accountAccess.message,
+        accountAccess,
+        hwid
+      }));
     }
 
     if (!license.hwid) {
@@ -1136,7 +1162,14 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
 
     if (normalizeHwid(license.hwid) !== hwid) {
       await incrementValidationFailure(license, licenseKey, "hwid_mismatch", hwid, appVersion);
-      return invalid(res, "hwid_mismatch", "This license key is already bound to another device. Please open a support ticket if this is your key.");
+      return invalid(res, "hwid_mismatch", licenseReasonMessage("hwid_mismatch"), licenseValidationPayload(license, {
+        valid: false,
+        reason: "hwid_mismatch",
+        message: licenseReasonMessage("hwid_mismatch"),
+        accountAccess,
+        hwid,
+        hwidMatches: false
+      }));
     }
 
     await prisma.$transaction([
@@ -1167,6 +1200,14 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
     ]);
 
     return res.json({
+      ...licenseValidationPayload(license, {
+        valid: true,
+        reason: "valid",
+        message: "License valid",
+        accountAccess,
+        hwid,
+        hwidMatches: true
+      }),
       valid: true,
       licenseKey,
       plan: license.plan,
@@ -1186,7 +1227,12 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
   } catch (error) {
     console.error("License validation failed", publicError(error));
     await logValidation(null, licenseKey || "-", "failed", "server_error", hwid, appVersion);
-    return res.status(500).json({ valid: false, reason: "server_error", message: "License validation failed" });
+    return res.status(500).json(licenseValidationPayload(null, {
+      valid: false,
+      reason: "server_error",
+      message: "License validation failed",
+      licenseKey
+    }));
   }
 });
 
@@ -1431,6 +1477,61 @@ async function adminLicensesHandler(req, res) {
 }
 
 app.get(["/admin/api/licenses", "/api/admin/licenses"], requireAdmin, adminLicensesHandler);
+
+app.post(["/admin/api/licenses/validate", "/api/admin/licenses/validate"], requireAdmin, async (req, res) => {
+  const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
+  const hwid = normalizeHwid(req.body?.hwid);
+
+  if (!licenseKey || !isNormalizedCloudLicenseKey(licenseKey)) {
+    return res.status(400).json(licenseValidationPayload(null, {
+      valid: false,
+      reason: "invalid_format",
+      message: licenseReasonMessage("invalid_format"),
+      licenseKey
+    }));
+  }
+
+  const license = await prisma.license.findUnique({ where: { licenseKey } });
+  if (!license) {
+    return res.status(404).json(licenseValidationPayload(null, {
+      valid: false,
+      reason: "license_not_found",
+      message: licenseReasonMessage("license_not_found"),
+      licenseKey
+    }));
+  }
+
+  const accountAccess = await buildLicenseAccountAccess(license);
+  let reason = "valid";
+  const blockedReason = licenseBlockedReason(license);
+  if (blockedReason) {
+    reason = blockedReason;
+  } else if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
+    reason = licenseSource(license) === "Trial" ? "trial_expired" : "expired";
+  } else if (!accountAccess.canUseApp) {
+    reason = accountAccess.missingRequirements.includes("fima_account")
+      ? "account_not_connected"
+      : accountAccess.missingRequirements.includes("discord")
+      ? "discord_not_connected"
+      : "roblox_not_connected";
+  } else if (hwid && license.hwid && normalizeHwid(license.hwid) !== hwid) {
+    reason = "hwid_mismatch";
+  }
+
+  const valid = reason === "valid";
+  return res.json({
+    ...licenseValidationPayload(license, {
+      valid,
+      reason,
+      message: licenseReasonMessage(reason),
+      accountAccess,
+      hwid,
+      hwidMatches: !hwid || !license.hwid || normalizeHwid(license.hwid) === hwid
+    }),
+    dryRun: true,
+    wouldBindHwid: Boolean(hwid && !license.hwid)
+  });
+});
 
 app.get(["/admin/api/licenses/:id", "/api/admin/licenses/:id"], requireAdmin, async (req, res) => {
   const license = await prisma.license.findUnique({
@@ -3069,6 +3170,90 @@ function licenseAccessState(license) {
     return { valid: false, reason: "expired" };
   }
   return { valid: true, reason: "valid" };
+}
+
+function isNormalizedCloudLicenseKey(licenseKey) {
+  return /^FIMA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(String(licenseKey || ""));
+}
+
+function licenseBlockedReason(license) {
+  const status = String(license?.status || "").trim().toLowerCase();
+  if (!status || status === "active") return null;
+  if (status === "banned") return "banned";
+  if (status === "canceled" || status === "cancelled") return "canceled";
+  if (status === "payment_failed" || status === "failed") return "payment_failed";
+  return "disabled";
+}
+
+function licenseReasonMessage(reason) {
+  return {
+    valid: "License valid",
+    license_not_found: "License key was not found.",
+    invalid_format: "Invalid license key format.",
+    expired: "Your license has expired.",
+    disabled: "This license key has been disabled by an admin.",
+    inactive: "This license key is inactive.",
+    banned: "This license has been banned.",
+    canceled: "This license was canceled.",
+    payment_failed: "Payment for this license was not completed.",
+    hwid_mismatch: "This license key is already bound to another device. Please open a support ticket if this is your key.",
+    account_not_connected: "Connect this license to a Fima account with Discord and Roblox before using the app.",
+    discord_not_connected: "Connect Discord on your Fima account before using the app.",
+    roblox_not_connected: "Connect Roblox on your Fima account before using the app.",
+    trial_expired: "Your trial license has expired.",
+    gift_not_claimed: "This gift license has not been claimed yet.",
+    referral_not_claimed: "This referral reward has not been claimed yet.",
+    server_error: "License server could not validate this key right now.",
+    timeout: "License server timed out. Try again in a moment."
+  }[reason] || "Invalid license key.";
+}
+
+function licenseValidationPayload(license, options = {}) {
+  const accountAccess = options.accountAccess || null;
+  const timeLeft = license ? licenseTimeLeft(license.expiresAt, license.lifetime) : { label: "", seconds: null, state: "unknown" };
+  const normalizedHwid = normalizeHwid(options.hwid);
+  const boundHwid = normalizeHwid(license?.hwid);
+  const hwidBound = Boolean(boundHwid);
+  const hwidMatches = options.hwidMatches ?? (hwidBound && normalizedHwid ? boundHwid === normalizedHwid : !hwidBound);
+  const reason = options.reason || (options.valid ? "valid" : "license_not_found");
+  const plan = license?.plan || null;
+  const planInfo = plan ? getPlan(plan) : null;
+  const user = accountAccess?.user || null;
+  const missingRequirements = accountAccess?.missingRequirements || [];
+  const accountConnected = accountAccess ? Boolean(accountAccess.user) : false;
+
+  return {
+    valid: Boolean(options.valid),
+    reason,
+    message: options.message || licenseReasonMessage(reason),
+    licenseKey: license?.licenseKey || options.licenseKey || null,
+    licenseId: license?.id || null,
+    source: license ? licenseSource(license) : null,
+    status: license?.status || null,
+    plan,
+    planName: planInfo?.name?.replace(/^Fima Macro\s+/i, "") || plan || null,
+    productName: "Fima Macro",
+    expiresAt: license?.expiresAt ? license.expiresAt.toISOString() : null,
+    timeLeft: timeLeft.label || null,
+    timeLeftSeconds: timeLeft.seconds,
+    timeLeftState: timeLeft.state,
+    lifetime: Boolean(license?.lifetime),
+    hwidBound,
+    hwidMatches,
+    hwidStatus: hwidBound ? "Bound" : "Unbound",
+    accountConnected,
+    discordLinked: accountAccess ? Boolean(accountAccess.discordLinked) : false,
+    robloxLinked: accountAccess ? Boolean(accountAccess.robloxLinked) : false,
+    canUseApp: Boolean(options.valid && accountAccess?.canUseApp !== false && hwidMatches),
+    missingRequirements,
+    hasActiveLicense: Boolean(license && license.status === "active"),
+    accountEmail: user?.email || license?.customerEmail || null,
+    customerEmail: license?.customerEmail || null,
+    robloxUsername: user?.robloxUsername || null,
+    robloxAvatarUrl: user?.robloxAvatarUrl || null,
+    discordUsername: user?.discordUsername || null,
+    createdAt: license?.createdAt ? license.createdAt.toISOString() : null
+  };
 }
 
 async function buildLicenseAccountAccess(license) {
