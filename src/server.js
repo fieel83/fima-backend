@@ -1054,6 +1054,27 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       return invalid(res, "expired", "Your license has expired.");
     }
 
+    const accountAccess = await buildLicenseAccountAccess(license);
+    if (!accountAccess.canUseApp) {
+      const reason = accountAccess.missingRequirements.includes("fima_account")
+        ? "account_not_connected"
+        : accountAccess.missingRequirements.includes("discord")
+        ? "discord_not_connected"
+        : "roblox_not_connected";
+      await incrementValidationFailure(license, licenseKey, reason, hwid, appVersion);
+      return invalid(res, reason, accountAccess.message, {
+        hasActiveLicense: true,
+        discordLinked: accountAccess.discordLinked,
+        robloxLinked: accountAccess.robloxLinked,
+        canUseApp: false,
+        missingRequirements: accountAccess.missingRequirements,
+        accountEmail: accountAccess.user?.email || license.customerEmail || null,
+        robloxUsername: accountAccess.user?.robloxUsername || null,
+        robloxAvatarUrl: accountAccess.user?.robloxAvatarUrl || null,
+        discordUsername: accountAccess.user?.discordUsername || null
+      });
+    }
+
     if (!license.hwid) {
       await prisma.license.updateMany({
         where: { id: license.id, hwid: null },
@@ -1100,6 +1121,15 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       plan: license.plan,
       expiresAt: license.expiresAt ? license.expiresAt.toISOString() : null,
       lifetime: license.lifetime,
+      hasActiveLicense: true,
+      discordLinked: accountAccess.discordLinked,
+      robloxLinked: accountAccess.robloxLinked,
+      canUseApp: true,
+      missingRequirements: [],
+      accountEmail: accountAccess.user?.email || license.customerEmail || null,
+      robloxUsername: accountAccess.user?.robloxUsername || null,
+      robloxAvatarUrl: accountAccess.user?.robloxAvatarUrl || null,
+      discordUsername: accountAccess.user?.discordUsername || null,
       message: "License valid"
     });
   } catch (error) {
@@ -2813,6 +2843,61 @@ function licenseAccessState(license) {
   return { valid: true, reason: "valid" };
 }
 
+async function buildLicenseAccountAccess(license) {
+  const user = await findUserForLicense(license);
+  const missingRequirements = [];
+
+  if (!user) {
+    missingRequirements.push("fima_account", "discord", "roblox");
+    return {
+      user: null,
+      discordLinked: false,
+      robloxLinked: false,
+      canUseApp: false,
+      missingRequirements,
+      message: "This license must be connected to a Fima account with Discord and Roblox linked before the app can be used."
+    };
+  }
+
+  const integrations = await buildIntegrationSummary(user);
+  const discordLinked = Boolean(integrations.discord.connected);
+  const robloxLinked = Boolean(integrations.roblox.connected);
+  if (!discordLinked) missingRequirements.push("discord");
+  if (!robloxLinked) missingRequirements.push("roblox");
+
+  const message = !missingRequirements.length
+    ? "Account requirements complete."
+    : missingRequirements.length === 2
+    ? "Please connect your Discord and Roblox accounts to use Fima App."
+    : missingRequirements[0] === "discord"
+    ? "Please connect your Discord account to use Fima App."
+    : "Please connect your Roblox account to use Fima App.";
+
+  return {
+    user,
+    discordLinked,
+    robloxLinked,
+    canUseApp: missingRequirements.length === 0,
+    missingRequirements,
+    message
+  };
+}
+
+async function findUserForLicense(license) {
+  const email = normalizeEmail(license?.customerEmail);
+  if (!isValidEmail(email)) return null;
+  const emailNormalized = normalizeAccountEmail(email);
+  return prisma.user.findFirst({
+    where: { OR: [{ email }, { emailNormalized }] },
+    include: {
+      oauthLinks: {
+        where: { provider: { in: ["discord", "roblox"] } },
+        orderBy: { updatedAt: "desc" }
+      }
+    }
+  });
+}
+
 function licenseSource(license) {
   const notes = String(license?.notes || "").toLowerCase();
   if (notes.includes("gift_purchase")) return "Gift/Website";
@@ -2845,6 +2930,9 @@ function adminLicensePayload(license, user = null) {
     robloxUsername: user?.robloxUsername || null,
     robloxUserId: user?.robloxUserId || null,
     robloxAvatarUrl: user?.robloxAvatarUrl || null,
+    discordUsername: user?.discordUsername || null,
+    discordUserId: user?.discordUserId || null,
+    discordAvatarUrl: user?.discordAvatarUrl || null,
     stripeCustomerId: user?.stripeCustomerId || null,
     hwidStatus: license.hwid ? "Bound" : "Unbound",
     enabled: license.status === "active",
@@ -4465,8 +4553,8 @@ function findOrderBySession(sessionId) {
   });
 }
 
-function invalid(res, reason, message) {
-  return res.json({ valid: false, reason, message });
+function invalid(res, reason, message, extra = {}) {
+  return res.json({ valid: false, reason, message, ...extra });
 }
 
 function isValidEmail(value) {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-03
+
+- Added account-link enforcement to `POST /api/license/validate`:
+  - cloud/website licenses require a matching Fima account
+  - Discord must be connected
+  - Roblox must be connected
+  - backend returns clear `account_not_connected`, `discord_not_connected` and `roblox_not_connected` reasons
+- Added Discord identity fields to admin license payloads so the desktop Admin Panel can show website buyer context.
+
 ## 2026-06-02
 
 - Added gift checkout metadata support:
