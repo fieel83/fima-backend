@@ -29,6 +29,8 @@ model License {
   validationLogs        ValidationLog[]
   downloadLogs          DownloadLog[]
   referralRewards       ReferralReward[]
+  giftRedemptions       GiftRedemption[]
+  directGiftPackages    DirectGiftPackage[]
 
   @@index([customerEmail])
   @@index([plan, status])
@@ -105,6 +107,8 @@ model User {
   purchases              Purchase[]
   oauthLinks             OAuthLink[]
   paymentSubmissions     PaymentSubmission[]
+  giftRedemptions        GiftRedemption[]
+  directGiftPackages     DirectGiftPackage[]
   referralCode           ReferralCode?
   referralsMade          Referral[]            @relation("ReferralReferrer")
   referralReceived       Referral?             @relation("ReferralReferred")
@@ -197,6 +201,88 @@ model ReferralAbuseFlag {
   @@index([type])
   @@index([status])
   @@map("referral_abuse_flags")
+}
+
+model GiftCode {
+  id                  String           @id @default(cuid())
+  codeHash            String           @unique @map("code_hash")
+  maskedCode          String           @map("masked_code")
+  plan                String
+  status              String           @default("unused")
+  maxUses             Int              @default(1) @map("max_uses")
+  usedCount           Int              @default(0) @map("used_count")
+  expiresAt           DateTime?        @map("expires_at")
+  recipientEmail      String?          @map("recipient_email")
+  recipientUserId     String?          @map("recipient_user_id")
+  requiresDiscord     Boolean          @default(true) @map("requires_discord")
+  requiresRoblox      Boolean          @default(true) @map("requires_roblox")
+  createdByAdminId    String?          @map("created_by_admin_id")
+  notes               String?
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  redemptions         GiftRedemption[]
+
+  @@index([plan])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([recipientEmail])
+  @@index([recipientUserId])
+  @@map("gift_codes")
+}
+
+model GiftRedemption {
+  id              String    @id @default(cuid())
+  giftCodeId      String    @map("gift_code_id")
+  giftCode        GiftCode  @relation(fields: [giftCodeId], references: [id], onDelete: Restrict)
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redeemedEmail   String    @map("redeemed_email")
+  discordUserId   String?   @map("discord_user_id")
+  robloxUserId    String?   @map("roblox_user_id")
+  hwid            String?
+  licenseId       String?   @map("license_id")
+  license         License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  result          String    @default("success")
+  reason          String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([giftCodeId])
+  @@index([userId])
+  @@index([licenseId])
+  @@index([result])
+  @@map("gift_redemptions")
+}
+
+model DirectGiftPackage {
+  id                String    @id @default(cuid())
+  recipientEmail    String    @map("recipient_email")
+  recipientUserId   String    @map("recipient_user_id")
+  recipientUser     User      @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  plan              String
+  status            String    @default("pending")
+  requiresDiscord   Boolean   @default(true) @map("requires_discord")
+  requiresRoblox    Boolean   @default(true) @map("requires_roblox")
+  sentByAdminId     String?   @map("sent_by_admin_id")
+  message           String?
+  notes             String?
+  claimExpiresAt    DateTime? @map("claim_expires_at")
+  claimedAt         DateTime? @map("claimed_at")
+  claimedByUserId   String?   @map("claimed_by_user_id")
+  claimedEmail      String?   @map("claimed_email")
+  claimedDiscordId  String?   @map("claimed_discord_id")
+  claimedRobloxId   String?   @map("claimed_roblox_id")
+  claimedHwid       String?   @map("claimed_hwid")
+  licenseId         String?   @map("license_id")
+  license           License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([recipientEmail])
+  @@index([recipientUserId])
+  @@index([status])
+  @@index([claimExpiresAt])
+  @@index([licenseId])
+  @@map("direct_gift_packages")
 }
 
 model OAuthLink {

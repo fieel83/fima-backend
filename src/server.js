@@ -50,6 +50,8 @@ const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHe
 const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const trialLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
 const giftRecipientSearchLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
+const giftRedeemLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
+const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
@@ -548,12 +550,14 @@ app.post("/api/store/checkout", storeCheckoutLimiter, requireUser, async (req, r
   }
 });
 
-app.get("/api/me/products", requireUser, async (req, res) => {
+app.get(["/api/me/products", "/api/account/products"], requireUser, async (req, res) => {
   const [purchases, licenses] = await getAccountAccess(req.user);
+  const pendingGifts = await getPendingGiftPackagesForUser(req.user);
   return res.json({
     success: true,
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
+    pendingGifts: pendingGifts.map(publicDirectGiftPackage),
     products: buildAccountProducts(purchases, licenses)
   });
 });
@@ -603,6 +607,7 @@ app.get("/api/me/dashboard", requireUser, async (req, res) => {
     referrals,
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
+    pendingGifts: (await getPendingGiftPackagesForUser(req.user)).map(publicDirectGiftPackage),
     products: buildAccountProducts(purchases, licenses)
   });
 });
@@ -624,6 +629,52 @@ app.get(["/users/search-gift-recipient", "/api/users/search-gift-recipient"], gi
   } catch (error) {
     console.error("Gift recipient search failed", publicError(error));
     return res.status(500).json({ error: "gift_recipient_search_failed" });
+  }
+});
+
+app.get("/api/gifts/pending", requireUser, async (req, res) => {
+  try {
+    const packages = await getPendingGiftPackagesForUser(req.user);
+    return res.json({ success: true, packages: packages.map(publicDirectGiftPackage) });
+  } catch (error) {
+    console.error("Pending gifts failed", publicError(error));
+    return res.status(500).json({ error: "pending_gifts_failed" });
+  }
+});
+
+app.post("/api/gifts/redeem", giftRedeemLimiter, requireUser, async (req, res) => {
+  try {
+    const result = await redeemGiftCodeForUser({
+      user: req.user,
+      code: req.body?.code,
+      hwid: req.body?.hwid
+    });
+    return res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    console.warn("Gift code redeem failed", { userId: req.user?.id, code: error.code || "redeem_failed", message: error.message });
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      error: error.code || "gift_redeem_failed",
+      message: giftErrorMessage(error.code || "gift_redeem_failed")
+    });
+  }
+});
+
+app.post("/api/gifts/claim-direct", giftRedeemLimiter, requireUser, async (req, res) => {
+  try {
+    const result = await claimDirectGiftPackageForUser({
+      user: req.user,
+      packageId: req.body?.packageId || req.body?.id,
+      hwid: req.body?.hwid
+    });
+    return res.status(201).json({ success: true, ...result });
+  } catch (error) {
+    console.warn("Direct gift claim failed", { userId: req.user?.id, code: error.code || "direct_claim_failed", message: error.message });
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      error: error.code || "direct_gift_claim_failed",
+      message: giftErrorMessage(error.code || "direct_gift_claim_failed")
+    });
   }
 });
 
@@ -1362,6 +1413,9 @@ async function adminLicensesHandler(req, res) {
         where: { email: { in: emails } },
         select: {
           email: true,
+          discordUsername: true,
+          discordUserId: true,
+          discordAvatarUrl: true,
           robloxUsername: true,
           robloxUserId: true,
           robloxAvatarUrl: true,
@@ -1868,6 +1922,180 @@ app.post("/admin/api/referrals/:id/status", requireAdmin, async (req, res) => {
     console.error("Admin referral status update failed", publicError(error));
     return res.status(500).json({ error: "referral_status_update_failed" });
   }
+});
+
+app.get(["/admin/api/gift-codes", "/api/admin/gift-codes"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  const status = String(req.query.status || "").trim().toLowerCase();
+  const search = String(req.query.search || "").trim();
+  const giftCodes = await prisma.giftCode.findMany({
+    where: {
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { maskedCode: { contains: search.toUpperCase() } },
+                { plan: { contains: search, mode: "insensitive" } },
+                { recipientEmail: { contains: normalizeEmail(search), mode: "insensitive" } }
+              ]
+            }
+          : {}
+      ]
+    },
+    include: {
+      redemptions: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { user: true, license: true }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200
+  });
+  return res.json({ giftCodes: giftCodes.map(adminGiftCodePayload) });
+});
+
+app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  try {
+    const giftPlan = resolveGiftPlan(req.body);
+    if (!giftPlan) return res.status(400).json({ error: "invalid_gift_plan" });
+    const quantity = Math.min(Math.max(toOptionalInt(req.body?.quantity) || 1, 1), 100);
+    const maxUses = Math.min(Math.max(toOptionalInt(req.body?.maxUses) || 1, 1), 100);
+    const expiresAt = parseOptionalDate(req.body?.expiresAt);
+    const recipientEmail = normalizeEmail(req.body?.recipientEmail);
+    const recipientUserId = String(req.body?.recipientUserId || "").trim() || null;
+    const requiresDiscord = req.body?.requiresDiscord !== false;
+    const requiresRoblox = req.body?.requiresRoblox !== false;
+    const notes = String(req.body?.notes || "").trim().slice(0, 1000) || null;
+    const created = [];
+
+    for (let index = 0; index < quantity; index += 1) {
+      const code = await generateUniqueGiftCode();
+      const giftCode = await prisma.giftCode.create({
+        data: {
+          codeHash: hashGiftCode(code),
+          maskedCode: maskGiftCode(code),
+          plan: giftPlan.id,
+          status: "unused",
+          maxUses,
+          expiresAt,
+          recipientEmail: isValidEmail(recipientEmail) ? recipientEmail : null,
+          recipientUserId,
+          requiresDiscord,
+          requiresRoblox,
+          createdByAdminId: "admin",
+          notes
+        }
+      });
+      created.push({ ...adminGiftCodePayload({ ...giftCode, redemptions: [] }), code });
+    }
+
+    await createAuditLog("gift_codes_created", "gift_code", null, {
+      quantity,
+      plan: giftPlan.id,
+      maxUses,
+      expiresAt: expiresAt?.toISOString?.() || null,
+      recipientEmail: isValidEmail(recipientEmail) ? recipientEmail : null
+    });
+    return res.status(201).json({ success: true, giftCodes: created });
+  } catch (error) {
+    console.error("Admin gift code create failed", publicError(error));
+    return res.status(500).json({ error: "gift_code_create_failed" });
+  }
+});
+
+app.post(["/admin/api/gift-codes/:id/revoke", "/api/admin/gift-codes/:id/revoke"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  const giftCode = await prisma.giftCode.update({
+    where: { id: req.params.id },
+    data: { status: "revoked" },
+    include: { redemptions: { include: { user: true, license: true } } }
+  });
+  await createAuditLog("gift_code_revoked", "gift_code", giftCode.id, {});
+  return res.json({ giftCode: adminGiftCodePayload(giftCode) });
+});
+
+app.get(["/admin/api/direct-packages", "/api/admin/direct-packages"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  const status = String(req.query.status || "").trim().toLowerCase();
+  const search = String(req.query.search || "").trim();
+  const packages = await prisma.directGiftPackage.findMany({
+    where: {
+      AND: [
+        status ? { status } : {},
+        search
+          ? {
+              OR: [
+                { recipientEmail: { contains: normalizeEmail(search), mode: "insensitive" } },
+                { plan: { contains: search, mode: "insensitive" } },
+                { recipientUser: { is: { robloxUsername: { contains: search, mode: "insensitive" } } } },
+                { recipientUser: { is: { discordUsername: { contains: search, mode: "insensitive" } } } }
+              ]
+            }
+          : {}
+      ]
+    },
+    include: { recipientUser: true, license: true },
+    orderBy: { createdAt: "desc" },
+    take: 200
+  });
+  return res.json({ packages: packages.map(adminDirectGiftPackagePayload) });
+});
+
+app.post(["/admin/api/direct-packages/send", "/api/admin/direct-packages/send"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  try {
+    const giftPlan = resolveGiftPlan(req.body);
+    if (!giftPlan) return res.status(400).json({ error: "invalid_gift_plan" });
+    const email = normalizeEmail(req.body?.recipientEmail);
+    if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_recipient_email" });
+    const emailNormalized = normalizeAccountEmail(email);
+    const recipient = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
+    if (!recipient) return res.status(404).json({ error: "recipient_account_not_found", message: "No account found with this email." });
+
+    const packageRow = await prisma.directGiftPackage.create({
+      data: {
+        recipientEmail: normalizeEmail(recipient.email),
+        recipientUserId: recipient.id,
+        plan: giftPlan.id,
+        status: "pending",
+        requiresDiscord: req.body?.requiresDiscord !== false,
+        requiresRoblox: req.body?.requiresRoblox !== false,
+        sentByAdminId: "admin",
+        message: String(req.body?.message || "").trim().slice(0, 1000) || null,
+        notes: String(req.body?.notes || "").trim().slice(0, 1000) || null,
+        claimExpiresAt: parseOptionalDate(req.body?.claimExpiresAt)
+      },
+      include: { recipientUser: true, license: true }
+    });
+    await createAuditLog("direct_gift_package_sent", "direct_gift_package", packageRow.id, {
+      recipientEmail: maskEmail(recipient.email),
+      plan: giftPlan.id
+    });
+    return res.status(201).json({ success: true, package: adminDirectGiftPackagePayload(packageRow) });
+  } catch (error) {
+    console.error("Admin direct package send failed", publicError(error));
+    return res.status(500).json({ error: "direct_package_send_failed" });
+  }
+});
+
+app.post(["/admin/api/direct-packages/:id/revoke", "/api/admin/direct-packages/:id/revoke"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  const packageRow = await prisma.directGiftPackage.update({
+    where: { id: req.params.id },
+    data: { status: "revoked" },
+    include: { recipientUser: true, license: true }
+  });
+  await createAuditLog("direct_gift_package_revoked", "direct_gift_package", packageRow.id, {});
+  return res.json({ package: adminDirectGiftPackagePayload(packageRow) });
+});
+
+app.get(["/admin/api/users/search", "/api/admin/users/search"], requireAdmin, async (req, res) => {
+  const email = normalizeEmail(req.query.email || req.query.q);
+  if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_email" });
+  const emailNormalized = normalizeAccountEmail(email);
+  const users = await prisma.user.findMany({
+    where: { OR: [{ email }, { emailNormalized }] },
+    orderBy: { createdAt: "desc" },
+    take: 10
+  });
+  return res.json({ users: users.map(publicUser) });
 });
 
 app.get("/admin/api/purchases", requireAdmin, async (req, res) => {
@@ -2900,6 +3128,8 @@ async function findUserForLicense(license) {
 
 function licenseSource(license) {
   const notes = String(license?.notes || "").toLowerCase();
+  if (notes.includes("direct_gift_package")) return "Direct Gift Package";
+  if (notes.includes("gift_code")) return "Gift Code";
   if (notes.includes("gift_purchase")) return "Gift/Website";
   if (license?.stripeSessionId) return "Stripe/Website";
   if (notes.includes("referral_reward")) return "Referral reward";
@@ -3537,6 +3767,352 @@ function publicGiftRecipient(user) {
     maskedEmail: maskEmail(user.email),
     discord: integrations.discord,
     roblox: integrations.roblox
+  };
+}
+
+async function getPendingGiftPackagesForUser(user) {
+  if (!user?.id) return [];
+  const email = normalizeEmail(user.email);
+  return prisma.directGiftPackage.findMany({
+    where: {
+      status: "pending",
+      OR: [
+        { recipientUserId: user.id },
+        { recipientEmail: email }
+      ]
+    },
+    include: { recipientUser: true, license: true },
+    orderBy: { createdAt: "desc" },
+    take: 20
+  });
+}
+
+function normalizeGiftCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+function hashGiftCode(code) {
+  return crypto.createHash("sha256").update(normalizeGiftCode(code)).digest("hex");
+}
+
+function maskGiftCode(code) {
+  const normalized = normalizeGiftCode(code);
+  if (!normalized) return "";
+  const tail = normalized.replace(/-/g, "").slice(-4);
+  return `FIMA-GIFT-****-${tail}`;
+}
+
+async function generateUniqueGiftCode(tx = prisma) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const token = crypto.randomBytes(10).toString("base64url").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+    const groups = token.match(/.{1,4}/g)?.join("-") || token;
+    const code = `FIMA-GIFT-${groups}`;
+    const existing = await tx.giftCode.findUnique({ where: { codeHash: hashGiftCode(code) } });
+    if (!existing) return code;
+  }
+  throw new Error("gift_code_generation_failed");
+}
+
+function resolveGiftPlan(input = {}) {
+  const directPlan = getPlan(input.plan || input.product || input.productId);
+  if (directPlan) return directPlan;
+  const alias = String(input.plan || input.duration || "").trim().toLowerCase().replace(/\s+/g, "");
+  const aliasDays = {
+    "1d": 1,
+    "1day": 1,
+    "3d": 3,
+    "3day": 3,
+    "3days": 3,
+    "7d": 7,
+    "7day": 7,
+    "7days": 7,
+    "15d": 15,
+    "15day": 15,
+    "15days": 15,
+    "2weeks": 15,
+    "1month": 30,
+    "30d": 30,
+    "30days": 30,
+    "3months": 90,
+    "90d": 90,
+    "90days": 90
+  };
+  if (["lifetime", "life", "unlimited", "never"].includes(alias)) return getPlan("lifetime");
+  const customAliasMatch = alias.match(/^gift_(\d+)d$/);
+  if (customAliasMatch) {
+    return {
+      id: `gift_${customAliasMatch[1]}d`,
+      name: `Fima Macro ${customAliasMatch[1]} Day Gift`,
+      durationDays: Number(customAliasMatch[1]),
+      lifetime: false
+    };
+  }
+  const durationDays = toOptionalInt(input.durationDays) || aliasDays[alias];
+  if (!durationDays || durationDays < 1 || durationDays > 3650) return null;
+  return {
+    id: `gift_${durationDays}d`,
+    name: `Fima Macro ${durationDays} Day Gift`,
+    durationDays,
+    lifetime: false
+  };
+}
+
+function giftAccessState(row) {
+  if (!row) return { ok: false, code: "invalid_code", statusCode: 404 };
+  if (row.status === "revoked") return { ok: false, code: "revoked", statusCode: 409 };
+  if (row.status === "redeemed" || row.usedCount >= row.maxUses) return { ok: false, code: "already_redeemed", statusCode: 409 };
+  if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return { ok: false, code: "expired", statusCode: 409 };
+  return { ok: true };
+}
+
+async function validateGiftClaimRequirements(user, row) {
+  if (!user?.id) throw giftError("account_required", 401);
+  const integrations = await buildIntegrationSummary(user);
+  if (row?.requiresDiscord !== false && !integrations.discord.connected) throw giftError("discord_required", 403);
+  if (row?.requiresRoblox !== false && !integrations.roblox.connected) throw giftError("roblox_required", 403);
+  if (row?.recipientUserId && row.recipientUserId !== user.id) throw giftError("wrong_recipient", 403);
+  if (row?.recipientEmail && normalizeAccountEmail(row.recipientEmail) !== normalizeAccountEmail(user.email)) throw giftError("wrong_recipient", 403);
+  return integrations;
+}
+
+function giftError(code, statusCode = 400) {
+  const error = new Error(giftErrorMessage(code));
+  error.code = code;
+  error.statusCode = statusCode;
+  return error;
+}
+
+function giftErrorMessage(code) {
+  const messages = {
+    account_required: "Please log in to your Fima account first.",
+    discord_required: "Please connect your Discord account first.",
+    roblox_required: "Please connect your Roblox account first.",
+    invalid_code: "Invalid gift code.",
+    already_redeemed: "This gift code has already been used.",
+    expired: "This gift code has expired.",
+    revoked: "This gift code has been revoked.",
+    wrong_recipient: "This gift is assigned to a different account.",
+    package_not_found: "Gift package was not found.",
+    direct_package_already_claimed: "This gift package has already been claimed.",
+    direct_package_expired: "This gift package has expired."
+  };
+  return messages[code] || "Gift claim could not be completed.";
+}
+
+async function createGiftLicense(tx, { user, plan, source, sourceId, notes = null, hwid = null }) {
+  return tx.license.create({
+    data: {
+      ...buildLicenseData({
+        licenseKey: await generateUniqueLicenseKey(tx),
+        email: normalizeEmail(user.email),
+        plan,
+        notes: `${source} ${sourceId || ""} user:${user.id}${notes ? ` note:${notes}` : ""}`.trim()
+      }),
+      hwid: normalizeHwid(hwid) || null
+    }
+  });
+}
+
+async function redeemGiftCodeForUser({ user, code, hwid = null }) {
+  const normalizedCode = normalizeGiftCode(code);
+  if (!normalizedCode) throw giftError("invalid_code", 400);
+  const codeHash = hashGiftCode(normalizedCode);
+  const existing = await prisma.giftCode.findUnique({ where: { codeHash } });
+  const state = giftAccessState(existing);
+  if (!state.ok) throw giftError(state.code, state.statusCode);
+  const integrations = await validateGiftClaimRequirements(user, existing);
+  const plan = resolveGiftPlan({ plan: existing.plan });
+  if (!plan) throw giftError("invalid_code", 400);
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.giftCode.findUnique({ where: { id: existing.id } });
+    const currentState = giftAccessState(current);
+    if (!currentState.ok) throw giftError(currentState.code, currentState.statusCode);
+    const already = await tx.giftRedemption.findFirst({
+      where: { giftCodeId: current.id, userId: user.id, result: "success" }
+    });
+    if (already) throw giftError("already_redeemed", 409);
+
+    const nextUsedCount = current.usedCount + 1;
+    const nextStatus = nextUsedCount >= current.maxUses ? "redeemed" : "active";
+    const lock = await tx.giftCode.updateMany({
+      where: {
+        id: current.id,
+        status: { in: ["unused", "active"] },
+        usedCount: { lt: current.maxUses },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+      },
+      data: {
+        usedCount: { increment: 1 },
+        status: nextStatus
+      }
+    });
+    if (lock.count !== 1) throw giftError("already_redeemed", 409);
+
+    const license = await createGiftLicense(tx, {
+      user,
+      plan,
+      source: "gift_code",
+      sourceId: current.id,
+      notes: current.notes,
+      hwid
+    });
+    const redemption = await tx.giftRedemption.create({
+      data: {
+        giftCodeId: current.id,
+        userId: user.id,
+        redeemedEmail: normalizeEmail(user.email),
+        discordUserId: integrations.discord.id,
+        robloxUserId: integrations.roblox.id,
+        hwid: normalizeHwid(hwid) || null,
+        licenseId: license.id,
+        result: "success"
+      }
+    });
+    await tx.auditLog.create({
+      data: {
+        action: "gift_code_redeemed",
+        targetType: "gift_code",
+        targetId: current.id,
+        metadata: { userId: user.id, licenseId: license.id, redemptionId: redemption.id }
+      }
+    });
+    return {
+      license: publicLicense(license),
+      giftCode: adminGiftCodePayload({ ...current, usedCount: nextUsedCount, status: nextStatus, redemptions: [{ ...redemption, user, license }] })
+    };
+  });
+}
+
+async function claimDirectGiftPackageForUser({ user, packageId, hwid = null }) {
+  const id = String(packageId || "").trim();
+  if (!id) throw giftError("package_not_found", 404);
+  const packageRow = await prisma.directGiftPackage.findFirst({
+    where: {
+      id,
+      OR: [{ recipientUserId: user.id }, { recipientEmail: normalizeEmail(user.email) }]
+    }
+  });
+  if (!packageRow) throw giftError("package_not_found", 404);
+  if (packageRow.status !== "pending") throw giftError("direct_package_already_claimed", 409);
+  if (packageRow.claimExpiresAt && packageRow.claimExpiresAt.getTime() <= Date.now()) throw giftError("direct_package_expired", 409);
+  const integrations = await validateGiftClaimRequirements(user, packageRow);
+  const plan = resolveGiftPlan({ plan: packageRow.plan });
+  if (!plan) throw giftError("package_not_found", 404);
+
+  return prisma.$transaction(async (tx) => {
+    const lock = await tx.directGiftPackage.updateMany({
+      where: {
+        id: packageRow.id,
+        status: "pending",
+        OR: [{ claimExpiresAt: null }, { claimExpiresAt: { gt: new Date() } }]
+      },
+      data: {
+        status: "claimed",
+        claimedAt: new Date(),
+        claimedByUserId: user.id,
+        claimedEmail: normalizeEmail(user.email),
+        claimedDiscordId: integrations.discord.id,
+        claimedRobloxId: integrations.roblox.id,
+        claimedHwid: normalizeHwid(hwid) || null
+      }
+    });
+    if (lock.count !== 1) throw giftError("direct_package_already_claimed", 409);
+    const license = await createGiftLicense(tx, {
+      user,
+      plan,
+      source: "direct_gift_package",
+      sourceId: packageRow.id,
+      notes: packageRow.notes,
+      hwid
+    });
+    const claimed = await tx.directGiftPackage.update({
+      where: { id: packageRow.id },
+      data: { licenseId: license.id },
+      include: { recipientUser: true, license: true }
+    });
+    await tx.auditLog.create({
+      data: {
+        action: "direct_gift_package_claimed",
+        targetType: "direct_gift_package",
+        targetId: packageRow.id,
+        metadata: { userId: user.id, licenseId: license.id }
+      }
+    });
+    return { license: publicLicense(license), package: publicDirectGiftPackage(claimed) };
+  });
+}
+
+function publicDirectGiftPackage(row) {
+  return {
+    id: row.id,
+    recipientEmail: maskEmail(row.recipientEmail),
+    plan: row.plan,
+    planLabel: resolveGiftPlan({ plan: row.plan })?.name || row.plan,
+    status: row.status,
+    requiresDiscord: row.requiresDiscord,
+    requiresRoblox: row.requiresRoblox,
+    message: row.message || null,
+    notes: row.notes || null,
+    claimExpiresAt: row.claimExpiresAt ? row.claimExpiresAt.toISOString() : null,
+    claimedAt: row.claimedAt ? row.claimedAt.toISOString() : null,
+    license: row.license ? publicLicense(row.license) : null,
+    createdAt: row.createdAt ? row.createdAt.toISOString() : null
+  };
+}
+
+function adminDirectGiftPackagePayload(row) {
+  return {
+    ...publicDirectGiftPackage(row),
+    recipientEmailFull: row.recipientEmail,
+    recipientUser: row.recipientUser ? publicUser(row.recipientUser) : null,
+    sentByAdminId: row.sentByAdminId || null,
+    claimedByUserId: row.claimedByUserId || null,
+    claimedEmail: row.claimedEmail || null,
+    claimedDiscordId: row.claimedDiscordId || null,
+    claimedRobloxId: row.claimedRobloxId || null,
+    claimedHwid: row.claimedHwid || null,
+    licenseId: row.licenseId || null
+  };
+}
+
+function adminGiftCodePayload(row) {
+  return {
+    id: row.id,
+    maskedCode: row.maskedCode,
+    plan: row.plan,
+    planLabel: resolveGiftPlan({ plan: row.plan })?.name || row.plan,
+    status: row.status,
+    maxUses: row.maxUses,
+    usedCount: row.usedCount,
+    expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
+    recipientEmail: row.recipientEmail ? maskEmail(row.recipientEmail) : null,
+    recipientUserId: row.recipientUserId || null,
+    requiresDiscord: row.requiresDiscord,
+    requiresRoblox: row.requiresRoblox,
+    createdByAdminId: row.createdByAdminId || null,
+    notes: row.notes || null,
+    redemptions: (row.redemptions || []).map((redemption) => ({
+      id: redemption.id,
+      userId: redemption.userId,
+      email: redemption.redeemedEmail ? maskEmail(redemption.redeemedEmail) : null,
+      discordUserId: redemption.discordUserId || null,
+      robloxUserId: redemption.robloxUserId || null,
+      hwid: redemption.hwid || null,
+      result: redemption.result,
+      reason: redemption.reason || null,
+      license: redemption.license ? publicLicense(redemption.license) : null,
+      user: redemption.user ? publicUser(redemption.user) : null,
+      createdAt: redemption.createdAt ? redemption.createdAt.toISOString() : null
+    })),
+    createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+    updatedAt: row.updatedAt ? row.updatedAt.toISOString() : null
   };
 }
 
@@ -4179,6 +4755,7 @@ function publicLicense(license) {
     expiresAt,
     remainingSeconds,
     expired: !license.lifetime && Boolean(license.expiresAt) && license.expiresAt.getTime() < Date.now(),
+    source: licenseSource(license),
     canExtend: license.status !== "banned" && !license.lifetime,
     validationCount: license.validationCount || 0,
     downloadCount: license.downloadCount || 0,
