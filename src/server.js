@@ -3887,6 +3887,9 @@ async function sendFimaEmail({ to, subject, text, html }) {
       host: smtp.host,
       port: smtp.port,
       secure: smtp.secure,
+      connectionTimeout: Number(env("SMTP_CONNECTION_TIMEOUT_MS", "12000")),
+      greetingTimeout: Number(env("SMTP_GREETING_TIMEOUT_MS", "12000")),
+      socketTimeout: Number(env("SMTP_SOCKET_TIMEOUT_MS", "15000")),
       auth: {
         user: env("SMTP_USER", ""),
         pass: env("SMTP_PASS", "")
