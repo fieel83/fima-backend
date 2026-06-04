@@ -1559,7 +1559,7 @@ app.post("/admin/api/licenses/manual", requireAdmin, async (req, res) => {
   return res.json({ license });
 });
 
-app.post("/admin/api/licenses/:id/extend", requireAdmin, async (req, res) => {
+app.post(["/admin/api/licenses/:id/extend", "/api/admin/licenses/:id/extend"], requireAdmin, async (req, res) => {
   const plan = getPlan(req.body?.plan);
   if (!plan) return res.status(400).json({ error: "invalid_plan" });
 
@@ -1602,7 +1602,7 @@ app.post(["/admin/api/licenses/:id/bind-hwid", "/api/admin/licenses/:id/bind-hwi
   return res.json({ license });
 });
 
-app.post("/admin/api/licenses/:id/notes", requireAdmin, async (req, res) => {
+app.post(["/admin/api/licenses/:id/notes", "/api/admin/licenses/:id/notes"], requireAdmin, async (req, res) => {
   const notes = String(req.body?.notes || "").slice(0, 5000);
   const license = await prisma.license.update({ where: { id: req.params.id }, data: { notes } });
   await createAuditLog("license_notes_updated", "license", license.id, {});
@@ -3301,8 +3301,20 @@ function licenseValidationPayload(license, options = {}) {
 async function buildLicenseAccountAccess(license) {
   const user = await findUserForLicense(license);
   const missingRequirements = [];
+  const strictLinkedAccountRequired = licenseRequiresLinkedAccount(license);
 
   if (!user) {
+    if (!strictLinkedAccountRequired) {
+      return {
+        user: null,
+        discordLinked: false,
+        robloxLinked: false,
+        canUseApp: true,
+        missingRequirements,
+        message: "Paid or legacy license access is allowed. HWID, status and expiry are still enforced."
+      };
+    }
+
     missingRequirements.push("fima_account", "discord", "roblox");
     return {
       user: null,
@@ -3317,8 +3329,10 @@ async function buildLicenseAccountAccess(license) {
   const integrations = await buildIntegrationSummary(user);
   const discordLinked = Boolean(integrations.discord.connected);
   const robloxLinked = Boolean(integrations.roblox.connected);
-  if (!discordLinked) missingRequirements.push("discord");
-  if (!robloxLinked) missingRequirements.push("roblox");
+  if (strictLinkedAccountRequired) {
+    if (!discordLinked) missingRequirements.push("discord");
+    if (!robloxLinked) missingRequirements.push("roblox");
+  }
 
   const message = !missingRequirements.length
     ? "Account requirements complete."
@@ -3336,6 +3350,14 @@ async function buildLicenseAccountAccess(license) {
     missingRequirements,
     message
   };
+}
+
+function licenseRequiresLinkedAccount(license) {
+  const source = licenseSource(license).toLowerCase();
+  return source.includes("trial") ||
+    source.includes("gift code") ||
+    source.includes("direct gift") ||
+    source.includes("referral");
 }
 
 async function findUserForLicense(license) {
