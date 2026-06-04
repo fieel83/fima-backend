@@ -7,6 +7,7 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
@@ -36,6 +37,14 @@ const stripePriceEnvNames = [...new Set(Object.values(PLANS).flatMap((plan) => g
 let lastStripePriceValidation = {
   checkedAt: null,
   results: Object.fromEntries(stripePriceEnvNames.map((name) => [name, { status: "unchecked" }]))
+};
+let lastEmailDeliveryState = {
+  checkedAt: null,
+  provider: "none",
+  configured: false,
+  lastSuccessAt: null,
+  lastErrorAt: null,
+  lastError: null
 };
 
 const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
@@ -407,22 +416,8 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
       : null;
     let devResetToken = null;
     if (user) {
-      const token = await generateUniquePasswordResetCode();
-      devResetToken = token;
-      await prisma.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          tokenHash: hashToken(token),
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-        }
-      });
-      await sendPasswordResetEmail(user.email, token).catch((error) => {
-        console.warn("Password reset email could not be sent", {
-          email: maskEmail(user.email),
-          ...publicError(error)
-        });
-      });
-      await createAuditLog("password_reset_requested", "user", user.id, {});
+      const result = await createPasswordResetForUser(user, "password_reset_requested");
+      devResetToken = result.token;
     }
 
     const response = {
@@ -1713,6 +1708,36 @@ app.post("/admin/api/customers/:email/notes", requireAdmin, async (req, res) => 
   });
   await createAuditLog("customer_notes_updated", "customer", customer.id, { email });
   res.json({ customer });
+});
+
+app.get("/admin/api/email/health", requireAdmin, async (_req, res) => {
+  res.json({
+    smtp: smtpSummary(),
+    resend: { configured: Boolean(env("RESEND_API_KEY", "")) },
+    lastEmailDelivery: lastEmailDeliveryState
+  });
+});
+
+app.post("/admin/api/customers/:email/password-reset", requireAdmin, async (req, res) => {
+  const email = normalizeEmail(req.params.email);
+  if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_email" });
+
+  const emailNormalized = normalizeAccountEmail(email);
+  const user = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
+  if (!user) return res.status(404).json({ error: "user_not_found" });
+
+  const result = await createPasswordResetForUser(user, "admin_password_reset_sent", {
+    requestedBy: "admin_panel"
+  });
+  res.json({
+    success: true,
+    message: result.emailConfigured
+      ? "Password reset email sent."
+      : "Password reset was created, but email delivery is not configured.",
+    emailConfigured: result.emailConfigured,
+    provider: result.provider,
+    resetUrl: env("NODE_ENV", "development") !== "production" ? result.resetUrl : undefined
+  });
 });
 
 app.get("/admin/api/downloads", requireAdmin, async (_req, res) => {
@@ -3599,12 +3624,40 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-async function sendPasswordResetEmail(email, code) {
-  const resendKey = env("RESEND_API_KEY", "");
-  if (!resendKey) return { configured: false };
+async function createPasswordResetForUser(user, auditAction = "password_reset_requested", metadata = {}) {
+  const token = await generateUniquePasswordResetCode();
+  const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(token)}`;
+  await prisma.passwordResetToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+    }
+  });
 
+  const emailResult = await sendPasswordResetEmail(user.email, token).catch((error) => {
+    console.warn("Password reset email could not be sent", {
+      email: maskEmail(user.email),
+      ...publicError(error)
+    });
+    return { configured: true, provider: emailProviderName(), error: error.code || "email_send_failed" };
+  });
+  await createAuditLog(auditAction, "user", user.id, {
+    ...metadata,
+    email: maskEmail(user.email),
+    emailConfigured: Boolean(emailResult?.configured),
+    provider: emailResult?.provider || "none"
+  });
+  return {
+    token,
+    resetUrl,
+    emailConfigured: Boolean(emailResult?.configured),
+    provider: emailResult?.provider || "none"
+  };
+}
+
+async function sendPasswordResetEmail(email, code) {
   const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(code)}`;
-  const from = env("MAIL_FROM", "Fima Macro <support@fimamacro.com>");
   const subject = "Your Fima Macro password reset code";
   const text = [
     "Your Fima Macro password reset code is:",
@@ -3628,23 +3681,7 @@ async function sendPasswordResetEmail(email, code) {
       </div>
     </div>
   `;
-
-  const response = await fetchWithAbort("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${resendKey}`,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ from, to: email, subject, text, html })
-  }, 8000);
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    const error = new Error(`Resend email failed with status ${response.status}`);
-    error.code = "email_send_failed";
-    error.type = body.slice(0, 160);
-    throw error;
-  }
-  return { configured: true };
+  return sendFimaEmail({ to: email, subject, text, html });
 }
 
 async function createAndSendEmailVerification(user) {
@@ -3662,10 +3699,6 @@ async function createAndSendEmailVerification(user) {
 }
 
 async function sendEmailVerificationEmail(email, code) {
-  const resendKey = env("RESEND_API_KEY", "");
-  if (!resendKey) return { configured: false };
-
-  const from = env("MAIL_FROM", "Fima Macro <support@fimamacro.com>");
   const subject = "Verify your Fima Macro email";
   const text = [
     "Your Fima Macro email verification code is:",
@@ -3688,6 +3721,75 @@ async function sendEmailVerificationEmail(email, code) {
       </div>
     </div>
   `;
+  return sendFimaEmail({ to: email, subject, text, html });
+}
+
+function smtpSummary() {
+  return {
+    configured: Boolean(env("SMTP_HOST", "") && env("SMTP_USER", "") && env("SMTP_PASS", "")),
+    host: env("SMTP_HOST", "smtp.gmail.com"),
+    port: Number(env("SMTP_PORT", "587")),
+    secure: isTruthy(env("SMTP_SECURE", "false")),
+    userConfigured: Boolean(env("SMTP_USER", "")),
+    passConfigured: Boolean(env("SMTP_PASS", "")),
+    from: mailFrom()
+  };
+}
+
+function isTruthy(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function emailProviderName() {
+  if (smtpSummary().configured) return "smtp";
+  if (env("RESEND_API_KEY", "")) return "resend";
+  return "none";
+}
+
+function mailFrom() {
+  return env("MAIL_FROM", "Fima Macro <fimamacro.noreply@gmail.com>");
+}
+
+async function sendFimaEmail({ to, subject, text, html }) {
+  const smtp = smtpSummary();
+  lastEmailDeliveryState = {
+    ...lastEmailDeliveryState,
+    checkedAt: new Date().toISOString(),
+    provider: emailProviderName(),
+    configured: smtp.configured || Boolean(env("RESEND_API_KEY", ""))
+  };
+  if (smtp.configured) {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: {
+        user: env("SMTP_USER", ""),
+        pass: env("SMTP_PASS", "")
+      }
+    });
+    await transporter.sendMail({ from: mailFrom(), to, subject, text, html });
+    lastEmailDeliveryState = {
+      ...lastEmailDeliveryState,
+      provider: "smtp",
+      configured: true,
+      lastSuccessAt: new Date().toISOString(),
+      lastError: null
+    };
+    return { configured: true, provider: "smtp" };
+  }
+
+  const resendKey = env("RESEND_API_KEY", "");
+  if (!resendKey) {
+    lastEmailDeliveryState = {
+      ...lastEmailDeliveryState,
+      provider: "none",
+      configured: false,
+      lastErrorAt: new Date().toISOString(),
+      lastError: "email_not_configured"
+    };
+    return { configured: false, provider: "none" };
+  }
 
   const response = await fetchWithAbort("https://api.resend.com/emails", {
     method: "POST",
@@ -3695,16 +3797,30 @@ async function sendEmailVerificationEmail(email, code) {
       authorization: `Bearer ${resendKey}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({ from, to: email, subject, text, html })
+    body: JSON.stringify({ from: mailFrom(), to, subject, text, html })
   }, 8000);
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     const error = new Error(`Resend email failed with status ${response.status}`);
     error.code = "email_send_failed";
     error.type = body.slice(0, 160);
+    lastEmailDeliveryState = {
+      ...lastEmailDeliveryState,
+      provider: "resend",
+      configured: true,
+      lastErrorAt: new Date().toISOString(),
+      lastError: error.code
+    };
     throw error;
   }
-  return { configured: true };
+  lastEmailDeliveryState = {
+    ...lastEmailDeliveryState,
+    provider: "resend",
+    configured: true,
+    lastSuccessAt: new Date().toISOString(),
+    lastError: null
+  };
+  return { configured: true, provider: "resend" };
 }
 
 async function issueUserSession(res, userId) {
