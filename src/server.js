@@ -416,7 +416,10 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
       : null;
     let devResetToken = null;
     if (user) {
-      const result = await createPasswordResetForUser(user, "password_reset_requested");
+      const result = await createPasswordResetForUser(user, "password_reset_requested", {
+        requestedBy: "forgot_password_page",
+        requireDelivery: true
+      });
       devResetToken = result.token;
     }
 
@@ -430,7 +433,13 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
     return res.json(response);
   } catch (error) {
     console.error("Password reset request failed", publicError(error));
-    return res.status(500).json({ error: "password_reset_failed" });
+    const code = error.code === "email_delivery_failed" || error.code === "email_not_configured"
+      ? "email_delivery_failed"
+      : "password_reset_failed";
+    return res.status(code === "email_delivery_failed" ? 503 : 500).json({
+      error: code,
+      smtp: code === "email_delivery_failed" ? smtpSummary() : undefined
+    });
   }
 });
 
@@ -1729,16 +1738,61 @@ app.post("/admin/api/customers/:email/password-reset", requireAdmin, async (req,
   if (!user) return res.status(404).json({ error: "user_not_found" });
 
   const result = await createPasswordResetForUser(user, "admin_password_reset_sent", {
-    requestedBy: "admin_panel"
+    requestedBy: "admin_panel",
+    requireDelivery: true
   });
   res.json({
     success: true,
-    message: result.emailConfigured
+    message: result.emailSent
       ? "Password reset email sent."
       : "Password reset was created, but email delivery is not configured.",
     emailConfigured: result.emailConfigured,
+    emailSent: result.emailSent,
     provider: result.provider,
     resetUrl: env("NODE_ENV", "development") !== "production" ? result.resetUrl : undefined
+  });
+});
+
+app.post(["/admin/api/users/:id/password-reset", "/api/admin/users/:id/password-reset"], requireAdmin, async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) return res.status(404).json({ error: "user_not_found" });
+  try {
+    const result = await createPasswordResetForUser(user, "admin_password_reset_sent", {
+      requestedBy: "admin_panel",
+      requireDelivery: true
+    });
+    return res.json({
+      success: true,
+      message: "Password reset email sent.",
+      emailConfigured: result.emailConfigured,
+      emailSent: result.emailSent,
+      provider: result.provider,
+      resetUrl: env("NODE_ENV", "development") !== "production" ? result.resetUrl : undefined
+    });
+  } catch (error) {
+    console.error("Admin password reset send failed", publicError(error));
+    return res.status(503).json({ error: "email_delivery_failed", smtp: smtpSummary(), lastEmailDelivery: lastEmailDeliveryState });
+  }
+});
+
+app.post(["/admin/api/users/:id/temporary-password", "/api/admin/users/:id/temporary-password"], requireAdmin, async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!user) return res.status(404).json({ error: "user_not_found" });
+
+  const temporaryPassword = generateTemporaryPassword();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(temporaryPassword) }
+  });
+  await prisma.userSession.deleteMany({ where: { userId: user.id } });
+  await createAuditLog("admin_temporary_password_generated", "user", user.id, {
+    email: maskEmail(user.email),
+    expiresNotice: "Show once only. User should change it after login."
+  });
+  return res.json({
+    success: true,
+    temporaryPassword,
+    message: "Temporary password generated. It is shown once only; tell the user to change it after login."
   });
 });
 
@@ -3640,6 +3694,27 @@ async function generateUniquePasswordResetCode() {
   return randomToken();
 }
 
+function generateTemporaryPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%?*";
+  const all = upper + lower + digits + symbols;
+  const pick = (chars) => chars[crypto.randomInt(0, chars.length)];
+  const raw = [
+    pick(upper),
+    pick(lower),
+    pick(digits),
+    pick(symbols),
+    ...Array.from({ length: 12 }, () => pick(all))
+  ];
+  for (let i = raw.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(0, i + 1);
+    [raw[i], raw[j]] = [raw[j], raw[i]];
+  }
+  return raw.join("");
+}
+
 async function generateUniqueEmailVerificationCode() {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const code = String(crypto.randomInt(100000, 1000000));
@@ -3656,6 +3731,9 @@ function hashToken(token) {
 }
 
 async function createPasswordResetForUser(user, auditAction = "password_reset_requested", metadata = {}) {
+  const requireDelivery = Boolean(metadata.requireDelivery);
+  const auditMetadata = { ...metadata };
+  delete auditMetadata.requireDelivery;
   const token = await generateUniquePasswordResetCode();
   const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(token)}`;
   await prisma.passwordResetToken.create({
@@ -3671,18 +3749,33 @@ async function createPasswordResetForUser(user, auditAction = "password_reset_re
       email: maskEmail(user.email),
       ...publicError(error)
     });
-    return { configured: true, provider: emailProviderName(), error: error.code || "email_send_failed" };
+    return {
+      configured: true,
+      sent: false,
+      provider: emailProviderName(),
+      error: error.code || "email_send_failed"
+    };
   });
+  const emailConfigured = Boolean(emailResult?.configured);
+  const emailSent = Boolean(emailResult?.sent || (emailResult?.configured && !emailResult?.error));
   await createAuditLog(auditAction, "user", user.id, {
-    ...metadata,
+    ...auditMetadata,
     email: maskEmail(user.email),
-    emailConfigured: Boolean(emailResult?.configured),
-    provider: emailResult?.provider || "none"
+    emailConfigured,
+    emailSent,
+    provider: emailResult?.provider || "none",
+    emailError: emailResult?.error || null
   });
+  if (requireDelivery && !emailSent) {
+    const error = new Error(emailResult?.error || "email_delivery_failed");
+    error.code = emailConfigured ? "email_delivery_failed" : "email_not_configured";
+    throw error;
+  }
   return {
     token,
     resetUrl,
-    emailConfigured: Boolean(emailResult?.configured),
+    emailConfigured,
+    emailSent,
     provider: emailResult?.provider || "none"
   };
 }
@@ -3807,7 +3900,7 @@ async function sendFimaEmail({ to, subject, text, html }) {
       lastSuccessAt: new Date().toISOString(),
       lastError: null
     };
-    return { configured: true, provider: "smtp" };
+    return { configured: true, sent: true, provider: "smtp" };
   }
 
   const resendKey = env("RESEND_API_KEY", "");
@@ -3851,7 +3944,7 @@ async function sendFimaEmail({ to, subject, text, html }) {
     lastSuccessAt: new Date().toISOString(),
     lastError: null
   };
-  return { configured: true, provider: "resend" };
+  return { configured: true, sent: true, provider: "resend" };
 }
 
 async function issueUserSession(res, userId) {
@@ -4226,10 +4319,10 @@ function giftAccessState(row) {
 async function validateGiftClaimRequirements(user, row) {
   if (!user?.id) throw giftError("account_required", 401);
   const integrations = await buildIntegrationSummary(user);
-  if (row?.requiresDiscord !== false && !integrations.discord.connected) throw giftError("discord_required", 403);
-  if (row?.requiresRoblox !== false && !integrations.roblox.connected) throw giftError("roblox_required", 403);
-  if (row?.recipientUserId && row.recipientUserId !== user.id) throw giftError("wrong_recipient", 403);
-  if (row?.recipientEmail && normalizeAccountEmail(row.recipientEmail) !== normalizeAccountEmail(user.email)) throw giftError("wrong_recipient", 403);
+  if (row?.requiresDiscord !== false && !integrations.discord.connected) throw giftError("discord_not_connected", 403);
+  if (row?.requiresRoblox !== false && !integrations.roblox.connected) throw giftError("roblox_not_connected", 403);
+  if (row?.recipientUserId && row.recipientUserId !== user.id) throw giftError("account_mismatch", 403);
+  if (row?.recipientEmail && normalizeAccountEmail(row.recipientEmail) !== normalizeAccountEmail(user.email)) throw giftError("account_mismatch", 403);
   return integrations;
 }
 
@@ -4245,6 +4338,9 @@ function giftErrorMessage(code) {
     account_required: "Please log in to your Fima account first.",
     discord_required: "Please connect your Discord account first.",
     roblox_required: "Please connect your Roblox account first.",
+    discord_not_connected: "Please connect your Discord account first.",
+    roblox_not_connected: "Please connect your Roblox account first.",
+    account_mismatch: "This gift is assigned to a different account.",
     invalid_code: "Invalid gift code.",
     already_redeemed: "This gift code has already been used.",
     expired: "This gift code has expired.",
@@ -4402,18 +4498,23 @@ async function claimDirectGiftPackageForUser({ user, packageId, hwid = null }) {
 }
 
 function publicDirectGiftPackage(row) {
+  const claimExpired = Boolean(row.claimExpiresAt && row.claimExpiresAt.getTime() <= Date.now());
+  const claimState = row.status === "pending" && claimExpired ? "expired" : row.status;
   return {
     id: row.id,
     recipientEmail: maskEmail(row.recipientEmail),
     plan: row.plan,
     planLabel: resolveGiftPlan({ plan: row.plan })?.name || row.plan,
     status: row.status,
+    claimState,
     requiresDiscord: row.requiresDiscord,
     requiresRoblox: row.requiresRoblox,
     message: row.message || null,
     notes: row.notes || null,
+    claimExpired,
     claimExpiresAt: row.claimExpiresAt ? row.claimExpiresAt.toISOString() : null,
     claimedAt: row.claimedAt ? row.claimedAt.toISOString() : null,
+    licenseExpiresAt: row.license?.expiresAt ? row.license.expiresAt.toISOString() : null,
     license: row.license ? publicLicense(row.license) : null,
     createdAt: row.createdAt ? row.createdAt.toISOString() : null
   };
