@@ -3279,7 +3279,7 @@ function licenseReasonMessage(reason) {
     canceled: "This license was canceled.",
     payment_failed: "Payment for this license was not completed.",
     hwid_mismatch: "This license key is already bound to another device. Please open a support ticket if this is your key.",
-    account_not_connected: "Your license is valid, but you must connect it to a Fima account with Discord and Roblox before using the app.",
+    account_not_connected: "Your license is valid and active, but it is not connected to a Fima account yet. Register or log in with the purchase email, then connect Discord and Roblox to use the app.",
     discord_not_connected: "Your license is valid, but you must connect Discord before using the app.",
     roblox_not_connected: "Your license is valid, but you must connect Roblox before using the app.",
     trial_expired: "Your trial license has expired.",
@@ -3339,7 +3339,11 @@ function licenseValidationPayload(license, options = {}) {
     hasActiveLicense: Boolean(license && license.status === "active"),
     buyerEmail: user?.email || license?.customerEmail || null,
     accountEmail: user?.email || license?.customerEmail || null,
+    maskedAccountEmail: maskEmail(user?.email || license?.customerEmail),
     customerEmail: license?.customerEmail || null,
+    accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard.html`,
+    connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard.html`,
+    connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard.html`,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
       id: user.discordUserId || null,
@@ -3372,7 +3376,7 @@ async function buildLicenseAccountAccess(license) {
       robloxLinked: false,
       canUseApp: false,
       missingRequirements,
-      message: "This license must be connected to a Fima account with Discord and Roblox linked before the app can be used."
+      message: "Your license is valid and active, but it is not connected to a Fima account yet. Register or log in with the purchase email, then connect Discord and Roblox to use the app."
     };
   }
 
