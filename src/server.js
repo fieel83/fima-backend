@@ -1140,6 +1140,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       await incrementValidationFailure(license, licenseKey, reason, hwid, appVersion);
       return invalid(res, reason, accountAccess.message, licenseValidationPayload(license, {
         valid: false,
+        validLicense: true,
         reason,
         message: accountAccess.message,
         accountAccess,
@@ -1517,6 +1518,7 @@ app.post(["/admin/api/licenses/validate", "/api/admin/licenses/validate"], requi
   return res.json({
     ...licenseValidationPayload(license, {
       valid,
+      validLicense: !["license_not_found", "invalid_format"].includes(reason),
       reason,
       message: licenseReasonMessage(reason),
       accountAccess,
@@ -3223,9 +3225,9 @@ function licenseReasonMessage(reason) {
     canceled: "This license was canceled.",
     payment_failed: "Payment for this license was not completed.",
     hwid_mismatch: "This license key is already bound to another device. Please open a support ticket if this is your key.",
-    account_not_connected: "Connect this license to a Fima account with Discord and Roblox before using the app.",
-    discord_not_connected: "Connect Discord on your Fima account before using the app.",
-    roblox_not_connected: "Connect Roblox on your Fima account before using the app.",
+    account_not_connected: "Your license is valid, but you must connect it to a Fima account with Discord and Roblox before using the app.",
+    discord_not_connected: "Your license is valid, but you must connect Discord before using the app.",
+    roblox_not_connected: "Your license is valid, but you must connect Roblox before using the app.",
     trial_expired: "Your trial license has expired.",
     gift_not_claimed: "This gift license has not been claimed yet.",
     referral_not_claimed: "This referral reward has not been claimed yet.",
@@ -3247,12 +3249,18 @@ function licenseValidationPayload(license, options = {}) {
   const user = accountAccess?.user || null;
   const missingRequirements = accountAccess?.missingRequirements || [];
   const accountConnected = accountAccess ? Boolean(accountAccess.user) : false;
+  const licenseExists = Boolean(license);
+  const validLicense = options.validLicense ?? Boolean(license && !["license_not_found", "invalid_format"].includes(reason));
+  const canUseApp = Boolean(options.valid && accountAccess?.canUseApp !== false && hwidMatches);
 
   return {
     valid: Boolean(options.valid),
+    validLicense: Boolean(validLicense),
+    licenseExists,
     reason,
     message: options.message || licenseReasonMessage(reason),
     appMessagePreview: options.message || licenseReasonMessage(reason),
+    recommendedFix: recommendedLicenseFix(reason),
     licenseKey: license?.licenseKey || options.licenseKey || null,
     licenseId: license?.id || null,
     source: license ? licenseSource(license) : null,
@@ -3272,7 +3280,7 @@ function licenseValidationPayload(license, options = {}) {
     accountConnected,
     discordLinked: accountAccess ? Boolean(accountAccess.discordLinked) : false,
     robloxLinked: accountAccess ? Boolean(accountAccess.robloxLinked) : false,
-    canUseApp: Boolean(options.valid && accountAccess?.canUseApp !== false && hwidMatches),
+    canUseApp,
     missingRequirements,
     hasActiveLicense: Boolean(license && license.status === "active"),
     buyerEmail: user?.email || license?.customerEmail || null,
@@ -3301,20 +3309,8 @@ function licenseValidationPayload(license, options = {}) {
 async function buildLicenseAccountAccess(license) {
   const user = await findUserForLicense(license);
   const missingRequirements = [];
-  const strictLinkedAccountRequired = licenseRequiresLinkedAccount(license);
 
   if (!user) {
-    if (!strictLinkedAccountRequired) {
-      return {
-        user: null,
-        discordLinked: false,
-        robloxLinked: false,
-        canUseApp: true,
-        missingRequirements,
-        message: "Paid or legacy license access is allowed. HWID, status and expiry are still enforced."
-      };
-    }
-
     missingRequirements.push("fima_account", "discord", "roblox");
     return {
       user: null,
@@ -3329,10 +3325,8 @@ async function buildLicenseAccountAccess(license) {
   const integrations = await buildIntegrationSummary(user);
   const discordLinked = Boolean(integrations.discord.connected);
   const robloxLinked = Boolean(integrations.roblox.connected);
-  if (strictLinkedAccountRequired) {
-    if (!discordLinked) missingRequirements.push("discord");
-    if (!robloxLinked) missingRequirements.push("roblox");
-  }
+  if (!discordLinked) missingRequirements.push("discord");
+  if (!robloxLinked) missingRequirements.push("roblox");
 
   const message = !missingRequirements.length
     ? "Account requirements complete."
@@ -3352,14 +3346,6 @@ async function buildLicenseAccountAccess(license) {
   };
 }
 
-function licenseRequiresLinkedAccount(license) {
-  const source = licenseSource(license).toLowerCase();
-  return source.includes("trial") ||
-    source.includes("gift code") ||
-    source.includes("direct gift") ||
-    source.includes("referral");
-}
-
 async function findUserForLicense(license) {
   const email = normalizeEmail(license?.customerEmail);
   if (!isValidEmail(email)) return null;
@@ -3373,6 +3359,29 @@ async function findUserForLicense(license) {
       }
     }
   });
+}
+
+function recommendedLicenseFix(reason) {
+  return {
+    valid: "No action needed.",
+    license_not_found: "Check the copied key. If the user paid, search by buyer email and verify the generated license.",
+    invalid_format: "Ask the user to copy the full FIMA-XXXX-XXXX-XXXX-XXXX key.",
+    expired: "Extend the license or ask the user to renew.",
+    trial_expired: "Trial expired. Ask the user to buy a plan or wait for the next eligible trial.",
+    disabled: "Re-enable the license if it was disabled by mistake.",
+    inactive: "Set license status to active if this user should have access.",
+    banned: "Unban only if the ban was a mistake.",
+    canceled: "Check the order/payment status before re-enabling.",
+    payment_failed: "Ask the user to complete payment or create a manual replacement if appropriate.",
+    hwid_mismatch: "Reset HWID from Admin Panel if this is the owner of the license.",
+    account_not_connected: "Ask the user to log in on fimamacro.com/dashboard.html and connect Discord + Roblox.",
+    discord_not_connected: "Ask the user to connect Discord on their Fima account, then refresh account status in the app.",
+    roblox_not_connected: "Ask the user to connect Roblox on their Fima account, then refresh account status in the app.",
+    gift_not_claimed: "Ask the user to claim the gift from their dashboard.",
+    referral_not_claimed: "Ask the user to claim the referral reward from their dashboard.",
+    server_error: "Check backend logs and retry validation.",
+    timeout: "Retry after the API connection recovers."
+  }[reason] || "Open the license record and inspect status, expiry, HWID and account links.";
 }
 
 function licenseSource(license) {
