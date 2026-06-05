@@ -438,7 +438,11 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
       : "password_reset_failed";
     return res.status(code === "email_delivery_failed" ? 503 : 500).json({
       error: code,
-      smtp: code === "email_delivery_failed" ? smtpSummary() : undefined
+      message: code === "email_delivery_failed"
+        ? "Email could not be sent. Please try again later or contact support."
+        : "Password reset could not be prepared right now.",
+      smtp: code === "email_delivery_failed" ? smtpSummary() : undefined,
+      lastEmailDelivery: code === "email_delivery_failed" ? lastEmailDeliveryState : undefined
     });
   }
 });
@@ -555,13 +559,20 @@ app.post("/api/store/checkout", storeCheckoutLimiter, requireUser, async (req, r
 });
 
 app.get(["/api/me/products", "/api/account/products"], requireUser, async (req, res) => {
-  const [purchases, licenses] = await getAccountAccess(req.user);
-  const pendingGifts = await getPendingGiftPackagesForUser(req.user);
+  const [[purchases, licenses], pendingGifts, purchasedGiftCodes] = await Promise.all([
+    getAccountAccess(req.user),
+    getPendingGiftPackagesForUser(req.user),
+    getPurchasedGiftCodesForUser(req.user)
+  ]);
   return res.json({
     success: true,
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
     pendingGifts: pendingGifts.map(publicDirectGiftPackage),
+    purchasedGiftCodes: purchasedGiftCodes.map((row) => publicPurchasedGiftCode(row, true)),
+    giftHistory: purchasedGiftCodes
+      .filter((row) => row.usedCount > 0 || row.status === "redeemed")
+      .map((row) => publicPurchasedGiftCode(row, false)),
     products: buildAccountProducts(purchases, licenses)
   });
 });
@@ -597,10 +608,12 @@ app.get("/api/store/result", requireUser, async (req, res) => {
 
 app.get("/api/me/dashboard", requireUser, async (req, res) => {
   const integrations = await buildIntegrationSummary(req.user);
-  const [access, trial, referrals] = await Promise.all([
+  const [access, trial, referrals, pendingGifts, purchasedGiftCodes] = await Promise.all([
     getAccountAccess(req.user),
     buildMonthlyTrialSummary(req.user, new Date(), integrations),
-    buildReferralSummary(req.user.id, { evaluate: true })
+    buildReferralSummary(req.user.id, { evaluate: true }),
+    getPendingGiftPackagesForUser(req.user),
+    getPurchasedGiftCodesForUser(req.user)
   ]);
   const [purchases, licenses] = access;
   return res.json({
@@ -611,7 +624,15 @@ app.get("/api/me/dashboard", requireUser, async (req, res) => {
     referrals,
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
-    pendingGifts: (await getPendingGiftPackagesForUser(req.user)).map(publicDirectGiftPackage),
+    pendingGifts: pendingGifts.map(publicDirectGiftPackage),
+    purchasedGiftCodes: purchasedGiftCodes.map((row) => publicPurchasedGiftCode(row, true)),
+    giftHistory: purchasedGiftCodes
+      .flatMap((row) => (row.redemptions || []).map((redemption) => ({
+        type: "gift_code_redeemed",
+        giftCode: publicPurchasedGiftCode(row, false),
+        license: redemption.license ? publicLicense(redemption.license) : null,
+        redeemedAt: redemption.createdAt ? redemption.createdAt.toISOString() : null
+      }))),
     products: buildAccountProducts(purchases, licenses)
   });
 });
@@ -643,6 +664,16 @@ app.get("/api/gifts/pending", requireUser, async (req, res) => {
   } catch (error) {
     console.error("Pending gifts failed", publicError(error));
     return res.status(500).json({ error: "pending_gifts_failed" });
+  }
+});
+
+app.get("/api/gifts/purchased", requireUser, async (req, res) => {
+  try {
+    const giftCodes = await getPurchasedGiftCodesForUser(req.user);
+    return res.json({ success: true, giftCodes: giftCodes.map((row) => publicPurchasedGiftCode(row, true)) });
+  } catch (error) {
+    console.error("Purchased gift codes failed", publicError(error));
+    return res.status(500).json({ error: "purchased_gift_codes_failed" });
   }
 });
 
@@ -938,9 +969,28 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     const customerEmail = String(account.email || "").trim().toLowerCase();
     if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
+    const checkoutType = String(req.body?.checkoutType || "").trim().toLowerCase();
+    const isGiftCodePurchase = checkoutType === "gift_code_purchase";
     const giftRecipientUserId = String(req.body?.giftRecipientUserId || "").trim();
     let giftRecipient = null;
+    if (isGiftCodePurchase) {
+      const integrations = await buildIntegrationSummary(account);
+      if (!integrations.discord.connected || !integrations.roblox.connected) {
+        return res.status(403).json({
+          error: !integrations.discord.connected ? "discord_not_connected" : "roblox_not_connected",
+          message: "You must connect Discord and Roblox before buying gift codes.",
+          missingRequirements: [
+            integrations.discord.connected ? "" : "discord",
+            integrations.roblox.connected ? "" : "roblox"
+          ].filter(Boolean),
+          connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard.html`,
+          connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard.html`,
+          accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard.html`
+        });
+      }
+    }
     if (giftRecipientUserId) {
+      if (isGiftCodePurchase) return res.status(400).json({ error: "gift_code_cannot_have_direct_recipient" });
       if (giftRecipientUserId === account.id) return res.status(400).json({ error: "gift_recipient_self" });
       giftRecipient = await prisma.user.findUnique({ where: { id: giftRecipientUserId } });
       if (!giftRecipient) return res.status(404).json({ error: "gift_recipient_not_found" });
@@ -959,6 +1009,8 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       extraMetadata: {
         userId: account.id,
         accountEmail: account.email,
+        checkoutType: isGiftCodePurchase ? "gift_code_purchase" : giftRecipient ? "direct_gift_purchase" : "license_purchase",
+        giftCodePurchase: isGiftCodePurchase ? "true" : "false",
         giftRecipientUserId: giftRecipient?.id || "",
         giftRecipientEmail: giftRecipient?.email || ""
       }
@@ -982,6 +1034,7 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       saleActive: commerce.saleActive,
       priceSource: checkout.priceSource,
       gift: Boolean(giftRecipient),
+      giftCodePurchase: isGiftCodePurchase,
       stripe: stripeStatus()
     });
 
@@ -990,6 +1043,7 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       mode: checkoutMode,
       checkoutSessionPrefix,
       priceSource: checkout.priceSource,
+      giftCodePurchase: isGiftCodePurchase,
       giftRecipient: giftRecipient ? publicGiftRecipient(giftRecipient) : null
     });
   } catch (error) {
@@ -1007,8 +1061,20 @@ app.get("/api/checkout/result", async (req, res) => {
     if (!sessionId.startsWith("cs_")) return res.status(400).json({ success: false, status: "invalid_session" });
 
     let order = await findOrderBySession(sessionId);
+    let giftCode = await findGiftCodeBySession(sessionId);
     if (!order) {
-      order = await tryFulfillFromStripeSession(sessionId);
+      const fulfillment = await tryFulfillFromStripeSession(sessionId);
+      order = fulfillment?.order || fulfillment || null;
+      giftCode = fulfillment?.giftCode || giftCode;
+    }
+
+    if (giftCode) {
+      return res.json({
+        success: true,
+        status: "gift_code_created",
+        giftCodePurchase: true,
+        giftCode: publicPurchasedGiftCode(giftCode, true)
+      });
     }
 
     if (!order?.license) {
@@ -1591,6 +1657,71 @@ app.post(["/admin/api/licenses/:id/extend", "/api/admin/licenses/:id/extend"], r
   return res.json({ license });
 });
 
+app.post(["/admin/api/licenses/:id/attach-user", "/api/admin/licenses/:id/attach-user"], requireAdmin, async (req, res) => {
+  const userId = String(req.body?.userId || "").trim();
+  const email = normalizeEmail(req.body?.email);
+  const reason = String(req.body?.reason || "admin_attach_license_to_user").trim().slice(0, 500);
+  if (!userId && !isValidEmail(email)) return res.status(400).json({ error: "user_or_email_required" });
+
+  const [license, user] = await Promise.all([
+    prisma.license.findUnique({ where: { id: req.params.id } }),
+    userId
+      ? prisma.user.findUnique({ where: { id: userId } })
+      : prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized: normalizeAccountEmail(email) }] } })
+  ]);
+  if (!license) return res.status(404).json({ error: "license_not_found" });
+  if (!user || !isValidEmail(user.email)) return res.status(404).json({ error: "user_not_found" });
+
+  const previousEmail = license.customerEmail;
+  const noteLine = `[${new Date().toISOString()}] attached_to_user:${user.id} previous_email:${previousEmail || "-"} reason:${reason}`;
+  const updated = await prisma.license.update({
+    where: { id: license.id },
+    data: {
+      customerEmail: normalizeEmail(user.email),
+      notes: [license.notes, noteLine].filter(Boolean).join("\n").slice(0, 5000)
+    }
+  });
+  await ensureCustomer(user.email);
+  await createAuditLog("license_attached_to_user", "license", updated.id, {
+    userId: user.id,
+    previousEmail: maskEmail(previousEmail),
+    newEmail: maskEmail(user.email),
+    reason
+  });
+  return res.json({ success: true, license: updated, user: publicUser(user) });
+});
+
+app.post(["/admin/api/licenses/:id/extend-compensation", "/api/admin/licenses/:id/extend-compensation"], requireAdmin, async (req, res) => {
+  const duration = String(req.body?.duration || "").trim().toLowerCase();
+  const reason = String(req.body?.reason || "").trim().slice(0, 500);
+  if (!reason) return res.status(400).json({ error: "reason_required" });
+
+  const current = await prisma.license.findUnique({ where: { id: req.params.id } });
+  if (!current) return res.status(404).json({ error: "not_found" });
+  const baseDate = current.expiresAt && current.expiresAt > new Date() ? new Date(current.expiresAt) : new Date();
+  const nextExpiry = addCompensationDuration(baseDate, duration, req.body?.customDays);
+  if (!nextExpiry) return res.status(400).json({ error: "invalid_duration" });
+
+  const noteLine = `[${new Date().toISOString()}] compensation_extension duration:${duration || "custom"} new_expiry:${nextExpiry.toISOString()} reason:${reason}`;
+  const license = await prisma.license.update({
+    where: { id: current.id },
+    data: {
+      lifetime: false,
+      status: "active",
+      expiresAt: nextExpiry,
+      notes: [current.notes, noteLine].filter(Boolean).join("\n").slice(0, 5000)
+    }
+  });
+  await createAuditLog("license_compensation_extended", "license", license.id, {
+    duration,
+    customDays: req.body?.customDays || null,
+    previousExpiresAt: current.expiresAt ? current.expiresAt.toISOString() : null,
+    newExpiresAt: nextExpiry.toISOString(),
+    reason
+  });
+  return res.json({ success: true, license });
+});
+
 app.post(["/admin/api/licenses/:id/status", "/api/admin/licenses/:id/status"], requireAdmin, async (req, res) => {
   const status = String(req.body?.status || "").trim().toLowerCase();
   if (!["active", "inactive", "banned", "disabled", "revoked"].includes(status)) return res.status(400).json({ error: "invalid_status" });
@@ -1729,28 +1860,57 @@ app.get("/admin/api/email/health", requireAdmin, async (_req, res) => {
   });
 });
 
+app.post(["/admin/api/email/test", "/api/admin/email/test"], requireAdmin, async (req, res) => {
+  const to = normalizeEmail(req.body?.email) || normalizeEmail(env("SMTP_USER", ""));
+  if (!isValidEmail(to)) return res.status(400).json({ error: "invalid_email" });
+  try {
+    const result = await sendFimaEmail({
+      to,
+      subject: "Fima Macro email test",
+      text: "Fima Macro email delivery test succeeded.",
+      html: `
+        <div style="font-family:Inter,Arial,sans-serif;background:#070711;color:#f6f2ff;padding:24px">
+          <div style="max-width:560px;margin:0 auto;border:1px solid rgba(190,150,255,.28);border-radius:12px;background:#121020;padding:24px">
+            <p style="margin:0 0 8px;color:#c79cff;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Fima Macro</p>
+            <h1 style="margin:0 0 14px;font-size:26px">Email test succeeded</h1>
+            <p style="color:#b7adc9">This confirms the configured mail provider can send Fima account emails.</p>
+          </div>
+        </div>
+      `
+    });
+    await createAuditLog("email_test_sent", "email", null, { to: maskEmail(to), provider: result.provider });
+    return res.json({ success: true, sent: true, provider: result.provider, lastEmailDelivery: lastEmailDeliveryState });
+  } catch (error) {
+    console.error("Admin email test failed", publicError(error));
+    return res.status(503).json({ error: "email_delivery_failed", message: "Email test failed.", smtp: smtpSummary(), lastEmailDelivery: lastEmailDeliveryState });
+  }
+});
+
 app.post("/admin/api/customers/:email/password-reset", requireAdmin, async (req, res) => {
   const email = normalizeEmail(req.params.email);
   if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_email" });
 
-  const emailNormalized = normalizeAccountEmail(email);
-  const user = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
-  if (!user) return res.status(404).json({ error: "user_not_found" });
+  try {
+    const emailNormalized = normalizeAccountEmail(email);
+    const user = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
+    if (!user) return res.status(404).json({ error: "user_not_found" });
 
-  const result = await createPasswordResetForUser(user, "admin_password_reset_sent", {
-    requestedBy: "admin_panel",
-    requireDelivery: true
-  });
-  res.json({
-    success: true,
-    message: result.emailSent
-      ? "Password reset email sent."
-      : "Password reset was created, but email delivery is not configured.",
-    emailConfigured: result.emailConfigured,
-    emailSent: result.emailSent,
-    provider: result.provider,
-    resetUrl: env("NODE_ENV", "development") !== "production" ? result.resetUrl : undefined
-  });
+    const result = await createPasswordResetForUser(user, "admin_password_reset_sent", {
+      requestedBy: "admin_panel",
+      requireDelivery: true
+    });
+    return res.json({
+      success: true,
+      message: "Password reset email sent.",
+      emailConfigured: result.emailConfigured,
+      emailSent: result.emailSent,
+      provider: result.provider,
+      resetUrl: env("NODE_ENV", "development") !== "production" ? result.resetUrl : undefined
+    });
+  } catch (error) {
+    console.error("Customer password reset send failed", publicError(error));
+    return res.status(503).json({ error: "email_delivery_failed", message: "Email could not be sent.", smtp: smtpSummary(), lastEmailDelivery: lastEmailDeliveryState });
+  }
 });
 
 app.post(["/admin/api/users/:id/password-reset", "/api/admin/users/:id/password-reset"], requireAdmin, async (req, res) => {
@@ -2156,6 +2316,7 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
       const giftCode = await prisma.giftCode.create({
         data: {
           codeHash: hashGiftCode(code),
+          codeCipher: encryptToken(code),
           maskedCode: maskGiftCode(code),
           plan: giftPlan.id,
           status: "unused",
@@ -2667,6 +2828,26 @@ function encryptToken(value) {
   const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;
+}
+
+function decryptToken(cipherText) {
+  const text = String(cipherText || "");
+  const keySource = env("APP_ENCRYPTION_KEY");
+  if (!text || !keySource) return null;
+  const [version, ivText, tagText, encryptedText] = text.split(".");
+  if (version !== "v1" || !ivText || !tagText || !encryptedText) return null;
+  try {
+    const key = crypto.createHash("sha256").update(keySource).digest();
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivText, "base64url"));
+    decipher.setAuthTag(Buffer.from(tagText, "base64url"));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encryptedText, "base64url")),
+      decipher.final()
+    ]);
+    return decrypted.toString("utf8");
+  } catch {
+    return null;
+  }
 }
 
 async function createManualRobuxSubmission(user, body) {
@@ -3338,6 +3519,7 @@ function licenseValidationPayload(license, options = {}) {
     missingRequirements,
     hasActiveLicense: Boolean(license && license.status === "active"),
     buyerEmail: user?.email || license?.customerEmail || null,
+    buyerEmailMasked: maskEmail(user?.email || license?.customerEmail),
     accountEmail: user?.email || license?.customerEmail || null,
     maskedAccountEmail: maskEmail(user?.email || license?.customerEmail),
     customerEmail: license?.customerEmail || null,
@@ -4239,6 +4421,28 @@ async function getPendingGiftPackagesForUser(user) {
   });
 }
 
+async function getPurchasedGiftCodesForUser(user) {
+  if (!user?.id) return [];
+  const email = normalizeEmail(user.email);
+  return prisma.giftCode.findMany({
+    where: {
+      OR: [
+        { buyerUserId: user.id },
+        { buyerEmail: email }
+      ]
+    },
+    include: {
+      redemptions: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { user: true, license: true }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100
+  });
+}
+
 function normalizeGiftCode(value) {
   return String(value || "")
     .trim()
@@ -4542,15 +4746,55 @@ function adminDirectGiftPackagePayload(row) {
   };
 }
 
+function publicPurchasedGiftCode(row, includeCode = false) {
+  const decryptedCode = includeCode ? decryptToken(row.codeCipher) : null;
+  const plan = resolveGiftPlan({ plan: row.plan });
+  const firstRedemption = row.redemptions?.[0] || null;
+  const redeemed = row.status === "redeemed" || row.usedCount >= row.maxUses;
+  const expired = Boolean(row.expiresAt && row.expiresAt.getTime() <= Date.now());
+  return {
+    id: row.id,
+    giftCode: decryptedCode || null,
+    codeAvailable: Boolean(decryptedCode),
+    shownOnceOnly: includeCode && !decryptedCode,
+    maskedCode: row.maskedCode,
+    productName: plan?.name || "Fima Macro",
+    plan: row.plan,
+    planLabel: plan?.name?.replace(/^Fima Macro\s+/i, "") || row.plan,
+    durationDays: plan?.durationDays ?? null,
+    status: expired && !redeemed ? "expired" : row.status,
+    used: redeemed,
+    maxUses: row.maxUses,
+    usedCount: row.usedCount,
+    requiresDiscord: row.requiresDiscord,
+    requiresRoblox: row.requiresRoblox,
+    createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+    purchasedAt: row.purchasedAt ? row.purchasedAt.toISOString() : null,
+    expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
+    redeemedAt: firstRedemption?.createdAt ? firstRedemption.createdAt.toISOString() : null,
+    redeemedBy: firstRedemption?.user ? publicUser(firstRedemption.user) : null,
+    generatedLicense: firstRedemption?.license ? publicLicense(firstRedemption.license) : null
+  };
+}
+
 function adminGiftCodePayload(row) {
   return {
     id: row.id,
     maskedCode: row.maskedCode,
+    codeAvailable: Boolean(row.codeCipher),
     plan: row.plan,
     planLabel: resolveGiftPlan({ plan: row.plan })?.name || row.plan,
     status: row.status,
     maxUses: row.maxUses,
     usedCount: row.usedCount,
+    buyerUserId: row.buyerUserId || null,
+    buyerEmail: row.buyerEmail ? maskEmail(row.buyerEmail) : null,
+    buyerEmailFull: row.buyerEmail || null,
+    buyerDiscordId: row.buyerDiscordId || null,
+    buyerRobloxId: row.buyerRobloxId || null,
+    stripeSessionId: row.stripeSessionId || null,
+    stripePaymentIntentId: row.stripePaymentIntentId || null,
+    purchasedAt: row.purchasedAt ? row.purchasedAt.toISOString() : null,
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
     recipientEmail: row.recipientEmail ? maskEmail(row.recipientEmail) : null,
     recipientUserId: row.recipientUserId || null,
@@ -5282,6 +5526,30 @@ function parseOptionalDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function addCompensationDuration(baseDate, duration, customDays) {
+  const date = new Date(baseDate);
+  if (Number.isNaN(date.getTime())) return null;
+  if (duration === "1week") {
+    date.setDate(date.getDate() + 7);
+  } else if (duration === "2weeks") {
+    date.setDate(date.getDate() + 14);
+  } else if (duration === "1month") {
+    date.setMonth(date.getMonth() + 1);
+  } else if (duration === "3months") {
+    date.setMonth(date.getMonth() + 3);
+  } else if (duration === "3months_2weeks" || duration === "3months+2weeks" || duration === "3_months_2_weeks") {
+    date.setMonth(date.getMonth() + 3);
+    date.setDate(date.getDate() + 14);
+  } else if (duration === "custom") {
+    const days = toOptionalInt(customDays);
+    if (!days || days < 1 || days > 3650) return null;
+    date.setDate(date.getDate() + days);
+  } else {
+    return null;
+  }
+  return date;
+}
+
 async function createAnalyticsEvent(type, data = {}) {
   await prisma.analyticsEvent.create({
     data: {
@@ -5461,6 +5729,7 @@ async function fulfillCheckoutSession(session) {
     : session.payment_intent?.id || null;
   const extensionKey = normalizeLicenseKey(session.metadata?.extendLicenseKey);
   const isExtension = session.metadata?.checkoutType === "license_extension" && extensionKey;
+  const isGiftCodePurchase = session.metadata?.checkoutType === "gift_code_purchase" || session.metadata?.giftCodePurchase === "true";
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -5468,6 +5737,106 @@ async function fulfillCheckoutSession(session) {
         where: { stripeSessionId: session.id },
         include: { license: true }
       });
+      if (isGiftCodePurchase) {
+        const existingGiftCode = await tx.giftCode.findUnique({
+          where: { stripeSessionId: session.id },
+          include: {
+            redemptions: {
+              include: { user: true, license: true },
+              orderBy: { createdAt: "desc" },
+              take: 5
+            }
+          }
+        });
+        if (again && existingGiftCode) return { order: again, giftCode: existingGiftCode };
+
+        const buyerUser = buyerUserId ? await tx.user.findUnique({ where: { id: buyerUserId } }) : null;
+        const code = await generateUniqueGiftCode(tx);
+        const giftCode = await tx.giftCode.create({
+          data: {
+            codeHash: hashGiftCode(code),
+            codeCipher: encryptToken(code),
+            maskedCode: maskGiftCode(code),
+            plan: plan.id,
+            status: "unused",
+            maxUses: 1,
+            buyerUserId: buyerUser?.id || buyerUserId || null,
+            buyerEmail: buyerUser?.email ? normalizeEmail(buyerUser.email) : email,
+            buyerDiscordId: buyerUser?.discordUserId || null,
+            buyerRobloxId: buyerUser?.robloxUserId || null,
+            stripeSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+            purchasedAt: new Date(),
+            requiresDiscord: true,
+            requiresRoblox: true,
+            notes: `gift_code_purchase buyer:${email} buyerUser:${buyerUserId || "unknown"}`
+          },
+          include: { redemptions: { include: { user: true, license: true } } }
+        });
+
+        const order = await tx.order.upsert({
+          where: { stripeSessionId: session.id },
+          create: {
+            stripeSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+            customerEmail: email,
+            plan: plan.id,
+            amount: session.amount_total ?? getPlanCommerce(plan).priceCents,
+            currency: String(session.currency || getPlanCommerce(plan).currency).toLowerCase(),
+            status: session.payment_status || "paid",
+            mode: session.livemode ? "live" : "test",
+            locale: session.locale || null,
+            notes: `gift_code_purchase giftCodeId:${giftCode.id}`,
+            licenseId: null
+          },
+          update: {
+            stripePaymentIntentId: paymentIntentId,
+            customerEmail: email,
+            status: session.payment_status || "paid",
+            mode: session.livemode ? "live" : "test",
+            locale: session.locale || null,
+            notes: `gift_code_purchase giftCodeId:${giftCode.id}`,
+            licenseId: null
+          },
+          include: { license: true }
+        });
+
+        await tx.customer.upsert({
+          where: { email },
+          create: {
+            email,
+            totalSpent: order.amount,
+            totalOrders: 1,
+            firstPurchaseAt: new Date(),
+            lastPurchaseAt: new Date()
+          },
+          update: {
+            totalSpent: { increment: order.amount },
+            totalOrders: { increment: 1 },
+            lastPurchaseAt: new Date()
+          }
+        });
+        await tx.analyticsEvent.create({
+          data: {
+            type: "gift_code_checkout_completed",
+            plan: plan.id,
+            amount: order.amount,
+            currency: order.currency,
+            mode: order.mode,
+            metadata: { buyerEmail: email, buyerUserId: buyerUserId || null, giftCodeId: giftCode.id }
+          }
+        });
+        await tx.auditLog.create({
+          data: {
+            action: "gift_code_purchased",
+            targetType: "gift_code",
+            targetId: giftCode.id,
+            metadata: { orderId: order.id, plan: plan.id, buyerEmail: maskEmail(email), buyerUserId: buyerUserId || null }
+          }
+        });
+
+        return { order, giftCode };
+      }
       if (again?.license) return again;
 
       let license;
@@ -5567,6 +5936,8 @@ async function fulfillCheckoutSession(session) {
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const order = await findOrderBySession(session.id);
+      const giftCode = await findGiftCodeBySession(session.id);
+      if (order && giftCode) return { order, giftCode };
       if (order?.license) return order;
     }
     throw error;
@@ -5587,6 +5958,19 @@ function findOrderBySession(sessionId) {
   return prisma.order.findUnique({
     where: { stripeSessionId: sessionId },
     include: { license: true }
+  });
+}
+
+function findGiftCodeBySession(sessionId) {
+  return prisma.giftCode.findUnique({
+    where: { stripeSessionId: sessionId },
+    include: {
+      redemptions: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { user: true, license: true }
+      }
+    }
   });
 }
 
