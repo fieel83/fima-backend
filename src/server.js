@@ -1712,8 +1712,33 @@ app.post(["/admin/api/licenses/:id/extend-compensation", "/api/admin/licenses/:i
 
   const current = await prisma.license.findUnique({ where: { id: req.params.id } });
   if (!current) return res.status(404).json({ error: "not_found" });
-  const baseDate = current.expiresAt && current.expiresAt > new Date() ? new Date(current.expiresAt) : new Date();
-  const nextExpiry = addCompensationDuration(baseDate, duration, req.body?.customDays);
+  if (["lifetime", "life", "unlimited"].includes(duration)) {
+    const noteLine = `[${new Date().toISOString()}] compensation_extension duration:lifetime reason:${reason}`;
+    const license = await prisma.license.update({
+      where: { id: current.id },
+      data: {
+        lifetime: true,
+        status: "active",
+        expiresAt: null,
+        notes: [current.notes, noteLine].filter(Boolean).join("\n").slice(0, 5000)
+      }
+    });
+    await createAuditLog("license_compensation_extended", "license", license.id, {
+      duration: "lifetime",
+      previousExpiresAt: current.expiresAt ? current.expiresAt.toISOString() : null,
+      newExpiresAt: null,
+      reason
+    });
+    return res.json({ success: true, license });
+  }
+
+  const fromMode = String(req.body?.from || req.body?.applyFrom || "").trim().toLowerCase();
+  const baseDate = fromMode === "now"
+    ? new Date()
+    : current.expiresAt && current.expiresAt > new Date()
+      ? new Date(current.expiresAt)
+      : new Date();
+  const nextExpiry = addCompensationDuration(baseDate, duration, req.body?.customDays, req.body?.customDate);
   if (!nextExpiry) return res.status(400).json({ error: "invalid_duration" });
 
   const noteLine = `[${new Date().toISOString()}] compensation_extension duration:${duration || "custom"} new_expiry:${nextExpiry.toISOString()} reason:${reason}`;
@@ -5570,13 +5595,19 @@ function parseOptionalDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function addCompensationDuration(baseDate, duration, customDays) {
+function addCompensationDuration(baseDate, duration, customDays, customDateValue) {
   const date = new Date(baseDate);
   if (Number.isNaN(date.getTime())) return null;
-  if (duration === "1week") {
+  if (duration === "1day" || duration === "1_day") {
+    date.setDate(date.getDate() + 1);
+  } else if (duration === "3days" || duration === "3_days") {
+    date.setDate(date.getDate() + 3);
+  } else if (duration === "1week") {
     date.setDate(date.getDate() + 7);
   } else if (duration === "2weeks") {
     date.setDate(date.getDate() + 14);
+  } else if (duration === "15days" || duration === "15_days") {
+    date.setDate(date.getDate() + 15);
   } else if (duration === "1month") {
     date.setMonth(date.getMonth() + 1);
   } else if (duration === "3months") {
@@ -5584,10 +5615,18 @@ function addCompensationDuration(baseDate, duration, customDays) {
   } else if (duration === "3months_2weeks" || duration === "3months+2weeks" || duration === "3_months_2_weeks") {
     date.setMonth(date.getMonth() + 3);
     date.setDate(date.getDate() + 14);
+  } else if (duration === "6months" || duration === "6_months") {
+    date.setMonth(date.getMonth() + 6);
+  } else if (duration === "1year" || duration === "1_year") {
+    date.setFullYear(date.getFullYear() + 1);
   } else if (duration === "custom") {
     const days = toOptionalInt(customDays);
     if (!days || days < 1 || days > 3650) return null;
     date.setDate(date.getDate() + days);
+  } else if (duration === "custom_date" || duration === "customdate") {
+    const customDate = parseOptionalDate(customDateValue);
+    if (!customDate || customDate <= new Date()) return null;
+    return customDate;
   } else {
     return null;
   }
