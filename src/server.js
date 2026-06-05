@@ -65,6 +65,8 @@ const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standar
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
+const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
+const usedRobloxOAuthStates = new Map();
 const MONTHLY_TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 const REFERRAL_REWARD_VALID_INVITES = 3;
@@ -342,6 +344,10 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
 
 app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
   try {
+    if (req.cookies?.[ROBLOX_OAUTH_COOLDOWN_COOKIE]) {
+      return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_cooldown&retryAfter=30`);
+    }
+
     const pkce = createPkcePair();
     const state = createOAuthState("roblox", {
       userId: req.user.id,
@@ -349,6 +355,14 @@ app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
     });
     setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
     setOAuthCookie(res, OAUTH_PKCE_COOKIE, pkce.verifier);
+    res.cookie(ROBLOX_OAUTH_COOLDOWN_COOKIE, "1", {
+      httpOnly: true,
+      secure: apiBaseUrl().startsWith("https"),
+      sameSite: "lax",
+      path: "/auth/roblox",
+      maxAge: 30 * 1000,
+      ...(oauthCookieDomain() ? { domain: oauthCookieDomain() } : {})
+    });
 
     const discovery = await getRobloxOidcDiscovery();
     const redirectUri = robloxRedirectUri();
@@ -375,7 +389,7 @@ app.get("/auth/roblox/callback", oauthLimiter, async (req, res) => {
   } catch (error) {
     console.error("Roblox OAuth callback failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_failed`);
+    return res.redirect(`${frontendUrl()}/dashboard.html?error=${encodeURIComponent(robloxOAuthPublicError(error))}`);
   }
 });
 
@@ -388,8 +402,8 @@ app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
     clearOAuthCookies(res);
     return res.status(400).json({
       success: false,
-      error: error.code || "roblox_oauth_failed",
-      redirectUrl: `${frontendUrl()}/dashboard.html?error=roblox_oauth_failed`
+      error: robloxOAuthPublicError(error),
+      redirectUrl: `${frontendUrl()}/dashboard.html?error=${encodeURIComponent(robloxOAuthPublicError(error))}`
     });
   }
 });
@@ -2506,10 +2520,12 @@ function setOAuthCookie(res, name, value) {
 function clearOAuthCookies(res) {
   res.clearCookie(OAUTH_STATE_COOKIE, { path: "/auth" });
   res.clearCookie(OAUTH_PKCE_COOKIE, { path: "/auth" });
+  res.clearCookie(ROBLOX_OAUTH_COOLDOWN_COOKIE, { path: "/auth/roblox" });
   const domain = oauthCookieDomain();
   if (domain) {
     res.clearCookie(OAUTH_STATE_COOKIE, { path: "/auth", domain });
     res.clearCookie(OAUTH_PKCE_COOKIE, { path: "/auth", domain });
+    res.clearCookie(ROBLOX_OAUTH_COOLDOWN_COOKIE, { path: "/auth/roblox", domain });
   }
 }
 
@@ -2556,6 +2572,15 @@ function verifyOAuthState(queryState, cookieState, provider) {
   return payload;
 }
 
+function robloxOAuthPublicError(error) {
+  const code = String(error?.code || error?.message || "");
+  if (code.includes("429") || code.includes("rate_limit") || code.includes("rate limit")) return "roblox_rate_limited";
+  if (code.includes("duplicate_oauth_callback") || code.includes("oauth_state_already_used")) return "duplicate_oauth_callback";
+  if (code.includes("roblox_link_requires_login")) return "roblox_link_requires_login";
+  if (code.includes("invalid_oauth_state") || code.includes("expired_oauth_state")) return "roblox_oauth_state_invalid";
+  return "roblox_oauth_failed";
+}
+
 function safeFrontendPath(value, fallback = "/dashboard.html") {
   const text = String(value || "").trim();
   if (!text || !text.startsWith("/") || text.startsWith("//")) return fallback;
@@ -2571,6 +2596,7 @@ function createPkcePair() {
 
 async function finishRobloxOAuth(req, res, input) {
   const state = verifyOAuthState(input?.state, req.cookies?.[OAUTH_STATE_COOKIE], "roblox");
+  rememberUsedRobloxOAuthState(String(input?.state || ""));
   const currentUser = await getOptionalUser(req, res);
   if (!currentUser || currentUser.id !== state.userId) {
     const error = new Error("roblox_link_requires_login");
@@ -2598,6 +2624,20 @@ async function finishRobloxOAuth(req, res, input) {
     user,
     redirectUrl: `${frontendUrl()}${state.returnTo || "/dashboard.html"}?roblox=connected`
   };
+}
+
+function rememberUsedRobloxOAuthState(state) {
+  const now = Date.now();
+  for (const [key, expiresAt] of usedRobloxOAuthStates) {
+    if (expiresAt <= now) usedRobloxOAuthStates.delete(key);
+  }
+  const digest = crypto.createHash("sha256").update(state).digest("hex");
+  if (usedRobloxOAuthStates.has(digest)) {
+    const error = new Error("duplicate_oauth_callback");
+    error.code = "duplicate_oauth_callback";
+    throw error;
+  }
+  usedRobloxOAuthStates.set(digest, now + 10 * 60 * 1000);
 }
 
 async function exchangeDiscordCode(code) {
@@ -2732,7 +2772,11 @@ async function exchangeRobloxCode(code, verifier) {
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body
   }, 8000);
-  if (!response.ok) throw new Error(`roblox_token_exchange_failed_${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`roblox_token_exchange_failed_${response.status}`);
+    error.code = response.status === 429 ? "roblox_rate_limited" : `roblox_token_exchange_failed_${response.status}`;
+    throw error;
+  }
   return response.json();
 }
 
