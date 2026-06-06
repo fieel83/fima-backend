@@ -826,7 +826,6 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
     if (!freshUser) return res.status(401).json({ error: "not_logged_in" });
     const integrations = await buildIntegrationSummary(freshUser);
     if (!integrations.discord.connected) return res.status(403).json({ error: "discord_not_connected" });
-    if (!integrations.roblox.connected) return res.status(403).json({ error: "roblox_not_connected" });
 
     const now = new Date();
     const activeTrial = await findActiveMonthlyTrial(freshUser, now);
@@ -859,7 +858,7 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
           hwid: null,
           expiresAt,
           lifetime: false,
-          notes: `monthly_trial user:${freshUser.id} discord:${freshUser.discordUserId} roblox:${freshUser.robloxUserId}`
+          notes: `monthly_trial user:${freshUser.id} discord:${freshUser.discordUserId} roblox:${freshUser.robloxUserId || "optional"}`
         }
       });
       const nextUser = await tx.user.update({
@@ -987,22 +986,6 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     const isGiftCodePurchase = checkoutType === "gift_code_purchase";
     const giftRecipientUserId = String(req.body?.giftRecipientUserId || "").trim();
     let giftRecipient = null;
-    if (isGiftCodePurchase) {
-      const integrations = await buildIntegrationSummary(account);
-      if (!integrations.discord.connected || !integrations.roblox.connected) {
-        return res.status(403).json({
-          error: !integrations.discord.connected ? "discord_not_connected" : "roblox_not_connected",
-          message: "You must connect Discord and Roblox before buying gift codes.",
-          missingRequirements: [
-            integrations.discord.connected ? "" : "discord",
-            integrations.roblox.connected ? "" : "roblox"
-          ].filter(Boolean),
-          connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard.html`,
-          connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard.html`,
-          accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard.html`
-        });
-      }
-    }
     if (giftRecipientUserId) {
       if (isGiftCodePurchase) return res.status(400).json({ error: "gift_code_cannot_have_direct_recipient" });
       if (giftRecipientUserId === account.id) return res.status(400).json({ error: "gift_recipient_self" });
@@ -1899,7 +1882,7 @@ app.get("/admin/api/email/health", requireAdmin, async (_req, res) => {
   });
 });
 
-app.post(["/admin/api/email/test", "/api/admin/email/test"], requireAdmin, async (req, res) => {
+app.post(["/admin/api/email/test", "/api/admin/email/test", "/admin/api/system/email-test"], requireAdmin, async (req, res) => {
   const to = normalizeEmail(req.body?.email) || normalizeEmail(env("SMTP_USER", ""));
   if (!isValidEmail(to)) return res.status(400).json({ error: "invalid_email" });
   try {
@@ -2345,8 +2328,8 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
     const expiresAt = parseOptionalDate(req.body?.expiresAt);
     const recipientEmail = normalizeEmail(req.body?.recipientEmail);
     const recipientUserId = String(req.body?.recipientUserId || "").trim() || null;
-    const requiresDiscord = req.body?.requiresDiscord !== false;
-    const requiresRoblox = req.body?.requiresRoblox !== false;
+    const requiresDiscord = req.body?.requiresDiscord === true;
+    const requiresRoblox = req.body?.requiresRoblox === true;
     const notes = String(req.body?.notes || "").trim().slice(0, 1000) || null;
     const created = [];
 
@@ -2438,8 +2421,8 @@ app.post(["/admin/api/direct-packages/send", "/api/admin/direct-packages/send"],
         recipientUserId: recipient.id,
         plan: giftPlan.id,
         status: "pending",
-        requiresDiscord: req.body?.requiresDiscord !== false,
-        requiresRoblox: req.body?.requiresRoblox !== false,
+        requiresDiscord: req.body?.requiresDiscord === true,
+        requiresRoblox: req.body?.requiresRoblox === true,
         sentByAdminId: "admin",
         message: String(req.body?.message || "").trim().slice(0, 1000) || null,
         notes: String(req.body?.notes || "").trim().slice(0, 1000) || null,
@@ -4150,13 +4133,51 @@ async function sendFimaEmail({ to, subject, text, html }) {
         pass: env("SMTP_PASS", "")
       }
     });
-    await transporter.sendMail({ from: mailFrom(), to, subject, text, html });
+    try {
+      await transporter.sendMail({ from: mailFrom(), to, subject, text, html });
+    } catch (error) {
+      const details = publicError(error);
+      const resendFallbackKey = env("RESEND_API_KEY", "");
+      if (resendFallbackKey) {
+        const fallback = await fetchWithAbort("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${resendFallbackKey}`,
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({ from: mailFrom(), to, subject, text, html })
+        }, 8000);
+        if (fallback.ok) {
+          lastEmailDeliveryState = {
+            ...lastEmailDeliveryState,
+            provider: "resend",
+            configured: true,
+            lastSuccessAt: new Date().toISOString(),
+            lastError: null,
+            lastErrorType: null
+          };
+          return { configured: true, sent: true, provider: "resend", fallbackFrom: "smtp" };
+        }
+        const fallbackBody = await fallback.text().catch(() => "");
+        details.type = `smtp:${details.type || details.message || "failed"}; resend:${fallback.status} ${fallbackBody.slice(0, 120)}`;
+      }
+      lastEmailDeliveryState = {
+        ...lastEmailDeliveryState,
+        provider: "smtp",
+        configured: true,
+        lastErrorAt: new Date().toISOString(),
+        lastError: details.code || details.message || "smtp_send_failed",
+        lastErrorType: details.type || null
+      };
+      throw error;
+    }
     lastEmailDeliveryState = {
       ...lastEmailDeliveryState,
       provider: "smtp",
       configured: true,
       lastSuccessAt: new Date().toISOString(),
-      lastError: null
+      lastError: null,
+      lastErrorType: null
     };
     return { configured: true, sent: true, provider: "smtp" };
   }
@@ -4599,8 +4620,6 @@ function giftAccessState(row) {
 async function validateGiftClaimRequirements(user, row) {
   if (!user?.id) throw giftError("account_required", 401);
   const integrations = await buildIntegrationSummary(user);
-  if (row?.requiresDiscord !== false && !integrations.discord.connected) throw giftError("discord_not_connected", 403);
-  if (row?.requiresRoblox !== false && !integrations.roblox.connected) throw giftError("roblox_not_connected", 403);
   if (row?.recipientUserId && row.recipientUserId !== user.id) throw giftError("account_mismatch", 403);
   if (row?.recipientEmail && normalizeAccountEmail(row.recipientEmail) !== normalizeAccountEmail(user.email)) throw giftError("account_mismatch", 403);
   return integrations;
@@ -4616,10 +4635,10 @@ function giftError(code, statusCode = 400) {
 function giftErrorMessage(code) {
   const messages = {
     account_required: "Please log in to your Fima account first.",
-    discord_required: "Please connect your Discord account first.",
-    roblox_required: "Please connect your Roblox account first.",
-    discord_not_connected: "Please connect your Discord account first.",
-    roblox_not_connected: "Please connect your Roblox account first.",
+    discord_required: "Discord is optional on the website. Refresh your account and try again.",
+    roblox_required: "Roblox is optional on the website. Refresh your account and try again.",
+    discord_not_connected: "Discord is optional on the website. Refresh your account and try again.",
+    roblox_not_connected: "Roblox is optional on the website. Refresh your account and try again.",
     account_mismatch: "This gift is assigned to a different account.",
     invalid_code: "Invalid gift code.",
     already_redeemed: "This gift code has already been used.",
@@ -5356,8 +5375,7 @@ async function buildMonthlyTrialSummary(user, now = new Date(), integrations = n
   const activeTrial = await findActiveMonthlyTrial(user, now);
   const requirements = [
     { id: "account", label: "Fima account logged in", complete: Boolean(user?.id), action: null },
-    { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" },
-    { id: "roblox", label: "Roblox connected", complete: Boolean(linked.roblox?.connected), action: "connect_roblox" }
+    { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" }
   ];
   const missing = requirements.filter((item) => !item.complete).map((item) => item.id);
   const nextTrialAvailableAt = user?.nextTrialAvailableAt || null;
@@ -5369,7 +5387,6 @@ async function buildMonthlyTrialSummary(user, now = new Date(), integrations = n
   let disabledReason = null;
   if (activeTrial) disabledReason = "trial_already_active";
   else if (missing.includes("discord")) disabledReason = "discord_not_connected";
-  else if (missing.includes("roblox")) disabledReason = "roblox_not_connected";
   else if (cooldownActive) disabledReason = "trial_cooldown_active";
 
   return {
@@ -5850,8 +5867,8 @@ async function fulfillCheckoutSession(session) {
             stripeSessionId: session.id,
             stripePaymentIntentId: paymentIntentId,
             purchasedAt: new Date(),
-            requiresDiscord: true,
-            requiresRoblox: true,
+            requiresDiscord: false,
+            requiresRoblox: false,
             notes: `gift_code_purchase buyer:${email} buyerUser:${buyerUserId || "unknown"}`
           },
           include: { redemptions: { include: { user: true, license: true } } }
