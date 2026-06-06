@@ -2356,8 +2356,8 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
     const expiresAt = parseOptionalDate(req.body?.expiresAt);
     const recipientEmail = normalizeEmail(req.body?.recipientEmail);
     const recipientUserId = String(req.body?.recipientUserId || "").trim() || null;
-    const requiresDiscord = req.body?.requiresDiscord === true;
-    const requiresRoblox = req.body?.requiresRoblox === true;
+    const requiresDiscord = false;
+    const requiresRoblox = false;
     const notes = String(req.body?.notes || "").trim().slice(0, 1000) || null;
     const created = [];
 
@@ -2449,8 +2449,8 @@ app.post(["/admin/api/direct-packages/send", "/api/admin/direct-packages/send"],
         recipientUserId: recipient.id,
         plan: giftPlan.id,
         status: "pending",
-        requiresDiscord: req.body?.requiresDiscord === true,
-        requiresRoblox: req.body?.requiresRoblox === true,
+        requiresDiscord: false,
+        requiresRoblox: false,
         sentByAdminId: "admin",
         message: String(req.body?.message || "").trim().slice(0, 1000) || null,
         notes: String(req.body?.notes || "").trim().slice(0, 1000) || null,
