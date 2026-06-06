@@ -189,10 +189,13 @@ app.get("/api/public/site-settings", async (_req, res) => {
 
 app.post("/api/auth/register", authLimiter, async (req, res) => {
   try {
-    const email = normalizeEmail(req.body?.email);
+    const usernameOnly = Boolean(req.body?.usernameOnly || req.body?.mode === "username" || req.body?.registerMode === "username");
+    const requestedUsername = normalizeUsername(req.body?.username);
+    const email = usernameOnly ? syntheticEmailForUsername(requestedUsername) : normalizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const referralCode = normalizeReferralCode(req.body?.referralCode);
-    const emailCheck = await validateSignupEmail(email);
+    if (usernameOnly && !requestedUsername) return res.status(400).json({ error: "invalid_username" });
+    const emailCheck = usernameOnly ? { valid: true, mxVerified: false } : await validateSignupEmail(email);
     if (!emailCheck.valid) return res.status(400).json({ error: emailCheck.reason });
     if (!isStrongPassword(password)) return res.status(400).json({ error: "weak_password" });
 
@@ -219,9 +222,11 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       }
     });
     const createdReferralCode = await ensureReferralCodeForUser(user);
-    await createAndSendEmailVerification(user).catch((error) => {
-      console.warn("Email verification send failed", { email: maskEmail(user.email), ...publicError(error) });
-    });
+    if (!usernameOnly) {
+      await createAndSendEmailVerification(user).catch((error) => {
+        console.warn("Email verification send failed", { email: maskEmail(user.email), ...publicError(error) });
+      });
+    }
     let referral = null;
     if (referralCode) {
       referral = await applyReferralCodeToUser({
@@ -236,11 +241,18 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       email,
       emailDomainChecked: emailCheck.mxVerified,
       robloxLinked: Boolean(robloxProfile),
+      usernameOnly,
+      username: usernameOnly ? requestedUsername : null,
       referralCode: referralCode || null,
       ownReferralCode: createdReferralCode.code
     });
     await issueUserSession(res, user.id);
-    return res.status(201).json({ success: true, user: publicUser(user), referral });
+    return res.status(201).json({
+      success: true,
+      user: publicUser(user),
+      referral,
+      warning: usernameOnly ? "Without a linked email, password recovery is not possible. Link an email later in Account Settings." : null
+    });
   } catch (error) {
     console.error("User registration failed", publicError(error));
     return res.status(500).json({ error: "registration_failed" });
@@ -260,7 +272,8 @@ app.post("/api/auth/roblox-preview", authLimiter, async (req, res) => {
 
 app.post("/api/auth/login", authLimiter, async (req, res) => {
   try {
-    const email = normalizeEmail(req.body?.email);
+    const login = String(req.body?.email || req.body?.login || req.body?.username || "").trim();
+    const email = login.includes("@") ? normalizeEmail(login) : syntheticEmailForUsername(login);
     const password = String(req.body?.password || "");
     const emailNormalized = normalizeAccountEmail(email);
     const user = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
@@ -429,7 +442,7 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
       ? await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } })
       : null;
     let devResetToken = null;
-    if (user) {
+    if (user && user.emailVerifiedAt && !isSyntheticUsernameEmail(user.email)) {
       const result = await createPasswordResetForUser(user, "password_reset_requested", {
         requestedBy: "forgot_password_page",
         requireDelivery: true
@@ -505,6 +518,37 @@ app.post("/api/auth/email-verification/send", emailVerificationLimiter, requireU
   }
 });
 
+app.post("/api/auth/email-link/start", emailVerificationLimiter, requireUser, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const emailCheck = await validateSignupEmail(email);
+    if (!emailCheck.valid) return res.status(400).json({ error: emailCheck.reason });
+    const emailNormalized = normalizeAccountEmail(email);
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { emailNormalized }],
+        NOT: { id: req.user.id }
+      }
+    });
+    if (existing) return res.status(409).json({ error: "email_already_registered" });
+
+    await createAndSendEmailVerification(req.user, email);
+    await createAuditLog("email_link_requested", "user", req.user.id, { email: maskEmail(email) });
+    return res.json({
+      success: true,
+      pendingEmail: maskEmail(email),
+      message: "Verification code sent. Enter the code to link this email."
+    });
+  } catch (error) {
+    console.error("Email link start failed", publicError(error));
+    return res.status(error.code === "email_delivery_failed" || error.code === "email_not_configured" ? 503 : 500).json({
+      error: error.code === "email_delivery_failed" || error.code === "email_not_configured" ? "email_delivery_failed" : "email_link_failed",
+      message: "Email could not be sent. Please try again later or contact support.",
+      lastEmailDelivery: lastEmailDeliveryState
+    });
+  }
+});
+
 app.post("/api/auth/email-verification/confirm", emailVerificationLimiter, requireUser, async (req, res) => {
   try {
     const code = String(req.body?.code || "").trim();
@@ -516,7 +560,13 @@ app.post("/api/auth/email-verification/confirm", emailVerificationLimiter, requi
     }
     const user = await prisma.$transaction(async (tx) => {
       await tx.emailVerificationToken.update({ where: { id: token.id }, data: { usedAt: new Date() } });
-      return tx.user.update({ where: { id: req.user.id }, data: { emailVerifiedAt: new Date() } });
+      const pendingEmail = token.email;
+      const data = { emailVerifiedAt: new Date() };
+      if (pendingEmail && isValidEmail(pendingEmail)) {
+        data.email = normalizeEmail(pendingEmail);
+        data.emailNormalized = normalizeAccountEmail(pendingEmail);
+      }
+      return tx.user.update({ where: { id: req.user.id }, data });
     });
     await evaluateReferralForUser(user.id).catch((error) => {
       console.warn("Referral evaluation after email verification failed", { userId: user.id, ...publicError(error) });
@@ -1203,22 +1253,6 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
     }
 
     const accountAccess = await buildLicenseAccountAccess(license);
-    if (!accountAccess.canUseApp) {
-      const reason = accountAccess.missingRequirements.includes("fima_account")
-        ? "account_not_connected"
-        : accountAccess.missingRequirements.includes("discord")
-        ? "discord_not_connected"
-        : "roblox_not_connected";
-      await incrementValidationFailure(license, licenseKey, reason, hwid, appVersion);
-      return invalid(res, reason, accountAccess.message, licenseValidationPayload(license, {
-        valid: false,
-        validLicense: true,
-        reason,
-        message: accountAccess.message,
-        accountAccess,
-        hwid
-      }));
-    }
 
     if (!license.hwid) {
       await prisma.license.updateMany({
@@ -1576,12 +1610,6 @@ app.post(["/admin/api/licenses/validate", "/api/admin/licenses/validate"], requi
     reason = blockedReason;
   } else if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
     reason = licenseSource(license) === "Trial" ? "trial_expired" : "expired";
-  } else if (!accountAccess.canUseApp) {
-    reason = accountAccess.missingRequirements.includes("fima_account")
-      ? "account_not_connected"
-      : accountAccess.missingRequirements.includes("discord")
-      ? "discord_not_connected"
-      : "roblox_not_connected";
   } else if (hwid && license.hwid && normalizeHwid(license.hwid) !== hwid) {
     reason = "hwid_mismatch";
   }
@@ -3512,9 +3540,9 @@ function licenseReasonMessage(reason) {
     canceled: "This license was canceled.",
     payment_failed: "Payment for this license was not completed.",
     hwid_mismatch: "This license key is already bound to another device. Please open a support ticket if this is your key.",
-    account_not_connected: "Your license is valid and active, but it is not connected to a Fima account yet. Register or log in with the purchase email, then connect Discord and Roblox to use the app.",
-    discord_not_connected: "Your license is valid, but you must connect Discord before using the app.",
-    roblox_not_connected: "Your license is valid, but you must connect Roblox before using the app.",
+    account_not_connected: "Your license is valid. A Fima account is optional for app access, but linking an account helps recovery and My Products.",
+    discord_not_connected: "Discord is optional except for free trial claims.",
+    roblox_not_connected: "Roblox is optional. You can add a username later for profile/community features.",
     trial_expired: "Your trial license has expired.",
     gift_not_claimed: "This gift license has not been claimed yet.",
     referral_not_claimed: "This referral reward has not been claimed yet.",
@@ -3538,7 +3566,7 @@ function licenseValidationPayload(license, options = {}) {
   const accountConnected = accountAccess ? Boolean(accountAccess.user) : false;
   const licenseExists = Boolean(license);
   const validLicense = options.validLicense ?? Boolean(license && !["license_not_found", "invalid_format"].includes(reason));
-  const canUseApp = Boolean(options.valid && accountAccess?.canUseApp !== false && hwidMatches);
+  const canUseApp = Boolean(options.valid && hwidMatches);
 
   return {
     valid: Boolean(options.valid),
@@ -3578,6 +3606,7 @@ function licenseValidationPayload(license, options = {}) {
     accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard.html`,
     connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard.html`,
     connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard.html`,
+    optionalProfileMissing: missingRequirements,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
       id: user.discordUserId || null,
@@ -3603,36 +3632,30 @@ async function buildLicenseAccountAccess(license) {
   const missingRequirements = [];
 
   if (!user) {
-    missingRequirements.push("fima_account", "discord", "roblox");
+    missingRequirements.push("fima_account");
     return {
       user: null,
       discordLinked: false,
       robloxLinked: false,
-      canUseApp: false,
+      canUseApp: true,
       missingRequirements,
-      message: "Your license is valid and active, but it is not connected to a Fima account yet. Register or log in with the purchase email, then connect Discord and Roblox to use the app."
+      message: "License is valid. Fima account, Discord and Roblox are optional for app access."
     };
   }
 
   const integrations = await buildIntegrationSummary(user);
   const discordLinked = Boolean(integrations.discord.connected);
   const robloxLinked = Boolean(integrations.roblox.connected);
-  if (!discordLinked) missingRequirements.push("discord");
-  if (!robloxLinked) missingRequirements.push("roblox");
+  if (!discordLinked) missingRequirements.push("discord_optional");
+  if (!robloxLinked) missingRequirements.push("roblox_optional");
 
-  const message = !missingRequirements.length
-    ? "Account requirements complete."
-    : missingRequirements.length === 2
-    ? "Please connect your Discord and Roblox accounts to use Fima App."
-    : missingRequirements[0] === "discord"
-    ? "Please connect your Discord account to use Fima App."
-    : "Please connect your Roblox account to use Fima App.";
+  const message = "Discord and Roblox are optional. You can connect them later for community features.";
 
   return {
     user,
     discordLinked,
     robloxLinked,
-    canUseApp: missingRequirements.length === 0,
+    canUseApp: true,
     missingRequirements,
     message
   };
@@ -3666,9 +3689,9 @@ function recommendedLicenseFix(reason) {
     canceled: "Check the order/payment status before re-enabling.",
     payment_failed: "Ask the user to complete payment or create a manual replacement if appropriate.",
     hwid_mismatch: "Reset HWID from Admin Panel if this is the owner of the license.",
-    account_not_connected: "Ask the user to log in on fimamacro.com/dashboard.html and connect Discord + Roblox.",
-    discord_not_connected: "Ask the user to connect Discord on their Fima account, then refresh account status in the app.",
-    roblox_not_connected: "Ask the user to connect Roblox on their Fima account, then refresh account status in the app.",
+    account_not_connected: "Optional only. App access should not be blocked; ask user to link an account only for recovery/My Products.",
+    discord_not_connected: "Discord is optional except when claiming the free trial.",
+    roblox_not_connected: "Roblox is optional and should never block app access.",
     gift_not_claimed: "Ask the user to claim the gift from their dashboard.",
     referral_not_claimed: "Ask the user to claim the referral reward from their dashboard.",
     server_error: "Check backend logs and retry validation.",
@@ -4046,17 +4069,24 @@ async function sendPasswordResetEmail(email, code) {
   return sendFimaEmail({ to: email, subject, text, html });
 }
 
-async function createAndSendEmailVerification(user) {
+async function createAndSendEmailVerification(user, targetEmail = null) {
   if (!user?.id || user.emailVerifiedAt) return { skipped: true };
+  const email = normalizeEmail(targetEmail || user.email);
+  if (!isValidEmail(email) || isSyntheticUsernameEmail(email)) {
+    const error = new Error("email_not_linked");
+    error.code = "email_not_linked";
+    throw error;
+  }
   const code = await generateUniqueEmailVerificationCode();
   await prisma.emailVerificationToken.create({
     data: {
       userId: user.id,
+      email,
       tokenHash: hashToken(code),
       expiresAt: new Date(Date.now() + 30 * 60 * 1000)
     }
   });
-  await sendEmailVerificationEmail(user.email, code);
+  await sendEmailVerificationEmail(email, code);
   return { sent: true };
 }
 
@@ -4302,10 +4332,37 @@ async function getOptionalUser(req, res) {
   return session.user;
 }
 
+function normalizeUsername(value) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,24}$/.test(text)) return "";
+  return text;
+}
+
+function syntheticEmailForUsername(value) {
+  const username = normalizeUsername(value);
+  return username ? `${username}@username.fimamacro.local` : "";
+}
+
+function isSyntheticUsernameEmail(email) {
+  return normalizeEmail(email).endsWith("@username.fimamacro.local");
+}
+
+function usernameFromSyntheticEmail(email) {
+  const normalized = normalizeEmail(email);
+  return isSyntheticUsernameEmail(normalized) ? normalized.split("@")[0] : "";
+}
+
 function publicUser(user) {
+  const usernameOnly = isSyntheticUsernameEmail(user.email);
+  const username = usernameOnly ? usernameFromSyntheticEmail(user.email) : null;
   return {
     id: user.id,
-    email: user.email,
+    email: usernameOnly ? null : user.email,
+    username,
+    loginName: username || user.email,
+    usernameOnly,
+    emailLinked: !usernameOnly && isValidEmail(user.email),
+    passwordResetAvailable: !usernameOnly && Boolean(user.emailVerifiedAt),
     stripeCustomerId: user.stripeCustomerId || null,
     discordUserId: user.discordUserId || null,
     discordUsername: user.discordUsername || null,
@@ -4621,7 +4678,11 @@ async function validateGiftClaimRequirements(user, row) {
   if (!user?.id) throw giftError("account_required", 401);
   const integrations = await buildIntegrationSummary(user);
   if (row?.recipientUserId && row.recipientUserId !== user.id) throw giftError("account_mismatch", 403);
-  if (row?.recipientEmail && normalizeAccountEmail(row.recipientEmail) !== normalizeAccountEmail(user.email)) throw giftError("account_mismatch", 403);
+  if (row?.recipientEmail && normalizeAccountEmail(row.recipientEmail) !== normalizeAccountEmail(user.email)) {
+    const recipient = normalizeEmail(row.recipientEmail);
+    const username = usernameFromSyntheticEmail(user.email);
+    if (!username || normalizeUsername(recipient) !== username) throw giftError("account_mismatch", 403);
+  }
   return integrations;
 }
 
