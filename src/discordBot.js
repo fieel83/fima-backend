@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, PermissionsBitField } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField } from "discord.js";
 import { env } from "./env.js";
 
 const ROLE_TYPES = {
@@ -159,6 +159,58 @@ export async function sendPaymentSubmissionLog(submission) {
 
   await channel.send({ content: lines.join("\n") });
   return { sent: true };
+}
+
+export async function sendPasswordResetDm(discordUserId, code, resetUrl) {
+  const userId = String(discordUserId || "").trim();
+  if (!userId) {
+    const error = new Error("discord_user_not_linked");
+    error.code = "discord_user_not_linked";
+    throw error;
+  }
+  if (!client?.isReady?.()) {
+    const error = new Error(lastError || "discord_bot_not_ready");
+    error.code = "discord_bot_not_ready";
+    throw error;
+  }
+
+  const user = await client.users.fetch(userId).catch(() => null);
+  if (!user) {
+    const error = new Error("discord_user_not_found");
+    error.code = "discord_user_not_found";
+    throw error;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Fima Account Recovery")
+    .setDescription([
+      "Your password reset code is:",
+      "",
+      `**${code}**`,
+      "",
+      "This code expires in 15 minutes.",
+      "If you did not request this, ignore this message."
+    ].join("\n"));
+
+  const components = resetUrl ? [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("Open Reset Page")
+        .setStyle(ButtonStyle.Link)
+        .setURL(resetUrl)
+    )
+  ] : [];
+
+  try {
+    await user.send({ embeds: [embed], components });
+    return { sent: true, provider: "discord_dm", discordUserId: userId };
+  } catch (error) {
+    const dmError = new Error("discord_dm_blocked");
+    dmError.code = "discord_dm_blocked";
+    dmError.cause = error;
+    throw dmError;
+  }
 }
 
 async function changeDiscordRole(discordUserId, type, action) {

@@ -26,6 +26,7 @@ import {
   discordBotHealth,
   giveDiscordRole,
   removeDiscordRole,
+  sendPasswordResetDm,
   sendPaymentSubmissionLog,
   startDiscordBot
 } from "./discordBot.js";
@@ -435,41 +436,67 @@ app.post("/payments/robux/manual/submit", manualPaymentLimiter, requireUser, asy
 });
 
 app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => {
-  const email = normalizeEmail(req.body?.email);
+  const login = String(req.body?.login || req.body?.username || req.body?.email || "").trim();
   try {
-    const emailNormalized = normalizeAccountEmail(email);
-    const user = isValidEmail(email)
-      ? await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } })
-      : null;
-    let devResetToken = null;
-    if (user && user.emailVerifiedAt && !isSyntheticUsernameEmail(user.email)) {
-      const result = await createPasswordResetForUser(user, "password_reset_requested", {
-        requestedBy: "forgot_password_page",
-        requireDelivery: true
+    if (!login) return res.status(400).json({ error: "invalid_recovery_login" });
+    const loginEmail = login.includes("@") ? normalizeEmail(login) : syntheticEmailForUsername(login);
+    const loginEmailNormalized = normalizeAccountEmail(loginEmail);
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: loginEmail },
+          { emailNormalized: loginEmailNormalized }
+        ]
+      }
+    });
+
+    if (!user) {
+      return res.json({
+        success: true,
+        method: "discord",
+        message: "If that Fima account has linked Discord recovery, the bot will DM a reset code."
       });
-      devResetToken = result.token;
     }
 
+    if (!user.discordUserId) {
+      await createAuditLog("password_reset_discord_unavailable", "user", user.id, {
+        requestedBy: "forgot_password_page",
+        reason: "discord_not_linked"
+      });
+      return res.status(400).json({
+        error: "discord_not_linked",
+        message: "This account has no linked Discord recovery. Contact support so an admin can verify ownership."
+      });
+    }
+
+    const result = await createDiscordPasswordResetForUser(user, "password_reset_discord_sent", {
+      requestedBy: "forgot_password_page"
+    });
     const response = {
       success: true,
-      message: "If that email exists, a password reset code will be sent."
+      method: "discord",
+      message: "A reset code was sent to your linked Discord DM."
     };
-    if (env("NODE_ENV", "development") !== "production" && devResetToken) {
-      response.resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(devResetToken)}`;
+    if (env("NODE_ENV", "development") !== "production") {
+      response.resetUrl = result.resetUrl;
     }
     return res.json(response);
   } catch (error) {
-    console.error("Password reset request failed", publicError(error));
-    const code = error.code === "email_delivery_failed" || error.code === "email_not_configured"
-      ? "email_delivery_failed"
-      : "password_reset_failed";
-    return res.status(code === "email_delivery_failed" ? 503 : 500).json({
+    console.error("Discord password reset request failed", publicError(error));
+    const code = ["discord_dm_blocked", "discord_bot_not_ready", "discord_user_not_found", "discord_user_not_linked"].includes(error.code)
+      ? error.code
+      : "discord_recovery_failed";
+    const messages = {
+      discord_dm_blocked: "The Fima bot could not DM you. Enable DMs from server members or use the Discord server recovery command.",
+      discord_bot_not_ready: "Discord recovery is temporarily unavailable because the Fima bot is not online.",
+      discord_user_not_found: "The linked Discord user could not be found. Re-link Discord or contact support.",
+      discord_user_not_linked: "This account has no linked Discord recovery. Contact support so an admin can verify ownership.",
+      discord_recovery_failed: "Discord recovery could not be prepared right now."
+    };
+    return res.status(code === "discord_dm_blocked" ? 403 : 503).json({
       error: code,
-      message: code === "email_delivery_failed"
-        ? "Email could not be sent. Please try again later or contact support."
-        : "Password reset could not be prepared right now.",
-      smtp: code === "email_delivery_failed" ? smtpSummary() : undefined,
-      lastEmailDelivery: code === "email_delivery_failed" ? lastEmailDeliveryState : undefined
+      message: messages[code] || messages.discord_recovery_failed,
+      bot: await discordBotHealth().catch(() => undefined)
     });
   }
 });
@@ -3995,15 +4022,7 @@ async function createPasswordResetForUser(user, auditAction = "password_reset_re
   const requireDelivery = Boolean(metadata.requireDelivery);
   const auditMetadata = { ...metadata };
   delete auditMetadata.requireDelivery;
-  const token = await generateUniquePasswordResetCode();
-  const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(token)}`;
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      tokenHash: hashToken(token),
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-    }
-  });
+  const { token, resetUrl } = await createPasswordResetTokenForUser(user);
 
   const emailResult = await sendPasswordResetEmail(user.email, token).catch((error) => {
     console.warn("Password reset email could not be sent", {
@@ -4039,6 +4058,42 @@ async function createPasswordResetForUser(user, auditAction = "password_reset_re
     emailSent,
     provider: emailResult?.provider || "none"
   };
+}
+
+async function createDiscordPasswordResetForUser(user, auditAction = "password_reset_discord_sent", metadata = {}) {
+  const { token, resetUrl } = await createPasswordResetTokenForUser(user);
+  const dmResult = await sendPasswordResetDm(user.discordUserId, token, resetUrl);
+  await createAuditLog(auditAction, "user", user.id, {
+    ...metadata,
+    provider: "discord_dm",
+    discordUserId: maskDiscordId(user.discordUserId),
+    discordSent: true
+  });
+  return {
+    token,
+    resetUrl,
+    provider: dmResult.provider,
+    discordSent: Boolean(dmResult.sent)
+  };
+}
+
+async function createPasswordResetTokenForUser(user) {
+  const token = await generateUniquePasswordResetCode();
+  const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(token)}`;
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() }
+    }),
+    prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000)
+      }
+    })
+  ]);
+  return { token, resetUrl };
 }
 
 async function sendPasswordResetEmail(email, code) {
@@ -4976,6 +5031,13 @@ function maskEmail(email) {
   const first = local.slice(0, 1);
   const last = local.length > 2 ? local.slice(-1) : "";
   return `${first}***${last}@${domain}`;
+}
+
+function maskDiscordId(discordUserId) {
+  const text = String(discordUserId || "").trim();
+  if (!text) return null;
+  if (text.length <= 6) return "***";
+  return `${text.slice(0, 3)}***${text.slice(-3)}`;
 }
 
 function normalizeReferralCode(value) {
