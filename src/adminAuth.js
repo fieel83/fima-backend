@@ -78,7 +78,7 @@ export function clearAdminCookie(res) {
 
 export function requireAdmin(req, res, next) {
   const submittedApiKey = adminApiKeyFromRequest(req);
-  const expectedApiKey = env("ADMIN_API_KEY", "").trim();
+  const expectedApiKey = env("FIMA_ADMIN_API_KEY", env("ADMIN_API_KEY", "")).trim();
   if (submittedApiKey) {
     if (expectedApiKey && timingSafeTextEqual(submittedApiKey, expectedApiKey)) return next();
     return res.status(401).json({ error: "unauthorized" });

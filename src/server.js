@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { execSync } from "node:child_process";
 import crypto from "node:crypto";
 import dns from "node:dns/promises";
 import compression from "compression";
@@ -34,7 +35,14 @@ import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState,
 
 const app = express();
 const port = Number(env("PORT", "8080"));
-const stripePriceEnvNames = [...new Set(Object.values(PLANS).flatMap((plan) => getPlanPriceOptions(plan).map((option) => option.priceEnv)))];
+const publicProductPlanIds = new Set(["1day", "3days", "monthly", "lifetime"]);
+const stripePriceEnvNames = [
+  ...new Set(
+    Object.values(PLANS)
+      .filter((plan) => publicProductPlanIds.has(plan.id))
+      .flatMap((plan) => getPlanPriceOptions(plan).map((option) => option.priceEnv))
+  )
+];
 let lastStripePriceValidation = {
   checkedAt: null,
   results: Object.fromEntries(stripePriceEnvNames.map((name) => [name, { status: "unchecked" }]))
@@ -62,6 +70,7 @@ const trialLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHea
 const giftRecipientSearchLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
 const giftRedeemLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
+const adminRuntimeLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
@@ -84,6 +93,46 @@ const defaultSiteSettings = {
   checkoutEnabled: true,
   downloadEnabled: true
 };
+const backendVersion = env("APP_VERSION", "1.0.126");
+const buildTime = env("BUILD_TIME", new Date().toISOString());
+const backendCommit = env("RENDER_GIT_COMMIT", env("GIT_COMMIT", safeGitCommit()));
+const runtimeEnvCatalog = [
+  ["STRIPE_AGENT_API_KEY", "stripe"],
+  ["STRIPE_AGENT_TEST_API_KEY", "stripe"],
+  ["STRIPE_TEST_SECRET_KEY", "stripe"],
+  ["STRIPE_TEST_PUBLISHABLE_KEY", "stripe"],
+  ["STRIPE_SECRET_KEY", "stripe"],
+  ["STRIPE_PUBLISHABLE_KEY", "stripe"],
+  ["STRIPE_WEBHOOK_SECRET", "stripe"],
+  ["STRIPE_PRICE_3DAYS", "stripe"],
+  ["STRIPE_PRICE_MONTHLY", "stripe"],
+  ["STRIPE_PRICE_LIFETIME", "stripe"],
+  ["STRIPE_TEST_PRICE_3DAYS", "stripe"],
+  ["STRIPE_TEST_PRICE_MONTHLY", "stripe"],
+  ["STRIPE_TEST_PRICE_LIFETIME", "stripe"],
+  ["RENDER_API_KEY", "render"],
+  ["RENDER_SERVICE_ID", "render"],
+  ["RENDER_DEPLOY_HOOK_URL", "render"],
+  ["FIMA_RENDER_DEPLOY_HOOK", "render"],
+  ["DISCORD_BOT_TOKEN", "discord"],
+  ["DISCORD_CLIENT_ID", "discord"],
+  ["DISCORD_GUILD_ID", "discord"],
+  ["FIMA_ADMIN_API_KEY", "app"],
+  ["ADMIN_API_KEY", "app"],
+  ["RESEND_API_KEY", "mail"],
+  ["SMTP_PASS", "mail"]
+];
+const requiredRuntimeEnv = [
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRICE_3DAYS",
+  "STRIPE_PRICE_MONTHLY",
+  "STRIPE_PRICE_LIFETIME",
+  "FIMA_ADMIN_API_KEY",
+  "DISCORD_BOT_TOKEN",
+  "DISCORD_CLIENT_ID",
+  "DISCORD_GUILD_ID"
+];
 
 app.set("trust proxy", 1);
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -109,7 +158,11 @@ app.use(cors({
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
+    status: "ok",
     app: env("APP_NAME", "Fima Macro"),
+    version: backendVersion,
+    commit: backendCommit,
+    buildTime,
     mode: env("NODE_ENV", "development"),
     apiBaseUrl: apiBaseUrl(),
     stripe: stripeStatus()
@@ -117,7 +170,11 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/healthz", (_req, res) => {
-  res.status(200).json({ status: "ok" });
+  res.status(200).json(versionPayload());
+});
+
+app.get("/api/version", (_req, res) => {
+  res.status(200).json(versionPayload());
 });
 
 app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), async (req, res) => {
@@ -157,6 +214,12 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
       fulfillment = isProductCheckoutSession(session)
         ? await fulfillProductCheckoutSession(session)
         : await fulfillCheckoutSession(session);
+    } else if (event.type === "invoice.payment_succeeded") {
+      fulfillment = await handleSubscriptionInvoicePaid(event.data.object, event.id);
+    } else if (event.type === "invoice.payment_failed") {
+      fulfillment = await handleSubscriptionInvoiceFailed(event.data.object, event.id);
+    } else if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+      fulfillment = await syncStripeSubscriptionState(event.data.object, event.type);
     }
     await prisma.webhookEvent.update({
       where: { stripeEventId: event.id },
@@ -182,6 +245,97 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
+
+app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  await auditRuntimeAdmin(req, "runtime_env_status");
+  return res.json({
+    success: true,
+    version: versionPayload(),
+    env: runtimeEnvCatalog.map(([envName, category]) => ({
+      envName,
+      category,
+      set: Boolean(env(envName))
+    }))
+  });
+});
+
+app.post(["/api/admin/deploy/verify-env", "/admin/api/deploy/verify-env"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  await auditRuntimeAdmin(req, "runtime_verify_env");
+  const status = runtimeEnvCatalog.map(([envName, category]) => ({
+    envName,
+    category,
+    set: Boolean(env(envName))
+  }));
+  const missing = requiredRuntimeEnv.filter((name) => !env(name));
+  return res.json({
+    success: missing.length === 0,
+    version: versionPayload(),
+    missing,
+    env: status
+  });
+});
+
+app.post(["/api/admin/stripe/setup-products", "/admin/api/stripe/setup-products"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  try {
+    await auditRuntimeAdmin(req, "stripe_setup_products_started");
+    const result = await setupStripeProducts({
+      mode: "live",
+      keyNames: ["STRIPE_AGENT_API_KEY", "STRIPE_SECRET_KEY"],
+      envMap: {
+        "3days": "STRIPE_PRICE_3DAYS",
+        monthly: "STRIPE_PRICE_MONTHLY",
+        lifetime: "STRIPE_PRICE_LIFETIME"
+      },
+      updateRenderEnv: req.body?.updateRenderEnv !== false
+    });
+    await createAuditLog("stripe_setup_products_completed", "stripe", null, safeStripeSetupAudit(result));
+    return res.json(result);
+  } catch (error) {
+    console.error("Stripe live setup failed", publicError(error));
+    await createAuditLog("stripe_setup_products_failed", "stripe", null, publicError(error));
+    return res.status(error.statusCode || 500).json({ success: false, error: error.code || "stripe_setup_failed", message: error.message });
+  }
+});
+
+app.post(["/api/admin/stripe/setup-test-products", "/admin/api/stripe/setup-test-products"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  try {
+    await auditRuntimeAdmin(req, "stripe_setup_test_products_started");
+    const result = await setupStripeProducts({
+      mode: "test",
+      keyNames: ["STRIPE_AGENT_TEST_API_KEY", "STRIPE_TEST_SECRET_KEY"],
+      envMap: {
+        "3days": "STRIPE_TEST_PRICE_3DAYS",
+        monthly: "STRIPE_TEST_PRICE_MONTHLY",
+        lifetime: "STRIPE_TEST_PRICE_LIFETIME"
+      },
+      updateRenderEnv: req.body?.updateRenderEnv !== false
+    });
+    await createAuditLog("stripe_setup_test_products_completed", "stripe", null, safeStripeSetupAudit(result));
+    return res.json(result);
+  } catch (error) {
+    console.error("Stripe test setup failed", publicError(error));
+    await createAuditLog("stripe_setup_test_products_failed", "stripe", null, publicError(error));
+    return res.status(error.statusCode || 500).json({ success: false, error: error.code || "stripe_test_setup_failed", message: error.message });
+  }
+});
+
+app.post(["/api/admin/stripe/test-clock-e2e", "/admin/api/stripe/test-clock-e2e"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  try {
+    await auditRuntimeAdmin(req, "stripe_test_clock_e2e_started");
+    const result = await runStripeTestClockE2E();
+    await createAuditLog("stripe_test_clock_e2e_completed", "stripe", null, {
+      testClockId: result.testClockId,
+      customerId: result.customerId,
+      subscriptionId: result.subscriptionId,
+      statuses: result.statuses
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error("Stripe Test Clock E2E failed", publicError(error));
+    await createAuditLog("stripe_test_clock_e2e_failed", "stripe", null, publicError(error));
+    return res.status(error.statusCode || 500).json({ success: false, error: error.code || "stripe_test_clock_failed", message: error.message });
+  }
+});
 
 app.get("/api/public/site-settings", async (_req, res) => {
   const settings = await getSiteSettings();
@@ -1054,6 +1208,7 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
 
     const plan = getPlan(req.body?.plan);
     if (!plan) return res.status(400).json({ error: "invalid_plan", plans: planIds() });
+    if (!publicProductPlanIds.has(plan.id)) return res.status(400).json({ error: "legacy_plan_unavailable", plans: Array.from(publicProductPlanIds) });
 
     const account = await ensureUserStripeCustomer(user);
     const customerEmail = String(account.email || "").trim().toLowerCase();
@@ -1162,6 +1317,25 @@ app.get("/api/checkout/result", async (req, res) => {
   } catch (error) {
     console.error("Checkout result failed", publicError(error));
     return res.status(500).json({ success: false, status: "error" });
+  }
+});
+
+app.post("/api/billing/portal", storeCheckoutLimiter, requireUser, async (req, res) => {
+  try {
+    const user = await ensureUserStripeCustomer(req.user);
+    if (!user.stripeCustomerId) return res.status(400).json({ error: "stripe_customer_missing" });
+    const session = await stripe().billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: `${frontendUrl()}/dashboard.html#billing`
+    });
+    await createAnalyticsEvent("billing_portal_created", {
+      mode: stripeStatus().effectiveMode,
+      metadata: { userId: user.id, customer: "set" }
+    });
+    return res.json({ success: true, url: session.url });
+  } catch (error) {
+    console.error("Billing portal creation failed", publicError(error));
+    return res.status(500).json({ error: "billing_portal_failed" });
   }
 });
 
@@ -3233,10 +3407,324 @@ function stripe() {
   return new Stripe(key);
 }
 
+function stripeWithKey(key, expectedMode) {
+  assertStripeSecretKeyAllowed(key, expectedMode);
+  return new Stripe(String(key || "").trim());
+}
+
 function stripeStatus() {
   return {
     ...stripeConfigSummary(stripePriceEnvNames),
     priceValidation: lastStripePriceValidation
+  };
+}
+
+function versionPayload() {
+  return {
+    status: "ok",
+    app: env("APP_NAME", "Fima Macro"),
+    version: backendVersion,
+    commit: backendCommit,
+    buildTime,
+    mode: env("NODE_ENV", "development")
+  };
+}
+
+function safeGitCommit() {
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+async function auditRuntimeAdmin(req, action) {
+  await createAuditLog(action, "admin_runtime", null, {
+    path: req.originalUrl,
+    ip: req.ip,
+    userAgent: String(req.get("user-agent") || "").slice(0, 160)
+  });
+}
+
+function requireRuntimeAdminKey(req, res, next) {
+  const expected = env("FIMA_ADMIN_API_KEY", env("ADMIN_API_KEY", "")).trim();
+  if (!expected) {
+    return res.status(503).json({ error: "admin_api_key_not_configured" });
+  }
+
+  const headerKey = String(req.get("x-admin-api-key") || "").trim();
+  const bearer = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const provided = headerKey || bearer;
+  if (!provided) {
+    return res.status(401).json({ error: "admin_api_key_required" });
+  }
+
+  const expectedHash = crypto.createHash("sha256").update(expected).digest();
+  const providedHash = crypto.createHash("sha256").update(provided).digest();
+  if (expectedHash.length !== providedHash.length || !crypto.timingSafeEqual(expectedHash, providedHash)) {
+    return res.status(403).json({ error: "admin_api_key_invalid" });
+  }
+
+  return next();
+}
+
+function firstConfiguredEnv(names) {
+  for (const name of names) {
+    const value = env(name);
+    if (value) return { name, value };
+  }
+  return { name: names[0], value: "" };
+}
+
+function stripeSetupPlans(envMap) {
+  return ["3days", "monthly", "lifetime"].map((planId) => {
+    const plan = getPlan(planId);
+    const commerce = getPlanCommerce(plan);
+    return {
+      plan,
+      commerce,
+      envName: envMap[planId],
+      productName: plan.name,
+      metadata: {
+        app: "fima_macro",
+        fima_plan: plan.id,
+        managed_by: "fima_runtime_setup"
+      }
+    };
+  });
+}
+
+async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv }) {
+  const key = firstConfiguredEnv(keyNames);
+  if (!key.value) {
+    const error = new Error(`${keyNames.join(" or ")} is required in Render runtime.`);
+    error.code = "missing_stripe_key";
+    error.statusCode = 503;
+    throw error;
+  }
+  const stripeClient = stripeWithKey(key.value, mode);
+  const planned = stripeSetupPlans(envMap);
+  const products = [];
+  const envUpdates = {};
+
+  for (const item of planned) {
+    const row = await verifyOrCreateStripePlan(stripeClient, item);
+    products.push(row);
+    envUpdates[item.envName] = row.priceId;
+  }
+
+  const renderEnv = updateRenderEnv ? await updateRenderEnvVars(envUpdates) : {
+    attempted: false,
+    updated: false,
+    reason: "disabled_by_request"
+  };
+  const deploy = renderEnv.updated ? await triggerRenderDeploy() : { attempted: false, triggered: false, reason: "env_not_updated" };
+  return {
+    success: true,
+    mode,
+    stripeKeyEnv: key.name,
+    products,
+    envUpdates: Object.fromEntries(Object.entries(envUpdates).map(([envName, priceId]) => [envName, { priceId, setInProcess: Boolean(process.env[envName]) }])),
+    renderEnv,
+    deploy
+  };
+}
+
+async function verifyOrCreateStripePlan(stripeClient, item) {
+  const { plan, commerce, envName, productName, metadata } = item;
+  let product = await findStripeProductForPlan(stripeClient, plan.id);
+  let productCreated = false;
+  if (!product) {
+    product = await stripeClient.products.create({
+      name: productName,
+      active: true,
+      metadata
+    });
+    productCreated = true;
+  }
+
+  const expectedType = plan.subscription ? "recurring" : "one_time";
+  let price = await findStripePriceForPlan(stripeClient, product.id, plan, commerce);
+  let priceCreated = false;
+  if (!price) {
+    price = await stripeClient.prices.create({
+      product: product.id,
+      currency: commerce.currency,
+      unit_amount: commerce.priceCents,
+      ...(plan.subscription ? { recurring: { interval: "month" } } : {}),
+      metadata
+    });
+    priceCreated = true;
+  }
+
+  const currentEnvPriceId = env(envName, "");
+  const currentMatches = currentEnvPriceId === price.id;
+  if (!currentMatches) process.env[envName] = price.id;
+  return {
+    plan: plan.id,
+    envName,
+    productId: product.id,
+    priceId: price.id,
+    productCreated,
+    priceCreated,
+    currentEnvPriceId: currentEnvPriceId ? "set" : "missing",
+    currentEnvMatches: currentMatches,
+    amount: commerce.priceCents,
+    currency: commerce.currency,
+    type: expectedType,
+    interval: plan.subscription ? "month" : null
+  };
+}
+
+async function findStripeProductForPlan(stripeClient, planId) {
+  const list = await stripeClient.products.search({
+    query: `metadata['fima_plan']:'${planId}' AND metadata['app']:'fima_macro'`,
+    limit: 10
+  }).catch(async () => {
+    const fallback = await stripeClient.products.list({ active: true, limit: 100 });
+    return { data: fallback.data.filter((product) => product.metadata?.fima_plan === planId && product.metadata?.app === "fima_macro") };
+  });
+  return list.data?.[0] || null;
+}
+
+async function findStripePriceForPlan(stripeClient, productId, plan, commerce) {
+  const prices = await stripeClient.prices.list({ product: productId, active: true, limit: 100 });
+  return prices.data.find((price) => {
+    if (String(price.currency || "").toLowerCase() !== commerce.currency) return false;
+    if (price.unit_amount !== commerce.priceCents) return false;
+    if (plan.subscription) return price.type === "recurring" && price.recurring?.interval === "month";
+    return price.type === "one_time";
+  }) || null;
+}
+
+async function updateRenderEnvVars(updates) {
+  const apiKey = env("RENDER_API_KEY");
+  const serviceId = env("RENDER_SERVICE_ID");
+  if (!apiKey || !serviceId) {
+    return {
+      attempted: false,
+      updated: false,
+      reason: "missing_render_api_env",
+      required: ["RENDER_API_KEY", "RENDER_SERVICE_ID"]
+    };
+  }
+  try {
+    const response = await fetch(`https://api.render.com/v1/services/${encodeURIComponent(serviceId)}/env-vars`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+        accept: "application/json"
+      },
+      body: JSON.stringify(Object.entries(updates).map(([key, value]) => ({ key, value })))
+    });
+    const body = await response.json().catch(() => ({}));
+    return {
+      attempted: true,
+      updated: response.ok,
+      status: response.status,
+      keys: Object.keys(updates),
+      error: response.ok ? null : (body?.message || body?.error || "render_env_update_failed")
+    };
+  } catch (error) {
+    return {
+      attempted: true,
+      updated: false,
+      keys: Object.keys(updates),
+      error: error.message
+    };
+  }
+}
+
+async function triggerRenderDeploy() {
+  const hook = env("FIMA_RENDER_DEPLOY_HOOK", env("RENDER_DEPLOY_HOOK_URL", ""));
+  if (hook) {
+    const response = await fetch(hook, { method: "POST" });
+    return { attempted: true, triggered: response.ok, status: response.status, method: "deploy_hook" };
+  }
+  const apiKey = env("RENDER_API_KEY");
+  const serviceId = env("RENDER_SERVICE_ID");
+  if (!apiKey || !serviceId) return { attempted: false, triggered: false, reason: "missing_deploy_hook_or_render_api" };
+  const response = await fetch(`https://api.render.com/v1/services/${encodeURIComponent(serviceId)}/deploys`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+      accept: "application/json"
+    },
+    body: JSON.stringify({ clearCache: "do_not_clear" })
+  });
+  return { attempted: true, triggered: response.ok, status: response.status, method: "render_api" };
+}
+
+function safeStripeSetupAudit(result) {
+  return {
+    mode: result.mode,
+    products: result.products?.map((row) => ({
+      plan: row.plan,
+      envName: row.envName,
+      productId: row.productId,
+      priceId: row.priceId,
+      productCreated: row.productCreated,
+      priceCreated: row.priceCreated,
+      currentEnvMatches: row.currentEnvMatches
+    })),
+    renderEnv: result.renderEnv,
+    deploy: result.deploy
+  };
+}
+
+async function runStripeTestClockE2E() {
+  const key = firstConfiguredEnv(["STRIPE_AGENT_TEST_API_KEY", "STRIPE_TEST_SECRET_KEY"]);
+  if (!key.value) {
+    const error = new Error("STRIPE_AGENT_TEST_API_KEY or STRIPE_TEST_SECRET_KEY is required.");
+    error.code = "missing_test_stripe_key";
+    error.statusCode = 503;
+    throw error;
+  }
+  const stripeClient = stripeWithKey(key.value, "test");
+  const monthlyPriceId = env("STRIPE_TEST_PRICE_MONTHLY");
+  if (stripePriceEnvState(monthlyPriceId) !== "set") {
+    const error = new Error("STRIPE_TEST_PRICE_MONTHLY is required. Run setup-test-products first.");
+    error.code = "missing_test_monthly_price";
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const testClock = await stripeClient.testHelpers.testClocks.create({
+    frozen_time: now,
+    name: `Fima v1.0.126 ${new Date().toISOString()}`
+  });
+  const customer = await stripeClient.customers.create({
+    email: `fima-test-clock-${testClock.id}@example.com`,
+    test_clock: testClock.id,
+    metadata: { app: "fima_macro", purpose: "test_clock_e2e" }
+  });
+  await stripeClient.paymentMethods.attach("pm_card_visa", { customer: customer.id });
+  await stripeClient.customers.update(customer.id, { invoice_settings: { default_payment_method: "pm_card_visa" } });
+  const subscription = await stripeClient.subscriptions.create({
+    customer: customer.id,
+    items: [{ price: monthlyPriceId }],
+    metadata: { app: "fima_macro", fima_plan: "monthly", purpose: "test_clock_e2e" }
+  });
+  const cancelUpdate = await stripeClient.subscriptions.update(subscription.id, { cancel_at_period_end: true });
+  const resumeUpdate = await stripeClient.subscriptions.update(subscription.id, { cancel_at_period_end: false });
+  const advancedClock = await stripeClient.testHelpers.testClocks.advance(testClock.id, {
+    frozen_time: now + 32 * 24 * 60 * 60
+  });
+  return {
+    success: true,
+    stripeKeyEnv: key.name,
+    testClockId: testClock.id,
+    customerId: customer.id,
+    subscriptionId: subscription.id,
+    statuses: {
+      subscriptionCreated: subscription.status,
+      cancelAtPeriodEnd: cancelUpdate.cancel_at_period_end,
+      resumeCancelAtPeriodEnd: resumeUpdate.cancel_at_period_end,
+      clockAdvanceStatus: advancedClock.status
+    }
   };
 }
 
@@ -3296,7 +3784,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
         ...baseSession,
         line_items: [{ price: normalizedPriceId, quantity: 1 }]
       });
-      return { session, priceSource: "price_id" };
+      return { session, priceSource: "stripe_price_id" };
     }
 
     console.warn("Stripe price env invalid", sanitizePriceCheck(priceCheck));
@@ -3376,7 +3864,7 @@ async function validateConfiguredStripePrices() {
   }
 
   const results = [];
-  for (const plan of Object.values(PLANS)) {
+  for (const plan of Object.values(PLANS).filter((item) => publicProductPlanIds.has(item.id))) {
     for (const option of getPlanPriceOptions(plan)) {
       const check = await validateStripePriceForPlan(stripeClient, plan, env(option.priceEnv), option);
       recordStripePriceCheck(check);
@@ -3422,7 +3910,9 @@ async function validateStripePriceForPlan(stripeClient, plan, priceId, commerce 
     };
 
     if (actual.active === false) return { ...base, ok: false, status: "inactive_price", actual };
-    if (actual.type !== "one_time") return { ...base, ok: false, status: "not_one_time_price", actual };
+    const expectedType = plan.subscription ? "recurring" : "one_time";
+    if (actual.type !== expectedType) return { ...base, ok: false, status: "price_type_mismatch", actual };
+    if (plan.subscription && price.recurring?.interval !== "month") return { ...base, ok: false, status: "recurring_interval_mismatch", actual: { ...actual, interval: price.recurring?.interval || null } };
     if (actual.currency !== commerce.currency) return { ...base, ok: false, status: "currency_mismatch", actual };
     if (actual.unitAmount !== commerce.priceCents) return { ...base, ok: false, status: "amount_mismatch", actual };
 
@@ -3451,7 +3941,8 @@ function expectedPriceForPlan(plan, commerce = getPlanCommerce(plan)) {
   return {
     currency: commerce.currency,
     unitAmount: commerce.priceCents,
-    type: "one_time"
+    type: plan.subscription ? "recurring" : "one_time",
+    interval: plan.subscription ? "month" : null
   };
 }
 
@@ -6012,6 +6503,9 @@ async function fulfillCheckoutSession(session) {
   const paymentIntentId = typeof session.payment_intent === "string"
     ? session.payment_intent
     : session.payment_intent?.id || null;
+  const subscriptionId = typeof session.subscription === "string"
+    ? session.subscription
+    : session.subscription?.id || null;
   const extensionKey = normalizeLicenseKey(session.metadata?.extendLicenseKey);
   const isExtension = session.metadata?.checkoutType === "license_extension" && extensionKey;
   const isGiftCodePurchase = session.metadata?.checkoutType === "gift_code_purchase" || session.metadata?.giftCodePurchase === "true";
@@ -6149,7 +6643,7 @@ async function fulfillCheckoutSession(session) {
             plan,
             stripeSessionId: session.id,
             stripePaymentIntentId: paymentIntentId,
-            notes: giftNote
+            notes: subscriptionId ? appendNote(giftNote, `stripe_subscription:${subscriptionId}`) : giftNote
           })
         });
       }
@@ -6227,6 +6721,110 @@ async function fulfillCheckoutSession(session) {
     }
     throw error;
   }
+}
+
+async function syncStripeSubscriptionState(subscription, eventType = "customer.subscription.updated") {
+  const subscriptionId = String(subscription?.id || "");
+  if (!subscriptionId) return null;
+  const license = await findLicenseBySubscriptionId(subscriptionId);
+  if (!license) {
+    await createAnalyticsEvent("subscription_sync_no_license", {
+      mode: subscription?.livemode ? "live" : "test",
+      metadata: { subscriptionId, eventType, status: subscription?.status || null }
+    });
+    return { subscriptionId };
+  }
+  const periodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : license.expiresAt;
+  const status = subscription.status === "canceled" || subscription.status === "unpaid" ? "expired" : "active";
+  const notes = appendNote(license.notes, `stripe_subscription_status:${subscription.status || "unknown"}`);
+  const updated = await prisma.license.update({
+    where: { id: license.id },
+    data: {
+      status,
+      expiresAt: license.lifetime ? null : periodEnd,
+      notes
+    }
+  });
+  await createAnalyticsEvent("subscription_synced", {
+    mode: subscription?.livemode ? "live" : "test",
+    metadata: {
+      subscriptionId,
+      eventType,
+      status: subscription?.status || null,
+      cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end)
+    }
+  });
+  return { license: updated, subscriptionId };
+}
+
+async function handleSubscriptionInvoicePaid(invoice, eventId) {
+  const subscriptionId = String(invoice?.subscription || invoice?.parent?.subscription_details?.subscription || "");
+  if (!subscriptionId) return null;
+  const invoiceId = String(invoice?.id || eventId || "");
+  const license = await findLicenseBySubscriptionId(subscriptionId);
+  if (!license) return { subscriptionId };
+  if (invoiceId && String(license.notes || "").includes(`stripe_invoice_paid:${invoiceId}`)) {
+    return { license, subscriptionId, duplicateInvoice: true };
+  }
+  let subscription = null;
+  try {
+    subscription = await stripe().subscriptions.retrieve(subscriptionId);
+  } catch {
+    subscription = null;
+  }
+  const periodEnd = subscription?.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : (invoice?.lines?.data?.[0]?.period?.end ? new Date(invoice.lines.data[0].period.end * 1000) : getPlanExpiry(getPlan("monthly"), license.expiresAt && license.expiresAt > new Date() ? license.expiresAt : new Date()));
+  const updated = await prisma.license.update({
+    where: { id: license.id },
+    data: {
+      status: "active",
+      expiresAt: license.lifetime ? null : periodEnd,
+      stripePaymentIntentId: typeof invoice?.payment_intent === "string" ? invoice.payment_intent : license.stripePaymentIntentId,
+      notes: appendNote(license.notes, `stripe_invoice_paid:${invoiceId}`)
+    }
+  });
+  await createAnalyticsEvent("subscription_invoice_paid", {
+    amount: invoice?.amount_paid || 0,
+    currency: String(invoice?.currency || "eur").toLowerCase(),
+    mode: invoice?.livemode ? "live" : "test",
+    metadata: { subscriptionId, invoiceId, licenseId: license.id }
+  });
+  return { license: updated, subscriptionId };
+}
+
+async function handleSubscriptionInvoiceFailed(invoice, eventId) {
+  const subscriptionId = String(invoice?.subscription || invoice?.parent?.subscription_details?.subscription || "");
+  const license = subscriptionId ? await findLicenseBySubscriptionId(subscriptionId) : null;
+  await createAnalyticsEvent("subscription_invoice_failed", {
+    amount: invoice?.amount_due || 0,
+    currency: String(invoice?.currency || "eur").toLowerCase(),
+    mode: invoice?.livemode ? "live" : "test",
+    metadata: { subscriptionId, invoiceId: invoice?.id || eventId, licenseId: license?.id || null }
+  });
+  if (!license) return { subscriptionId };
+  const updated = await prisma.license.update({
+    where: { id: license.id },
+    data: { notes: appendNote(license.notes, `stripe_invoice_failed:${invoice?.id || eventId}`) }
+  });
+  return { license: updated, subscriptionId };
+}
+
+async function findLicenseBySubscriptionId(subscriptionId) {
+  return prisma.license.findFirst({
+    where: {
+      notes: { contains: `stripe_subscription:${subscriptionId}` }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+function appendNote(current, addition) {
+  const cleanAddition = String(addition || "").trim();
+  if (!cleanAddition) return current || null;
+  const cleanCurrent = String(current || "").trim();
+  if (cleanCurrent.includes(cleanAddition)) return cleanCurrent || null;
+  return [cleanCurrent, cleanAddition].filter(Boolean).join(" ");
 }
 
 async function tryFulfillFromStripeSession(sessionId) {
