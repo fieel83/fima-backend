@@ -2424,6 +2424,50 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
   }
 });
 
+app.post(["/admin/api/gift-codes/create-test", "/api/admin/gift-codes/create-test"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  try {
+    const plan = resolveGiftPlan({ plan: req.body?.plan || "3days" });
+    if (!plan) return res.status(400).json({ error: "invalid_plan" });
+    const code = await generateUniqueGiftCode();
+    const giftCode = await prisma.giftCode.create({
+      data: {
+        codeHash: hashGiftCode(code),
+        codeCipher: encryptToken(code),
+        maskedCode: maskGiftCode(code),
+        plan: plan.id,
+        status: "unused",
+        maxUses: 1,
+        usedCount: 0,
+        requiresDiscord: false,
+        requiresRoblox: false,
+        notes: `disposable_test_gift createdBy:admin plan:${plan.id}`
+      },
+      include: {
+        redemptions: {
+          include: { user: true, license: true },
+          orderBy: { createdAt: "desc" },
+          take: 5
+        }
+      }
+    });
+    await createAuditLog("test_gift_code_created", "gift_code", giftCode.id, {
+      plan: plan.id,
+      disposable: true
+    });
+    return res.status(201).json({
+      success: true,
+      disposable: true,
+      giftCode: {
+        ...adminGiftCodePayload(giftCode),
+        code
+      }
+    });
+  } catch (error) {
+    console.error("Test gift code creation failed", publicError(error));
+    return res.status(500).json({ error: "test_gift_code_create_failed" });
+  }
+});
+
 app.post(["/admin/api/gift-codes/:id/revoke", "/api/admin/gift-codes/:id/revoke"], adminGiftLimiter, requireAdmin, async (req, res) => {
   const giftCode = await prisma.giftCode.update({
     where: { id: req.params.id },
@@ -3228,6 +3272,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
   const stripeClient = stripe();
   const checkoutType = String(extraMetadata.checkoutType || "").trim().toLowerCase();
   const subscriptionCheckout = Boolean(plan.subscription) && checkoutType === "license_purchase";
+  const productionMode = env("NODE_ENV", "development") === "production" || env("STRIPE_MODE", "auto") === "live";
   const baseSession = {
     mode: subscriptionCheckout ? "subscription" : "payment",
     allow_promotion_codes: true,
@@ -3254,7 +3299,14 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
       return { session, priceSource: "price_id" };
     }
 
-    console.warn("Stripe price env invalid, using inline price data", sanitizePriceCheck(priceCheck));
+    console.warn("Stripe price env invalid", sanitizePriceCheck(priceCheck));
+    if (productionMode) {
+      const error = new Error(`${commerce.priceEnv} must be a valid Stripe price ID before production checkout can run.`);
+      error.code = "missing_env";
+      error.priceEnv = commerce.priceEnv;
+      error.priceStatus = priceCheck.status;
+      throw error;
+    }
   } else {
     const priceCheck = {
       ok: false,
@@ -3264,7 +3316,14 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
       expected: expectedPriceForPlan(plan, commerce)
     };
     recordStripePriceCheck(priceCheck);
-    console.warn("Stripe price env missing, using inline price data", sanitizePriceCheck(priceCheck));
+    console.warn("Stripe price env missing", sanitizePriceCheck(priceCheck));
+    if (productionMode) {
+      const error = new Error(`${commerce.priceEnv} is missing. Production checkout cannot use inline price_data.`);
+      error.code = "missing_env";
+      error.priceEnv = commerce.priceEnv;
+      error.priceStatus = "missing_env";
+      throw error;
+    }
   }
 
   const session = await stripeClient.checkout.sessions.create({
