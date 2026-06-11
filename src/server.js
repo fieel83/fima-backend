@@ -3226,8 +3226,10 @@ async function createProductCheckoutSession({ user, product, price }) {
 
 async function createCheckoutSession({ plan, commerce, customerEmail, customerId, priceId, selectedCurrency, language, extraMetadata = {} }) {
   const stripeClient = stripe();
+  const checkoutType = String(extraMetadata.checkoutType || "").trim().toLowerCase();
+  const subscriptionCheckout = Boolean(plan.subscription) && checkoutType === "license_purchase";
   const baseSession = {
-    mode: "payment",
+    mode: subscriptionCheckout ? "subscription" : "payment",
     allow_promotion_codes: true,
     success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${frontendUrl()}/#pricing`,
@@ -3272,6 +3274,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
       price_data: {
         currency: commerce.currency,
         unit_amount: commerce.priceCents,
+        ...(subscriptionCheckout ? { recurring: { interval: "month" } } : {}),
         product_data: {
           name: plan.name,
           metadata: {

@@ -2,14 +2,33 @@ export const PLANS = {
   "1day": {
     id: "1day",
     name: "Fima Macro 1 Day",
-    priceCents: 99,
-    salePriceCents: 74,
-    compareAtCents: 99,
+    priceCents: 0,
+    compareAtCents: 0,
     currency: "eur",
     durationDays: 1,
     lifetime: false,
-    priceEnv: "STRIPE_PRICE_1DAY",
-    salePriceEnv: "STRIPE_SALE_PRICE_1DAY"
+    priceEnv: "STRIPE_PRICE_1DAY"
+  },
+  "3days": {
+    id: "3days",
+    name: "Fima Macro 3 Days",
+    priceCents: 99,
+    compareAtCents: 99,
+    currency: "eur",
+    durationDays: 3,
+    lifetime: false,
+    priceEnv: "STRIPE_PRICE_3DAYS"
+  },
+  "monthly": {
+    id: "monthly",
+    name: "Fima Macro Monthly",
+    priceCents: 499,
+    compareAtCents: 499,
+    currency: "eur",
+    durationDays: 30,
+    lifetime: false,
+    subscription: true,
+    priceEnv: "STRIPE_PRICE_MONTHLY"
   },
   "2weeks": {
     id: "2weeks",
@@ -50,7 +69,8 @@ export const PLANS = {
   "lifetime": {
     id: "lifetime",
     name: "Fima Macro Lifetime",
-    priceCents: 3999,
+    priceCents: 2999,
+    compareAtCents: 3999,
     currency: "eur",
     durationDays: null,
     lifetime: true,
