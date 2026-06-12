@@ -1,0 +1,118 @@
+{
+  "artifact": "primary-domain-render-ionos-migration-plan",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "manual DNS/custom-domain migration plan only; no code edits, no deploy, no Stripe calls, no admin runtime calls, no DB writes",
+  "chosenPrimaryHostingTarget": "Render backend service fima-backend",
+  "goal": "fimamacro.com and www.fimamacro.com should serve the same v1.0.127 public tree currently live at api.fimamacro.com.",
+  "renderService": {
+    "serviceName": "fima-backend",
+    "repo": "https://github.com/fieel83/fima-backend",
+    "branch": "main",
+    "domainsToAdd": [
+      "fimamacro.com",
+      "www.fimamacro.com"
+    ],
+    "manualSteps": [
+      "Open Render Dashboard.",
+      "Open the fima-backend service.",
+      "Go to Settings.",
+      "Open Custom Domains.",
+      "Add fimamacro.com.",
+      "Add www.fimamacro.com.",
+      "For each domain, copy the exact DNS target and record type Render displays.",
+      "Do not expose deploy hooks, environment variables, connection strings, or secrets."
+    ],
+    "dnsValuesRequiredFromRender": {
+      "fimamacro.com": "PLACEHOLDER: use the exact record type and value Render displays for the apex/root domain. Do not guess.",
+      "www.fimamacro.com": "PLACEHOLDER: use the exact record type and value Render displays for www. Do not guess."
+    }
+  },
+  "ionosDns": {
+    "currentProvider": "IONOS / 1&1 DNS and Apache hosting",
+    "manualSteps": [
+      "Open IONOS.",
+      "Go to Domains & SSL.",
+      "Open fimamacro.com.",
+      "Open DNS.",
+      "Find existing A record(s) for fimamacro.com pointing to 217.160.0.47.",
+      "Find existing AAAA record(s) for fimamacro.com pointing to 2001:8d8:100f:f000::200.",
+      "Find existing A/AAAA records for www.fimamacro.com pointing to the same IONOS host, if present.",
+      "Remove or replace only the web-hosting records that point root/www to the old IONOS web host.",
+      "Add the exact Render-required record for fimamacro.com using the record type and value shown in Render.",
+      "Add the exact Render-required record for www.fimamacro.com using the record type and value shown in Render.",
+      "Save DNS changes.",
+      "Wait for DNS propagation and Render custom-domain verification."
+    ],
+    "oldRecordsToRemoveOrReplace": [
+      {
+        "host": "fimamacro.com",
+        "type": "A",
+        "value": "217.160.0.47",
+        "action": "remove or replace with Render-required apex/root record"
+      },
+      {
+        "host": "fimamacro.com",
+        "type": "AAAA",
+        "value": "2001:8d8:100f:f000::200",
+        "action": "remove or replace with Render-required apex/root record"
+      },
+      {
+        "host": "www.fimamacro.com",
+        "type": "A/AAAA",
+        "value": "old IONOS web-hosting target if present",
+        "action": "remove or replace with Render-required www record"
+      }
+    ],
+    "recordsToKeep": [
+      "MX records",
+      "TXT records for SPF",
+      "TXT/CNAME records for DKIM",
+      "TXT record for DMARC",
+      "Email verification records",
+      "Any unrelated subdomain records not used for fimamacro.com or www.fimamacro.com web hosting",
+      "api.fimamacro.com CNAME to fima-backend-aqmi.onrender.com unless Render explicitly instructs otherwise"
+    ],
+    "doNotDelete": [
+      "MX/email records",
+      "SPF",
+      "DKIM",
+      "DMARC",
+      "Unrelated service verification records",
+      "api.fimamacro.com unless deliberately changing the API hostname too"
+    ]
+  },
+  "blockerConditions": [
+    {
+      "condition": "Render provides a specific apex/root record value that differs from examples or expectations.",
+      "action": "Use exactly what Render displays. Do not guess or substitute another target."
+    },
+    {
+      "condition": "IONOS does not support the Render-required ALIAS/ANAME/CNAME-style record at the apex/root domain.",
+      "action": "Use one of the alternatives: make www.fimamacro.com primary and redirect apex to www; move DNS to Cloudflare and use CNAME flattening; or keep IONOS hosting and upload the v1.0.127 public tree there."
+    },
+    {
+      "condition": "Render custom domain remains unverified after DNS propagation.",
+      "action": "Re-check that root/www records exactly match Render's requested record type and value, and that old IONOS A/AAAA records are not still active."
+    },
+    {
+      "condition": "SSL certificate is pending on Render.",
+      "action": "Wait for Render certificate provisioning after domain verification; do not force manual deploy or runtime jobs."
+    }
+  ],
+  "rollbackPlan": [
+    "If the domain migration fails and the site must be restored quickly, revert the root/www DNS records in IONOS back to the old IONOS web-hosting A/AAAA targets.",
+    "Old IONOS root A: 217.160.0.47.",
+    "Old IONOS root AAAA: 2001:8d8:100f:f000::200.",
+    "Keep email/MX/SPF/DKIM/DMARC records unchanged during rollback.",
+    "After rollback, fimamacro.com will return to the stale IONOS-hosted website until the v1.0.127 public tree is uploaded there or DNS is moved again."
+  ],
+  "postChangeVerification": [
+    "Resolve fimamacro.com and www.fimamacro.com and confirm they no longer point to 217.160.0.47 / 2001:8d8:100f:f000::200.",
+    "Check HTTP headers for fimamacro.com and www.fimamacro.com; expect Render-related headers instead of Apache/IONOS.",
+    "Verify https://fimamacro.com/assets/fima-preview-v127.png?v=127 returns 200 image/png.",
+    "Verify root/pricing/terms/privacy/success/dashboard show the v1.0.127 website content.",
+    "Rerun Priority 2H read-only live website verification."
+  ],
+  "nextRecommendedStep": "Kaan should add fimamacro.com and www.fimamacro.com to Render fima-backend Custom Domains, copy the exact DNS values Render shows, then update only the matching root/www web-hosting DNS records in IONOS."
+}

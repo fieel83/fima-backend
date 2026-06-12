@@ -1,0 +1,63 @@
+{
+  "artifact": "live-website-static-qa",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "read-only live website/static QA; no DB writes, no Stripe calls, no admin runtime calls",
+  "renderBackendDeploy": {
+    "expectedCommit": "65f3634653d52fae945dcead7e0768ddbb5e85f8",
+    "staticCommitContained": "bcaff5d8450d46e47c5dd340be7e227e6c78ae98",
+    "liveApiCommit": "65f3634653d52fae945dcead7e0768ddbb5e85f8",
+    "apiVersionStatus": 200,
+    "healthzStatus": 200,
+    "healthzEnrichedNotRegressed": true
+  },
+  "primaryWebsiteDomain": {
+    "domain": "https://fimamacro.com",
+    "status": "stale website host/build still live",
+    "pages": [
+      { "url": "https://fimamacro.com/", "status": 200, "v126Referenced": true, "v127Referenced": false },
+      { "url": "https://fimamacro.com/pricing.html", "status": 200, "mojibakeDetected": true, "robuxButtons": 0, "giftButtonText": "mojibake gift icon text" },
+      { "url": "https://fimamacro.com/terms/", "status": 200, "oldCurrentPublicProductTextDetected": true },
+      { "url": "https://fimamacro.com/privacy/", "status": 200, "mojibakeDetected": false },
+      { "url": "https://fimamacro.com/success.html", "status": 200, "v126Referenced": true, "v127Referenced": false },
+      { "url": "https://fimamacro.com/dashboard.html", "status": 200, "mojibakeDetected": false }
+    ],
+    "ogImage": {
+      "url": "https://fimamacro.com/assets/fima-preview-v127.png?v=127",
+      "status": 404,
+      "dimensions": null
+    },
+    "uiBehavior": {
+      "loggedOutPayWithCard": "pass on stale live site; redirects/gates to register and does not open Stripe",
+      "loggedOutBuyGiftCode": "pass on stale live site; redirects/gates to register and does not open Stripe",
+      "robuxButton": "fail; no Robux buttons present on live fimamacro.com pricing page",
+      "mojibake": "fail; pricing gift buttons show mojibake text",
+      "staleLaunchText": "pass; no stale June 3 sale/counter text detected",
+      "oldPublicProductText": "fail; terms page still treats old product durations as current text",
+      "desktopOverflow": "pass; no pricing button overflow detected",
+      "mobile390Overflow": "pass; no pricing button or viewport overflow detected"
+    }
+  },
+  "backendStaticHostDiagnostic": {
+    "domain": "https://api.fimamacro.com",
+    "rootStatus": 200,
+    "pricingStatus": 200,
+    "v127Referenced": true,
+    "mojibakeDetected": false,
+    "ogImageUrl": "https://api.fimamacro.com/assets/fima-preview-v127.png?v=127",
+    "ogImageStatus": 200,
+    "ogImageLength": 114782,
+    "note": "The v1.0.127 static files are live on the backend/API host, but not on the primary website domain."
+  },
+  "runtimeMutationJobsExecuted": false,
+  "adminRuntimeCallsExecuted": false,
+  "stripeCallsExecuted": false,
+  "dbWritesExecuted": false,
+  "remainingIssues": [
+    "https://fimamacro.com is not serving the newly deployed backend repo public/ tree.",
+    "https://fimamacro.com/assets/fima-preview-v127.png?v=127 returns 404.",
+    "https://fimamacro.com pricing still has mojibake gift button text and no Robux modal buttons.",
+    "https://fimamacro.com terms still contains old current-product wording."
+  ],
+  "nextRecommendedStep": "Fix the primary website domain routing/deploy target so fimamacro.com serves the same v1.0.127 public tree as api.fimamacro.com, or deploy the public tree to the actual fimamacro.com host, then rerun Priority 2H."
+}

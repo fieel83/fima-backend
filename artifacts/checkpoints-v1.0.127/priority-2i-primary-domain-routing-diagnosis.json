@@ -1,0 +1,60 @@
+{
+  "checkpoint": "priority-2i-primary-domain-routing-diagnosis",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "currentProviderTargetFimamacroCom": {
+    "provider": "IONOS / 1&1 web hosting",
+    "server": "Apache",
+    "A": ["217.160.0.47"],
+    "AAAA": ["2001:8d8:100f:f000::200"],
+    "nameservers": [
+      "ns1123.ui-dns.biz",
+      "ns1110.ui-dns.com",
+      "ns1100.ui-dns.de",
+      "ns1101.ui-dns.org"
+    ]
+  },
+  "currentProviderTargetWwwFimamacroCom": {
+    "provider": "IONOS / 1&1 web hosting",
+    "server": "Apache",
+    "A": ["217.160.0.47"],
+    "AAAA": ["2001:8d8:100f:f000::200"]
+  },
+  "currentProviderTargetApiFimamacroCom": {
+    "provider": "Render backend service through Cloudflare edge",
+    "CNAMEChain": [
+      "fima-backend-aqmi.onrender.com",
+      "gcp-us-west1-1.origin.onrender.com",
+      "gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net"
+    ],
+    "A": ["216.24.57.9", "216.24.57.8"],
+    "server": "cloudflare",
+    "xRenderOriginServer": "Render"
+  },
+  "fimamacroComAttachedToBackendService": false,
+  "anotherServiceOwnsPrimaryDomain": true,
+  "httpHeaderComparison": {
+    "fimamacro.com": "200, Server Apache, stale v126 HTML, no x-render-origin-server",
+    "www.fimamacro.com": "200, Server Apache, stale v126 HTML, no x-render-origin-server",
+    "api.fimamacro.com": "200, Server cloudflare, x-render-origin-server Render, v127 HTML"
+  },
+  "liveAssetComparison": {
+    "fimamacro.com/assets/fima-preview-v127.png?v=127": "404 from Apache/IONOS",
+    "api.fimamacro.com/assets/fima-preview-v127.png?v=127": "200 image/png from Render",
+    "fimamacro.com/": "200 stale IONOS HTML with v126 reference",
+    "api.fimamacro.com/": "200 Render HTML with v127 reference"
+  },
+  "safestFixPlan": [
+    "If Render backend should serve the website, attach fimamacro.com and www.fimamacro.com to the fima-backend Render service and update IONOS DNS records to Render's required custom-domain targets.",
+    "If IONOS should remain the primary website host, deploy the v1.0.127 public tree to the IONOS web root.",
+    "If a separate static site/web service owns fimamacro.com, identify that service/repo and apply the v1.0.127 public tree there.",
+    "Do not treat this as a cache-only issue until routing/deploy target is corrected.",
+    "After fixing routing/deploy target, rerun Priority 2H live website verification."
+  ],
+  "runtimeMutationJobsExecuted": false,
+  "adminRuntimeCallsExecuted": false,
+  "stripeCallsExecuted": false,
+  "dbWritesExecuted": false,
+  "artifactPath": "artifacts/domain-routing-v1.0.127/primary-domain-routing-diagnosis.json",
+  "nextRecommendedStep": "Priority 2J: choose and apply the primary-domain hosting fix outside runtime flows, then rerun read-only live website verification."
+}

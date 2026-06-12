@@ -1,0 +1,63 @@
+{
+  "checkpoint": "priority-2j-render-ionos-domain-migration-plan",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "chosenPrimaryHostingTarget": "Render backend service fima-backend",
+  "domainsToAddToRender": [
+    "fimamacro.com",
+    "www.fimamacro.com"
+  ],
+  "oldIonosRecordsToRemoveOrReplace": [
+    {
+      "host": "fimamacro.com",
+      "type": "A",
+      "value": "217.160.0.47"
+    },
+    {
+      "host": "fimamacro.com",
+      "type": "AAAA",
+      "value": "2001:8d8:100f:f000::200"
+    },
+    {
+      "host": "www.fimamacro.com",
+      "type": "A/AAAA",
+      "value": "old IONOS web-hosting target if present"
+    }
+  ],
+  "recordsToKeep": [
+    "MX/email records",
+    "SPF",
+    "DKIM",
+    "DMARC",
+    "Email verification records",
+    "Unrelated DNS records",
+    "api.fimamacro.com CNAME to fima-backend-aqmi.onrender.com unless intentionally changing API routing"
+  ],
+  "dnsValuesRequiredFromRender": {
+    "fimamacro.com": "PLACEHOLDER: use exact Render Dashboard record type/value. Do not guess.",
+    "www.fimamacro.com": "PLACEHOLDER: use exact Render Dashboard record type/value. Do not guess."
+  },
+  "blockerConditions": [
+    "IONOS cannot create the Render-required apex/root record type.",
+    "Render domain verification does not pass after DNS propagation.",
+    "Render SSL certificate remains pending after domain verification.",
+    "A separate service or policy still owns fimamacro.com and blocks attaching it to fima-backend."
+  ],
+  "rollbackPlan": [
+    "Restore fimamacro.com A record to 217.160.0.47 if needed.",
+    "Restore fimamacro.com AAAA record to 2001:8d8:100f:f000::200 if needed.",
+    "Restore old www IONOS web-hosting target if it was replaced.",
+    "Do not touch MX/SPF/DKIM/DMARC/email records during rollback."
+  ],
+  "manualStepsSummary": [
+    "Render Dashboard -> fima-backend -> Settings -> Custom Domains -> add fimamacro.com and www.fimamacro.com.",
+    "Copy exact DNS record type/value Render shows for each domain.",
+    "IONOS -> Domains & SSL -> fimamacro.com -> DNS.",
+    "Replace only root/www old IONOS web-hosting records with Render-required records.",
+    "Keep email and unrelated records.",
+    "Wait for DNS propagation, Render verification, and SSL provisioning.",
+    "Rerun Priority 2H read-only live verification."
+  ],
+  "artifactPath": "artifacts/domain-routing-v1.0.127/primary-domain-render-ionos-migration-plan.json",
+  "nextRecommendedStep": "Kaan should perform the manual Render custom-domain and IONOS DNS updates using the exact DNS values shown by Render, then request Priority 2K/2H rerun for live verification."
+}

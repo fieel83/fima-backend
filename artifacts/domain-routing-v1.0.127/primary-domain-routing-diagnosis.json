@@ -1,0 +1,121 @@
+{
+  "artifact": "primary-domain-routing-diagnosis",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "read-only primary domain routing/deploy target diagnosis; no edits, no deploy, no Stripe calls, no admin runtime calls, no DB writes",
+  "summary": {
+    "primaryDomainTarget": "IONOS / 1&1 web hosting on Apache",
+    "wwwDomainTarget": "IONOS / 1&1 web hosting on Apache",
+    "apiDomainTarget": "Render backend service via fima-backend-aqmi.onrender.com",
+    "likelyCause": "fimamacro.com and www.fimamacro.com are not routed to the Render backend service that now contains the v1.0.127 public tree. They still point to IONOS hosting with stale static files."
+  },
+  "dns": {
+    "fimamacro.com": {
+      "A": ["217.160.0.47"],
+      "AAAA": ["2001:8d8:100f:f000::200"],
+      "providerSignal": "IONOS / 1&1",
+      "nameservers": [
+        "ns1123.ui-dns.biz",
+        "ns1110.ui-dns.com",
+        "ns1100.ui-dns.de",
+        "ns1101.ui-dns.org"
+      ],
+      "soaPrimary": "ns1110.ui-dns.com",
+      "soaAdmin": "hostmaster.1und1.com"
+    },
+    "www.fimamacro.com": {
+      "A": ["217.160.0.47"],
+      "AAAA": ["2001:8d8:100f:f000::200"],
+      "providerSignal": "IONOS / 1&1"
+    },
+    "api.fimamacro.com": {
+      "CNAMEChain": [
+        "fima-backend-aqmi.onrender.com",
+        "gcp-us-west1-1.origin.onrender.com",
+        "gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net"
+      ],
+      "A": ["216.24.57.9", "216.24.57.8"],
+      "providerSignal": "Render through Cloudflare edge"
+    }
+  },
+  "renderCustomDomainAttachment": {
+    "fimamacro.comAttachedToBackend": "no or DNS not configured to backend; live DNS/headers do not route to Render",
+    "wwwAttachedToBackend": "no or DNS not configured to backend; live DNS/headers do not route to Render",
+    "apiAttachedToBackend": "yes; api.fimamacro.com resolves to fima-backend-aqmi.onrender.com and serves the deployed backend/static files",
+    "renderDashboardChecked": "not directly accessible from shell without credentials; diagnosis is based on DNS, HTTP headers, and live asset behavior"
+  },
+  "httpHeaderComparison": {
+    "https://fimamacro.com/": {
+      "status": 200,
+      "server": "Apache",
+      "contentType": "text/html",
+      "lastModified": "Thu, 11 Jun 2026 19:08:47 GMT",
+      "hasV126Reference": true,
+      "hasV127Reference": false,
+      "providerSignal": "IONOS Apache"
+    },
+    "https://www.fimamacro.com/": {
+      "status": 200,
+      "server": "Apache",
+      "contentType": "text/html",
+      "lastModified": "Thu, 11 Jun 2026 19:08:47 GMT",
+      "hasV126Reference": true,
+      "hasV127Reference": false,
+      "providerSignal": "IONOS Apache"
+    },
+    "https://api.fimamacro.com/": {
+      "status": 200,
+      "server": "cloudflare",
+      "xRenderOriginServer": "Render",
+      "contentType": "text/html; charset=UTF-8",
+      "lastModified": "Fri, 12 Jun 2026 12:59:33 GMT",
+      "hasV126Reference": false,
+      "hasV127Reference": true,
+      "providerSignal": "Render"
+    }
+  },
+  "liveAssetComparison": {
+    "https://fimamacro.com/assets/fima-preview-v127.png?v=127": {
+      "status": 404,
+      "server": "Apache",
+      "providerSignal": "IONOS Apache",
+      "dimensions": null
+    },
+    "https://api.fimamacro.com/assets/fima-preview-v127.png?v=127": {
+      "status": 200,
+      "server": "cloudflare",
+      "xRenderOriginServer": "Render",
+      "contentType": "image/png",
+      "length": 114782,
+      "providerSignal": "Render"
+    },
+    "https://fimamacro.com/": {
+      "status": 200,
+      "providerSignal": "IONOS Apache",
+      "servesV127PublicTree": false
+    },
+    "https://api.fimamacro.com/": {
+      "status": 200,
+      "providerSignal": "Render",
+      "servesV127PublicTree": true
+    }
+  },
+  "ownershipDiagnosis": {
+    "fimamacroComAttachedToBackendService": false,
+    "apiFimamacroComAttachedToBackendService": true,
+    "anotherServiceOwnsPrimaryDomain": true,
+    "likelyPrimaryDomainHost": "IONOS web hosting / Apache document root",
+    "cacheOnlyIssue": false,
+    "reasonCacheOnlyIssueUnlikely": "DNS for fimamacro.com/www resolves to IONOS IPs and headers show Apache, while api.fimamacro.com resolves to Render and serves v127 immediately."
+  },
+  "safestFixPlan": [
+    "Do not run runtime jobs or Stripe/admin actions.",
+    "Decide desired hosting model for fimamacro.com.",
+    "If the backend Render service should serve the website, attach fimamacro.com and www.fimamacro.com as custom domains on the fima-backend Render service, then update IONOS DNS records away from 217.160.0.47 / 2001:8d8:100f:f000::200 to the Render-provided targets.",
+    "If IONOS should continue serving the primary website, upload/deploy the v1.0.127 public tree to the IONOS web root instead of relying on the backend repo.",
+    "If a separate website service exists outside this shell, identify its repo/service and apply the v1.0.127 public tree there.",
+    "After DNS/deploy change, verify fimamacro.com root, pricing, terms, privacy, success, dashboard, and /assets/fima-preview-v127.png?v=127 again.",
+    "Purge IONOS/CDN/browser cache only after the routing/deploy target is correct; cache purge alone will not fix DNS pointing to the wrong host."
+  ],
+  "nextRecommendedStep": "Priority 2J: choose hosting target and either move fimamacro.com/www DNS to the Render backend service or deploy the v1.0.127 public tree to the current IONOS web root, then rerun live verification."
+}

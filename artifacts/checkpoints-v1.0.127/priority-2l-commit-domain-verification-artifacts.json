@@ -1,0 +1,30 @@
+{
+  "checkpoint": "priority-2l-commit-domain-verification-artifacts",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "commitHash": "PENDING",
+  "pushed": false,
+  "filesCommitted": [
+    "artifacts/backend-live-v1.0.127/post-website-deploy-api-version.json",
+    "artifacts/backend-live-v1.0.127/post-website-deploy-healthz.json",
+    "artifacts/checkpoints-v1.0.127/priority-2h-live-website-verify.json",
+    "artifacts/checkpoints-v1.0.127/priority-2i-primary-domain-routing-diagnosis.json",
+    "artifacts/checkpoints-v1.0.127/priority-2j-render-ionos-domain-migration-plan.json",
+    "artifacts/checkpoints-v1.0.127/priority-2k-live-domain-website-verify.json",
+    "artifacts/checkpoints-v1.0.127/priority-2l-commit-domain-verification-artifacts.json",
+    "artifacts/domain-routing-v1.0.127/primary-domain-render-ionos-migration-plan.json",
+    "artifacts/domain-routing-v1.0.127/primary-domain-routing-diagnosis.json",
+    "artifacts/frontend-cache-v1.0.127/live-website-static-qa.json"
+  ],
+  "secretScanResult": {
+    "status": "pass",
+    "findings": [],
+    "notes": [
+      "Broad FIMA-shaped token scan matched only public brand/filename strings; no license keys or secret values found.",
+      "Deploy hook scan matched phrase-only documentation; no deploy hook URL found."
+    ]
+  },
+  "deployStatus": "not manually deployed; Render Auto-Deploy is on commit, so an artifact-only auto-deploy may start after push",
+  "remainingIssues": [],
+  "nextRecommendedStep": "Proceed to the next planned read-only release checkpoint; keep runtime mutation jobs blocked until a database backup/export is available."
+}

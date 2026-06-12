@@ -1,0 +1,135 @@
+{
+  "checkpoint": "priority-2k-live-domain-website-verify",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "read-only live website verification after domain migration; no DB writes, no Stripe calls, no admin runtime calls",
+  "certificateStatus": {
+    "fimamacro.com": {
+      "status": "Certificate Issued / TLS usable",
+      "tlsOk": true,
+      "subject": "CN=fimamacro.com",
+      "issuer": "Google Trust Services WE1"
+    },
+    "www.fimamacro.com": {
+      "status": "Certificate Issued / TLS usable",
+      "tlsOk": true,
+      "subject": "CN=www.fimamacro.com",
+      "issuer": "Google Trust Services WE1",
+      "redirectTarget": "https://fimamacro.com/"
+    },
+    "api.fimamacro.com": {
+      "status": "Certificate Issued / TLS usable",
+      "tlsOk": true,
+      "subject": "CN=api.fimamacro.com",
+      "issuer": "Google Trust Services WE1"
+    }
+  },
+  "dnsStatus": {
+    "fimamacro.com": {
+      "A": ["216.24.57.1"],
+      "providerSignal": "Render apex target"
+    },
+    "www.fimamacro.com": {
+      "CNAMEChain": [
+        "fima-backend-aqmi.onrender.com",
+        "gcp-us-west1-1.origin.onrender.com",
+        "gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net"
+      ],
+      "providerSignal": "Render backend service"
+    },
+    "api.fimamacro.com": {
+      "CNAMEChain": [
+        "fima-backend-aqmi.onrender.com",
+        "gcp-us-west1-1.origin.onrender.com",
+        "gcp-us-west1-1.origin.onrender.com.cdn.cloudflare.net"
+      ],
+      "providerSignal": "Render backend service"
+    }
+  },
+  "primaryDomainStatus": {
+    "url": "https://fimamacro.com/",
+    "status": 200,
+    "server": "cloudflare",
+    "xRenderOriginServer": "Render",
+    "staleIonosContent": false,
+    "hasV126Preview": false,
+    "hasV127Preview": true,
+    "mojibakeDetected": false
+  },
+  "wwwRedirectStatus": {
+    "url": "https://www.fimamacro.com/",
+    "status": 200,
+    "redirectTarget": "https://fimamacro.com/",
+    "redirectOk": true
+  },
+  "apiEndpointStatus": {
+    "https://fimamacro.com/api/version": {
+      "status": 200,
+      "commit": "65f3634653d52fae945dcead7e0768ddbb5e85f8",
+      "buildTime": "2026-06-12T14:38:51.401Z"
+    },
+    "https://fimamacro.com/healthz": {
+      "status": 200,
+      "commit": "65f3634653d52fae945dcead7e0768ddbb5e85f8",
+      "buildTime": "2026-06-12T14:38:51.401Z",
+      "enrichedNotRegressed": true
+    },
+    "https://api.fimamacro.com/api/version": {
+      "status": 200,
+      "commit": "65f3634653d52fae945dcead7e0768ddbb5e85f8",
+      "buildTime": "2026-06-12T14:38:51.401Z"
+    },
+    "https://api.fimamacro.com/healthz": {
+      "status": 200,
+      "commit": "65f3634653d52fae945dcead7e0768ddbb5e85f8",
+      "buildTime": "2026-06-12T14:38:51.401Z",
+      "enrichedNotRegressed": true
+    }
+  },
+  "ogImageStatus": {
+    "url": "https://fimamacro.com/assets/fima-preview-v127.png?v=127",
+    "status": 200,
+    "contentType": "image/png",
+    "width": 1200,
+    "height": 630,
+    "length": 114782
+  },
+  "websiteUiStatus": {
+    "home": "pass; Render/v127 content, no mojibake, no v126 preview, no stale IONOS content",
+    "pricing": {
+      "status": "pass",
+      "currentProductsOnly": true,
+      "checkoutButtons": 3,
+      "robuxButtons": 3,
+      "giftButtons": [
+        "Buy Gift Code",
+        "Buy Gift Code",
+        "Buy Gift Code"
+      ],
+      "mojibakeDetected": false,
+      "v126PreviewDetected": false,
+      "staleJuneSaleCounterDetected": false,
+      "oldPublicProductTextDetected": false
+    },
+    "terms": "pass; no mojibake and no old products advertised as current purchase options",
+    "privacy": "pass",
+    "success": "pass; no mojibake, no v126 preview, v127 preview present",
+    "dashboardStaticShell": "pass; accessible. A referral reward sentence mentions 15 days of Fima access, but this is not public product pricing text.",
+    "loggedOutPayWithCard": "pass; gates to register and does not open Stripe",
+    "loggedOutBuyGiftCode": "pass; gates to register and does not open Stripe",
+    "robuxManualModal": "pass; manual Discord/ticket modal appears, no automatic Stripe checkout text present, no submit/write form present",
+    "mobile390": {
+      "status": "pass",
+      "viewportOverflow": false,
+      "buttonOverflow": false,
+      "mojibakeDetected": false,
+      "robuxButtons": 3
+    }
+  },
+  "runtimeMutationJobsExecuted": false,
+  "adminRuntimeCallsExecuted": false,
+  "stripeCallsExecuted": false,
+  "dbWritesExecuted": false,
+  "remainingIssues": [],
+  "nextRecommendedStep": "Priority 2L: commit the latest verification/domain-routing artifacts, then proceed to the next planned read-only QA or release checkpoint."
+}
