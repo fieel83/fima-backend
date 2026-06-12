@@ -1,0 +1,76 @@
+{
+  "checkpoint": "priority-2g-integrate-website-public-into-backend-repo",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "renderSourceEvidence": {
+    "source": "https://github.com/fieel83/fima-backend",
+    "branch": "main",
+    "rootDirectory": "repo root",
+    "buildCommand": "npm install && npm run prisma:generate && npm run prisma:deploy",
+    "startCommand": "npm start",
+    "autoDeploy": "On Commit"
+  },
+  "backendStaticServingResult": {
+    "servedBeforeChange": false,
+    "repoPublicFolderBeforeChange": false,
+    "servedAfterChange": true,
+    "details": "src/server.js now mounts express.static(publicDir, { extensions: [\"html\"] }) before the JSON 404 handler. API/admin/Stripe routes remain registered before static serving."
+  },
+  "filesDirsCopied": {
+    "source": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/public",
+    "destination": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo/public",
+    "fileCount": 69,
+    "included": [
+      "public/assets/fima-preview-v127.png",
+      "public/assets/js/app.js",
+      "public/assets/js/account.js",
+      "public/assets/js/success.js",
+      "public/assets/css/styles.css",
+      "public/terms/index.html",
+      "public/privacy/index.html",
+      "public HTML pages with OG/Twitter v127 meta",
+      "public/assets/images",
+      "public/assets/videos"
+    ],
+    "excluded": [
+      ".env",
+      ".env.*",
+      ".git",
+      "node_modules",
+      ".vscode",
+      ".idea",
+      "*.pem",
+      "*.key",
+      "*.p12",
+      "*.pfx",
+      "public/assets/fima-preview-v126.png"
+    ]
+  },
+  "staticChecksResult": {
+    "mojibake": "pass; no matches for ð, Ã, Ä, or �",
+    "fimaPreviewV126": "pass; no content references and no fima-preview-v126 file in backend repo public tree",
+    "publicStripePrice1Day": "pass; no STRIPE_PRICE_1DAY matches in public",
+    "staleLaunchSaleCounter": "pass; no stale launch sale/counter text matches",
+    "oldPublicProducts": "pass with allowed legacy-only labels in public/assets/js/success.js",
+    "jsSyntax": "pass; node --check public/assets/js/app.js, account.js, success.js, and src/server.js",
+    "copySafety": "pass; no .env, .git, node_modules, key/cert files copied; only placeholder-shaped FIMA examples were found, not real license values"
+  },
+  "ogImage": {
+    "path": "public/assets/fima-preview-v127.png",
+    "width": 1200,
+    "height": 630,
+    "format": "png"
+  },
+  "commitHash": "bcaff5d8450d46e47c5dd340be7e227e6c78ae98",
+  "pushed": true,
+  "deployStatus": "auto-deploy may start after push; manual deploy not triggered",
+  "runtimeMutationJobsExecuted": false,
+  "adminRuntimeCallsExecuted": false,
+  "stripeCallsExecuted": false,
+  "dbWritesExecuted": false,
+  "remainingIssues": [
+    "No manual deploy was triggered.",
+    "Render auto-deploy is expected to build from main after push because Auto-Deploy is On Commit."
+  ],
+  "nextRecommendedStep": "Priority 2H: wait for Render auto-deploy for the pushed commit, then verify live website pages and /api health/version without running admin runtime jobs or Stripe calls."
+}
