@@ -1,0 +1,138 @@
+{
+  "updatedAt": "2026-06-05",
+  "videos": [
+    {
+      "id": "normal-supa",
+      "name": "Normal Supa",
+      "file": "normal-supa.mp4",
+      "description": "Supa route preview with the in-app timing flow shown as a clean loop.",
+      "meta": "Supa preview"
+    },
+    {
+      "id": "fastgarou-1-3",
+      "name": "FastGarou 1&3",
+      "file": "fastgarou-1-3.mp4",
+      "description": "FastGarou sequence preview focused on quick activation timing and repeatable movement.",
+      "meta": "FastGarou preview"
+    },
+    {
+      "id": "kyoto",
+      "name": "Kyoto",
+      "file": "kyoto.mp4",
+      "description": "Kyoto execution sample for users who want to see the profile before binding it.",
+      "meta": "Kyoto preview"
+    },
+    {
+      "id": "kakyo-tech",
+      "name": "Kakyo Tech",
+      "file": "kakyo-tech.mp4",
+      "description": "Kakyo Tech execution sample for checking jump uppercut timing before binding the profile.",
+      "meta": "Kakyo preview"
+    },
+    {
+      "id": "normal-void",
+      "name": "Normal Void",
+      "file": "normal-void.mp4",
+      "description": "Void Tech route shown with the same looped preview behavior used inside the macro section.",
+      "meta": "Void preview"
+    },
+    {
+      "id": "no-shiftlock-void",
+      "name": "No Shiftlock Void",
+      "file": "no-shiftlock-void.mp4",
+      "description": "No-shiftlock Void example for setups that avoid shiftlock during execution.",
+      "meta": "No-shiftlock preview"
+    },
+    {
+      "id": "emote-bdc",
+      "name": "Emote BDC",
+      "file": "emote-bdc.mp4",
+      "description": "Backdash cancel preview built around a fast emote-based activation flow.",
+      "meta": "BDC preview"
+    },
+    {
+      "id": "10tiles",
+      "name": "10Tiles",
+      "file": "10tiles.mp4",
+      "description": "10Tiles movement sample for checking spacing, direction and execution timing.",
+      "meta": "10Tiles preview"
+    },
+    {
+      "id": "true-downslam",
+      "name": "True Downslam",
+      "file": "true-downslam.mp4",
+      "description": "Timed downslam route preview for users comparing the drop timing before binding.",
+      "meta": "Downslam preview"
+    },
+    {
+      "id": "side-dash-cancel",
+      "name": "Side Dash Cancel",
+      "file": "side-dash-cancel.mp4",
+      "description": "Side movement cancel clip with a compact route and quick profile activation.",
+      "meta": "Side dash preview"
+    },
+    {
+      "id": "lethal-dash",
+      "name": "Lethal Dash",
+      "file": "lethal-dash.mp4",
+      "description": "Lethal dash route sample for checking the follow-up rhythm before using the profile.",
+      "meta": "Lethal preview"
+    },
+    {
+      "id": "loop-dash",
+      "name": "Loop Dash",
+      "file": "loop-dash.mp4",
+      "description": "Loop Dash preview for repeat dash behavior and movement timing.",
+      "meta": "Loop preview"
+    },
+    {
+      "id": "backdash-cancel-1",
+      "name": "Backdash Cancel 1",
+      "file": "backdash-cancel-1.mp4",
+      "description": "First backdash cancel variant with ping-based timing shown in motion.",
+      "meta": "BDC 1 preview"
+    },
+    {
+      "id": "backdash-cancel-2",
+      "name": "Backdash Cancel 2",
+      "file": "backdash-cancel-2.mp4",
+      "description": "Second backdash cancel variant for comparing route timing.",
+      "meta": "BDC 2 preview"
+    },
+    {
+      "id": "backdash-cancel-3",
+      "name": "Backdash Cancel 3",
+      "file": "backdash-cancel-3.mp4",
+      "description": "Third backdash cancel variant for profile preview and setup confidence.",
+      "meta": "BDC 3 preview"
+    },
+    {
+      "id": "backdash-cancel-4",
+      "name": "Backdash Cancel 4",
+      "file": "backdash-cancel-4.mp4",
+      "description": "Fourth backdash cancel variant with the same in-app tutorial style.",
+      "meta": "BDC 4 preview"
+    },
+    {
+      "id": "instant-twisted",
+      "name": "Instant Twisted",
+      "file": "instant-twisted.mp4",
+      "description": "Instant Twisted preview using the updated ping-aware turn timing.",
+      "meta": "Twisted preview"
+    },
+    {
+      "id": "shove-m1-reset",
+      "name": "Shove M1 Reset",
+      "file": "shove-m1-reset.mp4",
+      "description": "Shove reset preview showing the macro flow before activation.",
+      "meta": "Shove preview"
+    },
+    {
+      "id": "3-m1-resets",
+      "name": "3 M1 Resets",
+      "file": "3-m1-resets.mp4",
+      "description": "3 M1 reset tutorial clip for the macro library and site preview.",
+      "meta": "3M1 preview"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+RewriteEngine On
+RewriteRule ^auth/roblox/callback/?$ /auth/roblox-callback.html [L]
+RewriteRule ^privacy/?$ /privacy/index.html [L]
+RewriteRule ^terms/?$ /terms/index.html [L]

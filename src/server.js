@@ -2,6 +2,7 @@ import "dotenv/config";
 import { execSync } from "node:child_process";
 import crypto from "node:crypto";
 import dns from "node:dns/promises";
+import path from "node:path";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -47,6 +48,7 @@ import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState,
 
 const app = express();
 const port = Number(env("PORT", "8080"));
+const publicDir = path.resolve("public");
 const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
@@ -3392,6 +3394,7 @@ async function cleanupExpiredMonthlyTrials() {
   }
 }
 
+app.use(express.static(publicDir, { extensions: ["html"] }));
 app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 
 app.listen(port, () => {

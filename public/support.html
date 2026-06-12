@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en" data-theme="violet-dragon">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Fima Macro is a premium macro app with ping-aware timing, setup scaling, license access and clean macro profiles.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Fima Macro">
+    <meta property="og:title" content="Fima Macro | Premium Macro App">
+    <meta property="og:description" content="Premium Roblox macro app with setup-aware timing, clean licenses, 1-day free trial, monthly access and lifetime access.">
+    <meta property="og:url" content="https://fimamacro.com/">
+    <meta property="og:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Fima Macro | Premium Macro App">
+    <meta name="twitter:description" content="Premium Roblox macro app with setup-aware timing, clean licenses, 1-day free trial, monthly access and lifetime access.">
+    <meta name="twitter:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
+    <meta name="description" content="Fima Macro is a premium macro app for clean timing, ping-aware profiles, resolution scaling, sensitivity scaling and simple license-ready access.">
+    <meta name="theme-color" content="#090812">
+    <title>Fima Macro | Premium Macro App</title>
+    <link rel="icon" href="assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260603-2">
+  </head>
+  <body data-page="support">
+    <canvas id="ambientCanvas" aria-hidden="true"></canvas>
+    <a class="skip-link" href="#main" data-i18n="accessibility.skip">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <div class="nav-shell">
+        <a class="brand" href="index.html" aria-label="Fima Macro home">
+          <img class="brand-logo" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="44" height="44">
+          <span>Fima Macro</span>
+        </a>
+
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="siteMenu" data-menu-toggle>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span class="sr-only" data-i18n="accessibility.menu">Open menu</span>
+        </button>
+
+        <nav class="site-menu" id="siteMenu" aria-label="Primary navigation" data-menu>
+          <a href="index.html" data-page-link="home" data-i18n="nav.home">Home</a>
+          <a href="macros.html" data-page-link="macros" data-i18n="nav.macros">Macros</a>
+          <a href="features.html" data-page-link="features" data-i18n="nav.features">Features</a>
+          <a href="pricing.html" data-page-link="pricing" data-i18n="nav.pricing">Pricing</a>
+          <a href="download.html" data-page-link="download" data-i18n="nav.download">Download</a>
+          <a href="faq.html" data-page-link="faq" data-i18n="nav.faq">FAQ</a>
+          <a href="support.html" data-page-link="support" data-i18n="nav.support">Support</a>
+          <a href="dashboard.html" data-page-link="dashboard" data-i18n="nav.dashboard">Dashboard</a>
+        </nav>
+
+        <div class="nav-controls" aria-label="Site preferences">
+          <div class="select-wrap custom-select" data-custom-select="themeSelect">
+            <span class="sr-only" data-i18n="controls.theme">Theme</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>Violet Dragon</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="violet-dragon">Violet Dragon</button>
+              <button type="button" role="option" data-value="royal-nebula">Royal Nebula</button>
+              <button type="button" role="option" data-value="amethyst-smoke">Amethyst Smoke</button>
+              <button type="button" role="option" data-value="spider-venom">Spider Venom</button>
+              <button type="button" role="option" data-value="crimson-void">Crimson Void</button>
+              <button type="button" role="option" data-value="ice-phantom">Ice Phantom</button>
+              <button type="button" role="option" data-value="emerald-matrix">Emerald Matrix</button>
+            </div>
+            <select id="themeSelect" class="native-select" aria-label="Theme selector" tabindex="-1">
+              <option value="violet-dragon">Violet Dragon</option>
+              <option value="royal-nebula">Royal Nebula</option>
+              <option value="amethyst-smoke">Amethyst Smoke</option>
+              <option value="spider-venom">Spider Venom</option>
+              <option value="crimson-void">Crimson Void</option>
+              <option value="ice-phantom">Ice Phantom</option>
+              <option value="emerald-matrix">Emerald Matrix</option>
+            </select>
+          </div>
+          <div class="select-wrap custom-select compact" data-custom-select="languageSelect">
+            <span class="sr-only" data-i18n="controls.language">Language</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>EN</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="en">EN</button>
+              <button type="button" role="option" data-value="tr">TR</button>
+              <button type="button" role="option" data-value="de">DE</button>
+              <button type="button" role="option" data-value="fr">FR</button>
+              <button type="button" role="option" data-value="bs">BS</button>
+            </div>
+            <select id="languageSelect" class="native-select" aria-label="Language selector" tabindex="-1">
+              <option value="en">EN</option>
+              <option value="tr">TR</option>
+              <option value="de">DE</option>
+              <option value="fr">FR</option>
+              <option value="bs">BS</option>
+            </select>
+          </div>
+          <div class="select-wrap custom-select compact currency-control" data-custom-select="currencySelect">
+            <span class="sr-only" data-i18n="controls.currency">Currency</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>USD</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="USD">USD</button>
+              <button type="button" role="option" data-value="EUR">EUR</button>
+              <button type="button" role="option" data-value="TRY">TRY</button>
+              <button type="button" role="option" data-value="GBP">GBP</button>
+            </div>
+            <select id="currencySelect" class="native-select" aria-label="Currency selector" tabindex="-1">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="TRY">TRY</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <a class="nav-cta" href="pricing.html" data-i18n="nav.cta">Buy Now</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero section" id="home">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">
+              <span class="pulse-dot"></span>
+              <span data-i18n="hero.eyebrow">Fima Macro for TSBG</span>
+            </p>
+            <h1 data-i18n="hero.title">Precision macros built around your setup.</h1>
+            <p class="hero-lead" data-i18n="hero.description">
+              Fima Macro aligns clean movement timing with ping-aware profiles, resolution scaling and sensitivity-based values for smoother execution in TSBG.
+            </p>
+            <div class="hero-actions">
+              <a class="button primary" href="pricing.html" data-i18n="hero.primaryCta">Get Fima Macro</a>
+              <a class="button secondary" href="https://discord.gg/JnEcaNmutd" data-discord-link data-i18n="hero.secondaryCta">Join Discord</a>
+            </div>
+            <div class="stat-strip" id="heroStats" aria-label="Fima Macro highlights"></div>
+          </div>
+
+          <div class="hero-visual" aria-label="Fima Macro interface preview">
+            <div class="app-preview-card">
+              <div class="app-preview-header">
+                <img src="assets/images/fima-logo.png?v=20260526-2" alt="" width="46" height="46">
+                <div>
+                  <strong>FIMA MACRO STUDIO</strong>
+                  <span data-i18n="mockup.realPreview">Real app home preview</span>
+                </div>
+                <span class="version-pill" id="previewVersion">v1.x</span>
+              </div>
+              <img class="app-preview-image" src="assets/images/fima-full-home.png?v=20260530-1" alt="Fima Macro Studio full home dashboard preview">
+              <div class="app-preview-caption">
+                <span data-i18n="mockup.scaleTitle">Setup scaling</span>
+                <p data-i18n="mockup.scaleText">Timing and movement values adapt from the base profile to your screen and sensitivity.</p>
+              </div>
+            </div>
+            <div class="floating-card card-one">
+              <span data-i18n="hero.floatOneLabel">License</span>
+              <strong>HWID lock</strong>
+            </div>
+            <div class="floating-card card-two">
+              <span data-i18n="hero.floatTwoLabel">Updater</span>
+              <strong>Manifest ready</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-band" id="macros">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="macros.eyebrow">Macro library</p>
+          <h2 data-i18n="macros.title">Fast access to the techs players actually use.</h2>
+          <p data-i18n="macros.description">Every card is designed as a clean profile target, ready for keybind-based activation and future license-controlled delivery.</p>
+        </div>
+        <div class="macro-grid" id="macroGrid"></div>
+        <div class="macro-showcase">
+          <div class="macro-video-panel">
+            <div class="showcase-topline">
+              <span data-i18n="showcase.videoLabel">Macro execution demo</span>
+              <strong id="macroVideoMeta">Supa preview</strong>
+            </div>
+            <video class="macro-demo-video" id="macroVideo" autoplay muted loop playsinline preload="auto">
+              <source id="macroVideoSource" src="assets/videos/normal-supa.mp4?v=20260530-1" type="video/mp4">
+            </video>
+          </div>
+          <div class="macro-showcase-copy">
+            <p class="eyebrow" data-i18n="showcase.eyebrow">Live macro preview</p>
+            <h3 data-i18n="showcase.title">Choose a macro and watch the execution.</h3>
+            <p data-i18n="showcase.description">Each preview is loaded from the public video manifest, so new clips can be added without rebuilding the page layout.</p>
+            <div class="macro-video-current">
+              <span data-i18n="showcase.currentLabel">Now playing</span>
+              <strong id="macroVideoTitle">Normal Supa</strong>
+              <p id="macroVideoDescription">Supa route preview with the in-app timing flow shown as a clean loop.</p>
+            </div>
+            <div class="macro-video-list" id="macroVideoList" aria-label="Macro video selector"></div>
+            <div class="showcase-mini-card">
+              <span data-i18n="showcase.sideTitle">Profiles and binds</span>
+              <p data-i18n="showcase.sideText">The Macros page keeps active profiles, grouped variants, keybinds and timing controls in one focused view.</p>
+            </div>
+          </div>
+        </div>
+        <div class="upcoming-block">
+          <div class="section-heading">
+            <p class="eyebrow" data-i18n="upcoming.eyebrow">Coming soon</p>
+            <h2 data-i18n="upcoming.title">Next macro profiles already have room in the system.</h2>
+            <p data-i18n="upcoming.description">These profiles are planned as locked or upcoming variants inside the app direction.</p>
+          </div>
+          <div class="upcoming-grid" id="upcomingGrid"></div>
+        </div>
+      </section>
+
+      <section class="section ui-tour-section" id="app-preview">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="tour.eyebrow">App walkthrough</p>
+          <h2 data-i18n="tour.title">Pick a screen and watch the UI slide into place.</h2>
+          <p data-i18n="tour.description">These are full app captures from Fima Macro Studio, not cropped mockups.</p>
+        </div>
+        <div class="ui-tour-shell">
+          <div class="ui-tour-controls" id="uiTourControls" aria-label="Fima Macro app screen selector"></div>
+          <div class="ui-tour-display">
+            <img id="uiTourImage" src="assets/images/fima-full-home.png?v=20260530-1" alt="Fima Macro Studio home screenshot">
+            <div class="ui-tour-caption">
+              <h3 id="uiTourTitle">Macro control studio</h3>
+              <p id="uiTourDescription">Dashboard, macro power, activity and live status in one full app window.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="features">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="features.eyebrow">Core system</p>
+          <h2 data-i18n="features.title">Built to adapt timing and movement values to your setup.</h2>
+          <p data-i18n="features.description">Fima Macro is structured around ping, resolution and sensitivity so profiles can stay consistent across different players and screens.</p>
+        </div>
+        <div class="feature-grid" id="featureGrid"></div>
+      </section>
+
+      <section class="section section-band pricing-section" id="pricing">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="pricing.eyebrow">Pricing</p>
+          <h2 data-i18n="pricing.title">Pick the access window that fits your grind.</h2>
+          <p data-i18n="pricing.description">Prices are displayed in your selected currency for clarity. Checkout currently runs through Stripe in USD.</p>
+        </div>
+        <div class="pricing-grid" id="pricingGrid"></div>
+        <p class="pricing-note" data-i18n="pricing.note">Purchases create a time-based Fima Macro license automatically after Stripe confirms payment.</p>
+      </section>
+
+      <section class="section split-section" id="download">
+        <div class="section-heading left">
+          <p class="eyebrow" data-i18n="download.eyebrow">Download</p>
+          <h2 data-i18n="download.title">Download unlocks after checkout.</h2>
+          <p data-i18n="download.description">Fima Macro downloads are delivered from your license page after Stripe creates an active license.</p>
+          <div class="download-actions">
+            <a class="button primary" id="downloadButton" href="pricing.html" data-i18n="download.primaryCta">Buy license to download</a>
+            <a class="button secondary" href="https://discord.gg/JnEcaNmutd" data-discord-link data-i18n="download.secondaryCta">Setup Help</a>
+          </div>
+        </div>
+        <div class="download-panel">
+          <div class="download-row">
+            <span data-i18n="download.latest">Latest version</span>
+            <strong id="latestVersion" data-i18n="download.versionFallback">Manifest check pending</strong>
+          </div>
+          <div class="download-row">
+            <span data-i18n="download.platform">Platform</span>
+            <strong>Windows</strong>
+          </div>
+          <div class="download-row">
+            <span data-i18n="download.updater">Auto updater</span>
+            <strong data-i18n="download.updaterValue">Supported</strong>
+          </div>
+          <div class="download-row">
+            <span data-i18n="download.support">Support</span>
+            <strong>Discord</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="section dashboard-section" id="dashboard">
+        <div class="dashboard-copy">
+          <p class="eyebrow" data-i18n="dashboard.eyebrow">Dashboard preview</p>
+          <h2 data-i18n="dashboard.title">License management will live here after backend integration.</h2>
+          <p data-i18n="dashboard.description">This placeholder shows the planned direction: license login, plan info, expiry date, HWID reset requests, downloads and support links.</p>
+        </div>
+        <div class="dashboard-card" aria-label="License dashboard placeholder">
+          <div class="license-form">
+            <label for="licenseKey" data-i18n="dashboard.inputLabel">License key</label>
+            <input id="licenseKey" type="text" placeholder="FIMA-XXXX-XXXX-XXXX" disabled>
+            <button type="button" disabled data-i18n="dashboard.button">License system coming soon</button>
+          </div>
+          <div class="dashboard-list">
+            <div>
+              <span data-i18n="dashboard.plan">Plan</span>
+              <strong data-i18n="dashboard.planValue">Backend required</strong>
+            </div>
+            <div>
+              <span data-i18n="dashboard.hwid">HWID</span>
+              <strong data-i18n="dashboard.hwidValue">Reset requests planned</strong>
+            </div>
+            <div>
+              <span data-i18n="dashboard.access">Download access</span>
+              <strong data-i18n="dashboard.accessValue">Connected after login</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-band" id="faq">
+        <div class="section-heading">
+          <p class="eyebrow">FAQ</p>
+          <h2 data-i18n="faq.title">Common questions before buying.</h2>
+          <p data-i18n="faq.description">Short, clear answers about access, updates, licenses, refunds and the move away from SellAuth.</p>
+        </div>
+        <div class="faq-list" id="faqList"></div>
+      </section>
+
+      <section class="section support-section" id="support">
+        <div>
+          <p class="eyebrow" data-i18n="support.eyebrow">Support</p>
+          <h2 data-i18n="support.title">Need setup help or checkout updates?</h2>
+          <p data-i18n="support.description">Discord will be the fastest place for setup questions, license help and release announcements while the new backend is being built.</p>
+        </div>
+        <div class="support-actions">
+          <a class="button primary" href="https://discord.gg/JnEcaNmutd" data-discord-link data-i18n="support.discord">Join Discord</a>
+          <a class="button secondary" href="https://discord.gg/JnEcaNmutd" data-discord-link data-i18n="support.contact">Contact Support</a>
+        </div>
+      </section>
+
+      <section class="legal-section" id="legal" aria-label="Legal notes">
+        <article id="terms">
+          <h3 data-i18n="legal.termsTitle">Terms of Service</h3>
+          <p data-i18n="legal.termsText">Use of Fima Macro will be governed by the final terms published with the checkout and license backend.</p>
+        </article>
+        <article id="privacy">
+          <h3 data-i18n="legal.privacyTitle">Privacy Policy</h3>
+          <p data-i18n="legal.privacyText">This static site stores theme, language and currency preferences locally in your browser. Country detection is used only for defaults.</p>
+        </article>
+        <article id="refund">
+          <h3 data-i18n="legal.refundTitle">Refund Policy</h3>
+          <p data-i18n="legal.refundText">Due to the digital nature of the product, refunds may be limited after access or license delivery. Please contact support if you have an issue.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <a class="footer-brand" href="index.html">
+          <img class="brand-logo small" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="38" height="38">
+          <span>Fima Macro</span>
+        </a>
+        <p data-i18n="footer.disclaimer">Fima Macro is not affiliated with, endorsed by, or sponsored by Roblox Corporation.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="legal.html#terms" data-i18n="footer.terms">Terms of Service</a>
+        <a href="legal.html#privacy" data-i18n="footer.privacy">Privacy Policy</a>
+        <a href="legal.html#refund" data-i18n="footer.refund">Refund Policy</a>
+        <a href="https://discord.gg/JnEcaNmutd" data-discord-link data-i18n="footer.contact">Contact</a>
+        <a href="https://discord.gg/JnEcaNmutd" data-discord-link>Discord</a>
+      </nav>
+    </footer>
+
+    <noscript>
+      <div class="noscript">Fima Macro site works best with JavaScript enabled for theme, language and currency preferences.</div>
+    </noscript>
+    <div class="checkout-modal" id="checkoutModal" aria-hidden="true">
+      <div class="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+        <button class="modal-close" type="button" data-checkout-close aria-label="Close">X</button>
+        <p class="eyebrow" data-i18n="checkout.eyebrow">Secure checkout</p>
+        <h2 id="checkoutTitle" data-i18n="checkout.title">Enter your email to continue.</h2>
+        <p data-i18n="checkout.description">Your license key will be delivered on the success page after Stripe confirms the payment.</p>
+        <form id="checkoutForm">
+          <label for="checkoutEmail" data-i18n="checkout.emailLabel">Email address</label>
+          <input id="checkoutEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+          <div class="checkout-error" id="checkoutError" role="alert"></div>
+          <div class="modal-actions">
+            <button class="button secondary" type="button" data-checkout-close data-i18n="checkout.cancel">Cancel</button>
+            <button class="button primary" type="submit" id="checkoutSubmit" data-i18n="checkout.continue">Continue to Stripe</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="checkout-toast" id="checkoutToast" role="status" aria-live="polite"></div>
+    <script src="assets/js/config.js?v=20260526-9" charset="utf-8"></script>
+    <script src="assets/js/app.js?v=20260603-2" charset="utf-8" defer></script>
+  </body>
+</html>
+
+
+
+
+
+
+
+

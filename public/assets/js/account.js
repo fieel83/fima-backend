@@ -1,0 +1,2610 @@
+﻿(() => {
+  const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
+  const page = document.body.dataset.accountPage || "";
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const language = () => localStorage.getItem("fima.language") || "en";
+
+  const copy = {
+    "en": {
+        "working": "Working...",
+        "loadingProducts": "Loading products...",
+        "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
+        "noStoreProducts": "No account-store products are active yet. Use the pricing page for license plans.",
+        "buyPricing": "Buy Now",
+        "copied": "Copied.",
+        "downloadReady": "Opening download...",
+        "extend": "Extend",
+        "renew": "Renew",
+        "copyKey": "Copy key",
+        "download": "Download",
+        "active": "Active",
+        "expired": "Expired",
+        "lifetime": "Never expires",
+        "expires": "Expires",
+        "remaining": "Time left",
+        "email": "Email",
+        "stripeCustomer": "Stripe Customer",
+        "roblox": "Roblox",
+        "noRoblox": "Not linked",
+        "checkout": "Creating Stripe Checkout...",
+        "robloxLookup": "Checking Roblox profile...",
+        "robloxNotFound": "Roblox user was not found.",
+        "invalidEmail": "Enter a valid email address or leave the optional email field empty.",
+        "invalidUsername": "Choose a username between 3 and 32 characters.",
+        "invalidRoblox": "Enter a valid Roblox username or leave it empty.",
+        "weakPassword": "Password must be at least 8 characters.",
+        "registered": "Account created. Redirecting...",
+        "loggedIn": "Logged in. Redirecting...",
+        "purchaseProcessing": "Payment is still processing. Checking again...",
+        "purchaseComplete": "Payment complete.",
+        "openMyProducts": "Open My Products",
+        "resetGeneric": "If that Fima account has linked Discord recovery, the bot will DM a reset code.",
+        "resetCodeSent": "A reset code was sent to your linked Discord DM.",
+        "resetEmailFailed": "Discord recovery could not send a reset code. Contact support if this keeps happening.",
+        "discordNotLinkedRecovery": "This account has no linked Discord recovery. Contact support so an admin can verify ownership.",
+        "discordDmBlocked": "The Fima bot could not DM you. Enable DMs from server members or use the Discord server recovery command.",
+        "discordBotOffline": "Discord recovery is temporarily unavailable because the Fima bot is not online.",
+        "passwordMismatch": "Passwords do not match.",
+        "resetComplete": "Password reset complete. Redirecting...",
+        "confirmPassword": "Confirm password",
+        "passwordStrength": "Password strength",
+        "networkError": "Could not reach the Fima API. Refresh the page or try again in a moment.",
+        "saleTitle": "Current plans",
+        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleEnds": "Sale ends in",
+        "licenseKey": "License key",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Purchased",
+        "licenseAccess": "License access",
+        "productAccess": "Product access",
+        "emailAlreadyRegistered": "Email already registered.",
+        "invalidCredentials": "Invalid username or password.",
+        "unauthorized": "Please log in again.",
+        "checkoutDisabled": "Checkout is disabled right now.",
+        "licenseNotFound": "License was not found on this account.",
+        "licenseBanned": "This license is banned.",
+        "storeNav": "Store",
+        "loginNav": "Login",
+        "logoutNav": "Logout",
+        "dashboardNav": "Account",
+        "myProductsNav": "My Products",
+        "registerEyebrow": "Fima Account",
+        "registerTitle": "Create your Fima account.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "robloxUsername": "Roblox username",
+        "password": "Password",
+        "registerButton": "Register",
+        "loginTitle": "Get back into Fima.",
+        "loginIntro": "Sign in with your Fima username.",
+        "loginButton": "Login",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Set a new password.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Update password",
+        "token": "Reset code",
+        "newPassword": "New password",
+        "dashboardEyebrow": "Account dashboard",
+        "dashboardTitle": "Your Fima account.",
+        "myProductsEyebrow": "My Products",
+        "myProductsTitle": "Purchased products.",
+        "storeEyebrow": "Product store",
+        "storeTitle": "Fima store.",
+        "storeIntro": "Buy products with Stripe checkout and link them to your account.",
+        "paymentSuccessTitle": "Payment complete.",
+        "paymentCancelledTitle": "Payment cancelled.",
+        "total": "Total",
+        "product": "Product",
+        "willBeCreated": "Will be created before checkout",
+        "noLicenses": "No licenses on this account yet.",
+        "productLinked": "Your product is now linked to your Fima account.",
+        "paymentCheckFailed": "Could not check payment.",
+        "paymentReceived": "Payment received.",
+        "purchaseStillProcessing": "Your purchase is still processing. Contact support if it does not appear soon.",
+        "buyWithStripe": "Buy with Stripe",
+        "giftSystemEyebrow": "Gift system",
+        "giftSystemTitle": "Gift a license",
+        "giftSystemIntro": "Search registered Fima users before buying a license for someone else.",
+        "giftAccessEyebrow": "Gift access",
+        "giftAccessTitle": "Claim gift access",
+        "giftAccessIntro": "Redeem a gift code or claim an admin-sent package from your Fima account. Roblox is optional on the website.",
+        "giftCodeTitle": "Redeem gift code",
+        "giftCodeIntro": "Gift codes are one-time access cards. Full license keys are created only after a valid claim.",
+        "giftCodePlaceholder": "FIMA-GIFT-XXXX-XXXX",
+        "redeemGiftCode": "Redeem gift code",
+        "pendingDirectGifts": "Pending admin gifts",
+        "noPendingGifts": "No pending gift packages.",
+        "claimGift": "Claim gift",
+        "giftClaimed": "Gift claimed. License added to My Products.",
+        "purchasedGiftCodes": "Purchased Gift Codes",
+        "giftHistory": "Gift History",
+        "noPurchasedGiftCodes": "No purchased gift codes yet.",
+        "noGiftHistory": "No gift history yet.",
+        "copyGiftCode": "Copy Gift Code",
+        "giftCodeCreated": "Gift Code Created",
+        "giftStartsOnRedeem": "License time starts only when the code is redeemed.",
+        "giftRedeemedTitle": "Gift Redeemed",
+        "giftRedeemedText": "Your new app license key is ready. Copy it and use it in the Fima App.",
+        "newLicenseKey": "Your new app license key",
+        "copyLicenseKey": "Copy License Key",
+        "unusedGiftCode": "Unused",
+        "usedGiftCode": "Used",
+        "revokedGiftCode": "Revoked",
+        "giftShownOnceOnly": "This code can only be shown once. Keep your copied code safe.",
+        "downloadApp": "Download App",
+        "close": "OK",
+        "giftRequirements": "Requires only Fima login. Discord, email and Roblox are optional on the website.",
+        "buyNowNav": "Buy Now",
+        "billingNav": "Subscription / Billing",
+        "redeemGiftNav": "Redeem Gift Code",
+        "purchasedGiftCodesNav": "Purchased Gift Codes",
+        "accountSettingsNav": "Account Settings",
+        "supportNav": "Support",
+        "recoveryNotLinked": "Recovery not linked",
+        "linkDiscordRecovery": "Link Discord",
+        "noActiveSubscription": "No active subscription",
+        "giftExpired": "This gift is expired or revoked.",
+        "giftAlreadyRedeemed": "This gift code was already redeemed.",
+        "giftCodeNotFound": "Gift code was not found.",
+        "giftSearchPlaceholder": "Search by email, Discord, or Roblox",
+        "giftSearchHint": "Recipient search works only for logged-in users and shows masked private data.",
+        "giftSearchEmpty": "No registered user found.",
+        "giftSearchStart": "Type at least 2 characters to search.",
+        "giftSearchLoading": "Searching recipients...",
+        "giftSearchFailed": "Recipient search failed.",
+        "chooseRecipient": "Select recipient",
+        "giftCheckoutSoon": "Gift checkout will use the selected registered account.",
+        "selectedGiftRecipient": "Selected gift recipient",
+        "giftRecipientReady": "Recipient selected. Choose the access plan to buy for this user.",
+        "giftBuy1day": "Gift Free Trial",
+        "giftBuy3days": "Gift 3 Days",
+        "giftBuyMonthly": "Gift Monthly",
+        "giftBuyLifetime": "Gift Lifetime",
+        "changeGiftRecipient": "Change recipient",
+        "accountNavProfileFallback": "Fima account",
+        "connectedAccounts": "Discord recovery and optional profile links",
+        "accountLinksEyebrow": "Account links",
+        "discord": "Discord",
+        "notConnected": "Not connected",
+        "connected": "Connected",
+        "connectDiscord": "Connect Discord",
+        "disconnectDiscord": "Disconnect Discord",
+        "reconnectDiscord": "Reconnect Discord",
+        "connectRoblox": "Connect Roblox",
+        "disconnectRoblox": "Disconnect Roblox",
+        "reconnectRoblox": "Reconnect Roblox",
+        "freeMonthlyTrial": "Free Monthly Trial",
+        "freeTrialEyebrow": "Free trial",
+        "trialIntro": "Claim one 24-hour trial every month after linking Discord. Roblox is optional on the website.",
+        "trialRequirements": "Free Monthly Trial Requirements",
+        "accountLoggedIn": "Fima account logged in",
+        "discordConnected": "Discord connected",
+        "robloxConnected": "Roblox optional",
+        "claimTrial": "Claim 1-Day Free Trial",
+        "trialActive": "Trial active",
+        "trialAvailable": "Trial available",
+        "trialLocked": "Trial locked",
+        "trialCooldown": "Trial cooldown",
+        "nextTrial": "Next free trial",
+        "connectDiscordTrial": "Connect Discord to unlock your monthly 1-day trial.",
+        "connectRobloxTrial": "Roblox is optional on the website.",
+        "trialClaimed": "1-day trial claimed. Your Trial role is being synced.",
+        "trialAlreadyActive": "You already have an active monthly trial.",
+        "trialCooldownActive": "Your monthly trial cooldown is still active.",
+        "discordNotConnected": "Discord is only required for the free trial or optional recovery.",
+        "robloxNotConnected": "Roblox is optional and never blocks website access.",
+        "disconnectConfirm": "Disconnect this account link?",
+        "openConnect": "Open connect",
+        "requirementsComplete": "All requirements complete.",
+        "emailVerificationEyebrow": "Account Recovery",
+        "emailVerificationTitle": "Email recovery",
+        "emailVerificationIntro": "Email is optional. Link and verify it if you want password reset codes by email.",
+        "emailVerified": "Email verified",
+        "emailNotVerified": "Email not verified",
+        "sendVerificationCode": "Send verification code",
+        "confirmVerificationCode": "Confirm code",
+        "verificationCode": "6-digit code",
+        "verificationSent": "Verification code sent if email delivery is configured.",
+        "verificationSendFailed": "Verification email could not be sent. Contact support if it keeps happening.",
+        "verificationComplete": "Email verified. Referral status updated.",
+        "invalidVerificationCode": "Enter the 6-digit verification code.",
+        "invalidOrExpiredVerificationCode": "Verification code is invalid or expired.",
+        "referralCode": "Referral code",
+        "referralOptional": "Optional invite code",
+        "referralPrefilled": "Invite code loaded. Discord or Roblox is not required unless the reward is a free trial.",
+        "referralRewardsEyebrow": "Invite Rewards",
+        "referralRewardsTitle": "Referral rewards",
+        "referralRewardsIntro": "Invite real users. Referral rewards do not require Roblox; free trial rewards may require Discord.",
+        "yourReferralCode": "Your invite code",
+        "yourReferralLink": "Your invite link",
+        "copyReferralCode": "Copy code",
+        "copyReferralLink": "Copy link",
+        "referralProgress": "Reward progress",
+        "verifiedInvites": "Verified invites",
+        "pendingInvites": "Pending invites",
+        "rejectedInvites": "Rejected",
+        "flaggedInvites": "Review",
+        "earnedRewards": "Earned rewards",
+        "nextReward": "Next reward",
+        "referralsRemaining": "verified invites left",
+        "referralApplyTitle": "Were you invited?",
+        "referralApplyIntro": "Optional invite/referral code. It does not require Discord or Roblox unless the reward is a free trial.",
+        "applyReferral": "Apply code",
+        "referralApplied": "Referral code applied.",
+        "invalidReferralCode": "Referral code was not found.",
+        "referralAlreadyUsed": "This account already used a referral code.",
+        "selfReferralNotAllowed": "You cannot use your own referral code.",
+        "recentInvites": "Recent invites",
+        "noReferralsYet": "No referrals yet. Share your link with friends.",
+        "incomingReferral": "Incoming referral",
+        "rewardRule": "3 verified invites = 15 days free access"
+    },
+    "tr": {
+        "working": "\u00c7al\u0131\u015f\u0131yor...",
+        "loadingProducts": "\u00dcr\u00fcnler y\u00fckleniyor...",
+        "noProducts": "Hen\u00fcz hesap \u00fcr\u00fcn\u00fc yok. Lisans al\u0131nca key ile birlikte burada g\u00f6r\u00fcnecek.",
+        "noStoreProducts": "Hesap ma\u011fazas\u0131nda aktif \u00fcr\u00fcn yok. Lisans planlar\u0131 i\u00e7in fiyatlar sayfas\u0131n\u0131 kullan.",
+        "buyPricing": "Sat\u0131n al",
+        "copied": "Kopyaland\u0131.",
+        "downloadReady": "\u0130ndirme a\u00e7\u0131l\u0131yor...",
+        "extend": "Uzat",
+        "renew": "Yenile",
+        "copyKey": "Keyi kopyala",
+        "download": "\u0130ndir",
+        "active": "Aktif",
+        "expired": "S\u00fcresi bitti",
+        "lifetime": "S\u00fcresiz",
+        "expires": "Biti\u015f",
+        "remaining": "Kalan s\u00fcre",
+        "email": "E-posta",
+        "stripeCustomer": "Stripe m\u00fc\u015fteri",
+        "roblox": "Roblox",
+        "noRoblox": "Ba\u011fl\u0131 de\u011fil",
+        "checkout": "Stripe Checkout olu\u015fturuluyor...",
+        "robloxLookup": "Roblox profili kontrol ediliyor...",
+        "robloxNotFound": "Roblox kullan\u0131c\u0131s\u0131 bulunamad\u0131.",
+        "invalidEmail": "Ge\u00e7erli bir e-posta gir veya opsiyonel e-posta alan\u0131n\u0131 bo\u015f b\u0131rak.",
+        "invalidUsername": "3-32 karakter aras\u0131 bir kullan\u0131c\u0131 ad\u0131 se\u00e7.",
+        "invalidRoblox": "Ge\u00e7erli Roblox kullan\u0131c\u0131 ad\u0131 gir veya bo\u015f b\u0131rak.",
+        "weakPassword": "\u015eifre en az 8 karakter olmal\u0131.",
+        "registered": "Hesap olu\u015fturuldu. Y\u00f6nlendiriliyor...",
+        "loggedIn": "Giri\u015f yap\u0131ld\u0131. Y\u00f6nlendiriliyor...",
+        "purchaseProcessing": "\u00d6deme i\u015fleniyor. Tekrar kontrol ediliyor...",
+        "purchaseComplete": "\u00d6deme tamamland\u0131.",
+        "openMyProducts": "\u00dcr\u00fcnlerimi a\u00e7",
+        "resetGeneric": "Bu Fima hesab\u0131nda Discord recovery ba\u011fl\u0131ysa bot DM ile reset kodu g\u00f6nderecek.",
+        "resetCodeSent": "Reset kodu ba\u011fl\u0131 Discord DM kutuna g\u00f6nderildi.",
+        "resetEmailFailed": "Discord recovery reset kodu g\u00f6nderemedi. Devam ederse destekle ileti\u015fime ge\u00e7.",
+        "discordNotLinkedRecovery": "Bu hesapta Discord recovery ba\u011fl\u0131 de\u011fil. Sahipli\u011fi do\u011frulamak i\u00e7in destekle ileti\u015fime ge\u00e7.",
+        "discordDmBlocked": "Fima bot sana DM atamad\u0131. Sunucu \u00fcyelerinden DM almay\u0131 a\u00e7 veya Discord sunucusundaki recovery komutunu kullan.",
+        "discordBotOffline": "Discord recovery ge\u00e7ici olarak kullan\u0131lam\u0131yor; Fima bot online de\u011fil.",
+        "passwordMismatch": "\u015eifreler ayn\u0131 de\u011fil.",
+        "resetComplete": "\u015eifre s\u0131f\u0131rland\u0131. Y\u00f6nlendiriliyor...",
+        "confirmPassword": "\u015eifreyi onayla",
+        "passwordStrength": "\u015eifre g\u00fcc\u00fc",
+        "networkError": "Fima API'ye ula\u015f\u0131lamad\u0131. Sayfay\u0131 yenile veya biraz sonra tekrar dene.",
+        "saleTitle": "S\u0131n\u0131rl\u0131 lansman indirimi",
+        "saleText": "Sureli planlarda %25 lansman indirimi. Lifetime sabit kalir.",
+        "saleEnds": "\u0130ndirimin bitmesine",
+        "licenseKey": "Lisans keyi",
+        "plan": "Plan",
+        "status": "Durum",
+        "purchased": "Sat\u0131n alma",
+        "licenseAccess": "Lisans eri\u015fimi",
+        "productAccess": "\u00dcr\u00fcn eri\u015fimi",
+        "emailAlreadyRegistered": "Bu e-posta zaten kay\u0131tl\u0131.",
+        "invalidCredentials": "Kullan\u0131c\u0131 ad\u0131/e-posta veya \u015fifre hatal\u0131.",
+        "unauthorized": "L\u00fctfen tekrar giri\u015f yap.",
+        "checkoutDisabled": "Checkout \u015fu an kapal\u0131.",
+        "licenseNotFound": "Bu hesapta lisans bulunamad\u0131.",
+        "licenseBanned": "Bu lisans banlanm\u0131\u015f.",
+        "storeNav": "Ma\u011faza",
+        "loginNav": "Giri\u015f",
+        "logoutNav": "\u00c7\u0131k\u0131\u015f",
+        "dashboardNav": "Hesap",
+        "myProductsNav": "\u00dcr\u00fcnlerim",
+        "registerEyebrow": "Fima Hesab\u0131",
+        "registerTitle": "Hesab\u0131n\u0131 olu\u015ftur.",
+        "registerIntro": "Sadece kullan\u0131c\u0131 ad\u0131 ve \u015fifreyle hesap olu\u015ftur. Discord'u daha sonra hesap kurtarma veya free trial i\u00e7in ba\u011flayabilirsin.",
+        "robloxUsername": "Roblox kullan\u0131c\u0131 ad\u0131",
+        "password": "\u015eifre",
+        "registerButton": "Kay\u0131t ol",
+        "loginTitle": "Giri\u015f yap.",
+        "loginIntro": "Fima kullan\u0131c\u0131 ad\u0131nla giri\u015f yap.",
+        "loginButton": "Giri\u015f yap",
+        "forgotTitle": "Discord ile s\u0131f\u0131rla.",
+        "forgotIntro": "Fima kullan\u0131c\u0131 ad\u0131n\u0131 gir. Discord recovery ba\u011fl\u0131ysa Fima bot DM ile tek kullan\u0131ml\u0131k reset kodu g\u00f6nderir.",
+        "forgotButton": "Discord kodu g\u00f6nder",
+        "resetTitle": "Yeni \u015fifre belirle.",
+        "resetIntro": "Fima Discord botundan gelen reset kodunu yap\u0131\u015ft\u0131r ve yeni \u015fifreni se\u00e7.",
+        "resetButton": "\u015eifreyi g\u00fcncelle",
+        "token": "Reset kodu",
+        "newPassword": "Yeni \u015fifre",
+        "dashboardEyebrow": "Hesap dashboard",
+        "dashboardTitle": "Fima hesab\u0131n.",
+        "myProductsEyebrow": "\u00dcr\u00fcnlerim",
+        "myProductsTitle": "Sat\u0131n al\u0131nan \u00fcr\u00fcnler.",
+        "storeEyebrow": "\u00dcr\u00fcn ma\u011fazas\u0131",
+        "storeTitle": "Fima ma\u011fazas\u0131.",
+        "storeIntro": "\u00dcr\u00fcnleri Stripe checkout ile al ve hesab\u0131na ba\u011fla.",
+        "paymentSuccessTitle": "\u00d6deme tamamland\u0131.",
+        "paymentCancelledTitle": "\u00d6deme iptal edildi.",
+        "total": "Toplam",
+        "product": "\u00dcr\u00fcn",
+        "willBeCreated": "Checkout \u00f6ncesi olu\u015fturulacak",
+        "noLicenses": "Bu e-postaya ba\u011fl\u0131 lisans yok.",
+        "productLinked": "\u00dcr\u00fcn art\u0131k Fima hesab\u0131na ba\u011fl\u0131.",
+        "paymentCheckFailed": "\u00d6deme kontrol edilemedi.",
+        "paymentReceived": "\u00d6deme al\u0131nd\u0131.",
+        "purchaseStillProcessing": "Sat\u0131n alma hala i\u015fleniyor. Yak\u0131nda g\u00f6r\u00fcnmezse deste\u011fe yaz.",
+        "buyWithStripe": "Stripe ile sat\u0131n al",
+        "giftSystemEyebrow": "Hediye sistemi",
+        "giftSystemTitle": "Lisans hediye et",
+        "giftSystemIntro": "Ba\u015fkas\u0131na lisans almadan \u00f6nce kay\u0131tl\u0131 Fima kullan\u0131c\u0131s\u0131n\u0131 ara.",
+        "giftAccessEyebrow": "Hediye eri\u015fimi",
+        "giftAccessTitle": "Hediyeyi claim et",
+        "giftAccessIntro": "Fima hesab\u0131ndan hediye kodunu veya adminin g\u00f6nderdi\u011fi paketi kullan. Roblox web sitesinde opsiyoneldir.",
+        "giftCodeTitle": "Hediye kodu kullan",
+        "giftCodeIntro": "Hediye kodlar\u0131 tek kullan\u0131ml\u0131kt\u0131r. Lisans keyi sadece ge\u00e7erli claim sonras\u0131 olu\u015fur.",
+        "giftCodePlaceholder": "FIMA-GIFT-XXXX-XXXX",
+        "redeemGiftCode": "Hediye kodunu kullan",
+        "pendingDirectGifts": "Bekleyen admin hediyeleri",
+        "noPendingGifts": "Bekleyen hediye paketi yok.",
+        "claimGift": "Hediyeyi al",
+        "giftClaimed": "Hediye claim edildi. Lisans My Products'a eklendi.",
+        "purchasedGiftCodes": "Sat\u0131n al\u0131nan gift code'lar",
+        "giftHistory": "Hediye ge\u00e7mi\u015fi",
+        "noPurchasedGiftCodes": "Hen\u00fcz sat\u0131n al\u0131nm\u0131\u015f gift code yok.",
+        "noGiftHistory": "Hen\u00fcz hediye ge\u00e7mi\u015fi yok.",
+        "copyGiftCode": "Gift Code'u kopyala",
+        "giftCodeCreated": "Gift Code olu\u015fturuldu",
+        "giftStartsOnRedeem": "Lisans s\u00fcresi sadece kod kullan\u0131ld\u0131\u011f\u0131nda ba\u015flar.",
+        "giftRedeemedTitle": "Gift kullan\u0131ld\u0131",
+        "giftRedeemedText": "Fima lisans\u0131n olu\u015fturuldu. Lisans keyini kopyala ve Fima App i\u00e7inde kullan.",
+        "newLicenseKey": "Yeni uygulama lisans keyin",
+        "copyLicenseKey": "Lisans keyini kopyala",
+        "unusedGiftCode": "Kullan\u0131lmad\u0131",
+        "usedGiftCode": "Kullan\u0131ld\u0131",
+        "revokedGiftCode": "\u0130ptal edildi",
+        "giftShownOnceOnly": "Bu kod sadece bir kez g\u00f6sterilebilir. Kopyalad\u0131\u011f\u0131n kodu g\u00fcvenli sakla.",
+        "downloadApp": "App'i indir",
+        "close": "OK",
+        "giftRequirements": "Sadece Fima login gerekir. Discord, e-posta ve Roblox web sitesinde opsiyoneldir.",
+        "buyNowNav": "Sat\u0131n al",
+        "billingNav": "Abonelik / Fatura",
+        "redeemGiftNav": "Gift code kullan",
+        "purchasedGiftCodesNav": "Sat\u0131n al\u0131nan gift kodlar\u0131",
+        "accountSettingsNav": "Hesap ayarlar\u0131",
+        "supportNav": "Destek",
+        "recoveryNotLinked": "Kurtarma ba\u011fl\u0131 de\u011fil",
+        "linkDiscordRecovery": "Discord ba\u011fla",
+        "noActiveSubscription": "Aktif abonelik yok",
+        "giftExpired": "Bu hediyenin s\u00fcresi bitmi\u015f veya iptal edilmi\u015f.",
+        "giftAlreadyRedeemed": "Bu hediye kodu zaten kullan\u0131lm\u0131\u015f.",
+        "giftCodeNotFound": "Hediye kodu bulunamad\u0131.",
+        "giftSearchPlaceholder": "E-posta, Discord veya Roblox ile ara",
+        "giftSearchHint": "Al\u0131c\u0131 arama sadece giri\u015f yapm\u0131\u015f kullan\u0131c\u0131lar i\u00e7in \u00e7al\u0131\u015f\u0131r ve gizli verileri maskeler.",
+        "giftSearchEmpty": "Kay\u0131tl\u0131 kullan\u0131c\u0131 bulunamad\u0131.",
+        "giftSearchStart": "Aramak i\u00e7in en az 2 karakter yaz.",
+        "giftSearchLoading": "Al\u0131c\u0131lar aran\u0131yor...",
+        "giftSearchFailed": "Al\u0131c\u0131 arama ba\u015far\u0131s\u0131z.",
+        "chooseRecipient": "Al\u0131c\u0131y\u0131 se\u00e7",
+        "giftCheckoutSoon": "Hediye checkout se\u00e7ilen kay\u0131tl\u0131 hesaba ba\u011flanacak.",
+        "selectedGiftRecipient": "Se\u00e7ili hediye al\u0131c\u0131s\u0131",
+        "giftRecipientReady": "Al\u0131c\u0131 se\u00e7ildi. Bu kullan\u0131c\u0131ya al\u0131nacak eri\u015fim plan\u0131n\u0131 se\u00e7.",
+        "giftBuy1day": "Trial hediye et",
+        "giftBuy3days": "3 G\u00fcn hediye et",
+        "giftBuyMonthly": "Ayl\u0131k hediye et",
+        "giftBuyLifetime": "Lifetime hediye et",
+        "changeGiftRecipient": "Al\u0131c\u0131y\u0131 de\u011fi\u015ftir",
+        "accountNavProfileFallback": "Fima hesab\u0131",
+        "connectedAccounts": "Discord kurtarma ve opsiyonel profil ba\u011flant\u0131lar\u0131",
+        "accountLinksEyebrow": "Hesap ba\u011flant\u0131lar\u0131",
+        "discord": "Discord",
+        "notConnected": "Ba\u011fl\u0131 de\u011fil",
+        "connected": "Ba\u011fl\u0131",
+        "connectDiscord": "Discord Ba\u011fla",
+        "disconnectDiscord": "Discord'u Ay\u0131r",
+        "reconnectDiscord": "Discord'u Yeniden Ba\u011fla",
+        "connectRoblox": "Roblox Ba\u011fla",
+        "disconnectRoblox": "Roblox'u Ay\u0131r",
+        "reconnectRoblox": "Roblox'u Yeniden Ba\u011fla",
+        "freeMonthlyTrial": "Ayl\u0131k \u00dccretsiz Trial",
+        "freeTrialEyebrow": "\u00dccretsiz deneme",
+        "trialIntro": "Discord'u ba\u011flad\u0131ktan sonra ayda bir kez 24 saatlik trial alabilirsin. Roblox web sitesinde opsiyoneldir.",
+        "trialRequirements": "Ayl\u0131k Trial Gereksinimleri",
+        "accountLoggedIn": "Fima hesab\u0131yla giri\u015f yap\u0131ld\u0131",
+        "discordConnected": "Discord ba\u011fl\u0131",
+        "robloxConnected": "Roblox opsiyonel",
+        "claimTrial": "1 G\u00fcnl\u00fck Trial Al",
+        "trialActive": "Trial aktif",
+        "trialAvailable": "Trial haz\u0131r",
+        "trialLocked": "Trial kilitli",
+        "trialCooldown": "Trial bekleme s\u00fcresi",
+        "nextTrial": "Sonraki \u00fccretsiz trial",
+        "connectDiscordTrial": "Ayl\u0131k 1 g\u00fcnl\u00fck trial i\u00e7in Discord'u ba\u011fla.",
+        "connectRobloxTrial": "Roblox web sitesinde opsiyoneldir.",
+        "trialClaimed": "1 g\u00fcnl\u00fck trial al\u0131nd\u0131. Trial rol\u00fcn senkronize ediliyor.",
+        "trialAlreadyActive": "Zaten aktif ayl\u0131k trial'\u0131n var.",
+        "trialCooldownActive": "Ayl\u0131k trial bekleme s\u00fcren h\u00e2l\u00e2 aktif.",
+        "discordNotConnected": "Discord sadece free trial veya opsiyonel kurtarma i\u00e7in gerekir.",
+        "robloxNotConnected": "Roblox opsiyoneldir ve site eri\u015fimini engellemez.",
+        "disconnectConfirm": "Bu hesap ba\u011flant\u0131s\u0131 ayr\u0131ls\u0131n m\u0131?",
+        "openConnect": "Ba\u011flant\u0131y\u0131 a\u00e7",
+        "requirementsComplete": "T\u00fcm gereksinimler tamam.",
+        "emailVerificationEyebrow": "Hesap Kurtarma",
+        "emailVerificationTitle": "E-posta kurtarma",
+        "emailVerificationIntro": "E-posta opsiyoneldir. E-posta ile reset kodu almak istiyorsan ba\u011fla ve do\u011frula.",
+        "emailVerified": "E-posta do\u011fruland\u0131",
+        "emailNotVerified": "E-posta do\u011frulanmad\u0131",
+        "sendVerificationCode": "Do\u011frulama kodu g\u00f6nder",
+        "confirmVerificationCode": "Kodu onayla",
+        "verificationCode": "6 haneli kod",
+        "verificationSent": "Mail g\u00f6nderimi ayarl\u0131ysa do\u011frulama kodu g\u00f6nderildi.",
+        "verificationSendFailed": "Do\u011frulama e-postas\u0131 g\u00f6nderilemedi. Devam ederse deste\u011fe yaz.",
+        "verificationComplete": "E-posta do\u011fruland\u0131. Referral durumu g\u00fcncellendi.",
+        "invalidVerificationCode": "6 haneli do\u011frulama kodunu gir.",
+        "invalidOrExpiredVerificationCode": "Do\u011frulama kodu hatal\u0131 veya s\u00fcresi bitti.",
+        "referralCode": "Davet kodu",
+        "referralOptional": "\u0130ste\u011fe ba\u011fl\u0131 davet kodu",
+        "referralPrefilled": "Davet kodu y\u00fcklendi. \u00d6d\u00fcl free trial de\u011filse Discord veya Roblox gerekmez.",
+        "referralRewardsEyebrow": "Davet \u00d6d\u00fclleri",
+        "referralRewardsTitle": "Referral \u00f6d\u00fclleri",
+        "referralRewardsIntro": "Ger\u00e7ek kullan\u0131c\u0131lar\u0131 davet et. Referral i\u00e7in Roblox gerekmez; free trial \u00f6d\u00fcllerinde Discord gerekebilir.",
+        "yourReferralCode": "Davet kodun",
+        "yourReferralLink": "Davet linkin",
+        "copyReferralCode": "Kodu kopyala",
+        "copyReferralLink": "Linki kopyala",
+        "referralProgress": "\u00d6d\u00fcl ilerlemesi",
+        "verifiedInvites": "Do\u011frulanm\u0131\u015f davet",
+        "pendingInvites": "Bekleyen davet",
+        "rejectedInvites": "Reddedilen",
+        "flaggedInvites": "\u0130nceleme",
+        "earnedRewards": "Kazan\u0131lan \u00f6d\u00fcl",
+        "nextReward": "Sonraki \u00f6d\u00fcl",
+        "referralsRemaining": "do\u011frulanm\u0131\u015f davet kald\u0131",
+        "referralApplyTitle": "Davet mi ald\u0131n?",
+        "referralApplyIntro": "Opsiyonel davet/referral kodu. \u00d6d\u00fcl free trial de\u011filse Discord veya Roblox gerektirmez.",
+        "applyReferral": "Kodu uygula",
+        "referralApplied": "Davet kodu uyguland\u0131.",
+        "invalidReferralCode": "Davet kodu bulunamad\u0131.",
+        "referralAlreadyUsed": "Bu hesap zaten davet kodu kulland\u0131.",
+        "selfReferralNotAllowed": "Kendi davet kodunu kullanamazs\u0131n.",
+        "recentInvites": "Son davetler",
+        "noReferralsYet": "Hen\u00fcz davet yok. Linkini arkada\u015flar\u0131nla payla\u015f.",
+        "incomingReferral": "Kullan\u0131lan davet",
+        "rewardRule": "3 do\u011frulanm\u0131\u015f davet = 15 g\u00fcn \u00fccretsiz eri\u015fim"
+    },
+    "de": {
+        "working": "Wird verarbeitet...",
+        "loadingProducts": "Produkte werden geladen...",
+        "noProducts": "Noch keine Produkte. Nach dem Kauf erscheint deine Lizenz hier.",
+        "noStoreProducts": "Keine aktiven Store-Produkte. Oeffne die Preisseite fuer Lizenzplaene.",
+        "buyPricing": "Preise oeffnen",
+        "copied": "Kopiert.",
+        "downloadReady": "Download wird geoeffnet...",
+        "extend": "Verlaengern",
+        "renew": "Erneuern",
+        "copyKey": "Key kopieren",
+        "download": "Download",
+        "active": "Aktiv",
+        "expired": "Abgelaufen",
+        "lifetime": "Laeuft nie ab",
+        "expires": "Ablauf",
+        "remaining": "Restzeit",
+        "email": "E-Mail",
+        "stripeCustomer": "Stripe Kunde",
+        "roblox": "Roblox",
+        "noRoblox": "Nicht verknuepft",
+        "checkout": "Stripe Checkout wird erstellt...",
+        "robloxLookup": "Roblox Profil wird geprueft...",
+        "robloxNotFound": "Roblox Nutzer wurde nicht gefunden.",
+        "invalidEmail": "Nutze eine echte E-Mail mit funktionierender Mail-Domain.",
+        "invalidRoblox": "Gueltigen Roblox-Namen eingeben oder leer lassen.",
+        "weakPassword": "Passwort muss mindestens 8 Zeichen haben.",
+        "registered": "Account erstellt. Weiterleitung...",
+        "loggedIn": "Eingeloggt. Weiterleitung...",
+        "purchaseProcessing": "Zahlung wird verarbeitet. Erneute Pruefung...",
+        "purchaseComplete": "Zahlung abgeschlossen.",
+        "openMyProducts": "Meine Produkte oeffnen",
+        "resetGeneric": "Falls diese E-Mail existiert, wurde ein Reset vorbereitet.",
+        "saleTitle": "Aktuelle Tarife",
+        "saleText": "Lifetime bleibt fest. Zeitplaene sind bis 3. Juni rabattiert.",
+        "saleEnds": "Sale endet in",
+        "licenseKey": "Lizenzschluessel",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Kauf",
+        "licenseAccess": "Lizenzzugriff",
+        "productAccess": "Produktzugriff",
+        "emailAlreadyRegistered": "E-Mail ist bereits registriert.",
+        "invalidCredentials": "E-Mail oder Passwort ist falsch.",
+        "unauthorized": "Bitte erneut einloggen.",
+        "checkoutDisabled": "Checkout ist gerade deaktiviert.",
+        "licenseNotFound": "Lizenz wurde in diesem Account nicht gefunden.",
+        "licenseBanned": "Diese Lizenz ist gebannt.",
+        "storeNav": "Store",
+        "loginNav": "Login",
+        "logoutNav": "Logout",
+        "dashboardNav": "Konto",
+        "myProductsNav": "Meine Produkte",
+        "registerEyebrow": "Fima Account",
+        "registerTitle": "Account erstellen.",
+        "registerIntro": "Erstelle dein Fima Konto nur mit Benutzername und Passwort. Discord kannst du spaeter fuer Wiederherstellung oder Free Trial verbinden.",
+        "robloxUsername": "Roblox Nutzername",
+        "password": "Passwort",
+        "registerButton": "Registrieren",
+        "loginTitle": "Einloggen.",
+        "loginIntro": "Oeffne dein Fima Dashboard, Produkte und Lizenzkeys.",
+        "loginButton": "Einloggen",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Neues Passwort setzen.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Passwort aktualisieren",
+        "token": "Reset-Token",
+        "newPassword": "Neues Passwort",
+        "dashboardEyebrow": "Account Dashboard",
+        "dashboardTitle": "Dein Fima Account.",
+        "myProductsEyebrow": "Meine Produkte",
+        "myProductsTitle": "Gekaufte Produkte.",
+        "storeEyebrow": "Produkt-Store",
+        "storeTitle": "Fima Store.",
+        "storeIntro": "Kaufe Produkte mit Stripe Checkout und verknuepfe sie mit deinem Account.",
+        "paymentSuccessTitle": "Zahlung abgeschlossen.",
+        "paymentCancelledTitle": "Zahlung abgebrochen.",
+        "total": "Summe",
+        "product": "Produkt",
+        "willBeCreated": "Wird vor Checkout erstellt",
+        "noLicenses": "Noch keine Lizenz mit dieser E-Mail verknuepft.",
+        "productLinked": "Das Produkt ist jetzt mit deinem Fima Account verknuepft.",
+        "paymentCheckFailed": "Zahlung konnte nicht geprueft werden.",
+        "paymentReceived": "Zahlung erhalten.",
+        "purchaseStillProcessing": "Dein Kauf wird noch verarbeitet. Kontaktiere Support, falls er nicht bald erscheint.",
+        "buyWithStripe": "Mit Stripe kaufen"
+    },
+    "fr": {
+        "working": "Traitement...",
+        "loadingProducts": "Chargement des produits...",
+        "noProducts": "Aucun produit pour le moment. Ta licence apparaitra ici apres achat.",
+        "noStoreProducts": "Aucun produit actif. Ouvre la page des prix pour les licences.",
+        "buyPricing": "Voir les prix",
+        "copied": "Copie.",
+        "downloadReady": "Ouverture du telechargement...",
+        "extend": "Prolonger",
+        "renew": "Renouveler",
+        "copyKey": "Copier la cle",
+        "download": "Telecharger",
+        "active": "Actif",
+        "expired": "Expire",
+        "lifetime": "N'expire jamais",
+        "expires": "Expire",
+        "remaining": "Temps restant",
+        "email": "E-mail",
+        "stripeCustomer": "Client Stripe",
+        "roblox": "Roblox",
+        "noRoblox": "Non lie",
+        "checkout": "Creation du Checkout Stripe...",
+        "robloxLookup": "Verification Roblox...",
+        "robloxNotFound": "Utilisateur Roblox introuvable.",
+        "invalidEmail": "Utilise une vraie adresse e-mail avec domaine mail actif.",
+        "invalidRoblox": "Entre un pseudo Roblox valide ou laisse vide.",
+        "weakPassword": "Le mot de passe doit avoir au moins 8 caracteres.",
+        "registered": "Compte cree. Redirection...",
+        "loggedIn": "Connecte. Redirection...",
+        "purchaseProcessing": "Paiement en cours. Nouvelle verification...",
+        "purchaseComplete": "Paiement termine.",
+        "openMyProducts": "Ouvrir mes produits",
+        "resetGeneric": "Si cet e-mail existe, une demande de reset est preparee.",
+        "saleTitle": "Offres actuelles",
+        "saleText": "Les produits publics actuels sont Free Trial, 3 Days Access, Monthly Subscription et Lifetime.",
+        "saleEnds": "Fin de l'offre dans",
+        "licenseKey": "Cle de licence",
+        "plan": "Plan",
+        "status": "Statut",
+        "purchased": "Achat",
+        "licenseAccess": "Acces licence",
+        "productAccess": "Acces produit",
+        "emailAlreadyRegistered": "Cet e-mail est deja inscrit.",
+        "invalidCredentials": "E-mail ou mot de passe incorrect.",
+        "unauthorized": "Connecte-toi a nouveau.",
+        "checkoutDisabled": "Checkout est desactive pour le moment.",
+        "licenseNotFound": "Licence introuvable sur ce compte.",
+        "licenseBanned": "Cette licence est bannie.",
+        "storeNav": "Store",
+        "loginNav": "Connexion",
+        "logoutNav": "Deconnexion",
+        "dashboardNav": "Compte",
+        "myProductsNav": "Mes produits",
+        "registerEyebrow": "Compte Fima",
+        "registerTitle": "Cree ton compte.",
+        "registerIntro": "Cree ton compte avec seulement un pseudo et un mot de passe. Tu peux lier Discord plus tard pour la recuperation ou le free trial.",
+        "robloxUsername": "Pseudo Roblox",
+        "password": "Mot de passe",
+        "registerButton": "Inscription",
+        "loginTitle": "Connexion.",
+        "loginIntro": "Ouvre ton dashboard Fima, tes produits et tes cles.",
+        "loginButton": "Connexion",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Definir un nouveau mot de passe.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Mettre a jour",
+        "token": "Token de reset",
+        "newPassword": "Nouveau mot de passe",
+        "dashboardEyebrow": "Dashboard compte",
+        "dashboardTitle": "Ton compte Fima.",
+        "myProductsEyebrow": "Mes produits",
+        "myProductsTitle": "Produits achetes.",
+        "storeEyebrow": "Store produits",
+        "storeTitle": "Store Fima.",
+        "storeIntro": "Achete avec Stripe Checkout et lie le produit a ton compte.",
+        "paymentSuccessTitle": "Paiement termine.",
+        "paymentCancelledTitle": "Paiement annule.",
+        "total": "Total",
+        "product": "Produit",
+        "willBeCreated": "Cree avant checkout",
+        "noLicenses": "Aucune licence liee a cet e-mail.",
+        "productLinked": "Le produit est maintenant lie a ton compte Fima.",
+        "paymentCheckFailed": "Impossible de verifier le paiement.",
+        "paymentReceived": "Paiement recu.",
+        "purchaseStillProcessing": "Ton achat est encore en traitement. Contacte le support si cela dure.",
+        "buyWithStripe": "Acheter avec Stripe"
+    },
+    "bs": {
+        "working": "Radim...",
+        "loadingProducts": "Ucitavanje proizvoda...",
+        "noProducts": "Jos nema proizvoda. Kupljena licenca ce se pojaviti ovdje.",
+        "noStoreProducts": "Nema aktivnih store proizvoda. Otvori cijene za license planove.",
+        "buyPricing": "Otvori cijene",
+        "copied": "Kopirano.",
+        "downloadReady": "Otvaram download...",
+        "extend": "Produzi",
+        "renew": "Obnovi",
+        "copyKey": "Kopiraj key",
+        "download": "Preuzmi",
+        "active": "Aktivno",
+        "expired": "Isteklo",
+        "lifetime": "Nikad ne istice",
+        "expires": "Istice",
+        "remaining": "Preostalo",
+        "email": "E-mail",
+        "stripeCustomer": "Stripe kupac",
+        "roblox": "Roblox",
+        "noRoblox": "Nije povezano",
+        "checkout": "Kreiram Stripe Checkout...",
+        "robloxLookup": "Provjeravam Roblox profil...",
+        "robloxNotFound": "Roblox korisnik nije pronadjen.",
+        "invalidEmail": "Koristi stvarni e-mail sa aktivnom mail domenom.",
+        "invalidRoblox": "Unesi validan Roblox username ili ostavi prazno.",
+        "weakPassword": "Lozinka mora imati najmanje 8 znakova.",
+        "registered": "Nalog kreiran. Preusmjeravam...",
+        "loggedIn": "Prijava uspjesna. Preusmjeravam...",
+        "purchaseProcessing": "Placanje se obradjuje. Provjeravam opet...",
+        "purchaseComplete": "Placanje zavrseno.",
+        "openMyProducts": "Otvori moje proizvode",
+        "resetGeneric": "Ako taj e-mail postoji, reset zahtjev je pripremljen.",
+        "saleTitle": "Trenutni paketi",
+        "saleText": "Trenutni javni proizvodi su Free Trial, 3 Days Access, Monthly Subscription i Lifetime.",
+        "saleEnds": "Popust zavrsava za",
+        "licenseKey": "License key",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Kupovina",
+        "licenseAccess": "License pristup",
+        "productAccess": "Product pristup",
+        "emailAlreadyRegistered": "E-mail je vec registrovan.",
+        "invalidCredentials": "E-mail ili lozinka nisu tacni.",
+        "unauthorized": "Prijavi se ponovo.",
+        "checkoutDisabled": "Checkout je trenutno iskljucen.",
+        "licenseNotFound": "Licenca nije nadjena na ovom nalogu.",
+        "licenseBanned": "Ova licenca je banovana.",
+        "storeNav": "Store",
+        "loginNav": "Prijava",
+        "logoutNav": "Odjava",
+        "dashboardNav": "Nalog",
+        "myProductsNav": "Moji proizvodi",
+        "registerEyebrow": "Fima nalog",
+        "registerTitle": "Kreiraj nalog.",
+        "registerIntro": "Registruj se e-mailom, lozinkom i opcionim Roblox imenom. Stripe se koristi samo za placanja.",
+        "robloxUsername": "Roblox username",
+        "password": "Lozinka",
+        "registerButton": "Registruj se",
+        "loginTitle": "Prijava.",
+        "loginIntro": "Otvori Fima dashboard, proizvode i license keyeve.",
+        "loginButton": "Prijavi se",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Postavi novu lozinku.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Azuriraj lozinku",
+        "token": "Reset token",
+        "newPassword": "Nova lozinka",
+        "dashboardEyebrow": "Account dashboard",
+        "dashboardTitle": "Tvoj Fima nalog.",
+        "myProductsEyebrow": "Moji proizvodi",
+        "myProductsTitle": "Kupljeni proizvodi.",
+        "storeEyebrow": "Product store",
+        "storeTitle": "Fima store.",
+        "storeIntro": "Kupi proizvode preko Stripe Checkouta i povezi ih sa nalogom.",
+        "paymentSuccessTitle": "Placanje zavrseno.",
+        "paymentCancelledTitle": "Placanje otkazano.",
+        "total": "Ukupno",
+        "product": "Proizvod",
+        "willBeCreated": "Bit ce kreirano prije checkouta",
+        "noLicenses": "Nema licenci povezanih s ovim e-mailom.",
+        "productLinked": "Proizvod je povezan sa Fima nalogom.",
+        "paymentCheckFailed": "Placanje nije moguce provjeriti.",
+        "paymentReceived": "Placanje primljeno.",
+        "purchaseStillProcessing": "Kupovina se jos obradjuje. Javi se supportu ako se ne pojavi brzo.",
+        "buyWithStripe": "Kupi preko Stripe"
+    },
+    "ru": {
+        "working": "Working...",
+        "loadingProducts": "Loading products...",
+        "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
+        "noStoreProducts": "No account-store products are active yet. Use the pricing page for license plans.",
+        "buyPricing": "Open pricing",
+        "copied": "Copied.",
+        "downloadReady": "Opening download...",
+        "extend": "Extend",
+        "renew": "Renew",
+        "copyKey": "Copy key",
+        "download": "Download",
+        "active": "Active",
+        "expired": "Expired",
+        "lifetime": "Never expires",
+        "expires": "Expires",
+        "remaining": "Time left",
+        "email": "Email",
+        "stripeCustomer": "Stripe Customer",
+        "roblox": "Roblox",
+        "noRoblox": "Not linked",
+        "checkout": "Creating Stripe Checkout...",
+        "robloxLookup": "Checking Roblox profile...",
+        "robloxNotFound": "Roblox user was not found.",
+        "invalidEmail": "Use a real email address with a working mail domain.",
+        "invalidRoblox": "Enter a valid Roblox username or leave it empty.",
+        "weakPassword": "Password must be at least 8 characters.",
+        "registered": "Account created. Redirecting...",
+        "loggedIn": "Logged in. Redirecting...",
+        "purchaseProcessing": "Payment is still processing. Checking again...",
+        "purchaseComplete": "Payment complete.",
+        "openMyProducts": "Open My Products",
+        "resetGeneric": "If that email exists, a reset request has been prepared.",
+        "saleTitle": "Current plans",
+        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleEnds": "Sale ends in",
+        "licenseKey": "License key",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Purchased",
+        "licenseAccess": "License access",
+        "productAccess": "Product access",
+        "emailAlreadyRegistered": "Email already registered.",
+        "invalidCredentials": "Invalid email or password.",
+        "unauthorized": "Please log in again.",
+        "checkoutDisabled": "Checkout is disabled right now.",
+        "licenseNotFound": "License was not found on this account.",
+        "licenseBanned": "This license is banned.",
+        "storeNav": "Store",
+        "loginNav": "Login",
+        "logoutNav": "Logout",
+        "dashboardNav": "Account",
+        "myProductsNav": "My Products",
+        "registerEyebrow": "Fima Account",
+        "registerTitle": "Create your Fima account.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "robloxUsername": "Roblox username",
+        "password": "Password",
+        "registerButton": "Register",
+        "loginTitle": "Get back into Fima.",
+        "loginIntro": "Sign in with your Fima username.",
+        "loginButton": "Login",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Set a new password.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Update password",
+        "token": "Reset token",
+        "newPassword": "New password",
+        "dashboardEyebrow": "Account dashboard",
+        "dashboardTitle": "Your Fima account.",
+        "myProductsEyebrow": "My Products",
+        "myProductsTitle": "Purchased products.",
+        "storeEyebrow": "Product store",
+        "storeTitle": "Fima store.",
+        "storeIntro": "Buy products with Stripe checkout and link them to your account.",
+        "paymentSuccessTitle": "Payment complete.",
+        "paymentCancelledTitle": "Payment cancelled.",
+        "total": "Total",
+        "product": "Product",
+        "willBeCreated": "Will be created before checkout",
+        "noLicenses": "No licenses on this account yet.",
+        "productLinked": "Your product is now linked to your Fima account.",
+        "paymentCheckFailed": "Could not check payment.",
+        "paymentReceived": "Payment received.",
+        "purchaseStillProcessing": "Your purchase is still processing. Contact support if it does not appear soon.",
+        "buyWithStripe": "Buy with Stripe"
+    },
+    "es": {
+        "working": "Working...",
+        "loadingProducts": "Loading products...",
+        "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
+        "noStoreProducts": "No account-store products are active yet. Use the pricing page for license plans.",
+        "buyPricing": "Open pricing",
+        "copied": "Copied.",
+        "downloadReady": "Opening download...",
+        "extend": "Extend",
+        "renew": "Renew",
+        "copyKey": "Copy key",
+        "download": "Download",
+        "active": "Active",
+        "expired": "Expired",
+        "lifetime": "Never expires",
+        "expires": "Expires",
+        "remaining": "Time left",
+        "email": "Email",
+        "stripeCustomer": "Stripe Customer",
+        "roblox": "Roblox",
+        "noRoblox": "Not linked",
+        "checkout": "Creating Stripe Checkout...",
+        "robloxLookup": "Checking Roblox profile...",
+        "robloxNotFound": "Roblox user was not found.",
+        "invalidEmail": "Use a real email address with a working mail domain.",
+        "invalidRoblox": "Enter a valid Roblox username or leave it empty.",
+        "weakPassword": "Password must be at least 8 characters.",
+        "registered": "Account created. Redirecting...",
+        "loggedIn": "Logged in. Redirecting...",
+        "purchaseProcessing": "Payment is still processing. Checking again...",
+        "purchaseComplete": "Payment complete.",
+        "openMyProducts": "Open My Products",
+        "resetGeneric": "If that email exists, a reset request has been prepared.",
+        "saleTitle": "Current plans",
+        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleEnds": "Sale ends in",
+        "licenseKey": "License key",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Purchased",
+        "licenseAccess": "License access",
+        "productAccess": "Product access",
+        "emailAlreadyRegistered": "Email already registered.",
+        "invalidCredentials": "Invalid email or password.",
+        "unauthorized": "Please log in again.",
+        "checkoutDisabled": "Checkout is disabled right now.",
+        "licenseNotFound": "License was not found on this account.",
+        "licenseBanned": "This license is banned.",
+        "storeNav": "Store",
+        "loginNav": "Login",
+        "logoutNav": "Logout",
+        "dashboardNav": "Account",
+        "myProductsNav": "My Products",
+        "registerEyebrow": "Fima Account",
+        "registerTitle": "Create your Fima account.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "robloxUsername": "Roblox username",
+        "password": "Password",
+        "registerButton": "Register",
+        "loginTitle": "Get back into Fima.",
+        "loginIntro": "Sign in with your Fima username.",
+        "loginButton": "Login",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Set a new password.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Update password",
+        "token": "Reset token",
+        "newPassword": "New password",
+        "dashboardEyebrow": "Account dashboard",
+        "dashboardTitle": "Your Fima account.",
+        "myProductsEyebrow": "My Products",
+        "myProductsTitle": "Purchased products.",
+        "storeEyebrow": "Product store",
+        "storeTitle": "Fima store.",
+        "storeIntro": "Buy products with Stripe checkout and link them to your account.",
+        "paymentSuccessTitle": "Payment complete.",
+        "paymentCancelledTitle": "Payment cancelled.",
+        "total": "Total",
+        "product": "Product",
+        "willBeCreated": "Will be created before checkout",
+        "noLicenses": "No licenses on this account yet.",
+        "productLinked": "Your product is now linked to your Fima account.",
+        "paymentCheckFailed": "Could not check payment.",
+        "paymentReceived": "Payment received.",
+        "purchaseStillProcessing": "Your purchase is still processing. Contact support if it does not appear soon.",
+        "buyWithStripe": "Buy with Stripe"
+    },
+    "pt": {
+        "working": "Working...",
+        "loadingProducts": "Loading products...",
+        "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
+        "noStoreProducts": "No account-store products are active yet. Use the pricing page for license plans.",
+        "buyPricing": "Open pricing",
+        "copied": "Copied.",
+        "downloadReady": "Opening download...",
+        "extend": "Extend",
+        "renew": "Renew",
+        "copyKey": "Copy key",
+        "download": "Download",
+        "active": "Active",
+        "expired": "Expired",
+        "lifetime": "Never expires",
+        "expires": "Expires",
+        "remaining": "Time left",
+        "email": "Email",
+        "stripeCustomer": "Stripe Customer",
+        "roblox": "Roblox",
+        "noRoblox": "Not linked",
+        "checkout": "Creating Stripe Checkout...",
+        "robloxLookup": "Checking Roblox profile...",
+        "robloxNotFound": "Roblox user was not found.",
+        "invalidEmail": "Use a real email address with a working mail domain.",
+        "invalidRoblox": "Enter a valid Roblox username or leave it empty.",
+        "weakPassword": "Password must be at least 8 characters.",
+        "registered": "Account created. Redirecting...",
+        "loggedIn": "Logged in. Redirecting...",
+        "purchaseProcessing": "Payment is still processing. Checking again...",
+        "purchaseComplete": "Payment complete.",
+        "openMyProducts": "Open My Products",
+        "resetGeneric": "If that email exists, a reset request has been prepared.",
+        "saleTitle": "Current plans",
+        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleEnds": "Sale ends in",
+        "licenseKey": "License key",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Purchased",
+        "licenseAccess": "License access",
+        "productAccess": "Product access",
+        "emailAlreadyRegistered": "Email already registered.",
+        "invalidCredentials": "Invalid email or password.",
+        "unauthorized": "Please log in again.",
+        "checkoutDisabled": "Checkout is disabled right now.",
+        "licenseNotFound": "License was not found on this account.",
+        "licenseBanned": "This license is banned.",
+        "storeNav": "Store",
+        "loginNav": "Login",
+        "logoutNav": "Logout",
+        "dashboardNav": "Account",
+        "myProductsNav": "My Products",
+        "registerEyebrow": "Fima Account",
+        "registerTitle": "Create your Fima account.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "robloxUsername": "Roblox username",
+        "password": "Password",
+        "registerButton": "Register",
+        "loginTitle": "Get back into Fima.",
+        "loginIntro": "Sign in with your Fima username.",
+        "loginButton": "Login",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Set a new password.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Update password",
+        "token": "Reset token",
+        "newPassword": "New password",
+        "dashboardEyebrow": "Account dashboard",
+        "dashboardTitle": "Your Fima account.",
+        "myProductsEyebrow": "My Products",
+        "myProductsTitle": "Purchased products.",
+        "storeEyebrow": "Product store",
+        "storeTitle": "Fima store.",
+        "storeIntro": "Buy products with Stripe checkout and link them to your account.",
+        "paymentSuccessTitle": "Payment complete.",
+        "paymentCancelledTitle": "Payment cancelled.",
+        "total": "Total",
+        "product": "Product",
+        "willBeCreated": "Will be created before checkout",
+        "noLicenses": "No licenses on this account yet.",
+        "productLinked": "Your product is now linked to your Fima account.",
+        "paymentCheckFailed": "Could not check payment.",
+        "paymentReceived": "Payment received.",
+        "purchaseStillProcessing": "Your purchase is still processing. Contact support if it does not appear soon.",
+        "buyWithStripe": "Buy with Stripe"
+    },
+    "ar": {
+        "working": "Working...",
+        "loadingProducts": "Loading products...",
+        "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
+        "noStoreProducts": "No account-store products are active yet. Use the pricing page for license plans.",
+        "buyPricing": "Open pricing",
+        "copied": "Copied.",
+        "downloadReady": "Opening download...",
+        "extend": "Extend",
+        "renew": "Renew",
+        "copyKey": "Copy key",
+        "download": "Download",
+        "active": "Active",
+        "expired": "Expired",
+        "lifetime": "Never expires",
+        "expires": "Expires",
+        "remaining": "Time left",
+        "email": "Email",
+        "stripeCustomer": "Stripe Customer",
+        "roblox": "Roblox",
+        "noRoblox": "Not linked",
+        "checkout": "Creating Stripe Checkout...",
+        "robloxLookup": "Checking Roblox profile...",
+        "robloxNotFound": "Roblox user was not found.",
+        "invalidEmail": "Use a real email address with a working mail domain.",
+        "invalidRoblox": "Enter a valid Roblox username or leave it empty.",
+        "weakPassword": "Password must be at least 8 characters.",
+        "registered": "Account created. Redirecting...",
+        "loggedIn": "Logged in. Redirecting...",
+        "purchaseProcessing": "Payment is still processing. Checking again...",
+        "purchaseComplete": "Payment complete.",
+        "openMyProducts": "Open My Products",
+        "resetGeneric": "If that email exists, a reset request has been prepared.",
+        "saleTitle": "Current plans",
+        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleEnds": "Sale ends in",
+        "licenseKey": "License key",
+        "plan": "Plan",
+        "status": "Status",
+        "purchased": "Purchased",
+        "licenseAccess": "License access",
+        "productAccess": "Product access",
+        "emailAlreadyRegistered": "Email already registered.",
+        "invalidCredentials": "Invalid email or password.",
+        "unauthorized": "Please log in again.",
+        "checkoutDisabled": "Checkout is disabled right now.",
+        "licenseNotFound": "License was not found on this account.",
+        "licenseBanned": "This license is banned.",
+        "storeNav": "Store",
+        "loginNav": "Login",
+        "logoutNav": "Logout",
+        "dashboardNav": "Account",
+        "myProductsNav": "My Products",
+        "registerEyebrow": "Fima Account",
+        "registerTitle": "Create your Fima account.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "robloxUsername": "Roblox username",
+        "password": "Password",
+        "registerButton": "Register",
+        "loginTitle": "Get back into Fima.",
+        "loginIntro": "Sign in with your Fima username.",
+        "loginButton": "Login",
+        "forgotTitle": "Reset with Discord.",
+        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotButton": "Send Discord code",
+        "resetTitle": "Set a new password.",
+        "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
+        "resetButton": "Update password",
+        "token": "Reset token",
+        "newPassword": "New password",
+        "dashboardEyebrow": "Account dashboard",
+        "dashboardTitle": "Your Fima account.",
+        "myProductsEyebrow": "My Products",
+        "myProductsTitle": "Purchased products.",
+        "storeEyebrow": "Product store",
+        "storeTitle": "Fima store.",
+        "storeIntro": "Buy products with Stripe checkout and link them to your account.",
+        "paymentSuccessTitle": "Payment complete.",
+        "paymentCancelledTitle": "Payment cancelled.",
+        "total": "Total",
+        "product": "Product",
+        "willBeCreated": "Will be created before checkout",
+        "noLicenses": "No licenses on this account yet.",
+        "productLinked": "Your product is now linked to your Fima account.",
+        "paymentCheckFailed": "Could not check payment.",
+        "paymentReceived": "Payment received.",
+        "purchaseStillProcessing": "Your purchase is still processing. Contact support if it does not appear soon.",
+        "buyWithStripe": "Buy with Stripe"
+    }
+};
+
+  const t = (key) => (copy[language()] || copy.en)[key] || copy.en[key] || key;
+  const setText = (selector, value, root = document) => {
+    const node = $(selector, root);
+    if (node) node.textContent = value;
+  };
+  const setAllText = (selector, value) => {
+    $$(selector).forEach((node) => { node.textContent = value; });
+  };
+  const setLabel = (inputSelector, value) => {
+    const input = $(inputSelector);
+    const label = input?.closest("label");
+    if (!label) return;
+    const textNode = Array.from(label.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+    if (textNode) textNode.nodeValue = value;
+    else label.prepend(document.createTextNode(value));
+  };
+  const setHeroCopy = (eyebrow, title, intro) => {
+    setText(".eyebrow", eyebrow);
+    setText("h1", title);
+    const introNode = $(".auth-intro > div > p:not(.eyebrow), .account-lead, .shell > section > p:not(.eyebrow), .shell > p:not(.eyebrow)");
+    if (introNode) introNode.textContent = intro;
+  };
+  const applyStaticTranslations = () => {
+    document.documentElement.lang = language();
+    setAllText(".links a[href='store.html']", t("storeNav"));
+    setAllText(".links a[href='login.html']", t("loginNav"));
+    setAllText(".links a[href='dashboard.html']", t("dashboardNav"));
+    setAllText(".links a[href='my-products.html']", t("myProductsNav"));
+    setAllText("[data-logout]", t("logoutNav"));
+
+    if (page === "register") {
+      setHeroCopy(t("registerEyebrow"), t("registerTitle"), t("registerIntro"));
+      setLabel("input[name='username']", language() === "tr" ? "Kullanici adi" : "Username");
+      setLabel("input[name='robloxUsername']", language() === "tr" ? "Roblox kullanici adi (opsiyonel)" : "Roblox username (optional)");
+      setLabel("input[name='referralCode']", language() === "tr" ? "Referral / davet kodu (opsiyonel)" : "Referral / invite code (optional)");
+      setLabel("input[name='password']", t("password"));
+      setLabel("input[name='confirmPassword']", t("confirmPassword"));
+      setText("button[type='submit']", t("registerButton"));
+      const warning = $(".recovery-warning");
+      if (warning) warning.textContent = language() === "tr"
+        ? "Uyari: Discord'u daha sonra baglamazsan sifreni unutunca hesap kurtarma mumkun olmayabilir."
+        : "Warning: If you do not link Discord later, password recovery may not be possible.";
+    }
+    if (page === "login") {
+      setHeroCopy("Fima Account", t("loginTitle"), t("loginIntro"));
+      setLabel("input[name='login']", language() === "tr" ? "Kullanici adi" : "Username");
+      setLabel("input[name='password']", t("password"));
+      setText("button[type='submit']", t("loginButton"));
+      setText("a[href='forgot-password.html']", t("forgotTitle"));
+    }
+    if (page === "forgot") {
+      setHeroCopy("Fima Account", t("forgotTitle"), t("forgotIntro"));
+      setLabel("input[name='login']", language() === "tr" ? "Fima kullanici adi" : "Fima username");
+      setText("button[type='submit']", t("forgotButton"));
+    }
+    if (page === "reset") {
+      setHeroCopy("Fima Account", t("resetTitle"), t("resetIntro"));
+      setLabel("input[name='token']", t("token"));
+      setLabel("input[name='password']", t("newPassword"));
+      setLabel("input[name='confirmPassword']", t("confirmPassword"));
+      setText("button[type='submit']", t("resetButton"));
+    }
+    if (page === "dashboard") {
+      setHeroCopy(t("dashboardEyebrow"), t("dashboardTitle"), "");
+      const rows = $$(".row span");
+      if (rows[0]) rows[0].textContent = language() === "tr" ? "Kullanici adi" : "Username";
+      if (rows[1]) rows[1].textContent = t("email");
+      if (rows[2]) rows[2].textContent = t("stripeCustomer");
+      if (rows[3]) rows[3].textContent = language() === "tr" ? "Roblox opsiyonel" : "Roblox optional";
+      setText(".account-summary-card h2", t("dashboardNav"));
+      const headings = $$(".account-section h2");
+      if (headings[0]) headings[0].textContent = t("emailVerificationTitle");
+      if (headings[1]) headings[1].textContent = t("connectedAccounts");
+      if (headings[2]) headings[2].textContent = t("giftSystemTitle");
+      if (headings[3]) headings[3].textContent = t("giftAccessTitle");
+      if (headings[4]) headings[4].textContent = t("referralRewardsTitle");
+      if (headings[5]) headings[5].textContent = t("freeMonthlyTrial");
+      if (headings[6]) headings[6].textContent = t("myProductsTitle");
+      if (headings[7]) headings[7].textContent = t("licenseAccess");
+      const sections = $$(".account-section");
+      const sectionIntro = (index, value) => {
+        const node = sections[index]?.querySelector(".section-heading p:not(.eyebrow)");
+        if (node) node.textContent = value;
+      };
+      sectionIntro(0, t("emailVerificationIntro"));
+      sectionIntro(1, language() === "tr"
+        ? "Discord sadece free trial veya opsiyonel kurtarma icin gerekir. Roblox web sitesinde hicbir islemi engellemez."
+        : "Discord is only required for the free trial or optional recovery. Roblox never blocks website actions.");
+      sectionIntro(2, t("giftSystemIntro"));
+      sectionIntro(3, t("giftAccessIntro"));
+      sectionIntro(4, t("referralRewardsIntro"));
+      const eyebrows = $$(".account-section .eyebrow");
+      if (eyebrows[0]) eyebrows[0].textContent = t("emailVerificationEyebrow");
+      if (eyebrows[1]) eyebrows[1].textContent = t("accountLinksEyebrow");
+      if (eyebrows[2]) eyebrows[2].textContent = t("giftSystemEyebrow");
+      if (eyebrows[3]) eyebrows[3].textContent = t("giftAccessEyebrow");
+      if (eyebrows[4]) eyebrows[4].textContent = t("referralRewardsEyebrow");
+      if (eyebrows[5]) eyebrows[5].textContent = t("freeTrialEyebrow");
+    }
+    if (page === "my-products") setHeroCopy(t("myProductsEyebrow"), t("myProductsTitle"), "");
+    if (page === "store") setHeroCopy(t("storeEyebrow"), t("storeTitle"), t("storeIntro"));
+    if (page === "payment-success") setText("#result h1", t("paymentSuccessTitle"));
+  };
+  const saleEndsAt = new Date("2026-06-03T23:59:59+02:00");
+
+  const escapeHtml = (value = "") =>
+    String(value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[char]));
+
+  const money = (amount, currency = "eur") =>
+    new Intl.NumberFormat(language() === "tr" ? "tr-TR" : "en-US", {
+      style: "currency",
+      currency: String(currency || "eur").toUpperCase()
+    }).format((amount || 0) / 100);
+
+  const date = (value) => value ? new Date(value).toLocaleString(language() === "tr" ? "tr-TR" : undefined) : "-";
+  const duration = (seconds) => {
+    const total = Math.max(0, Number(seconds || 0));
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = Math.floor(total % 60);
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+    return `${minutes}m ${secs}s`;
+  };
+
+  const api = async (path, options = {}) => {
+    let response;
+    try {
+      response = await fetch(`${apiBase}${path}`, {
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        ...options
+      });
+    } catch (error) {
+      throw new Error(t("networkError"));
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.message || formatError(data.error || "request_failed"));
+      error.status = response.status;
+      error.code = data.error || "request_failed";
+      error.details = data;
+      throw error;
+    }
+    return data;
+  };
+
+  const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+  let currentUserPromise = null;
+
+  const getOptionalAccount = async () => {
+    if (!currentUserPromise) {
+      currentUserPromise = api("/api/auth/me")
+        .then((data) => data.user || null)
+        .catch(() => null);
+    }
+    return currentUserPromise;
+  };
+
+  const accountProfile = (user) => {
+    if (user?.username || user?.displayName) {
+      return {
+        label: user.username || user.displayName,
+        sub: user.discordUserId ? "Discord recovery linked" : t("recoveryNotLinked"),
+        avatar: user.discordAvatarUrl || user.robloxAvatarUrl || "",
+        fallback: String(user.username || user.displayName || "F").charAt(0).toUpperCase()
+      };
+    }
+    if (user?.robloxUsername) {
+      return {
+        label: user.robloxUsername,
+        sub: user.robloxUserId || "Roblox",
+        avatar: user.robloxAvatarUrl || "",
+        fallback: "R"
+      };
+    }
+    if (user?.discordUsername) {
+      return {
+        label: user.discordUsername,
+        sub: user.discordUserId || "Discord",
+        avatar: user.discordAvatarUrl || "",
+        fallback: "D"
+      };
+    }
+    if (user?.email) {
+      return {
+        label: user.email.split("@")[0],
+        sub: user.email,
+        avatar: "",
+        fallback: "F"
+      };
+    }
+    return { label: t("accountNavProfileFallback"), sub: "Fima", avatar: "", fallback: "F" };
+  };
+
+  const profileChip = (user) => {
+    const profile = accountProfile(user);
+    return `
+      <button class="account-nav-profile" type="button" data-account-menu-toggle aria-expanded="false" aria-label="${escapeHtml(profile.label)}">
+        ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+        <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
+      </button>
+    `;
+  };
+
+  const profileDropdown = (user) => {
+    const profile = accountProfile(user);
+    const planLabel = user?.subscriptionStatus ? String(user.subscriptionStatus) : t("noActiveSubscription");
+    return `
+      <div class="account-profile-menu" data-account-menu>
+        ${profileChip(user)}
+        <div class="account-profile-dropdown" data-account-menu-panel hidden>
+          <div class="account-profile-summary">
+            ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+            <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(planLabel)}</small></div>
+          </div>
+          <a class="account-dropdown-link" href="dashboard.html">${t("dashboardNav")}</a>
+          <a class="account-dropdown-link" href="my-products.html">${t("myProductsNav")}</a>
+          <a class="account-dropdown-link" href="dashboard.html#gift-access">${t("redeemGiftNav")}</a>
+          <a class="account-dropdown-link" href="dashboard.html#purchased-gifts">${t("purchasedGiftCodesNav")}</a>
+          <a class="account-dropdown-link" href="dashboard.html#billing">${t("billingNav")}</a>
+          <a class="account-dropdown-link" href="dashboard.html#account-settings">${t("accountSettingsNav")}</a>
+          <a class="account-dropdown-link" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
+          <a class="account-dropdown-link" href="support.html">${t("supportNav")}</a>
+          <button class="account-dropdown-link" type="button" data-logout>${t("logoutNav")}</button>
+          ${user?.discordUserId ? "" : `<a class="account-dropdown-warning" href="${apiBase}/auth/discord/start">${t("recoveryNotLinked")} - ${t("linkDiscordRecovery")}</a>`}
+        </div>
+      </div>
+    `;
+  };
+
+  const wireAccountDropdown = () => {
+    const menu = $("[data-account-menu]");
+    if (!menu || menu.dataset.wired === "1") return;
+    menu.dataset.wired = "1";
+    const toggle = $("[data-account-menu-toggle]", menu);
+    const panel = $("[data-account-menu-panel]", menu);
+    const setOpen = (open) => {
+      if (!panel || !toggle) return;
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    toggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(panel?.hidden);
+    });
+    document.addEventListener("click", (event) => {
+      if (!menu.contains(event.target)) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
+  };
+
+  const renderAccountHeader = (user) => {
+    const nav = $(".account-header .nav");
+    if (!nav) return;
+    nav.innerHTML = `
+      <a class="brand" href="index.html"><img src="assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a>
+      <div class="links account-main-links">
+        ${user ? `
+          <a class="${page === "my-products" ? "is-active" : ""}" href="my-products.html">${t("myProductsNav")}</a>
+          <a href="dashboard.html#gift-access">${t("redeemGiftNav")}</a>
+          <a href="pricing.html">${t("buyPricing")}</a>
+        ` : `
+          <a class="${page === "login" ? "is-active" : ""}" href="login.html">${t("loginNav")}</a>
+          <a class="nav-register-cta ${page === "register" ? "is-active" : ""}" href="register.html">${t("registerButton")}</a>
+          <a class="nav-buy-cta" href="pricing.html">${t("buyPricing")}</a>
+        `}
+      </div>
+      <div class="account-header-actions">
+        ${user ? profileDropdown(user) : ""}
+      </div>
+    `;
+    wireAccountDropdown();
+  };
+
+  const hydrateAccountHeader = async () => {
+    renderAccountHeader(null);
+    const user = await getOptionalAccount();
+    renderAccountHeader(user);
+    return user;
+  };
+
+  const formatError = (code) => ({
+    invalid_email: t("invalidEmail"),
+    invalid_username: t("invalidUsername"),
+    email_domain_has_no_mail: t("invalidEmail"),
+    weak_password: t("weakPassword"),
+    invalid_roblox_username: t("invalidRoblox"),
+    roblox_user_not_found: t("robloxNotFound"),
+    email_already_registered: t("emailAlreadyRegistered"),
+    invalid_credentials: t("invalidCredentials"),
+    unauthorized: t("unauthorized"),
+    checkout_disabled: t("checkoutDisabled"),
+    license_not_found: t("licenseNotFound"),
+    license_banned: t("licenseBanned"),
+    not_logged_in: t("unauthorized"),
+    discord_not_connected: t("discordNotConnected"),
+    roblox_not_connected: t("robloxNotConnected"),
+    trial_cooldown_active: t("trialCooldownActive"),
+    trial_already_active: t("trialAlreadyActive"),
+    invalid_referral_code: t("invalidReferralCode"),
+    referral_already_used: t("referralAlreadyUsed"),
+    self_referral_not_allowed: t("selfReferralNotAllowed"),
+    referral_apply_failed: t("invalidReferralCode"),
+    invalid_gift_code: t("giftCodeNotFound"),
+    gift_code_not_found: t("giftCodeNotFound"),
+    gift_code_redeemed: t("giftAlreadyRedeemed"),
+    already_redeemed: t("giftAlreadyRedeemed"),
+    gift_code_expired: t("giftExpired"),
+    expired: t("giftExpired"),
+    gift_code_revoked: t("giftExpired"),
+    revoked: t("giftExpired"),
+    gift_package_not_found: t("giftCodeNotFound"),
+    gift_package_expired: t("giftExpired"),
+    gift_package_claimed: t("giftAlreadyRedeemed"),
+    package_not_found: t("giftCodeNotFound"),
+    package_expired: t("giftExpired"),
+    package_claimed: t("giftAlreadyRedeemed"),
+    package_revoked: t("giftExpired"),
+    already_claimed: t("giftAlreadyRedeemed"),
+    invalid_verification_code: t("invalidVerificationCode"),
+    invalid_or_expired_verification_code: t("invalidOrExpiredVerificationCode"),
+    email_verification_failed: t("invalidOrExpiredVerificationCode"),
+    email_verification_send_failed: t("verificationSendFailed"),
+    email_delivery_failed: t("resetEmailFailed"),
+    password_reset_failed: t("resetEmailFailed"),
+    discord_not_linked: t("discordNotLinkedRecovery"),
+    discord_user_not_linked: t("discordNotLinkedRecovery"),
+    discord_dm_blocked: t("discordDmBlocked"),
+    discord_bot_not_ready: t("discordBotOffline"),
+    discord_user_not_found: t("discordNotLinkedRecovery"),
+    discord_recovery_failed: t("resetEmailFailed"),
+    invalid_reset_request: t("weakPassword"),
+    invalid_or_expired_token: t("invalidOrExpiredVerificationCode"),
+    discord_required: t("discordNotConnected"),
+    roblox_required: t("robloxNotConnected"),
+    account_mismatch: t("giftExpired"),
+    direct_package_expired: t("giftExpired"),
+    direct_package_already_claimed: t("giftAlreadyRedeemed")
+  }[code] || String(code || "Request failed").replaceAll("_", " "));
+
+  const setMessage = (text, type = "") => {
+    const node = $("#message");
+    if (!node) return;
+    node.textContent = text || "";
+    node.className = `message ${type}`.trim();
+  };
+
+  const initOauthFlash = () => {
+    const params = new URLSearchParams(location.search);
+    const error = params.get("error");
+    if (!error) return;
+    const messages = {
+      roblox_rate_limited: state.language === "tr"
+        ? "Roblox bu ba\u011flant\u0131 denemesini rate limitledi. Birka\u00e7 dakika bekleyip tekrar dene."
+        : "Roblox is rate limiting this login attempt. Please wait a few minutes and try again.",
+      roblox_oauth_cooldown: state.language === "tr"
+        ? "Roblox ba\u011flant\u0131s\u0131 zaten ba\u015flat\u0131ld\u0131. L\u00fctfen birka\u00e7 saniye bekle."
+        : "Roblox linking already started. Please wait a few seconds.",
+      duplicate_oauth_callback: state.language === "tr"
+        ? "Bu Roblox ba\u011flant\u0131 iste\u011fi zaten i\u015flendi. Dashboard'u yenileyebilirsin."
+        : "This Roblox link request was already handled. Refresh the dashboard.",
+      roblox_oauth_state_invalid: state.language === "tr"
+        ? "Roblox ba\u011flant\u0131 oturumu s\u00fcresi doldu. Tekrar Connect Roblox'a bas."
+        : "Roblox link session expired. Click Connect Roblox again."
+    };
+    setMessage(messages[error] || errorMessage(error), "error");
+  };
+
+  const requireLogin = async () => {
+    try {
+      return (await api("/api/auth/me")).user;
+    } catch {
+      window.location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+      return null;
+    }
+  };
+
+  const initLogout = () => {
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-logout]");
+      if (!button) return;
+      button.disabled = true;
+      currentUserPromise = null;
+      await post("/api/auth/logout", {});
+      window.location.href = "login.html";
+    });
+  };
+
+  const initAuthForm = (endpoint, successTarget) => {
+    const form = $("form[data-auth-form]");
+    if (!form) return;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      setMessage(t("working"));
+      try {
+        const password = form.password?.value || "";
+        let payload;
+        if (endpoint.includes("register")) {
+          const username = (form.username?.value || "").trim();
+          const email = (form.email?.value || "").trim();
+          const confirm = form.confirmPassword?.value || "";
+          if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)) throw new Error(t("invalidUsername"));
+          if (password !== confirm) throw new Error(t("passwordMismatch"));
+          payload = {
+            username,
+            usernameOnly: !email,
+            email,
+            password,
+            robloxUsername: form.robloxUsername?.value || "",
+            referralCode: form.referralCode?.value || ""
+          };
+        } else {
+          const login = (form.login?.value || form.email?.value || "").trim();
+          payload = { login, email: login, username: login, password };
+        }
+        await post(endpoint, payload);
+        currentUserPromise = null;
+        setMessage(endpoint.includes("register") ? t("registered") : t("loggedIn"), "good");
+        const next = new URLSearchParams(location.search).get("next") || successTarget;
+        window.setTimeout(() => { window.location.href = next; }, 400);
+      } catch (error) {
+        setMessage(error.message, "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  };
+
+  const initRobloxPreview = () => {
+    const input = $("#robloxUsername");
+    const preview = $("#robloxPreview");
+    if (!input || !preview) return;
+    let timer;
+    const renderEmpty = () => {
+      preview.innerHTML = `<div class="avatar-placeholder">R</div><div><strong>${t("roblox")}</strong><span>${t("noRoblox")}</span></div>`;
+    };
+    const lookup = () => {
+      window.clearTimeout(timer);
+      const username = input.value.trim();
+      if (!username) {
+        renderEmpty();
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        preview.innerHTML = `<div class="avatar-placeholder">...</div><div><strong>${t("roblox")}</strong><span>${t("robloxLookup")}</span></div>`;
+        try {
+          const data = await post("/api/auth/roblox-preview", { robloxUsername: username });
+          const profile = data.profile;
+          preview.innerHTML = `<img src="${escapeHtml(profile.avatarUrl || "assets/images/fima-logo.png")}" alt=""><div><strong>${escapeHtml(profile.displayName || profile.username)}</strong><span>@${escapeHtml(profile.username)}</span></div>`;
+        } catch {
+          preview.innerHTML = `<div class="avatar-placeholder">!</div><div><strong>${t("roblox")}</strong><span>${t("robloxNotFound")}</span></div>`;
+        }
+      }, 450);
+    };
+    renderEmpty();
+    input.addEventListener("input", lookup);
+  };
+
+  const initReferralPrefill = () => {
+    const input = $("input[name='referralCode']");
+    const notice = $("#referralNotice");
+    if (!input) return;
+    const ref = new URLSearchParams(location.search).get("ref") || "";
+    if (ref) {
+      input.value = ref;
+      if (notice) notice.innerHTML = `<strong>${escapeHtml(t("referralOptional"))}</strong><span>${escapeHtml(t("referralPrefilled"))}</span>`;
+    } else if (notice) {
+      notice.innerHTML = `<strong>${escapeHtml(t("referralOptional"))}</strong><span>${escapeHtml(t("referralApplyIntro"))}</span>`;
+    }
+  };
+
+  const initForgotPassword = () => {
+    const form = $("form[data-forgot-form]");
+    if (!form) return;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      setMessage(t("working"));
+      try {
+        const login = (form.login?.value || form.email?.value || "").trim();
+        const data = await post("/api/auth/forgot-password", { login, username: login, method: "discord" });
+        setMessage(data.resetUrl ? `Dev reset URL: ${data.resetUrl}` : (data.message || t("resetCodeSent")), "good");
+        window.setTimeout(() => {
+          window.location.href = `reset-password.html?login=${encodeURIComponent(login)}`;
+        }, 850);
+      } catch (error) {
+        setMessage(error.message, "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  };
+
+  const initResetPassword = () => {
+    const form = $("form[data-reset-form]");
+    if (!form) return;
+    form.token.value = new URLSearchParams(location.search).get("token") || "";
+    const strength = $("[data-password-strength]");
+    const scorePassword = (value) => {
+      let score = 0;
+      if (value.length >= 8) score += 1;
+      if (/[A-Z]/.test(value)) score += 1;
+      if (/[a-z]/.test(value)) score += 1;
+      if (/\d/.test(value)) score += 1;
+      if (/[^A-Za-z0-9]/.test(value)) score += 1;
+      return score;
+    };
+    const updateStrength = () => {
+      if (!strength) return;
+      const score = scorePassword(form.password.value || "");
+      const labels = ["Easy", "Easy", "Normal", "Hard", "Hard", "Impossible"];
+      strength.dataset.score = String(score);
+      const meter = strength.querySelector("span");
+      const label = strength.querySelector("small");
+      if (meter) meter.style.width = `${Math.max(8, score * 20)}%`;
+      if (label) label.textContent = `${t("passwordStrength")}: ${labels[score]}`;
+    };
+    form.password.addEventListener("input", updateStrength);
+    updateStrength();
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      setMessage(t("working"));
+      try {
+        if (form.confirmPassword && form.password.value !== form.confirmPassword.value) {
+          throw new Error(t("passwordMismatch"));
+        }
+        await post("/api/auth/reset-password", { token: form.token.value, password: form.password.value });
+        setMessage(t("resetComplete"), "good");
+        window.setTimeout(() => { window.location.href = "login.html"; }, 900);
+      } catch (error) {
+        setMessage(error.message, "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  };
+
+  const saleBanner = () => `
+    <section class="sale-panel">
+      <div>
+        <span class="sale-kicker">${t("saleTitle")}</span>
+        <strong>${t("saleText")}</strong>
+      </div>
+      <div class="sale-clock"><span>${t("saleEnds")}</span><b data-sale-countdown>${duration((saleEndsAt.getTime() - Date.now()) / 1000)}</b></div>
+    </section>
+  `;
+
+  const renderProducts = (products) => {
+    const target = $("#products");
+    if (!target) return;
+    target.innerHTML = products.length ? products.map((product) => `
+      <article class="product-card">
+        <div class="card-top">
+          <div>
+            <span class="pill">${escapeHtml(product.category || "Fima")}</span>
+            <h3>${escapeHtml(product.name)}</h3>
+          </div>
+          <span class="price">${product.price ? money(product.price.amount, product.price.currency) : "-"}</span>
+        </div>
+        <p>${escapeHtml(product.description || "Premium Fima Macro product access.")}</p>
+        <button class="button" type="button" data-buy-product="${escapeHtml(product.id)}" ${product.price ? "" : "disabled"}>${t("buyWithStripe")}</button>
+      </article>
+    `).join("") : `<div class="empty-state"><h3>${t("noStoreProducts")}</h3><a class="button" href="pricing.html">${t("buyPricing")}</a></div>`;
+  };
+
+  const initStore = async () => {
+    const target = $("#products");
+    if (!target) return;
+    target.innerHTML = `<div class="panel panel-pad">${t("loadingProducts")}</div>`;
+    const user = await requireLogin();
+    if (!user) return;
+    renderAccountHeader(user);
+    $("#storeSale")?.insertAdjacentHTML("afterbegin", saleBanner());
+    const data = await api("/api/store/products");
+    renderProducts(data.products || []);
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-buy-product]");
+      if (!button) return;
+      button.disabled = true;
+      setMessage(t("checkout"));
+      try {
+        const checkout = await post("/api/store/checkout", { productId: button.dataset.buyProduct });
+        window.location.href = checkout.url;
+      } catch (error) {
+        setMessage(error.message, "error");
+        button.disabled = false;
+      }
+    });
+  };
+
+  const statusLabel = (item) => {
+    if (item.license?.lifetime) return t("lifetime");
+    if (item.license?.expired) return t("expired");
+    if (item.license?.status === "active") return t("active");
+    return item.license?.status || item.status || "-";
+  };
+
+  const productCard = (item) => {
+    const license = item.license;
+    const hasLicense = Boolean(license?.licenseKey);
+    return `
+      <article class="access-card ${license?.expired ? "is-expired" : ""}">
+        <div class="access-head">
+          <div>
+            <span class="pill">${escapeHtml(hasLicense ? t("licenseAccess") : t("productAccess"))}</span>
+            <h3>${escapeHtml(item.name || "Fima Macro")}</h3>
+          </div>
+          <span class="status-pill">${escapeHtml(statusLabel(item))}</span>
+        </div>
+        ${hasLicense ? `
+          <div class="key-box">
+            <span>${t("licenseKey")}</span>
+            <code>${escapeHtml(license.licenseKey)}</code>
+          </div>
+          <div class="metric-grid">
+            <div><span>${t("plan")}</span><strong>${escapeHtml(license.planLabel || license.plan)}</strong></div>
+            <div><span>${t("expires")}</span><strong>${license.lifetime ? t("lifetime") : date(license.expiresAt)}</strong></div>
+            <div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(license.expiresAt || "")}">${license.lifetime ? t("lifetime") : duration(license.remainingSeconds)}</strong></div>
+          </div>
+          <div class="access-actions">
+            <button class="button secondary" type="button" data-copy="${escapeHtml(license.licenseKey)}">${t("copyKey")}</button>
+            <button class="button" type="button" data-download-license="${escapeHtml(license.licenseKey)}">${t("download")}</button>
+            ${license.canExtend ? `<button class="button secondary" type="button" data-extend-license="${escapeHtml(license.licenseKey)}" data-plan="${escapeHtml(license.plan)}">${license.expired ? t("renew") : t("extend")}</button>` : ""}
+          </div>
+        ` : `
+          <p>${escapeHtml(item.product?.description || "Purchased product access is linked to this account.")}</p>
+          <div class="metric-grid">
+            <div><span>${t("status")}</span><strong>${escapeHtml(item.status)}</strong></div>
+            <div><span>${t("purchased")}</span><strong>${date(item.createdAt)}</strong></div>
+            <div><span>${t("total")}</span><strong>${money(item.amountTotal, item.currency)}</strong></div>
+          </div>
+        `}
+      </article>
+    `;
+  };
+
+  const renderAccountProducts = (items, targetSelector = "#purchases") => {
+    const target = $(targetSelector);
+    if (!target) return;
+    target.innerHTML = items.length
+      ? `<div class="access-grid">${items.map(productCard).join("")}</div>`
+      : `<div class="empty-state"><h3>${t("noProducts")}</h3><a class="button" href="pricing.html">${t("buyPricing")}</a></div>`;
+    updateCountdowns();
+  };
+
+  const renderLicenses = (licenses = []) => {
+    const target = $("#licenses");
+    if (!target) return;
+    target.innerHTML = licenses.length
+      ? `<div class="rows">${licenses.map((license) => `
+          <div class="row">
+            <span>${escapeHtml(license.planLabel || license.plan)}</span>
+            <code>${escapeHtml(license.licenseKey)}</code>
+          </div>
+        `).join("")}</div>`
+      : `<div class="panel panel-pad">${t("noLicenses")}</div>`;
+  };
+
+  const renderAccountSummary = (user) => {
+    $("#accountUsername") && ($("#accountUsername").textContent = user.username || user.loginName || t("accountNavProfileFallback"));
+    $("#accountEmail") && ($("#accountEmail").textContent = user.discordUserId ? t("connected") : t("notConnected"));
+    $("#stripeCustomer") && ($("#stripeCustomer").textContent = user.stripeCustomerId || t("willBeCreated"));
+    const roblox = $("#accountRoblox");
+    if (roblox) {
+      roblox.innerHTML = user.robloxUsername
+        ? `<div class="mini-profile">${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span></span>`}<div><strong>${escapeHtml(user.robloxUsername)}</strong><small>${escapeHtml(user.robloxUserId || "")}</small></div></div>`
+        : t("noRoblox");
+    }
+  };
+
+  const renderEmailVerification = (user = {}) => {
+    const target = $("#emailVerification");
+    if (!target) return;
+    const linked = Boolean(user.discordUserId || user.discordUsername);
+    target.innerHTML = `
+      <div class="verification-card ${linked ? "is-verified" : "is-pending"}">
+        <div class="verification-status">
+          <span class="status-pill">${linked ? t("connected") : t("notConnected")}</span>
+          <div>
+            <strong>${escapeHtml(linked ? (user.discordUsername || user.discordUserId || "Discord recovery linked") : "Discord recovery not linked")}</strong>
+            <small>${linked ? "The Fima bot can DM password reset codes to this Discord account." : "Link Discord to receive password reset codes by DM. Discord is also required for the free trial."}</small>
+          </div>
+        </div>
+        ${!linked ? `
+          <div class="verification-actions">
+            <a class="button" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
+            <a class="button secondary" href="forgot-password.html">${t("forgotTitle")}</a>
+          </div>
+        ` : `
+          <div class="verification-actions">
+            <a class="button secondary" href="forgot-password.html">Send test recovery code</a>
+          </div>
+        `}
+      </div>
+    `;
+  };
+
+  const profileMini = (account, fallbackLabel) => {
+    if (!account?.connected) {
+      return `<div class="mini-profile is-missing"><div class="avatar-placeholder">!</div><div><strong>${escapeHtml(fallbackLabel)}</strong><small>${t("notConnected")}</small></div></div>`;
+    }
+    return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(account.id || "")}</small></div></div>`;
+  };
+
+  const renderConnectedAccounts = (integrations = {}) => {
+    const target = $("#connectedAccounts");
+    if (!target) return;
+    const discord = integrations.discord || {};
+    const roblox = integrations.roblox || {};
+    target.innerHTML = `
+      <div class="integration-grid">
+        <article class="integration-card ${discord.connected ? "is-connected" : "is-missing"}">
+          <div>
+            <span class="pill">${t("discord")}</span>
+            ${profileMini(discord, t("discord"))}
+            <p class="integration-note">Optional for recovery. Required only for the free 1-day trial.</p>
+          </div>
+          <div class="integration-actions">
+            <span class="status-pill">${discord.connected ? t("connected") : t("notConnected")}</span>
+            ${discord.connected
+              ? `<a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=/dashboard.html">${t("reconnectDiscord")}</a><button class="button danger" type="button" data-disconnect-provider="discord">${t("disconnectDiscord")}</button>`
+              : `<a class="button" href="${apiBase}/auth/discord/start?returnTo=/dashboard.html">${t("connectDiscord")}</a>`}
+          </div>
+        </article>
+        <article class="integration-card ${roblox.connected ? "is-connected" : "is-missing"}">
+          <div>
+            <span class="pill">${t("roblox")}</span>
+            ${profileMini(roblox, t("roblox"))}
+            <p class="integration-note">Optional profile link. Roblox never blocks website purchases, gifts or login.</p>
+          </div>
+          <div class="integration-actions">
+            <span class="status-pill">${roblox.connected ? t("connected") : t("notConnected")}</span>
+            ${roblox.connected
+              ? `<a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=/dashboard.html">${t("reconnectRoblox")}</a><button class="button danger" type="button" data-disconnect-provider="roblox">${t("disconnectRoblox")}</button>`
+              : `<a class="button" href="${apiBase}/auth/roblox/start?returnTo=/dashboard.html">${t("connectRoblox")}</a>`}
+          </div>
+        </article>
+      </div>
+    `;
+  };
+
+  const requirementLabel = (id) => ({
+    account: t("accountLoggedIn"),
+    discord: t("discordConnected"),
+    roblox: t("robloxConnected")
+  }[id] || id);
+
+  const renderMonthlyTrial = (trial = {}) => {
+    const target = $("#monthlyTrial");
+    if (!target) return;
+    const requirements = trial.requirements || [];
+    const statusText = trial.active ? t("trialActive") : trial.cooldownActive ? t("trialCooldown") : trial.eligible ? t("trialAvailable") : t("trialLocked");
+    const missingDiscord = requirements.some((item) => item.id === "discord" && !item.complete);
+    const missingRoblox = false;
+    target.innerHTML = `
+      <div class="trial-card">
+        <div class="trial-main">
+          <div class="card-top">
+            <div>
+              <span class="pill">${statusText}</span>
+              <h3>${t("trialRequirements")}</h3>
+            </div>
+            <span class="status-pill">${statusText}</span>
+          </div>
+          <p>${t("trialIntro")}</p>
+          <div class="requirement-list">
+            ${requirements.map((item) => `<div class="requirement ${item.complete ? "is-complete" : "is-missing"}"><span>${item.complete ? "OK" : "!"}</span><strong>${escapeHtml(requirementLabel(item.id))}</strong></div>`).join("")}
+          </div>
+          ${missingDiscord ? `<div class="trial-hint"><span>${t("connectDiscordTrial")}</span><a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=/dashboard.html">${t("connectDiscord")}</a></div>` : ""}
+          ${missingRoblox ? `<div class="trial-hint"><span>${t("connectRobloxTrial")}</span><a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=/dashboard.html">${t("connectRoblox")}</a></div>` : ""}
+          ${!missingDiscord && !trial.active && !trial.cooldownActive ? `<div class="trial-hint is-ready"><span>${t("requirementsComplete")}</span></div>` : ""}
+        </div>
+        <aside class="trial-side">
+          ${trial.active ? `<div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong></div>` : ""}
+          ${trial.nextTrialAvailableAt ? `<div><span>${t("nextTrial")}</span><strong>${date(trial.nextTrialAvailableAt)}</strong><small data-countdown="${escapeHtml(trial.nextTrialAvailableAt)}">${duration(trial.cooldownSeconds)}</small></div>` : ""}
+          ${trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(trial.activeLicense.licenseKey)}</code></div>` : ""}
+          <button class="button" type="button" data-claim-trial ${trial.eligible ? "" : "disabled"}>${t("claimTrial")}</button>
+        </aside>
+      </div>
+    `;
+    updateCountdowns();
+  };
+
+  const giftCodeStatusLabel = (status, used) => {
+    const clean = String(status || "").toLowerCase();
+    if (used || clean === "redeemed") return t("usedGiftCode");
+    if (clean === "revoked") return t("revokedGiftCode");
+    if (clean === "expired") return t("expired");
+    return t("unusedGiftCode");
+  };
+
+  const renderPurchasedGiftCodeCard = (item) => {
+    const code = item.giftCode || item.maskedCode || "";
+    const used = Boolean(item.used || item.status === "redeemed");
+    const generated = item.generatedLicense || null;
+    return `
+      <article class="gift-code-card ${used ? "is-used" : "is-unused"}">
+        <div class="card-top">
+          <div>
+            <span class="pill">${escapeHtml(giftCodeStatusLabel(item.status, used))}</span>
+            <h4>${escapeHtml(item.productName || item.planLabel || item.plan || "Fima Macro")}</h4>
+          </div>
+          <span class="status-pill">${escapeHtml(item.planLabel || item.plan || "")}</span>
+        </div>
+        <div class="gift-code-box">
+          <code>${escapeHtml(code || item.maskedCode || "FIMA-GIFT-****")}</code>
+          ${item.giftCode && !used ? `<button class="button secondary" type="button" data-copy="${escapeHtml(item.giftCode)}">${t("copyGiftCode")}</button>` : ""}
+        </div>
+        ${item.shownOnceOnly ? `<p class="gift-warning">${t("giftShownOnceOnly")}</p>` : ""}
+        <div class="gift-meta-grid">
+          <span>${t("purchased")}: <b>${date(item.purchasedAt || item.createdAt)}</b></span>
+          <span>${t("status")}: <b>${escapeHtml(giftCodeStatusLabel(item.status, used))}</b></span>
+          ${item.redeemedAt ? `<span>${t("usedGiftCode")}: <b>${date(item.redeemedAt)}</b></span>` : ""}
+          ${generated?.licenseKey ? `<span>${t("licenseKey")}: <code>${escapeHtml(generated.licenseKey)}</code></span>` : ""}
+        </div>
+      </article>
+    `;
+  };
+
+  const renderGiftHistoryRow = (item) => {
+    const license = item.generatedLicense || {};
+    return `
+      <article class="gift-history-row">
+        <div>
+          <strong>${escapeHtml(item.planLabel || item.productName || item.plan || "Fima Macro")}</strong>
+          <small>${escapeHtml(item.maskedCode || "")} ${item.redeemedAt ? `/ ${date(item.redeemedAt)}` : ""}</small>
+        </div>
+        <span class="status-pill">${escapeHtml(giftCodeStatusLabel(item.status, item.used))}</span>
+        ${license.licenseKey ? `<code>${escapeHtml(license.licenseKey)}</code>` : ""}
+      </article>
+    `;
+  };
+
+  const renderGiftClaims = (pendingGifts = [], integrations = {}, purchasedGiftCodes = [], giftHistory = []) => {
+    const target = $("#giftClaims");
+    if (!target) return;
+    const discordReady = Boolean(integrations.discord?.connected);
+    const robloxReady = Boolean(integrations.roblox?.connected);
+    const missing = "";
+    const packages = pendingGifts || [];
+    const purchased = purchasedGiftCodes || [];
+    const history = giftHistory || [];
+    target.innerHTML = `
+      <div class="gift-claim-grid">
+        <article class="gift-redeem-card">
+          <div>
+            <h3>${t("giftCodeTitle")}</h3>
+            <p>${t("giftCodeIntro")}</p>
+          </div>
+          <form data-gift-code-form>
+            <input name="code" type="text" maxlength="64" autocomplete="off" placeholder="${escapeHtml(t("giftCodePlaceholder"))}" required>
+            <button class="button" type="submit">${t("redeemGiftCode")}</button>
+          </form>
+          <div class="gift-claim-note">
+            <span>${t("giftRequirements")}</span>
+            <span class="status-pill">${t("requirementsComplete")}</span>
+          </div>
+        </article>
+        <article class="gift-redeem-card">
+          <div class="section-heading compact">
+            <div>
+              <h3>${t("pendingDirectGifts")}</h3>
+              <p>${t("giftAccessIntro")}</p>
+            </div>
+            <span class="pill">${packages.length}</span>
+          </div>
+          <div class="gift-package-list">
+            ${packages.length ? packages.map((item) => `
+              <div class="gift-package-card">
+                <div>
+                  <strong>${escapeHtml(item.planLabel || item.plan)}</strong>
+                  <small>${escapeHtml(item.message || item.notes || t("giftRequirements"))}</small>
+                  ${item.claimExpiresAt ? `<small>${t("expires")}: ${date(item.claimExpiresAt)} / <b data-countdown="${escapeHtml(item.claimExpiresAt)}"></b></small>` : ""}
+                </div>
+                <button class="button secondary" type="button" data-claim-direct-gift="${escapeHtml(item.id)}">${t("claimGift")}</button>
+              </div>
+            `).join("") : `<div class="empty-state">${t("noPendingGifts")}</div>`}
+          </div>
+        </article>
+        <article class="gift-redeem-card gift-purchased-card">
+          <div class="section-heading compact">
+            <div>
+              <h3>${t("purchasedGiftCodes")}</h3>
+              <p>${t("giftStartsOnRedeem")}</p>
+            </div>
+            <span class="pill">${purchased.length}</span>
+          </div>
+          <div class="gift-code-list">
+            ${purchased.length ? purchased.map(renderPurchasedGiftCodeCard).join("") : `<div class="empty-state">${t("noPurchasedGiftCodes")}</div>`}
+          </div>
+        </article>
+        <article class="gift-redeem-card gift-history-card">
+          <div class="section-heading compact">
+            <div>
+              <h3>${t("giftHistory")}</h3>
+              <p>${t("giftRedeemedText")}</p>
+            </div>
+          </div>
+          <div class="gift-history-list">
+            ${history.length ? history.map(renderGiftHistoryRow).join("") : `<div class="empty-state">${t("noGiftHistory")}</div>`}
+          </div>
+        </article>
+      </div>
+    `;
+    updateCountdowns();
+  };
+
+  const renderGiftResult = (recipient) => {
+    const discord = recipient.discord || {};
+    const roblox = recipient.roblox || {};
+    const avatar = roblox.avatar || discord.avatar || "";
+    const name = roblox.username || discord.username || recipient.maskedEmail || "Fima user";
+    const sub = [recipient.maskedEmail, discord.connected ? "Discord" : "", roblox.connected ? "Roblox" : ""].filter(Boolean).join(" / ");
+    return `
+      <article class="gift-result-card" data-gift-result-id="${escapeHtml(recipient.id)}">
+        <div class="mini-profile">
+          ${avatar ? `<img src="${escapeHtml(avatar)}" alt="">` : `<span>F</span>`}
+          <div>
+            <strong>${escapeHtml(name)}</strong>
+            <small>${escapeHtml(sub)}</small>
+          </div>
+        </div>
+        <div class="gift-badges">
+          <span class="${discord.connected ? "is-on" : ""}">Discord</span>
+          <span class="${roblox.connected ? "is-on" : ""}">Roblox</span>
+        </div>
+        <button class="button secondary" type="button" data-select-gift-recipient="${escapeHtml(recipient.id)}">${t("chooseRecipient")}</button>
+      </article>
+    `;
+  };
+
+  const giftPlanButtons = (recipientId) => ([
+    ["3days", t("giftBuy3days")],
+    ["monthly", t("giftBuyMonthly")],
+    ["lifetime", t("giftBuyLifetime")]
+  ]).map(([plan, label]) => `
+    <a class="button ${plan === "monthly" ? "primary" : "secondary"}" href="pricing.html?giftRecipient=${encodeURIComponent(recipientId)}&checkout=${encodeURIComponent(plan)}" data-gift-plan="${escapeHtml(plan)}">${escapeHtml(label)}</a>
+  `).join("");
+
+  const renderSelectedGiftRecipient = (recipient) => {
+    const target = $("#giftRecipientSelected");
+    if (!target) return;
+    if (!recipient?.id) {
+      target.innerHTML = "";
+      target.hidden = true;
+      return;
+    }
+    const discord = recipient.discord || {};
+    const roblox = recipient.roblox || {};
+    const avatar = roblox.avatar || discord.avatar || "";
+    const name = roblox.username || discord.username || recipient.maskedEmail || "Fima user";
+    const sub = [recipient.maskedEmail, discord.connected ? "Discord" : "", roblox.connected ? "Roblox" : ""].filter(Boolean).join(" / ");
+    target.hidden = false;
+    target.innerHTML = `
+      <article class="gift-selected-card">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">${t("selectedGiftRecipient")}</p>
+            <h3>${escapeHtml(name)}</h3>
+            <p>${escapeHtml(sub)}</p>
+          </div>
+          <button class="button secondary" type="button" data-clear-gift-recipient>${t("changeGiftRecipient")}</button>
+        </div>
+        <p>${t("giftRecipientReady")}</p>
+        <div class="gift-plan-actions">${giftPlanButtons(recipient.id)}</div>
+      </article>
+    `;
+  };
+
+  const initGiftRecipientSearch = () => {
+    const target = $("#giftRecipientSearch");
+    if (!target) return;
+    target.innerHTML = `
+      <div class="gift-search-panel">
+        <div>
+          <input id="giftRecipientQuery" type="search" autocomplete="off" placeholder="${escapeHtml(t("giftSearchPlaceholder"))}">
+          <p>${t("giftSearchHint")}</p>
+        </div>
+        <div id="giftRecipientSelected" class="gift-selected" hidden></div>
+        <div id="giftRecipientResults" class="gift-results"><div class="empty-state">${t("giftSearchStart")}</div></div>
+      </div>
+    `;
+    const input = $("#giftRecipientQuery");
+    const results = $("#giftRecipientResults");
+    let lastRecipients = [];
+    let timer;
+    input?.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      const query = input.value.trim();
+      if (query.length < 2) {
+        results.innerHTML = `<div class="empty-state">${t("giftSearchStart")}</div>`;
+        return;
+      }
+      results.innerHTML = `<div class="empty-state">${t("giftSearchLoading")}</div>`;
+      timer = window.setTimeout(async () => {
+        try {
+          const data = await api(`/api/users/search-gift-recipient?q=${encodeURIComponent(query)}`);
+          const recipients = data.results || [];
+          lastRecipients = recipients;
+          results.innerHTML = recipients.length
+            ? recipients.map(renderGiftResult).join("")
+            : `<div class="empty-state">${t("giftSearchEmpty")}</div>`;
+        } catch {
+          results.innerHTML = `<div class="empty-state">${t("giftSearchFailed")}</div>`;
+        }
+      }, 260);
+    });
+
+    results?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-select-gift-recipient]");
+      if (!button) return;
+      results.querySelectorAll(".gift-result-card").forEach((item) => item.classList.remove("is-selected"));
+      results.querySelectorAll("[data-select-gift-recipient]").forEach((item) => {
+        item.textContent = t("chooseRecipient");
+        item.classList.add("secondary");
+        item.classList.remove("primary");
+      });
+      button.closest(".gift-result-card")?.classList.add("is-selected");
+      button.textContent = t("selectedGiftRecipient");
+      button.classList.remove("secondary");
+      button.classList.add("primary");
+      const recipient = lastRecipients.find((item) => String(item.id) === String(button.dataset.selectGiftRecipient));
+      if (recipient) {
+        sessionStorage.setItem("fima.giftRecipient", JSON.stringify(recipient));
+        renderSelectedGiftRecipient(recipient);
+        $("#giftRecipientSelected")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      setMessage(t("giftCheckoutSoon"), "good");
+    });
+
+    target.addEventListener("click", (event) => {
+      if (event.target.closest("[data-clear-gift-recipient]")) {
+        sessionStorage.removeItem("fima.giftRecipient");
+        renderSelectedGiftRecipient(null);
+        input?.focus();
+      }
+    });
+  };
+
+  const referralStatus = (status) => {
+    const clean = String(status || "pending").replaceAll("_", " ");
+    return clean.slice(0, 1).toUpperCase() + clean.slice(1);
+  };
+
+  const renderReferralRow = (referral) => {
+    const user = referral.user || {};
+    const name = user.robloxUsername || user.discordUsername || user.maskedEmail || "Fima user";
+    return `
+      <article class="referral-row ${escapeHtml(referral.status || "pending")}">
+        <div class="mini-profile">
+          ${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span>${escapeHtml(String(name).slice(0, 1).toUpperCase())}</span>`}
+          <div>
+            <strong>${escapeHtml(name)}</strong>
+            <small>${escapeHtml([user.maskedEmail, date(referral.createdAt)].filter(Boolean).join(" / "))}</small>
+          </div>
+        </div>
+        <span class="status-pill">${escapeHtml(referralStatus(referral.status))}</span>
+      </article>
+    `;
+  };
+
+  const renderReferralDashboard = (summary = {}) => {
+    const target = $("#referralDashboard");
+    if (!target) return;
+    if (!summary?.code) {
+      target.innerHTML = `<div class="empty-state">${t("working")}</div>`;
+      return;
+    }
+    const counts = summary.counts || {};
+    const progress = summary.progress || {};
+    const required = Math.max(1, progress.required || summary.rewardRule?.requiredValidInvites || 3);
+    const current = Math.min(required, progress.current ?? ((counts.valid || 0) % required));
+    const width = Math.round((current / required) * 100);
+    const rewards = summary.rewards || [];
+    const referrals = summary.referrals || [];
+    target.innerHTML = `
+      <div class="referral-dashboard">
+        <div class="referral-hero-card">
+          <div>
+            <span class="pill">${t("rewardRule")}</span>
+            <h3>${t("yourReferralCode")}</h3>
+          </div>
+          <div class="referral-code-box">
+            <code>${escapeHtml(summary.code)}</code>
+            <button class="button secondary" type="button" data-copy="${escapeHtml(summary.code)}">${t("copyReferralCode")}</button>
+          </div>
+          <div class="referral-code-box">
+            <code>${escapeHtml(summary.link)}</code>
+            <button class="button" type="button" data-copy="${escapeHtml(summary.link)}">${t("copyReferralLink")}</button>
+          </div>
+        </div>
+        <div class="referral-progress-card">
+          <div class="card-top">
+            <div>
+              <span class="pill">${t("referralProgress")}</span>
+              <h3>${current}/${required}</h3>
+            </div>
+            <span class="status-pill">${escapeHtml(progress.remaining || required)} ${t("referralsRemaining")}</span>
+          </div>
+          <div class="progress-track"><span style="width:${width}%"></span></div>
+          <div class="metric-grid">
+            <div><span>${t("verifiedInvites")}</span><strong>${counts.valid || 0}</strong></div>
+            <div><span>${t("pendingInvites")}</span><strong>${counts.pending || 0}</strong></div>
+            <div><span>${t("rejectedInvites")}</span><strong>${(counts.rejected || 0) + (counts.flagged || 0)}</strong></div>
+            <div><span>${t("earnedRewards")}</span><strong>${rewards.length}</strong></div>
+          </div>
+        </div>
+        <div class="referral-apply-card">
+          <h3>${summary.incoming ? t("incomingReferral") : t("referralApplyTitle")}</h3>
+          ${summary.incoming ? `
+            <p>${escapeHtml(summary.incoming.user?.maskedEmail || "")}</p>
+            <span class="status-pill">${escapeHtml(referralStatus(summary.incoming.status))}</span>
+          ` : `
+            <p>${t("referralApplyIntro")}</p>
+            <form data-referral-apply-form>
+              <input name="referralCode" type="text" maxlength="48" placeholder="FIMA-FIEELCOMPL-SMGS" required>
+              <button class="button secondary" type="submit">${t("applyReferral")}</button>
+            </form>
+          `}
+        </div>
+        <div class="referral-list-card">
+          <div class="section-heading compact"><div><h3>${t("recentInvites")}</h3><p>${t("nextReward")}: ${required} ${t("verifiedInvites").toLowerCase()}</p></div></div>
+          <div class="referral-list">
+            ${referrals.length ? referrals.slice(0, 6).map(renderReferralRow).join("") : `<div class="empty-state">${t("noReferralsYet")}</div>`}
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const refreshDashboardAccess = async () => {
+    const data = await api("/api/me/dashboard");
+    if (data.user) {
+      renderAccountHeader(data.user);
+      renderAccountSummary(data.user);
+      renderEmailVerification(data.user);
+    }
+    renderConnectedAccounts(data.integrations || {});
+    renderGiftClaims(data.pendingGifts || [], data.integrations || {}, data.purchasedGiftCodes || [], data.giftHistory || []);
+    renderMonthlyTrial(data.trial || {});
+    renderReferralDashboard(data.referrals || {});
+    renderAccountProducts(data.products || [], "#purchases");
+    renderLicenses(data.licenses || []);
+    return data;
+  };
+
+  const initDashboard = async () => {
+    const user = await requireLogin();
+    if (!user) return;
+    renderAccountHeader(user);
+    renderAccountSummary(user);
+    initGiftRecipientSearch();
+    await refreshDashboardAccess();
+  };
+
+  const initMyProducts = async () => {
+    const user = await requireLogin();
+    if (!user) return;
+    renderAccountHeader(user);
+    const data = await api("/api/me/products");
+    renderAccountProducts(data.products || [], "#purchases");
+    renderGiftClaims([], {}, data.purchasedGiftCodes || [], data.giftHistory || []);
+  };
+
+  const initPaymentSuccess = async () => {
+    const sessionId = new URLSearchParams(location.search).get("session_id") || "";
+    const target = $("#result");
+    if (!target) return;
+    await requireLogin();
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const data = await api(`/api/store/result?session_id=${encodeURIComponent(sessionId)}`);
+        if (data.success && data.purchase) {
+          target.innerHTML = `<h1>${t("purchaseComplete")}</h1><p>${t("productLinked")}</p><div class="row"><span>${t("product")}</span><strong>${escapeHtml(data.purchase.product?.name || t("product"))}</strong></div><a class="button" href="my-products.html">${t("openMyProducts")}</a>`;
+          return;
+        }
+      } catch (error) {
+        target.innerHTML = `<h1>${t("paymentCheckFailed")}</h1><p>${escapeHtml(error.message)}</p>`;
+        return;
+      }
+      if (attempts < 15) {
+        target.querySelector("p")?.replaceChildren(document.createTextNode(t("purchaseProcessing")));
+        window.setTimeout(poll, 2000);
+      } else {
+        target.innerHTML = `<h1>${t("paymentReceived")}</h1><p>${t("purchaseStillProcessing")}</p>`;
+      }
+    };
+    poll();
+  };
+
+  const showGiftLicenseModal = ({ title, message, license, giftCode }) => {
+    const existing = $(".gift-success-overlay");
+    existing?.remove();
+    const licenseKey = license?.licenseKey || "";
+    const code = giftCode?.giftCode || "";
+    const overlay = document.createElement("div");
+    overlay.className = "gift-success-overlay";
+    overlay.innerHTML = `
+      <section class="gift-success-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(title || t("giftRedeemedTitle"))}">
+        <div class="card-top">
+          <div>
+            <span class="pill">${escapeHtml(giftCode ? t("giftCodeCreated") : t("giftRedeemedTitle"))}</span>
+            <h3>${escapeHtml(title || t("giftRedeemedTitle"))}</h3>
+            <p>${escapeHtml(message || t("giftRedeemedText"))}</p>
+          </div>
+          <button class="link-button" type="button" data-close-gift-modal>${t("close")}</button>
+        </div>
+        ${code ? `
+          <div class="gift-modal-key">
+            <span>${t("giftCodeTitle")}</span>
+            <code>${escapeHtml(code)}</code>
+            <button class="button secondary" type="button" data-copy="${escapeHtml(code)}">${t("copyGiftCode")}</button>
+          </div>
+        ` : ""}
+        ${licenseKey ? `
+          <div class="gift-modal-key gift-modal-key-primary">
+            <span>${t("newLicenseKey")}</span>
+            <code>${escapeHtml(licenseKey)}</code>
+            <button class="button" type="button" data-copy="${escapeHtml(licenseKey)}">${t("copyLicenseKey")}</button>
+          </div>
+        ` : ""}
+        <div class="gift-meta-grid">
+          ${license?.plan ? `<span>${t("plan")}: <b>${escapeHtml(license.planName || license.plan)}</b></span>` : ""}
+          ${license?.expiresAt ? `<span>${t("expires")}: <b>${date(license.expiresAt)}</b></span>` : ""}
+          ${license?.expiresAt ? `<span>${t("remaining")}: <b data-countdown="${escapeHtml(license.expiresAt)}"></b></span>` : ""}
+          ${giftCode?.status ? `<span>${t("status")}: <b>${escapeHtml(giftCodeStatusLabel(giftCode.status, giftCode.used))}</b></span>` : ""}
+        </div>
+        <div class="gift-modal-actions">
+          <a class="button secondary" href="my-products.html">${t("openMyProducts")}</a>
+          ${licenseKey ? `<button class="button secondary" type="button" data-download-license="${escapeHtml(licenseKey)}">${t("downloadApp")}</button>` : ""}
+          <button class="button" type="button" data-close-gift-modal>${t("close")}</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(overlay);
+    document.body.classList.add("modal-open");
+    window.setTimeout(() => overlay.classList.add("is-visible"), 20);
+    updateCountdowns();
+  };
+
+  const initAccountActions = () => {
+    document.addEventListener("submit", async (event) => {
+      const giftForm = event.target.closest("[data-gift-code-form]");
+      if (giftForm) {
+        event.preventDefault();
+        const submit = giftForm.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post("/api/gifts/redeem", { code: giftForm.elements.code.value });
+          giftForm.reset();
+          await refreshDashboardAccess();
+          showGiftLicenseModal({
+            title: t("giftRedeemedTitle"),
+            message: t("giftRedeemedText"),
+            license: data.license,
+            giftCode: data.giftCode
+          });
+          setMessage(t("giftClaimed"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+        return;
+      }
+
+      const form = event.target.closest("[data-referral-apply-form]");
+      if (!form) return;
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      setMessage(t("working"));
+      try {
+        const data = await post("/api/referrals/apply", { code: form.referralCode.value });
+        renderReferralDashboard(data.referrals || {});
+        setMessage(t("referralApplied"), "good");
+      } catch (error) {
+        setMessage(error.message, "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    document.addEventListener("submit", async (event) => {
+      const emailLinkForm = event.target.closest("[data-email-link-form]");
+      if (emailLinkForm) {
+        event.preventDefault();
+        const submit = emailLinkForm.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post("/api/auth/email-link/start", { email: emailLinkForm.email.value });
+          currentUserPromise = null;
+          renderEmailVerification(data.user || {});
+          renderAccountSummary(data.user || {});
+          renderAccountHeader(data.user || {});
+          setMessage(t("verificationSent"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+        return;
+      }
+
+      const form = event.target.closest("[data-email-verification-form]");
+      if (!form) return;
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      setMessage(t("working"));
+      try {
+        const data = await post("/api/auth/email-verification/confirm", { code: form.code.value });
+        currentUserPromise = null;
+        renderEmailVerification(data.user || {});
+        renderAccountSummary(data.user || {});
+        renderAccountHeader(data.user || {});
+        renderReferralDashboard(data.referrals || {});
+        setMessage(t("verificationComplete"), "good");
+      } catch (error) {
+        setMessage(error.message, "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    document.addEventListener("click", async (event) => {
+      const emailButton = event.target.closest("[data-send-email-verification]");
+      if (emailButton) {
+        emailButton.disabled = true;
+        setMessage(t("working"));
+        try {
+          await post("/api/auth/email-verification/send", {});
+          setMessage(t("verificationSent"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          emailButton.disabled = false;
+        }
+        return;
+      }
+
+      const copyButton = event.target.closest("[data-copy]");
+      if (copyButton) {
+        await navigator.clipboard?.writeText(copyButton.dataset.copy || "");
+        setMessage(t("copied"), "good");
+        return;
+      }
+
+      const downloadButton = event.target.closest("[data-download-license]");
+      if (downloadButton) {
+        downloadButton.disabled = true;
+        try {
+          const data = await api(`/api/download?licenseKey=${encodeURIComponent(downloadButton.dataset.downloadLicense)}`);
+          setMessage(t("downloadReady"), "good");
+          window.location.href = data.downloadUrl;
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          downloadButton.disabled = false;
+        }
+        return;
+      }
+
+      const extendButton = event.target.closest("[data-extend-license]");
+      if (extendButton) {
+        extendButton.disabled = true;
+        setMessage(t("checkout"));
+        try {
+          const checkout = await post(`/api/me/licenses/${encodeURIComponent(extendButton.dataset.extendLicense)}/extend-checkout`, {
+            plan: extendButton.dataset.plan,
+            currency: localStorage.getItem("fima.currency") || "EUR",
+            language: language()
+          });
+          window.location.href = checkout.url;
+        } catch (error) {
+          setMessage(error.message, "error");
+          extendButton.disabled = false;
+        }
+        return;
+      }
+
+      const directGiftButton = event.target.closest("[data-claim-direct-gift]");
+      if (directGiftButton) {
+        directGiftButton.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post("/api/gifts/claim-direct", { packageId: directGiftButton.dataset.claimDirectGift });
+          await refreshDashboardAccess();
+          showGiftLicenseModal({
+            title: t("giftRedeemedTitle"),
+            message: t("giftRedeemedText"),
+            license: data.license
+          });
+          setMessage(t("giftClaimed"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+          directGiftButton.disabled = false;
+        }
+        return;
+      }
+
+      const closeGiftModal = event.target.closest("[data-close-gift-modal]");
+      if (closeGiftModal || event.target.classList.contains("gift-success-overlay")) {
+        const overlay = event.target.closest(".gift-success-overlay") || $(".gift-success-overlay");
+        if (overlay) {
+          overlay.classList.remove("is-visible");
+          window.setTimeout(() => overlay.remove(), 220);
+        }
+        document.body.classList.remove("modal-open");
+        return;
+      }
+
+      const disconnectButton = event.target.closest("[data-disconnect-provider]");
+      if (disconnectButton) {
+        if (!window.confirm(t("disconnectConfirm"))) return;
+        const provider = disconnectButton.dataset.disconnectProvider;
+        disconnectButton.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post(`/api/auth/${provider}/disconnect`, {});
+          renderConnectedAccounts(data.integrations || {});
+          renderMonthlyTrial(data.trial || {});
+          renderAccountSummary(data.user || {});
+          renderAccountHeader(data.user || {});
+          setMessage(t("working"), "good");
+          window.setTimeout(() => setMessage(""), 1200);
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          disconnectButton.disabled = false;
+        }
+        return;
+      }
+
+      const trialButton = event.target.closest("[data-claim-trial]");
+      if (trialButton) {
+        trialButton.disabled = true;
+        setMessage(t("working"));
+        try {
+          await post("/api/trial/monthly/claim", {});
+          await refreshDashboardAccess();
+          setMessage(t("trialClaimed"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+          trialButton.disabled = false;
+        }
+      }
+    });
+  };
+
+  const updateCountdowns = () => {
+    $$("[data-countdown]").forEach((node) => {
+      const expiresAt = node.dataset.countdown;
+      if (!expiresAt) return;
+      const seconds = (new Date(expiresAt).getTime() - Date.now()) / 1000;
+      node.textContent = seconds <= 0 ? t("expired") : duration(seconds);
+    });
+    $$("[data-sale-countdown]").forEach((node) => {
+      const seconds = (saleEndsAt.getTime() - Date.now()) / 1000;
+      node.textContent = seconds <= 0 ? "0m 0s" : duration(seconds);
+    });
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    applyStaticTranslations();
+    initOauthFlash();
+    initLogout();
+    initAccountActions();
+    hydrateAccountHeader();
+    window.setInterval(updateCountdowns, 1000);
+    if (page === "register") {
+      initAuthForm("/api/auth/register", "dashboard.html");
+      initRobloxPreview();
+      initReferralPrefill();
+    }
+    if (page === "login") initAuthForm("/api/auth/login", "dashboard.html");
+    if (page === "forgot") initForgotPassword();
+    if (page === "reset") initResetPassword();
+    if (page === "store") initStore();
+    if (page === "dashboard") initDashboard();
+    if (page === "my-products") initMyProducts();
+    if (page === "payment-success") initPaymentSuccess();
+  });
+})();
+

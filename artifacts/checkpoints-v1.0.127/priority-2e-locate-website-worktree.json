@@ -1,0 +1,81 @@
+{
+  "checkpoint": "priority-2e-locate-website-worktree",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "locate real website Git worktree and create safe handoff plan; no source edits, no deploy, no Stripe calls, no admin runtime calls, no DB writes",
+  "searchRoots": [
+    "C:/Users/PC/Documents/Codex/2026-05-19/",
+    "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam",
+    "C:/Users/PC/Documents/Codex/",
+    "C:/Users/PC/Documents/Codex/2026-05-13/benim-visual-studio-yu-bagla"
+  ],
+  "candidateWebsiteRepoPaths": [
+    {
+      "path": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam",
+      "hasGit": false,
+      "gitRemoteUrl": null,
+      "branch": null,
+      "containsPublicAssetsJsAppJs": true,
+      "containsPublicIndexHtml": true,
+      "containsPublicAssetsFimaPreviewV127Png": true,
+      "publicFilesInsideGit": false,
+      "v1_0_127WebsiteFixesAlreadyPresent": true,
+      "appearsToBeLiveWebsiteRepo": false,
+      "appearsToBeLiveWebsiteWorkspace": true,
+      "notes": "This is the only workspace found with the current public/assets/js/app.js and public/index.html tree. It contains the v1.0.127 website fixes but is not a Git worktree."
+    },
+    {
+      "path": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+      "hasGit": true,
+      "gitRemoteUrl": "https://github.com/fieel83/fima-backend.git",
+      "branch": "main",
+      "containsPublicAssetsJsAppJs": false,
+      "containsPublicIndexHtml": false,
+      "containsPublicAssetsFimaPreviewV127Png": false,
+      "publicFilesInsideGit": false,
+      "v1_0_127WebsiteFixesAlreadyPresent": false,
+      "appearsToBeLiveWebsiteRepo": false,
+      "notes": "Backend Git repo only; it does not contain the public website source tree."
+    },
+    {
+      "path": "C:/Users/PC/Documents/Codex/2026-05-13/benim-visual-studio-yu-bagla/FimaMacroStudio",
+      "hasGit": false,
+      "gitRemoteUrl": null,
+      "branch": null,
+      "containsPublicAssetsJsAppJs": false,
+      "containsPublicIndexHtml": false,
+      "containsPublicAssetsFimaPreviewV127Png": false,
+      "publicFilesInsideGit": false,
+      "v1_0_127WebsiteFixesAlreadyPresent": false,
+      "appearsToBeLiveWebsiteRepo": false,
+      "notes": "Desktop app workspace, not the website repo."
+    },
+    {
+      "path": "C:/Users/PC/Documents/Codex/2026-05-13/benim-visual-studio-yu-bagla/FimaUpdateSite",
+      "hasGit": false,
+      "gitRemoteUrl": null,
+      "branch": null,
+      "containsPublicAssetsJsAppJs": false,
+      "containsPublicIndexHtml": false,
+      "containsPublicAssetsFimaPreviewV127Png": false,
+      "publicFilesInsideGit": false,
+      "v1_0_127WebsiteFixesAlreadyPresent": false,
+      "appearsToBeLiveWebsiteRepo": false,
+      "notes": "Older update-site folder with root index/latest assets, not the current public website tree."
+    }
+  ],
+  "bestMatchingWebsiteRepoPath": null,
+  "bestMatchingWebsiteWorkspacePath": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam",
+  "gitRemoteBranch": null,
+  "publicFilesInsideGit": false,
+  "v1_0_127WebsiteFixesAlreadyPresentInBestMatch": true,
+  "blocker": "No actual website Git worktree containing public/assets/js/app.js or public/index.html was found locally. The only matching public website files are in a non-Git sibling workspace.",
+  "safeHandoffPlan": [
+    "Do not deploy from the non-Git sibling workspace.",
+    "Locate or clone the real website repository that deploys fimamacro.com and contains the public website tree.",
+    "Copy/apply the already-prepared v1.0.127 website changes from the sibling public workspace into that Git worktree.",
+    "Re-run the Priority 2B/2C static checks and narrow browser QA inside the website Git worktree.",
+    "Commit and push from the real website Git worktree only after the diff confirms public website files are tracked there."
+  ],
+  "nextRecommendedStep": "Provide the real website repo path or clone URL, or confirm permission to clone the website repository, then apply the v1.0.127 public website fixes there and commit/push from that Git worktree."
+}
