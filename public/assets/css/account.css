@@ -1355,6 +1355,7 @@ code { color: var(--primary-strong); }
   .hero-grid, .grid, .cards, .access-grid, .auth-shell, .account-summary-card, .integration-grid, .integration-card, .trial-card, .requirement-list, .verification-card, .verification-actions, .verification-actions form, .gift-claim-grid, .gift-redeem-card form, .gift-package-card, .gift-code-box, .gift-history-row, .gift-modal-key, .referral-dashboard, .referral-apply-card form, .referral-code-box { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: 1fr; }
   .sale-panel { align-items: stretch; flex-direction: column; }
+  .account-header { position: relative; top: auto; }
   .nav { align-items: stretch; flex-direction: column; padding: 14px 0; }
   .links { justify-content: flex-start; }
   .account-main-links { justify-content: flex-start; width: 100%; }
