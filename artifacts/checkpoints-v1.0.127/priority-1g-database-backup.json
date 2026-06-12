@@ -1,0 +1,30 @@
+{
+  "checkpoint": "priority-1g-database-backup",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "providerDetected": "Render Postgres-like dpg host",
+  "backupMethod": "pg_dump logical backup using DATABASE_URL",
+  "backupFilePath": null,
+  "backupCreated": false,
+  "blocker": "Cannot run pg_dump from this environment because DATABASE_URL is not available to the shell/.env and pg_dump is not installed locally.",
+  "databaseProviderAndBackupPlanPath": "artifacts/backup-rollback-v1.0.127/database-provider-and-backup-plan.json",
+  "renderPostgresServiceDiscoverability": {
+    "renderYamlPresent": true,
+    "renderYamlDatabaseServiceVisible": false,
+    "renderApiMetadataAvailableLocally": false
+  },
+  "rollbackNotes": [
+    "Create a database backup/export before deploy or runtime jobs.",
+    "Prefer Render provider-native Recovery/Export if the database service becomes visible.",
+    "Otherwise run pg_dump using DATABASE_URL from an environment variable without printing the URL.",
+    "Do not delete old Stripe products/prices or old license rows during rollback."
+  ],
+  "safety": {
+    "deployed": false,
+    "stripeCalled": false,
+    "adminRuntimeEndpointsCalled": false,
+    "runtimeJobsRun": false,
+    "secretsPrinted": false
+  },
+  "nextRecommendedStep": "Install or use PostgreSQL client tools in a secure environment with DATABASE_URL set privately, then create artifacts/backup-rollback-v1.0.127/fima-db-backup-before-v1.0.127.sql or .sql.gz before deploy/runtime jobs."
+}

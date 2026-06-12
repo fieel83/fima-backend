@@ -1,0 +1,39 @@
+{
+  "artifact": "database-provider-and-backup-plan",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "providerDetected": "Render Postgres-like dpg host",
+  "providerDetectionSource": "DATABASE_URL hostname class reported as starting with dpg; full DATABASE_URL was not printed or stored",
+  "renderPostgresServiceDiscoverability": {
+    "renderYamlPresent": true,
+    "renderYamlDatabaseServiceVisible": false,
+    "renderApiMetadataAvailableLocally": false,
+    "nativeRecoveryExportAvailableFromLocalContext": false
+  },
+  "backupMethod": "pg_dump logical backup using DATABASE_URL",
+  "backupCreated": false,
+  "backupFilePath": null,
+  "attemptedBackupFilePath": "artifacts/backup-rollback-v1.0.127/fima-db-backup-before-v1.0.127.sql",
+  "blocker": {
+    "databaseUrlAvailableToShell": false,
+    "pgDumpAvailableLocally": false,
+    "exactBlocker": "Cannot run pg_dump from this environment because DATABASE_URL is not available to the shell/.env and pg_dump is not installed locally.",
+    "secretsPrinted": false
+  },
+  "requiredManualAction": [
+    "In Render, locate the database connection string without copying it into logs.",
+    "Prefer Render provider-native Recovery/Export if the Postgres service becomes visible in the Render dashboard.",
+    "If no native export is visible, run pg_dump from a machine with PostgreSQL client tools installed using DATABASE_URL as an environment variable, never echoing the URL.",
+    "Save the backup as artifacts/backup-rollback-v1.0.127/fima-db-backup-before-v1.0.127.sql or .sql.gz before deploy/runtime jobs."
+  ],
+  "safePgDumpCommandPattern": [
+    "Set DATABASE_URL in the process environment without printing it.",
+    "Run pg_dump with --dbname from the DATABASE_URL environment variable.",
+    "Write output to artifacts/backup-rollback-v1.0.127/fima-db-backup-before-v1.0.127.sql or pipe to gzip if available."
+  ],
+  "rollbackNotes": [
+    "Do not run deploy, admin runtime jobs, Stripe product setup, webhook replay, checkout verification, or license/gift mutation until a database backup/export exists.",
+    "If runtime jobs later mutate data incorrectly, restore from the pre-runtime database backup or apply targeted compensating changes using audit evidence.",
+    "Keep old Stripe products/prices and old license rows intact; rollback should restore env/database state rather than deleting historical records."
+  ]
+}

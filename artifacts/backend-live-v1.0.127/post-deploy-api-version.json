@@ -1,0 +1,13 @@
+﻿{
+    "url":  "https://api.fimamacro.com/api/version",
+    "statusCode":  200,
+    "checkedAt":  "2026-06-12T13:59:28.1619359+02:00",
+    "body":  {
+                 "status":  "ok",
+                 "app":  "Fima Macro",
+                 "version":  "1.0.126",
+                 "commit":  "9d6e690d0293f59fa7706282cb072273453b787d",
+                 "buildTime":  "2026-06-12T11:51:11.600Z",
+                 "mode":  "production"
+             }
+}

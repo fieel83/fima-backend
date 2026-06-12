@@ -1,0 +1,25 @@
+{
+  "artifact": "og-preview-image-summary",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "imagePath": "public/assets/fima-preview-v127.png",
+  "imageUrl": "https://fimamacro.com/assets/fima-preview-v127.png?v=127",
+  "dimensions": {
+    "width": 1200,
+    "height": 630
+  },
+  "format": "png",
+  "theme": "dark/purple Fima theme",
+  "textIncluded": [
+    "FIMA MACRO STUDIO",
+    "Premium Macro App",
+    "Setup-aware timing, clean licenses and premium macro profiles.",
+    "Free Trial | 3 Days | Monthly | Lifetime"
+  ],
+  "forbiddenTextIncluded": [],
+  "notes": [
+    "The v127 preview image was freshly generated and not reused from v126.",
+    "The image contains only the current public product set.",
+    "Readable local visual inspection completed; no Discord crawler request was made."
+  ]
+}

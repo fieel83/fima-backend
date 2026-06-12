@@ -1,0 +1,14 @@
+{
+  "artifact": "og-preview-image-reference-needed",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "status": "resolved in Priority 2C",
+  "expectedPreviewUrl": "https://fimamacro.com/assets/fima-preview-v127.png?v=127",
+  "localImagePathChecked": "public/assets/fima-preview-v127.png",
+  "localImageExists": true,
+  "notes": [
+    "Public HTML OG/Twitter meta references were updated to the v1.0.127 absolute URL.",
+    "The local v127 image file now exists at 1200x630.",
+    "See artifacts/discord-preview-v1.0.127/og-preview-image-summary.json for the current preview summary."
+  ]
+}

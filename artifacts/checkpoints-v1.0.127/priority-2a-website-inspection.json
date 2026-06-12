@@ -1,0 +1,177 @@
+{
+  "checkpoint": "priority-2a-website-inspection",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "website/public inspection only; no source edits",
+  "filesInspected": [
+    "public/index.html",
+    "public/pricing.html",
+    "public/dashboard.html",
+    "public/my-products.html",
+    "public/success.html",
+    "public/payment-success.html",
+    "public/payment-cancelled.html",
+    "public/store.html",
+    "public/download.html",
+    "public/features.html",
+    "public/faq.html",
+    "public/support.html",
+    "public/login.html",
+    "public/register.html",
+    "public/forgot-password.html",
+    "public/reset-password.html",
+    "public/legal.html",
+    "public/terms/index.html",
+    "public/privacy/index.html",
+    "public/auth/roblox-callback.html",
+    "public/assets/js/app.js",
+    "public/assets/js/account.js",
+    "public/assets/js/success.js",
+    "public/assets/js/config.js",
+    "public/assets/css/styles.css",
+    "public/assets/css/account.css",
+    "public/assets/videos/macro-videos.json"
+  ],
+  "brokenEncodingFindings": [
+    {
+      "file": "public/assets/js/app.js",
+      "lines": [364, 600],
+      "problem": "Mojibake gift button label: broken emoji text appears as ðŸŽ Buy Gift Code / ðŸŽ Gift Code Satın Al."
+    },
+    {
+      "file": "public/assets/js/account.js",
+      "lines": [358, 359, 360, 361, 364, 365, 366, 369, 370, 371, 372],
+      "problem": "Turkish gift/account strings contain mojibake such as SatÄ±n, geÃ§miÅŸi, HenÃ¼z, sÃ¼resi, kullanÄ±ldÄ±, oluÅŸturuldu, Ä°ptal, gÃ¶sterilebilir."
+    },
+    {
+      "file": "public/assets/js/account.js",
+      "lines": [1470, 1473, 1476, 1479],
+      "problem": "Turkish Roblox OAuth error strings contain mojibake such as baÄŸlantÄ±, baÅŸlatÄ±ldÄ±, LÃ¼tfen, isteÄŸi, sÃ¼resi."
+    }
+  ],
+  "oldProductPublicPricingFindings": [
+    {
+      "file": "public/assets/js/app.js",
+      "lines": [151, 152, 153, 154, 155],
+      "status": "Current root basePlans list is already limited to 1day trial, 3days, monthly, lifetime."
+    },
+    {
+      "file": "public/assets/js/app.js",
+      "lines": [830, 909],
+      "problem": "French and Bosnian/Croatian locale copy still labels 1day as a paid cheap test/access product instead of Free Trial."
+    },
+    {
+      "file": "public/assets/js/app.js",
+      "lines": [821, 825, 826, 827, 900, 904, 905, 906],
+      "problem": "French and Bosnian/Croatian pricing copy still references launch discounts ending June 3 and short-plan promos."
+    },
+    {
+      "file": "public/terms/index.html",
+      "line": 137,
+      "problem": "Terms still list old purchased license durations: 1 day, 15 days, 30 days, 90 days or lifetime."
+    },
+    {
+      "file": "public/assets/js/success.js",
+      "lines": [24, 25, 26],
+      "problem": "Success page still maps legacy 2weeks, 1month, and 3months labels as normal labels; should be legacy-only if shown."
+    },
+    {
+      "file": "public/dashboard.html",
+      "line": 94,
+      "note": "Referral reward says 15 days free access. This may be a reward rule rather than public purchasable product copy, but it should be checked against current product language."
+    },
+    {
+      "file": "public/assets/js/account.js",
+      "lines": [243, 479],
+      "note": "Referral reward translations say 3 verified invites = 15 days free access; check if still valid reward copy."
+    }
+  ],
+  "giftButtonFindings": [
+    {
+      "file": "public/assets/js/app.js",
+      "lines": [364, 600, 1371],
+      "problem": "Gift Code button uses broken emoji/mojibake source copy. Rendering uses pricingCopy.buyGiftCode, so both English and Turkish labels need clean text."
+    },
+    {
+      "file": "public/assets/js/account.js",
+      "lines": [2053, 2054, 2055, 2056],
+      "status": "Gift plan buttons are limited to 3days/monthly/lifetime, which matches paid public products."
+    }
+  ],
+  "robuxModalFindings": [
+    {
+      "file": "public/assets/js/app.js",
+      "lines": [160, 363, 375, 376, 377, 378, 599, 611, 612, 613, 614, 1370, 1372, 1373, 1374, 1380, 1382],
+      "problem": "Robux UI is present as direct Discord ticket links and per-plan Robux boxes. It is not a modal in the inspected public files; next edit should decide whether to keep, hide, or convert it to an explicit manual-payment modal."
+    }
+  ],
+  "ogDiscordPreviewFindings": [
+    {
+      "files": [
+        "public/index.html",
+        "public/pricing.html",
+        "public/dashboard.html",
+        "public/my-products.html",
+        "public/success.html",
+        "public/payment-success.html",
+        "public/payment-cancelled.html",
+        "public/store.html",
+        "public/download.html",
+        "public/features.html",
+        "public/faq.html",
+        "public/support.html",
+        "public/login.html",
+        "public/register.html",
+        "public/forgot-password.html",
+        "public/reset-password.html",
+        "public/legal.html",
+        "public/terms/index.html",
+        "public/privacy/index.html",
+        "public/macros.html"
+      ],
+      "problem": "Repeated OG/Twitter preview meta uses fima-preview-v126.png?v=126 and shared description. Need verify desired v1.0.127 preview image/copy and update consistently for Discord/social embeds."
+    },
+    {
+      "file": "public/assets/social-preview.png",
+      "note": "Existing social-preview asset is present but not the referenced OG image in inspected HTML."
+    },
+    {
+      "file": "public/assets/fima-preview-v126.png",
+      "note": "Current referenced OG/Twitter preview asset."
+    }
+  ],
+  "exactFilesThatNeedEditsNext": [
+    "public/assets/js/app.js",
+    "public/assets/js/account.js",
+    "public/assets/js/success.js",
+    "public/terms/index.html",
+    "public/dashboard.html",
+    "public/index.html",
+    "public/pricing.html",
+    "public/my-products.html",
+    "public/success.html",
+    "public/payment-success.html",
+    "public/payment-cancelled.html",
+    "public/store.html",
+    "public/download.html",
+    "public/features.html",
+    "public/faq.html",
+    "public/support.html",
+    "public/login.html",
+    "public/register.html",
+    "public/forgot-password.html",
+    "public/reset-password.html",
+    "public/legal.html",
+    "public/privacy/index.html",
+    "public/macros.html"
+  ],
+  "safety": {
+    "sourceFilesEdited": false,
+    "databaseWrites": false,
+    "stripeCalls": false,
+    "adminRuntimeCalls": false,
+    "aiBotStarted": false,
+    "macroLabStarted": false
+  },
+  "nextRecommendedStep": "Proceed with a narrow website text/UI fix pass for public/assets/js/app.js, public/assets/js/account.js, public/assets/js/success.js, terms/legal copy, and repeated OG/Twitter preview metadata; do not run DB-writing flows or runtime admin jobs."
+}

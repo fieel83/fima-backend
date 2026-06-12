@@ -1,0 +1,102 @@
+{
+  "checkpoint": "priority-2b-website-text-ui-fix",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "narrow website text/UI fix pass only; no DB writes, no Stripe calls, no admin runtime calls, no deploy",
+  "filesEdited": [
+    "public/assets/js/app.js",
+    "public/assets/js/account.js",
+    "public/assets/js/success.js",
+    "public/assets/css/styles.css",
+    "public/terms/index.html",
+    "public/index.html",
+    "public/pricing.html",
+    "public/download.html",
+    "public/features.html",
+    "public/faq.html",
+    "public/macros.html",
+    "public/legal.html",
+    "public/support.html",
+    "public/my-products.html",
+    "public/payment-success.html",
+    "public/payment-cancelled.html",
+    "public/forgot-password.html",
+    "public/reset-password.html",
+    "public/login.html",
+    "public/success.html",
+    "public/register.html",
+    "public/store.html",
+    "public/dashboard.html",
+    "public/privacy/index.html",
+    "artifacts/website-v1.0.127/og-preview-image-reference-needed.json",
+    "artifacts/checkpoints-v1.0.127/priority-2b-website-text-ui-fix.json"
+  ],
+  "mojibakeScanResult": {
+    "command": "rg -n \"ð|Ã|Ä|�\" -S public --glob '*.html' --glob '*.js' --glob '*.css' --glob '*.json'",
+    "result": "pass; no matches"
+  },
+  "oldProductTextScanResult": {
+    "command": "rg -n \"15 Days|30 Days|90 Days|3 Months|2 Weeks|old one-time 1 Month|fima-preview-v126|STRIPE_PRICE_1DAY\" -S public --glob '*.html' --glob '*.js' --glob '*.css' --glob '*.json'",
+    "result": "pass with allowed legacy-only matches",
+    "allowedLegacyMatches": [
+      "public/assets/js/success.js: Legacy Product - 15 Days",
+      "public/assets/js/success.js: Legacy Product - 3 Months"
+    ],
+    "blockedPublicMatches": []
+  },
+  "staleLaunchCopyScanResult": {
+    "command": "rg -n \"25% OFF|launch sale|Launch-Sale|lancement|3 juin|3\\. juna|Lansman fiyat|Launch price|before launch|avant lancement|prije launch|fima-preview-v126\" -S public --glob '*.html' --glob '*.js' --glob '*.css' --glob '*.json'",
+    "result": "pass; no matches"
+  },
+  "ogTwitterPreviewReferencesAfterFix": {
+    "url": "https://fimamacro.com/assets/fima-preview-v127.png?v=127",
+    "updatedHtmlFiles": [
+      "public/index.html",
+      "public/pricing.html",
+      "public/dashboard.html",
+      "public/my-products.html",
+      "public/success.html",
+      "public/payment-success.html",
+      "public/payment-cancelled.html",
+      "public/store.html",
+      "public/download.html",
+      "public/features.html",
+      "public/faq.html",
+      "public/support.html",
+      "public/login.html",
+      "public/register.html",
+      "public/forgot-password.html",
+      "public/reset-password.html",
+      "public/legal.html",
+      "public/terms/index.html",
+      "public/privacy/index.html",
+      "public/macros.html"
+    ],
+    "localPreviewImageExists": false,
+    "referenceTaskArtifact": "artifacts/website-v1.0.127/og-preview-image-reference-needed.json"
+  },
+  "robuxUiModalStatus": {
+    "status": "static frontend modal added",
+    "details": [
+      "Robux package buttons now open a manual verification modal instead of direct ticket copy.",
+      "Modal explains manual staff verification, Discord ticket requirement, and no automatic Stripe checkout.",
+      "Modal action links to the existing Discord ticket URL only when clicked by the user.",
+      "No backend DB-writing endpoint was added or called."
+    ]
+  },
+  "testsStaticChecksRun": [
+    {
+      "command": "node --check public/assets/js/app.js; node --check public/assets/js/account.js; node --check public/assets/js/success.js",
+      "result": "pass"
+    },
+    {
+      "command": "rg -n \"fima-preview-v127|og:image|twitter:image\" -S public --glob '*.html'",
+      "result": "pass; public HTML preview references use v127 absolute URL"
+    }
+  ],
+  "remainingIssues": [
+    "public/assets/fima-preview-v127.png is missing locally; preview meta references are updated, but the actual v127 image asset still needs to be added or verified before website deploy.",
+    "No browser visual QA was run in this priority by request scope."
+  ],
+  "nextRecommendedStep": "Priority 2C: add or verify the v1.0.127 OG preview image asset, then run narrow browser/static visual QA for the edited website pricing/gift/Robux flows before deploy."
+}

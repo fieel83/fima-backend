@@ -1,0 +1,88 @@
+{
+  "artifact": "website-static-qa",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "narrow public website static/local QA only; no DB writes, no Stripe calls, no admin runtime calls",
+  "localPreview": {
+    "server": "http://127.0.0.1:4177",
+    "servedFolder": "public",
+    "runtimeCallsExecuted": false,
+    "stripeCallsExecuted": false,
+    "adminRuntimeCallsExecuted": false,
+    "dbWritesExecuted": false
+  },
+  "staticChecks": [
+    {
+      "command": "rg -n \"ð|Ã|Ä|�\" -S public --glob '*.html' --glob '*.js' --glob '*.css' --glob '*.json'",
+      "result": "pass; no matches"
+    },
+    {
+      "command": "rg -n \"fima-preview-v126|15 Days|30 Days|90 Days|3 Months|2 Weeks|STRIPE_PRICE_1DAY|2 Wochen|1 Monat|3 Monate|15 Tage|30 Tage|90 Tage|3 mois|15 jours|30 jours|90 jours|3 mjeseca|15 dana|30 dana|90 dana\" -S public --glob '*.html' --glob '*.js' --glob '*.css' --glob '*.json'",
+      "result": "pass with allowed legacy-only matches",
+      "allowedLegacyMatches": [
+        "public/assets/js/success.js: Legacy Product - 15 Days",
+        "public/assets/js/success.js: Legacy Product - 3 Months"
+      ]
+    },
+    {
+      "command": "rg -n \"25% OFF|launch sale|Launch-Sale|lancement|3 juin|3\\. juna|Lansman fiyat|Launch price|before launch|avant lancement|prije launch|sale countdown|Ends in|Bitmesine\" -S public --glob '*.html' --glob '*.js' --glob '*.css' --glob '*.json'",
+      "result": "pass; no matches"
+    },
+    {
+      "command": "node --check public/assets/js/app.js; node --check public/assets/js/account.js; node --check public/assets/js/success.js",
+      "result": "pass"
+    }
+  ],
+  "visualLocalQa": {
+    "home": "loaded; no mojibake, old public package text, or stale launch text detected",
+    "pricingDesktop": {
+      "checkoutButtons": 3,
+      "robuxButtons": 3,
+      "giftButtons": [
+        "Buy Gift Code",
+        "Buy Gift Code",
+        "Buy Gift Code"
+      ],
+      "buttonOverflowCount": 0,
+      "mojibakeDetected": false,
+      "oldPublicPackageTextDetected": false,
+      "staleLaunchTextDetected": false
+    },
+    "loggedOutCardCheckout": {
+      "registerGate": true,
+      "noStripeUrl": true
+    },
+    "loggedOutGiftCheckout": {
+      "registerGate": true,
+      "giftCodeNext": true,
+      "noStripeUrl": true,
+      "mojibakeDetected": false
+    },
+    "robuxModal": {
+      "visible": true,
+      "manualVerificationText": true,
+      "discordTicketText": true,
+      "staffVerificationText": true,
+      "noAutomaticStripeCheckoutText": true,
+      "backendWriteTriggerPresent": false
+    },
+    "pricingMobile390": {
+      "viewportOverflow": false,
+      "buttonOverflowCount": 0,
+      "giftButtons": [
+        "Buy Gift Code",
+        "Buy Gift Code",
+        "Buy Gift Code"
+      ],
+      "mojibakeDetected": false
+    },
+    "terms": "loaded; current product wording present and old products not advertised as current purchase options",
+    "success": "loaded; no mojibake; legacy mappings remain legacy-only in success.js",
+    "accountDashboardStatic": "loaded; gift/account strings clean in static local preview"
+  },
+  "remainingIssues": [
+    "No live Discord crawler preview was fetched in this priority; only local asset/meta verification was performed.",
+    "The noindex Roblox callback page intentionally has no OG/Twitter preview tags."
+  ],
+  "nextRecommendedStep": "Priority 2D: commit website text/UI/OG preview changes after a final diff and secret-safe static review."
+}

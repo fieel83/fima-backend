@@ -1,0 +1,30 @@
+﻿{
+    "checkpoint":  "priority-1h-code-deploy-verify",
+    "version":  "v1.0.127",
+    "createdAt":  "2026-06-12T13:59:28.1864841+02:00",
+    "deployedCommit":  "9d6e690d0293f59fa7706282cb072273453b787d",
+    "renderLiveCommit":  "9d6e690d0293f59fa7706282cb072273453b787d",
+    "liveCommitContainsRequestedCommit":  true,
+    "endpointStatus":  {
+                           "apiVersion":  {
+                                              "url":  "https://api.fimamacro.com/api/version",
+                                              "statusCode":  200,
+                                              "artifact":  "artifacts/backend-live-v1.0.127/post-deploy-api-version.json"
+                                          },
+                           "healthz":  {
+                                           "url":  "https://api.fimamacro.com/healthz",
+                                           "statusCode":  200,
+                                           "artifact":  "artifacts/backend-live-v1.0.127/post-deploy-healthz.json"
+                                       }
+                       },
+    "liveVersion":  "1.0.126",
+    "commit":  "9d6e690d0293f59fa7706282cb072273453b787d",
+    "buildTime":  "2026-06-12T11:51:11.600Z",
+    "healthzEnrichedNotRegressed":  true,
+    "backupCreated":  false,
+    "runtimeMutationJobsExecuted":  false,
+    "adminRuntimeJobsExecuted":  false,
+    "stripeCallsExecuted":  false,
+    "deployStatus":  "public endpoints confirm requested commit is live; no Render admin/runtime endpoint was called from this checkpoint",
+    "nextRecommendedStep":  "Create Render database backup/export before any admin runtime setup, Stripe setup, DB mutation jobs, or broader runtime QA."
+}

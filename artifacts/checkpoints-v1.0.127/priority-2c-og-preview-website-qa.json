@@ -1,0 +1,58 @@
+{
+  "checkpoint": "priority-2c-og-preview-website-qa",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "scope": "OG preview image plus narrow public website visual/static QA; no backend runtime/admin/Stripe code, no DB writes, no Stripe calls, no admin runtime calls",
+  "filesEdited": [
+    "public/assets/fima-preview-v127.png",
+    "public/assets/js/app.js",
+    "public/terms/index.html",
+    "public/privacy/index.html",
+    "artifacts/website-v1.0.127/og-preview-image-reference-needed.json",
+    "artifacts/frontend-cache-v1.0.127/website-static-qa.json",
+    "artifacts/discord-preview-v1.0.127/og-preview-image-summary.json",
+    "artifacts/checkpoints-v1.0.127/priority-2c-og-preview-website-qa.json"
+  ],
+  "ogImagePath": "public/assets/fima-preview-v127.png",
+  "ogImageDimensions": {
+    "width": 1200,
+    "height": 630
+  },
+  "metaReferencesAfterFix": {
+    "requiredUrl": "https://fimamacro.com/assets/fima-preview-v127.png?v=127",
+    "previewEnabledHtmlPages": "all preview-enabled public HTML pages use v127 absolute URL for og:image and twitter:image",
+    "v126References": 0,
+    "stalePackageTextInMeta": 0,
+    "note": "public/auth/roblox-callback.html is noindex/nofollow and intentionally has no OG/Twitter preview tags."
+  },
+  "staticSearchResult": {
+    "mojibake": "pass; no matches",
+    "v126": "pass; no matches",
+    "oldPublicProducts": "pass with allowed legacy-only success.js labels",
+    "stripePrice1Day": "pass; no matches",
+    "staleLaunchSaleCounter": "pass; no matches",
+    "syntax": "pass; node --check app.js/account.js/success.js"
+  },
+  "visualLocalQaResult": {
+    "home": "pass",
+    "pricing": "pass",
+    "loginRegisterGate": "pass; logged-out card and gift actions redirect to register and do not navigate to Stripe",
+    "payWithCardButtons": "pass; 3 current paid products have card buttons; no direct Stripe URL while logged out",
+    "payWithRobuxButtons": "pass; buttons open static manual Discord ticket modal",
+    "buyGiftCodeButtons": "pass; 3 clean Buy Gift Code labels, no mojibake",
+    "giftModalOrGate": "pass; logged-out gift purchase gates to register with giftCode next param",
+    "termsPage": "pass",
+    "successPageCopy": "pass; legacy products are legacy-only where mapped",
+    "accountDashboardGiftStrings": "pass in static local preview",
+    "layout": "pass; no pricing button overflow on desktop or 390px mobile viewport"
+  },
+  "runtimeMutationJobsExecuted": false,
+  "adminRuntimeCallsExecuted": false,
+  "stripeCallsExecuted": false,
+  "dbWritesExecuted": false,
+  "remainingIssues": [
+    "No live Discord crawler preview was fetched in this priority; local image/meta verification only.",
+    "The noindex Roblox callback page intentionally has no OG/Twitter preview tags."
+  ],
+  "nextRecommendedStep": "Priority 2D: commit website text/UI/OG preview changes after a final diff and secret-safe static review."
+}

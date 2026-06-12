@@ -1,0 +1,54 @@
+{
+  "checkpoint": "priority-2d-commit-website-static-fixes",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-12",
+  "commitHash": "PENDING",
+  "pushed": false,
+  "filesCommitted": [
+    "artifacts/backend-live-v1.0.127/post-deploy-api-version.json",
+    "artifacts/backend-live-v1.0.127/post-deploy-healthz.json",
+    "artifacts/backup-rollback-v1.0.127/database-provider-and-backup-plan.json",
+    "artifacts/checkpoints-v1.0.127/priority-1g-database-backup.json",
+    "artifacts/checkpoints-v1.0.127/priority-1h-code-deploy-verify.json",
+    "artifacts/checkpoints-v1.0.127/priority-2a-website-inspection.json",
+    "artifacts/checkpoints-v1.0.127/priority-2b-website-text-ui-fix.json",
+    "artifacts/checkpoints-v1.0.127/priority-2c-og-preview-website-qa.json",
+    "artifacts/checkpoints-v1.0.127/priority-2d-commit-website-static-fixes.json",
+    "artifacts/discord-preview-v1.0.127/og-preview-image-summary.json",
+    "artifacts/frontend-cache-v1.0.127/website-static-qa.json",
+    "artifacts/website-v1.0.127/og-preview-image-reference-needed.json"
+  ],
+  "websiteSourceFilesOutsideGit": [
+    "public/assets/fima-preview-v127.png",
+    "public/assets/js/app.js",
+    "public/assets/js/account.js",
+    "public/assets/js/success.js",
+    "public/assets/css/styles.css",
+    "public/terms/index.html",
+    "public/privacy/index.html",
+    "public HTML pages with OG/Twitter meta references"
+  ],
+  "staticChecksResult": {
+    "mojibake": "pass; no matches",
+    "fimaPreviewV126": "pass; no matches",
+    "publicStripePrice1Day": "pass; no matches",
+    "staleLaunchSaleCounter": "pass; no matches",
+    "oldPublicProducts": "pass with allowed legacy-only success.js labels",
+    "jsSyntax": "pass; node --check public/assets/js/app.js public/assets/js/account.js public/assets/js/success.js",
+    "ogImageDimensions": "pass; public/assets/fima-preview-v127.png is 1200x630"
+  },
+  "secretScanResult": {
+    "status": "pass; no secret values found",
+    "notes": [
+      "Broad text scan found safe UI/documentation terms such as license key, recovery code, and the literal config name DATABASE_URL, with no values printed.",
+      "Strict token scan found two masked FIMA-shaped giftCodePlaceholder examples in public/assets/js/account.js; these are placeholders, not live license values.",
+      "No sk_live, sk_test, rk_live, whsec, OpenAI, Stripe, Discord, admin API, database URL value, real license key, or recovery code value was found."
+    ]
+  },
+  "deployStatus": "not deployed",
+  "remainingIssues": [
+    "Only fima-backend-repo is a Git repo in this workspace; the sibling public website files are outside Git and cannot be committed from this worktree.",
+    "No deploy was performed."
+  ],
+  "nextRecommendedStep": "Provide or switch to the website Git worktree so the actual public website static file changes can be committed and pushed before deploy."
+}
