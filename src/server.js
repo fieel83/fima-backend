@@ -13,7 +13,19 @@ import Stripe from "stripe";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
-import { PLANS, getPlan, getPlanCommerce, getPlanExpiry, getPlanPriceOptions, planIds } from "./plans.js";
+import {
+  PLANS,
+  PUBLIC_REQUIRED_PRICE_ENVS,
+  checkoutModeForPlan,
+  getPlan,
+  getPlanCommerce,
+  getPlanExpiry,
+  getPlanPriceOptions,
+  isPublicCheckoutPlan,
+  planIds,
+  productionInlinePriceDataBlocked,
+  publicCheckoutPlanIds
+} from "./plans.js";
 import {
   buildLicenseData,
   generateUniqueLicenseKey,
@@ -35,7 +47,7 @@ import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState,
 
 const app = express();
 const port = Number(env("PORT", "8080"));
-const publicProductPlanIds = new Set(["1day", "3days", "monthly", "lifetime"]);
+const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
     Object.values(PLANS)
@@ -125,9 +137,7 @@ const runtimeEnvCatalog = [
 const requiredRuntimeEnv = [
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_PRICE_3DAYS",
-  "STRIPE_PRICE_MONTHLY",
-  "STRIPE_PRICE_LIFETIME",
+  ...PUBLIC_REQUIRED_PRICE_ENVS,
   "FIMA_ADMIN_API_KEY",
   "DISCORD_BOT_TOKEN",
   "DISCORD_CLIENT_ID",
@@ -1208,7 +1218,7 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
 
     const plan = getPlan(req.body?.plan);
     if (!plan) return res.status(400).json({ error: "invalid_plan", plans: planIds() });
-    if (!publicProductPlanIds.has(plan.id)) return res.status(400).json({ error: "legacy_plan_unavailable", plans: Array.from(publicProductPlanIds) });
+    if (!isPublicCheckoutPlan(plan.id)) return res.status(400).json({ error: "legacy_plan_unavailable", plans: publicCheckoutPlanIds() });
 
     const account = await ensureUserStripeCustomer(user);
     const customerEmail = String(account.email || "").trim().toLowerCase();
@@ -3759,8 +3769,8 @@ async function createProductCheckoutSession({ user, product, price }) {
 async function createCheckoutSession({ plan, commerce, customerEmail, customerId, priceId, selectedCurrency, language, extraMetadata = {} }) {
   const stripeClient = stripe();
   const checkoutType = String(extraMetadata.checkoutType || "").trim().toLowerCase();
-  const subscriptionCheckout = Boolean(plan.subscription) && checkoutType === "license_purchase";
-  const productionMode = env("NODE_ENV", "development") === "production" || env("STRIPE_MODE", "auto") === "live";
+  const subscriptionCheckout = checkoutModeForPlan(plan) === "subscription" && checkoutType === "license_purchase";
+  const productionMode = productionInlinePriceDataBlocked(env("NODE_ENV", "development"), env("STRIPE_MODE", "auto"));
   const baseSession = {
     mode: subscriptionCheckout ? "subscription" : "payment",
     allow_promotion_codes: true,

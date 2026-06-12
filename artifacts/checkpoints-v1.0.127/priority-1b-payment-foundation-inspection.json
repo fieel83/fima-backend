@@ -1,0 +1,85 @@
+{
+  "checkpoint": "priority-1b-payment-foundation-inspection",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-11",
+  "currentWorkingDirectory": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+  "backendEvidencePaths": [
+    "artifacts/backend-live-v1.0.127/live-api-version.json",
+    "artifacts/backend-live-v1.0.127/live-healthz.json",
+    "artifacts/backend-live-v1.0.127/render-source-summary.json"
+  ],
+  "backendLiveEvidenceExists": {
+    "artifacts/backend-live-v1.0.127/live-api-version.json": true,
+    "artifacts/backend-live-v1.0.127/live-healthz.json": true,
+    "artifacts/backend-live-v1.0.127/render-source-summary.json": true
+  },
+  "filesInspected": [
+    "src/plans.js",
+    "src/server.js",
+    "src/adminHtml.js",
+    "src/discordBot.js",
+    "src/stripeSafety.js",
+    "scripts/setup-stripe-products.js",
+    "scripts/e2e-gift-license-flow.js",
+    "test/license.test.js",
+    "README.md",
+    "DEPLOY_RENDER.md",
+    ".env.example",
+    "prisma/schema.prisma"
+  ],
+  "findings": {
+    "publicProductsPlansDefined": [
+      "src/plans.js defines PLANS and per-plan priceEnv/salePriceEnv.",
+      "src/server.js line 38 defines publicProductPlanIds as 1day, 3days, monthly, lifetime.",
+      "src/server.js lines 767-776 serves database store products at /api/store/products.",
+      "src/server.js lines 1199-1285 serves public plan checkout at /api/checkout/create-session."
+    ],
+    "oldProductsStillReferenced": [
+      "src/plans.js still defines 2weeks as name Fima Macro 15 Days with STRIPE_PRICE_2WEEKS and STRIPE_SALE_PRICE_2WEEKS.",
+      "src/plans.js still defines 1month as duration 30 days with STRIPE_PRICE_1MONTH and STRIPE_SALE_PRICE_1MONTH.",
+      "src/plans.js still defines 3months as name Fima Macro 3 Months, duration 90 days, STRIPE_PRICE_3MONTHS, and STRIPE_SALE_PRICE_3MONTHS.",
+      "src/adminHtml.js still offers admin direct gift/manual/filter options for 2weeks, 1month, and 3months, with labels including 15 Days and 3 Months.",
+      "test/license.test.js still asserts 2weeks, 1month, and 3months expiry behavior.",
+      "README.md, DEPLOY_RENDER.md, and .env.example still document old STRIPE_PRICE_1DAY, STRIPE_PRICE_2WEEKS, STRIPE_PRICE_1MONTH, STRIPE_PRICE_3MONTHS and sale env variants including STRIPE_SALE_PRICE_3MONTHS."
+    ],
+    "freeTrialStripeEnvRequirement": [
+      "The actual monthly trial claim route in src/server.js lines 1051-1142 creates a license directly and does not call Stripe or read any Stripe price env.",
+      "However, src/server.js line 38 still includes 1day in publicProductPlanIds, and src/plans.js lines 2-10 gives 1day priceEnv STRIPE_PRICE_1DAY. A checkout request for plan 1day would still require STRIPE_PRICE_1DAY in production."
+    ],
+    "inlinePriceDataFallback": [
+      "src/server.js lines 3759-3835 contains createCheckoutSession fallback to inline price_data.",
+      "src/server.js lines 3791-3814 block that fallback in production or live Stripe mode for invalid or missing price env.",
+      "Therefore production checkout should not use inline_price_data unless NODE_ENV is not production and STRIPE_MODE is not live."
+    ],
+    "publicRequiredEnvs": [
+      "src/server.js lines 125-130 requiredRuntimeEnv only lists STRIPE_PRICE_3DAYS, STRIPE_PRICE_MONTHLY, and STRIPE_PRICE_LIFETIME among public price envs.",
+      "But src/server.js lines 38-44 derives stripePriceEnvNames from publicProductPlanIds, which still includes 1day, so startup price validation still includes STRIPE_PRICE_1DAY.",
+      "Docs/examples still list old price envs and sale envs."
+    ]
+  },
+  "exactProblemsFound": [
+    "Legacy plans 2weeks, 1month, and 3months remain in src/plans.js even though public checkout allowlist excludes them.",
+    "Old product labels 15 Days, 30-day/1 Month, 90-day/3 Months, 2 Weeks, 3 Months remain in admin UI, tests, docs, and env examples.",
+    "Sale price env variants remain documented and configured in plan definitions for legacy products, including STRIPE_SALE_PRICE_3MONTHS.",
+    "1day is still treated as a public product plan in src/server.js, causing checkout validation and checkout creation to involve STRIPE_PRICE_1DAY even though requiredRuntimeEnv no longer includes it.",
+    "Production checkout blocks inline_price_data fallback correctly, but the fallback code still exists for non-production/non-live modes.",
+    "Runtime required envs are the intended three price envs, but derived validation and docs are not fully aligned."
+  ],
+  "exactFilesThatNeedEditsNext": [
+    "src/plans.js",
+    "src/server.js",
+    "src/adminHtml.js",
+    "test/license.test.js",
+    "README.md",
+    "DEPLOY_RENDER.md",
+    ".env.example"
+  ],
+  "changedFilesAtCheckpoint": [
+    "artifacts/backend-live-v1.0.127/live-api-version.json",
+    "artifacts/backend-live-v1.0.127/live-healthz.json",
+    "artifacts/backend-live-v1.0.127/render-source-summary.json",
+    "artifacts/checkpoints-v1.0.127/correct-repo-checkpoint.json",
+    "artifacts/checkpoints-v1.0.127/priority-1b-payment-foundation-inspection.json"
+  ],
+  "nextRecommendedStep": "Edit only the payment/product foundation files to remove legacy public checkout products and old env documentation, keep Free Trial off Stripe checkout, and align derived public price validation to STRIPE_PRICE_3DAYS, STRIPE_PRICE_MONTHLY, and STRIPE_PRICE_LIFETIME."
+}

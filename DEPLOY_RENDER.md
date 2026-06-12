@@ -38,15 +38,12 @@ STRIPE_MODE=auto
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
-STRIPE_PRICE_1DAY=price_1Tcvj9HluwdGuEsNu8C6Pb0Z
-STRIPE_SALE_PRICE_1DAY=price_1TcvjAHluwdGuEsNaMlOv3ZV
-STRIPE_PRICE_2WEEKS=price_1TcvjAHluwdGuEsNvO97mkOO
-STRIPE_SALE_PRICE_2WEEKS=price_1TcvjAHluwdGuEsNx341iL1Z
-STRIPE_PRICE_1MONTH=price_1TcvjBHluwdGuEsNENJtFbEs
-STRIPE_SALE_PRICE_1MONTH=price_1TcvjBHluwdGuEsNQT2dR92l
-STRIPE_PRICE_3MONTHS=price_1TcvjBHluwdGuEsNhQbV6i61
-STRIPE_SALE_PRICE_3MONTHS=price_1TcvjBHluwdGuEsNtpogLJ5P
-STRIPE_PRICE_LIFETIME=price_1TcvjCHluwdGuEsN5mjPd8eN
+STRIPE_PRICE_3DAYS=
+STRIPE_PRICE_MONTHLY=
+STRIPE_PRICE_LIFETIME=
+STRIPE_TEST_PRICE_3DAYS=
+STRIPE_TEST_PRICE_MONTHLY=
+STRIPE_TEST_PRICE_LIFETIME=
 ADMIN_PASSWORD=
 FRONTEND_URL=https://fimamacro.com
 API_BASE_URL=https://api.fimamacro.com
@@ -58,6 +55,8 @@ CORS_ORIGINS=https://fimamacro.com,https://www.fimamacro.com
 ```
 
 Use Render PostgreSQL's Internal Database URL for `DATABASE_URL`.
+
+The Free 1-Day Trial is not a Stripe Checkout product and must not use `STRIPE_PRICE_1DAY`. Legacy packages such as 15 Days, old one-time 1 Month, and 3 Months are not public checkout products and their old price or sale envs are not required.
 
 ## DNS
 
@@ -104,4 +103,4 @@ Copy the generated Stripe webhook signing secret into Render as `STRIPE_WEBHOOK_
 11. Open `https://api.fimamacro.com/admin`.
 12. Test HWID reset and ban/unban.
 
-Live mode depends on Render `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and live `STRIPE_PRICE_*` values.
+Live mode depends on Render `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and only these public live price envs: `STRIPE_PRICE_3DAYS`, `STRIPE_PRICE_MONTHLY`, and `STRIPE_PRICE_LIFETIME`. Production/live checkout must use Stripe Price IDs; inline `price_data` fallback is blocked.

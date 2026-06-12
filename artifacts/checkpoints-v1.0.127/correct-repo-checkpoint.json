@@ -1,0 +1,17 @@
+{
+  "currentWorkingDirectory": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+  "isGitRepo": true,
+  "gitRoot": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+  "remoteUrl": "https://github.com/fieel83/fima-backend.git",
+  "branch": "main",
+  "changedFiles": [
+    "artifacts/checkpoints-v1.0.127/correct-repo-checkpoint.json"
+  ],
+  "uncommittedChanges": true,
+  "backendLiveEvidenceExists": {
+    "artifacts/backend-live-v1.0.127/live-api-version.json": false,
+    "artifacts/backend-live-v1.0.127/live-healthz.json": false,
+    "artifacts/backend-live-v1.0.127/render-source-summary.json": false
+  },
+  "nextRecommendedStep": "Stay in this Git repo and create the missing backend live evidence artifacts before continuing the v1.0.127 plan."
+}

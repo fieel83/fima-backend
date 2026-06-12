@@ -1,0 +1,41 @@
+{
+  "checkpoint": "priority-1f-commit-payment-foundation",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-11",
+  "currentWorkingDirectory": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+  "commitHash": "pending_until_commit",
+  "pushed": false,
+  "filesCommitted": [
+    ".env.example",
+    "DEPLOY_RENDER.md",
+    "README.md",
+    "scripts/setup-stripe-products.js",
+    "src/adminHtml.js",
+    "src/plans.js",
+    "src/server.js",
+    "test/license.test.js",
+    "test/stripeSetup.test.js",
+    "artifacts/backend-live-v1.0.127/live-api-version.json",
+    "artifacts/backend-live-v1.0.127/live-healthz.json",
+    "artifacts/backend-live-v1.0.127/render-source-summary.json",
+    "artifacts/backup-rollback-v1.0.127/pre-runtime-backup-rollback-plan.json",
+    "artifacts/checkpoints-v1.0.127/correct-repo-checkpoint.json",
+    "artifacts/checkpoints-v1.0.127/priority-1b-payment-foundation-inspection.json",
+    "artifacts/checkpoints-v1.0.127/priority-1c-payment-foundation-fix.json",
+    "artifacts/checkpoints-v1.0.127/priority-1d-backend-tests-stripe-script.json",
+    "artifacts/checkpoints-v1.0.127/priority-1e-pre-deploy-safety-review.json",
+    "artifacts/checkpoints-v1.0.127/priority-1f-commit-payment-foundation.json"
+  ],
+  "testCommandResult": {
+    "command": "npm test",
+    "result": "passed",
+    "summary": "19 tests passed, 0 failed"
+  },
+  "secretScanResult": {
+    "scannedFileCount": 18,
+    "realFindingCount": 0,
+    "result": "clean"
+  },
+  "deployStatus": "not deployed",
+  "nextRequiredManualAction": "create Render database backup/export before deploy/runtime jobs"
+}

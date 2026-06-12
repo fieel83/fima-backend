@@ -1,0 +1,14 @@
+﻿{
+    "checkedAt":  "2026-06-11T22:51:32.1504645+02:00",
+    "apiVersion":  {
+                       "url":  "https://api.fimamacro.com/api/version",
+                       "statusCode":  200,
+                       "artifact":  "artifacts/backend-live-v1.0.127/live-api-version.json"
+                   },
+    "healthz":  {
+                    "url":  "https://api.fimamacro.com/healthz",
+                    "statusCode":  200,
+                    "artifact":  "artifacts/backend-live-v1.0.127/live-healthz.json"
+                },
+    "source":  "public HTTPS GET only; no Stripe/admin endpoints called"
+}

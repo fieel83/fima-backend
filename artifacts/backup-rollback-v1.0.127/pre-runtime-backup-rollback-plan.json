@@ -1,0 +1,52 @@
+{
+  "artifact": "pre-runtime-backup-rollback-plan",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-11",
+  "runtimeJobsMayMutateLater": [
+    "admin Stripe product setup for live prices",
+    "admin Stripe product setup for test prices",
+    "Render environment variable updates for Stripe price IDs",
+    "Render deploy hook trigger after env updates",
+    "public checkout session creation",
+    "Stripe webhook fulfillment for checkout.session.completed",
+    "license creation, extension, and subscription period sync",
+    "gift code creation, direct package creation, and redemption",
+    "admin product, price, coupon, and promotion-code management"
+  ],
+  "backupExportRequiredBeforeRuntimeJobs": [
+    "Export or snapshot the production database before any admin runtime setup, webhook replay, checkout verification, gift/license migration, or subscription sync.",
+    "Capture current Render environment variable names and whether required values are set, without exporting secret values into artifacts.",
+    "Capture current Stripe product and price IDs for the three public paid plans before creating or updating runtime envs.",
+    "Capture current webhook endpoint configuration and event delivery status before any replay or deploy verification."
+  ],
+  "rollbackNotesForProductSetup": [
+    "The setup script must only find or create 3days, monthly, and lifetime products/prices; it must not delete or deactivate old Stripe products.",
+    "If a wrong price ID is written to Render, restore the previous Render env value from the pre-runtime env inventory and redeploy.",
+    "If a duplicate product or price is created, leave it inactive only after manual Stripe dashboard review; do not delete historical objects needed by old sessions or receipts.",
+    "Public checkout can be rolled back by reverting env vars to known-good price IDs and redeploying the previous backend commit."
+  ],
+  "rollbackNotesForLicenseGiftSubscriptionWebhookChanges": [
+    "Before any job that mutates licenses, gifts, subscriptions, purchases, orders, webhook events, or analytics, take a database snapshot/export.",
+    "If webhook fulfillment creates incorrect licenses or orders, stop webhook replay, disable checkout if necessary, restore from snapshot or apply a targeted compensating update from the audit trail.",
+    "If gift or direct package flows create incorrect records, revoke only the affected pending packages/codes and preserve redeemed audit history.",
+    "If subscription sync updates the wrong expiry, restore affected license rows from backup or Stripe invoice/subscription period evidence."
+  ],
+  "duplicatePreventionNotes": [
+    "Stripe setup finds existing products by fima_plan metadata or matching product name before creating new products.",
+    "Stripe setup finds existing active prices by product, currency, amount, one-time vs recurring type, and monthly interval before creating new prices.",
+    "Webhook fulfillment should continue to rely on unique Stripe session/event IDs and existing order/license records to avoid double fulfillment.",
+    "Gift redemption and direct package claim paths should continue to rely on existing redemption/package status constraints."
+  ],
+  "idempotencyNotes": [
+    "The standalone setup script is intended to be safe to rerun because it reuses existing matching products and prices.",
+    "Admin runtime setup should be rerun only after verifying Render env state and Stripe mode; it should write the same env values when products/prices already exist.",
+    "Checkout creation is not idempotent by itself and should not be used as a migration or verification loop without explicit test scope.",
+    "Webhook replay must be treated as idempotency-sensitive and should be limited to known event IDs after backup."
+  ],
+  "notPerformedInThisCheckpoint": [
+    "no live Stripe calls",
+    "no admin runtime endpoints",
+    "no deploy",
+    "no database mutation"
+  ]
+}

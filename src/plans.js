@@ -1,85 +1,88 @@
 export const PLANS = {
   "1day": {
     id: "1day",
-    name: "Fima Macro 1 Day",
+    name: "Free 1-Day Trial",
     priceCents: 0,
     compareAtCents: 0,
     currency: "eur",
     durationDays: 1,
     lifetime: false,
-    priceEnv: "STRIPE_PRICE_1DAY"
+    trial: true,
+    publicCheckout: false
   },
   "3days": {
     id: "3days",
-    name: "Fima Macro 3 Days",
+    name: "3 Days Access",
     priceCents: 99,
     compareAtCents: 99,
     currency: "eur",
     durationDays: 3,
     lifetime: false,
-    priceEnv: "STRIPE_PRICE_3DAYS"
+    priceEnv: "STRIPE_PRICE_3DAYS",
+    publicCheckout: true
   },
   "monthly": {
     id: "monthly",
-    name: "Fima Macro Monthly",
+    name: "Monthly Subscription",
     priceCents: 499,
     compareAtCents: 499,
     currency: "eur",
     durationDays: 30,
     lifetime: false,
     subscription: true,
-    priceEnv: "STRIPE_PRICE_MONTHLY"
+    priceEnv: "STRIPE_PRICE_MONTHLY",
+    publicCheckout: true
   },
   "2weeks": {
     id: "2weeks",
-    name: "Fima Macro 15 Days",
+    name: "Legacy Product - 15 Days",
     priceCents: 399,
-    salePriceCents: 299,
     compareAtCents: 399,
     currency: "eur",
     durationDays: 15,
     lifetime: false,
-    priceEnv: "STRIPE_PRICE_2WEEKS",
-    salePriceEnv: "STRIPE_SALE_PRICE_2WEEKS"
+    legacy: true,
+    publicCheckout: false
   },
   "1month": {
     id: "1month",
-    name: "Fima Macro 1 Month",
+    name: "Legacy Product - 1 Month",
     priceCents: 799,
-    salePriceCents: 599,
     compareAtCents: 799,
     currency: "eur",
     durationDays: 30,
     lifetime: false,
-    priceEnv: "STRIPE_PRICE_1MONTH",
-    salePriceEnv: "STRIPE_SALE_PRICE_1MONTH"
+    legacy: true,
+    publicCheckout: false
   },
   "3months": {
     id: "3months",
-    name: "Fima Macro 3 Months",
+    name: "Legacy Product - 3 Months",
     priceCents: 1799,
-    salePriceCents: 1349,
     compareAtCents: 1799,
     currency: "eur",
     durationDays: 90,
     lifetime: false,
-    priceEnv: "STRIPE_PRICE_3MONTHS",
-    salePriceEnv: "STRIPE_SALE_PRICE_3MONTHS"
+    legacy: true,
+    publicCheckout: false
   },
   "lifetime": {
     id: "lifetime",
-    name: "Fima Macro Lifetime",
+    name: "Lifetime",
     priceCents: 2999,
     compareAtCents: 3999,
     currency: "eur",
     durationDays: null,
     lifetime: true,
-    priceEnv: "STRIPE_PRICE_LIFETIME"
+    priceEnv: "STRIPE_PRICE_LIFETIME",
+    publicCheckout: true
   }
 };
 
-export const SALE_START_AT = new Date("2026-05-31T00:00:00+02:00");
-export const SALE_END_AT = new Date("2026-06-03T23:59:59+02:00");
+export const FREE_TRIAL_PLAN_ID = "1day";
+export const PUBLIC_CHECKOUT_PLAN_IDS = Object.freeze(["3days", "monthly", "lifetime"]);
+export const PUBLIC_REQUIRED_PRICE_ENVS = Object.freeze(["STRIPE_PRICE_3DAYS", "STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_LIFETIME"]);
+export const TEST_PRICE_ENVS = Object.freeze(["STRIPE_TEST_PRICE_3DAYS", "STRIPE_TEST_PRICE_MONTHLY", "STRIPE_TEST_PRICE_LIFETIME"]);
 
 export function getPlan(planId) {
   return PLANS[String(planId || "").toLowerCase()] || null;
@@ -89,44 +92,52 @@ export function planIds() {
   return Object.keys(PLANS);
 }
 
+export function publicCheckoutPlanIds() {
+  return [...PUBLIC_CHECKOUT_PLAN_IDS];
+}
+
+export function requiredPublicPriceEnvs() {
+  return [...PUBLIC_REQUIRED_PRICE_ENVS];
+}
+
+export function isPublicCheckoutPlan(planId) {
+  return PUBLIC_CHECKOUT_PLAN_IDS.includes(String(planId || "").toLowerCase());
+}
+
+export function checkoutModeForPlan(plan) {
+  return plan?.subscription ? "subscription" : "payment";
+}
+
+export function productionInlinePriceDataBlocked(nodeEnv = process.env.NODE_ENV, stripeMode = process.env.STRIPE_MODE) {
+  return String(nodeEnv || "development") === "production" || String(stripeMode || "auto") === "live";
+}
+
 export function getPlanExpiry(plan, fromDate = new Date()) {
   if (!plan || plan.lifetime) return null;
   return new Date(fromDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 }
 
 export function isPlanSaleActive(plan, now = new Date()) {
-  if (!plan || plan.lifetime || !plan.salePriceEnv || !plan.salePriceCents) return false;
-  const current = now instanceof Date ? now : new Date(now);
-  return current >= SALE_START_AT && current <= SALE_END_AT;
+  return false;
 }
 
 export function getPlanCommerce(plan, now = new Date()) {
-  const saleActive = isPlanSaleActive(plan, now);
   return {
     currency: plan.currency || "eur",
-    priceCents: saleActive ? plan.salePriceCents : plan.priceCents,
+    priceCents: plan.priceCents,
     compareAtCents: plan.compareAtCents || null,
-    priceEnv: saleActive ? plan.salePriceEnv : plan.priceEnv,
-    saleActive,
-    saleStartAt: SALE_START_AT.toISOString(),
-    saleEndAt: SALE_END_AT.toISOString()
+    priceEnv: plan.priceEnv || null,
+    saleActive: false
   };
 }
 
 export function getPlanPriceOptions(plan) {
+  if (!plan?.priceEnv) return [];
   const options = [{
     label: "regular",
     currency: plan.currency || "eur",
     priceCents: plan.priceCents,
     priceEnv: plan.priceEnv
   }];
-  if (plan.salePriceEnv && plan.salePriceCents) {
-    options.push({
-      label: "sale",
-      currency: plan.currency || "eur",
-      priceCents: plan.salePriceCents,
-      priceEnv: plan.salePriceEnv
-    });
-  }
   return options;
 }

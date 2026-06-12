@@ -1,0 +1,116 @@
+{
+  "checkpoint": "priority-1d-backend-tests-stripe-script",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-11",
+  "currentWorkingDirectory": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+  "filesInspected": [
+    "artifacts/checkpoints-v1.0.127/priority-1c-payment-foundation-fix.json",
+    ".env.example",
+    "DEPLOY_RENDER.md",
+    "README.md",
+    "scripts/setup-stripe-products.js",
+    "src/adminHtml.js",
+    "src/plans.js",
+    "src/server.js",
+    "src/stripeSafety.js",
+    "test/license.test.js",
+    "test/stripeSafety.test.js"
+  ],
+  "filesEdited": [
+    "README.md",
+    "scripts/setup-stripe-products.js",
+    "test/stripeSetup.test.js"
+  ],
+  "priority1cDiffReview": {
+    "publicProductSetConfirmed": [
+      "Free 1-Day Trial",
+      "3 Days Access",
+      "Monthly Subscription",
+      "Lifetime"
+    ],
+    "freeTrialStripeCheckoutProduct": false,
+    "legacyOnlyProductsConfirmed": [
+      "2weeks",
+      "old 1month one-time",
+      "3months",
+      "15/30/90 day legacy references",
+      "sale variants removed from public env/script logic"
+    ],
+    "requiredPublicEnvsConfirmed": [
+      "STRIPE_PRICE_3DAYS",
+      "STRIPE_PRICE_MONTHLY",
+      "STRIPE_PRICE_LIFETIME"
+    ]
+  },
+  "testCommandsRun": [
+    {
+      "command": "node --check scripts/setup-stripe-products.js; node --check src/plans.js; node --check src/server.js",
+      "result": "passed"
+    },
+    {
+      "command": "node --test test/license.test.js test/stripeSetup.test.js",
+      "result": "passed",
+      "summary": "14 tests passed, 0 failed"
+    },
+    {
+      "command": "npm test",
+      "result": "passed",
+      "summary": "19 tests passed, 0 failed"
+    }
+  ],
+  "passFailResult": "passed",
+  "exactSetupScriptProductSet": [
+    {
+      "planId": "3days",
+      "productName": "3 Days Access",
+      "amount": 99,
+      "currency": "eur",
+      "priceType": "one_time",
+      "interval": null,
+      "liveEnvName": "STRIPE_PRICE_3DAYS",
+      "testEnvName": "STRIPE_TEST_PRICE_3DAYS"
+    },
+    {
+      "planId": "monthly",
+      "productName": "Monthly Subscription",
+      "amount": 499,
+      "currency": "eur",
+      "priceType": "recurring",
+      "interval": "month",
+      "liveEnvName": "STRIPE_PRICE_MONTHLY",
+      "testEnvName": "STRIPE_TEST_PRICE_MONTHLY"
+    },
+    {
+      "planId": "lifetime",
+      "productName": "Lifetime",
+      "amount": 2999,
+      "currency": "eur",
+      "priceType": "one_time",
+      "interval": null,
+      "liveEnvName": "STRIPE_PRICE_LIFETIME",
+      "testEnvName": "STRIPE_TEST_PRICE_LIFETIME"
+    }
+  ],
+  "freeTrialStripePriceCreationBlocked": true,
+  "oldProductsExcludedFromSetupScript": true,
+  "liveTestSeparation": {
+    "live": [
+      "STRIPE_PRICE_3DAYS",
+      "STRIPE_PRICE_MONTHLY",
+      "STRIPE_PRICE_LIFETIME"
+    ],
+    "test": [
+      "STRIPE_TEST_PRICE_3DAYS",
+      "STRIPE_TEST_PRICE_MONTHLY",
+      "STRIPE_TEST_PRICE_LIFETIME"
+    ]
+  },
+  "stripeCallsMade": false,
+  "adminRuntimeEndpointsCalled": false,
+  "deployAttempted": false,
+  "remainingIssues": [
+    "No Priority 1D blockers found.",
+    "Broader tests in this repo are limited to node --test files; no integration tests, live Stripe checks, admin runtime endpoints, or deploy verification were run."
+  ],
+  "nextRecommendedStep": "Review the backend diff, then proceed to a controlled non-live verification step before any admin runtime setup or deployment."
+}

@@ -1,0 +1,72 @@
+{
+  "checkpoint": "priority-1c-payment-foundation-fix",
+  "version": "v1.0.127",
+  "createdAt": "2026-06-11",
+  "currentWorkingDirectory": "C:/Users/PC/Documents/Codex/2026-05-19/senin-sitemi-duzenlemen-icin-ianosami-baglamam/fima-backend-repo",
+  "filesEdited": [
+    ".env.example",
+    "DEPLOY_RENDER.md",
+    "README.md",
+    "src/adminHtml.js",
+    "src/plans.js",
+    "src/server.js",
+    "test/license.test.js"
+  ],
+  "testsRun": [
+    {
+      "command": "node --test test/license.test.js",
+      "result": "passed",
+      "summary": "10 tests passed, 0 failed"
+    }
+  ],
+  "testsPassed": true,
+  "exactProductSetAfterFix": {
+    "freeTrial": {
+      "id": "1day",
+      "name": "Free 1-Day Trial",
+      "stripeCheckoutProduct": false,
+      "priceEnv": null
+    },
+    "publicStripeCheckoutProducts": [
+      {
+        "id": "3days",
+        "name": "3 Days Access",
+        "checkoutMode": "payment",
+        "priceEnv": "STRIPE_PRICE_3DAYS"
+      },
+      {
+        "id": "monthly",
+        "name": "Monthly Subscription",
+        "checkoutMode": "subscription",
+        "priceEnv": "STRIPE_PRICE_MONTHLY"
+      },
+      {
+        "id": "lifetime",
+        "name": "Lifetime",
+        "checkoutMode": "payment",
+        "priceEnv": "STRIPE_PRICE_LIFETIME"
+      }
+    ],
+    "legacyReadableOnly": [
+      "2weeks",
+      "1month",
+      "3months"
+    ]
+  },
+  "exactRequiredPublicEnvsAfterFix": [
+    "STRIPE_PRICE_3DAYS",
+    "STRIPE_PRICE_MONTHLY",
+    "STRIPE_PRICE_LIFETIME"
+  ],
+  "testOnlyPriceEnvs": [
+    "STRIPE_TEST_PRICE_3DAYS",
+    "STRIPE_TEST_PRICE_MONTHLY",
+    "STRIPE_TEST_PRICE_LIFETIME"
+  ],
+  "inlinePriceDataBlockedInProduction": true,
+  "remainingIssues": [
+    "No source-level blockers found in the allowed Priority 1C files.",
+    "The standalone scripts/setup-stripe-products.js was not edited because it was outside the requested file list; it imports PLANS directly and should be inspected before using that script for product setup."
+  ],
+  "nextRecommendedStep": "Review the diff, then run the broader backend test suite and inspect the standalone Stripe setup script before any admin runtime setup or deploy."
+}
