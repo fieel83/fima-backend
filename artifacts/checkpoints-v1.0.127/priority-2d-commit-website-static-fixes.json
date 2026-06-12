@@ -2,8 +2,8 @@
   "checkpoint": "priority-2d-commit-website-static-fixes",
   "version": "v1.0.127",
   "createdAt": "2026-06-12",
-  "commitHash": "PENDING",
-  "pushed": false,
+  "commitHash": "6911e726b37b75ce0a97aca3b58d22c415b2f214",
+  "pushed": true,
   "filesCommitted": [
     "artifacts/backend-live-v1.0.127/post-deploy-api-version.json",
     "artifacts/backend-live-v1.0.127/post-deploy-healthz.json",
