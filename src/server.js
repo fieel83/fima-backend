@@ -5038,6 +5038,8 @@ function licenseValidationPayload(license, options = {}) {
     message: options.message || licenseReasonMessage(reason),
     appMessagePreview: options.message || licenseReasonMessage(reason),
     recommendedFix: recommendedLicenseFix(reason),
+    latestVersion: options.latestVersion || null,
+    downloadUrl: options.downloadUrl || null,
     licenseKey: license?.licenseKey || options.licenseKey || null,
     licenseId: license?.id || null,
     source: license ? licenseSource(license) : null,
