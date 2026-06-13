@@ -9,5 +9,12 @@
     "prettyPrintNotFound":  "not reproduced after fix; stale paths removed from source and fallback page added",
     "loggedOutDownload":  "source points directly to public URL; live verification pending deploy",
     "loggedInDownload":  "account/success downloads use /api/download which resolves to public URL; live verification pending deploy",
-    "incognitoDownload":  "public URL download passed without GitHub authentication"
+    "incognitoDownload":  "public URL download passed without GitHub authentication",
+    "liveVerification":  {
+                             "verifiedAt":  "2026-06-13T08:51:45.9495246Z",
+                             "backendCommit":  "0fe9a246fbc295ab9c8d4dc1c26422d8828a3c1c",
+                             "latestJson":  "1.0.127",
+                             "setupDownload":  "passed unauthenticated; size 157184; sha e2000f85ca495aec9542382164b7c5c75ff345e2790605951fbd02bb1a83e44e",
+                             "websiteDownloadLink":  "homepage/download.html/app.js contain public setup URL; no private repo or untagged URL; no pretty print marker"
+                         }
 }

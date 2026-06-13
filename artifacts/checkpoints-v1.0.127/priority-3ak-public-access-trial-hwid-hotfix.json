@@ -45,9 +45,23 @@
     "adminRuntimeCallsExecuted":  "no",
     "releaseBuildExecuted":  "no",
     "remainingIssues":  [
-                            "Render env vars for 7-day promo are not configured from this shell; live banner/promo remains pending until TRIAL_PROMO_ENABLED/TRIAL_PROMO_DAYS/TRIAL_PROMO_END_AT are set.",
+                            "Render env vars for 7-day promo are not configured from this shell; /api/trial-promo is deployed but inactive.",
                             "Production trial-history reset script was not run because DB backup/export is still missing.",
-                            "Live deploy verification pending after backend commit/push."
+                            "Live disposable trial/HWID DB-writing E2E was not run."
                         ],
-    "nextRecommendedStep":  "Commit/push backend hotfix, wait for Render auto-deploy, then verify live download URL and read-only endpoints. Configure Render trial promo env and create DB backup before any production trial reset/job."
+    "nextRecommendedStep":  "Set Render TRIAL_PROMO_ENABLED=true, TRIAL_PROMO_DAYS=7, TRIAL_PROMO_END_AT=\u003cISO now+7d\u003e; create a Render Postgres backup/export; then run disposable trial E2E and optionally the dry-run reset script before any confirmed reset.",
+    "liveVerification":  {
+                             "verifiedAt":  "2026-06-13T08:51:29.9331330Z",
+                             "backendCommit":  "0fe9a246fbc295ab9c8d4dc1c26422d8828a3c1c",
+                             "appCommit":  "935c781",
+                             "healthz":  "200 ok enriched; commit 0fe9a246fbc295ab9c8d4dc1c26422d8828a3c1c",
+                             "apiVersion":  "200; commit 0fe9a246fbc295ab9c8d4dc1c26422d8828a3c1c; version 1.0.126 env value",
+                             "latestJson":  "1.0.127; public release URL",
+                             "setupDownload":  "passed unauthenticated; size 157184; sha e2000f85ca495aec9542382164b7c5c75ff345e2790605951fbd02bb1a83e44e",
+                             "websiteDownloadLink":  "homepage/download.html/app.js contain public setup URL; no private repo or untagged URL; no pretty print marker",
+                             "trialPromoEndpoint":  "200; inactive because Render TRIAL_PROMO_* env not configured",
+                             "dbWritesExecuted":  "no",
+                             "stripeCallsExecuted":  "no",
+                             "adminRuntimeCallsExecuted":  "no"
+                         }
 }
