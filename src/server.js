@@ -36,6 +36,7 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import { minimumAppVersionStatus } from "./appVersionPolicy.js";
 import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
   discordBotHealth,
@@ -1484,8 +1485,20 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
   const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
   const hwid = normalizeHwid(req.body?.hwid);
   const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
+  const versionStatus = minimumAppVersionStatus(appVersion, env("MIN_SUPPORTED_APP_VERSION", ""));
 
   try {
+    if (versionStatus.updateRequired) {
+      await logValidation(null, licenseKey || "-", "failed", "update_required", hwid, appVersion);
+      return res.status(426).json(licenseValidationPayload(null, {
+        valid: false,
+        validLicense: false,
+        reason: "update_required",
+        message: "This app version is no longer supported. Please download the latest Fima Macro update.",
+        licenseKey
+      }));
+    }
+
     if (!licenseKey || !isNormalizedCloudLicenseKey(licenseKey)) {
       await logValidation(null, licenseKey || "-", "failed", "invalid_format", hwid, appVersion);
       return res.status(400).json(licenseValidationPayload(null, {
@@ -4699,6 +4712,7 @@ function licenseReasonMessage(reason) {
     trial_expired: "Your trial license has expired.",
     gift_not_claimed: "This gift license has not been claimed yet.",
     referral_not_claimed: "This referral reward has not been claimed yet.",
+    update_required: "This app version is no longer supported. Please download the latest Fima Macro update.",
     server_error: "License server could not validate this key right now.",
     timeout: "License server timed out. Try again in a moment."
   }[reason] || "Invalid license key.";
@@ -4850,6 +4864,7 @@ function recommendedLicenseFix(reason) {
     roblox_not_connected: "Roblox is optional and should never block app access.",
     gift_not_claimed: "Ask the user to claim the gift from their dashboard.",
     referral_not_claimed: "Ask the user to claim the referral reward from their dashboard.",
+    update_required: "Install the latest Fima Macro app from fimamacro.com/download.html.",
     server_error: "Check backend logs and retry validation.",
     timeout: "Retry after the API connection recovers."
   }[reason] || "Open the license record and inspect status, expiry, HWID and account links.";
