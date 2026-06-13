@@ -35,7 +35,7 @@ import {
   normalizeLicenseKey
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
-import { clearAdminCookie, createAdminToken, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import { clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
   discordBotHealth,
@@ -88,6 +88,7 @@ const giftRedeemLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 12, stand
 const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const adminRuntimeLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
+const adminFailedLoginState = new Map();
 const USER_SESSION_COOKIE = "fima_user_session";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
@@ -262,6 +263,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
+app.use(emergencyAdminSecurityGate);
 
 app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
   await auditRuntimeAdmin(req, "runtime_env_status");
@@ -1632,13 +1634,26 @@ app.get("/admin/login", (_req, res) => res.type("html").send(loginPage()));
 
 app.post("/admin/login", adminLoginLimiter, async (req, res) => {
   try {
+    const loginKey = adminLoginKey(req);
+    const lock = adminLoginLockState(loginKey);
+    if (lock.locked) {
+      await createAuditLog("admin_login_locked_out", "admin", null, { ip: req.ip });
+      return res.status(429).type("html").send(loginPage("Admin login is temporarily locked. Try again later."));
+    }
+
     const submitted = String(req.body?.password || "");
     const expected = requiredEnv("ADMIN_PASSWORD");
+    if (!adminPasswordMeetsEmergencyPolicy(expected)) {
+      await createAuditLog("admin_login_blocked_weak_password", "admin", null, {});
+      return res.status(503).type("html").send(loginPage("Admin login is disabled until the admin password is rotated to a strong value."));
+    }
     if (!timingSafeTextEqual(submitted, expected)) {
-      await createAuditLog("admin_login_failed", "admin", null, { reason: "invalid_password" });
+      recordAdminLoginFailure(loginKey);
+      await createAuditLog("admin_login_failed", "admin", null, { reason: "invalid_password", ip: req.ip });
       return res.status(401).type("html").send(loginPage("Invalid password"));
     }
 
+    clearAdminLoginFailure(loginKey);
     await createAuditLog("admin_login_success", "admin", null, {});
     setAdminCookie(res, createAdminToken());
     return res.redirect(303, "/admin");
@@ -3618,27 +3633,155 @@ function runtimeTrialPromoEnvStatus() {
   };
 }
 
+function securityFlagEnabled(...names) {
+  return names.some((name) => isTruthy(env(name, "false")));
+}
+
+function adminPanelEnabled() {
+  return securityFlagEnabled("ADMIN_PANEL_ENABLED");
+}
+
+function adminMutationsEnabled() {
+  return adminPanelEnabled() && securityFlagEnabled("ADMIN_MUTATIONS_ENABLED");
+}
+
+function adminDebugEndpointsEnabled() {
+  return adminPanelEnabled() && securityFlagEnabled("ADMIN_DEBUG_ENDPOINTS_ENABLED");
+}
+
+function emergencyAdminSecurityGate(req, res, next) {
+  const routePath = String(req.path || "");
+  if (!isAdminSurfacePath(routePath)) return next();
+
+  const authenticated = isAdminAuthenticated(req);
+  if (!adminPanelEnabled()) {
+    return rejectEmergencyAdminRoute(req, res, authenticated, "admin_panel_disabled", "ADMIN_PANEL_ENABLED");
+  }
+
+  if (isAdminDebugPath(routePath) && !adminDebugEndpointsEnabled()) {
+    return rejectEmergencyAdminRoute(req, res, authenticated, "admin_debug_endpoints_disabled", "ADMIN_DEBUG_ENDPOINTS_ENABLED");
+  }
+
+  if (isAdminMutationRequest(req, routePath) && !adminMutationsEnabled()) {
+    return rejectEmergencyAdminRoute(req, res, authenticated, "admin_mutations_disabled", "ADMIN_MUTATIONS_ENABLED");
+  }
+
+  return next();
+}
+
+function isAdminSurfacePath(routePath) {
+  return routePath === "/admin" ||
+    routePath.startsWith("/admin/") ||
+    routePath.startsWith("/api/admin/") ||
+    routePath === "/cloud-admin" ||
+    routePath.startsWith("/cloud-admin/") ||
+    routePath === "/gift-admin" ||
+    routePath.startsWith("/gift-admin/") ||
+    routePath.startsWith("/payments/robux/manual/");
+}
+
+function isAdminDebugPath(routePath) {
+  return /\/(?:system|backup|runtime|debug|test|health\/bot|bot\/health|trial-reset|stripe\/setup|stripe\/test)/i.test(routePath);
+}
+
+function isAdminMutationRequest(req, routePath) {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return false;
+  if (routePath === "/admin/login" || routePath === "/admin/logout") return false;
+  return isAdminSurfacePath(routePath);
+}
+
+function rejectEmergencyAdminRoute(req, res, authenticated, reason, requiredFlag) {
+  const status = authenticated ? 403 : 401;
+  const payload = {
+    error: reason,
+    message: "Admin functionality is temporarily locked during security containment.",
+    requiredFlag
+  };
+  createAuditLog("admin_emergency_lockdown_blocked", "admin", null, {
+    reason,
+    requiredFlag,
+    path: req.originalUrl,
+    method: req.method,
+    authenticated,
+    ip: req.ip,
+    userAgent: String(req.get("user-agent") || "").slice(0, 160)
+  });
+  if (req.path.startsWith("/admin") && !req.path.startsWith("/admin/api") && !req.is("application/json")) {
+    return res.status(status).type("html").send("<!doctype html><title>Admin locked</title><h1>Admin locked</h1><p>Admin functionality is temporarily locked during security containment.</p>");
+  }
+  return res.status(status).json(payload);
+}
+
+function adminLoginKey(req) {
+  return String(req.ip || req.get("x-forwarded-for") || "unknown").split(",")[0].trim() || "unknown";
+}
+
+function adminLoginLockState(key) {
+  const now = Date.now();
+  const state = adminFailedLoginState.get(key);
+  if (!state) return { locked: false };
+  if (state.lockedUntil && state.lockedUntil > now) return { locked: true, lockedUntil: state.lockedUntil };
+  if (state.lockedUntil && state.lockedUntil <= now) {
+    adminFailedLoginState.delete(key);
+    return { locked: false };
+  }
+  return { locked: false };
+}
+
+function recordAdminLoginFailure(key) {
+  const now = Date.now();
+  const windowMs = 30 * 60 * 1000;
+  const maxFailures = 5;
+  const existing = adminFailedLoginState.get(key);
+  const state = existing && existing.firstFailedAt + windowMs > now
+    ? existing
+    : { count: 0, firstFailedAt: now, lockedUntil: null };
+  state.count += 1;
+  if (state.count >= maxFailures) state.lockedUntil = now + windowMs;
+  adminFailedLoginState.set(key, state);
+}
+
+function clearAdminLoginFailure(key) {
+  adminFailedLoginState.delete(key);
+}
+
+function adminPasswordMeetsEmergencyPolicy(password) {
+  const value = String(password || "");
+  return value.length >= 16 &&
+    /[a-z]/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /\d/.test(value) &&
+    /[^A-Za-z0-9]/.test(value);
+}
+
 function giftAdminPermissionSummary() {
-  const createEnabled = isTruthy(env("FIMA_GIFT_CODES_CREATE_ENABLED", "false"));
-  const bulkEnabled = createEnabled && isTruthy(env("FIMA_GIFT_CODES_BULK_ENABLED", "false"));
+  const createEnabled = adminMutationsEnabled() && securityFlagEnabled("GIFT_ADMIN_ENABLED", "FIMA_GIFT_CODES_CREATE_ENABLED");
+  const bulkEnabled = createEnabled && securityFlagEnabled("BULK_GIFT_ENABLED", "FIMA_GIFT_CODES_BULK_ENABLED");
   const maxBulkQuantity = Math.min(Math.max(toOptionalInt(env("FIMA_GIFT_CODES_MAX_BULK_QUANTITY")) || 1, 1), 25);
   const maxUses = Math.min(Math.max(toOptionalInt(env("FIMA_GIFT_CODES_MAX_USES")) || 1, 1), 25);
   return {
     canCreateGiftCodes: createEnabled,
-    canCreateDisposableTestCodes: createEnabled && isTruthy(env("FIMA_GIFT_CODES_TEST_ENABLED", "false")),
-    canCreateLifetimeGifts: createEnabled && isTruthy(env("FIMA_GIFT_CODES_LIFETIME_ENABLED", "false")),
+    canCreateDisposableTestCodes: createEnabled && securityFlagEnabled("DISPOSABLE_GIFT_ENABLED", "FIMA_GIFT_CODES_TEST_ENABLED"),
+    canCreateLifetimeGifts: createEnabled && securityFlagEnabled("LIFETIME_GIFT_ENABLED", "FIMA_GIFT_CODES_LIFETIME_ENABLED"),
     canBulkCreateGifts: bulkEnabled,
-    canRevokeGiftCodes: isTruthy(env("FIMA_GIFT_CODES_REVOKE_ENABLED", "false")),
-    canViewGiftAuditLogs: isTruthy(env("FIMA_GIFT_CODES_AUDIT_ENABLED", "false")),
+    canRevokeGiftCodes: adminMutationsEnabled() && securityFlagEnabled("GIFT_ADMIN_ENABLED", "FIMA_GIFT_CODES_REVOKE_ENABLED"),
+    canViewGiftAuditLogs: adminPanelEnabled() && securityFlagEnabled("GIFT_ADMIN_ENABLED", "FIMA_GIFT_CODES_AUDIT_ENABLED"),
     maxBulkQuantity: bulkEnabled ? maxBulkQuantity : 1,
     maxUses: bulkEnabled ? maxUses : 1,
     creationLocked: !createEnabled,
     permissionsSource: "service_env_flags",
     requiredEnvFlags: {
+      adminPanel: "ADMIN_PANEL_ENABLED",
+      adminMutations: "ADMIN_MUTATIONS_ENABLED",
       create: "FIMA_GIFT_CODES_CREATE_ENABLED",
+      createAlias: "GIFT_ADMIN_ENABLED",
       disposableTest: "FIMA_GIFT_CODES_TEST_ENABLED",
+      disposableTestAlias: "DISPOSABLE_GIFT_ENABLED",
       lifetime: "FIMA_GIFT_CODES_LIFETIME_ENABLED",
+      lifetimeAlias: "LIFETIME_GIFT_ENABLED",
       bulk: "FIMA_GIFT_CODES_BULK_ENABLED",
+      bulkAlias: "BULK_GIFT_ENABLED",
       revoke: "FIMA_GIFT_CODES_REVOKE_ENABLED"
     }
   };

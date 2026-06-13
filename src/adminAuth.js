@@ -43,6 +43,7 @@ export function createAdminToken() {
   const payload = JSON.stringify({
     iat: Date.now(),
     exp: Date.now() + SESSION_TTL_MS,
+    sessionVersion: env("ADMIN_SESSION_VERSION", ""),
     nonce: crypto.randomBytes(16).toString("base64url")
   });
   const encoded = Buffer.from(payload).toString("base64url");
@@ -55,10 +56,27 @@ export function verifyAdminToken(token) {
   if (!encoded || !signature || !safeEqual(hmac(encoded), signature)) return false;
   try {
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-    return typeof payload.exp === "number" && payload.exp > Date.now();
+    if (typeof payload.exp !== "number" || payload.exp <= Date.now()) return false;
+    const revokedBefore = env("ADMIN_SESSION_REVOKED_BEFORE", "").trim();
+    if (revokedBefore) {
+      const cutoff = Number.isFinite(Number(revokedBefore)) ? Number(revokedBefore) : Date.parse(revokedBefore);
+      if (Number.isFinite(cutoff) && typeof payload.iat === "number" && payload.iat < cutoff) return false;
+    }
+    const requiredVersion = env("ADMIN_SESSION_VERSION", "").trim();
+    if (requiredVersion && payload.sessionVersion !== requiredVersion) return false;
+    return true;
   } catch {
     return false;
   }
+}
+
+export function isAdminAuthenticated(req) {
+  const submittedApiKey = adminApiKeyFromRequest(req);
+  const expectedApiKey = env("FIMA_ADMIN_API_KEY", env("ADMIN_API_KEY", "")).trim();
+  if (submittedApiKey) {
+    return Boolean(expectedApiKey && timingSafeTextEqual(submittedApiKey, expectedApiKey));
+  }
+  return verifyAdminToken(req.cookies?.[COOKIE_NAME]);
 }
 
 export function setAdminCookie(res, token) {
@@ -77,14 +95,7 @@ export function clearAdminCookie(res) {
 }
 
 export function requireAdmin(req, res, next) {
-  const submittedApiKey = adminApiKeyFromRequest(req);
-  const expectedApiKey = env("FIMA_ADMIN_API_KEY", env("ADMIN_API_KEY", "")).trim();
-  if (submittedApiKey) {
-    if (expectedApiKey && timingSafeTextEqual(submittedApiKey, expectedApiKey)) return next();
-    return res.status(401).json({ error: "unauthorized" });
-  }
-
-  if (verifyAdminToken(req.cookies?.[COOKIE_NAME])) return next();
+  if (isAdminAuthenticated(req)) return next();
   if (isJsonRequest(req)) return res.status(401).json({ error: "unauthorized" });
   return res.redirect("/admin/login");
 }
