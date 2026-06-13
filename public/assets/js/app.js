@@ -2036,9 +2036,11 @@
       if (!response.ok) return;
       const data = await response.json();
       state.trialPromo = data.promo || null;
+      renderHomeTrialPromoBanner();
       renderPricing();
     } catch (error) {
       state.trialPromo = null;
+      renderHomeTrialPromoBanner();
     }
   };
 
