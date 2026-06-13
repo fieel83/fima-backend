@@ -23,6 +23,16 @@ npm run dev
 
 Set `DATABASE_URL` to PostgreSQL before running migrations.
 
+Security envs for v1.0.128 entitlement enforcement:
+
+- `ENTITLEMENT_SIGNING_SECRET` (32+ random chars, backend only)
+- `DOWNLOAD_SIGNING_SECRET` (32+ random chars, backend only)
+- `UPDATE_MANIFEST_SIGNING_SECRET` (32+ random chars, backend only)
+- `ADMIN_SESSION_VERSION` or `ADMIN_SESSION_REVOKED_BEFORE` (bump to invalidate old entitlement/admin sessions)
+- `MIN_SUPPORTED_APP_VERSION=1.0.128` only after the hardened app release is live
+
+Never place these values in public website files, app binaries, `latest.json`, logs, screenshots, or artifacts.
+
 ## Stripe Price Setup
 
 Put the Stripe secret/restricted key in `.env` as `STRIPE_SECRET_KEY`, then run:

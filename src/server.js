@@ -47,6 +47,16 @@ import {
   startDiscordBot
 } from "./discordBot.js";
 import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
+import {
+  downloadSecretStatus,
+  entitlementSecretStatus,
+  hashDeviceId,
+  issueAppEntitlement,
+  productionSecurityReadiness,
+  publicEntitlementPayload,
+  updateManifestSecretStatus,
+  verifyAppEntitlement
+} from "./entitlements.js";
 
 const app = express();
 const port = Number(env("PORT", "8080"));
@@ -75,6 +85,7 @@ let lastEmailDeliveryState = {
 
 const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const validateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
+const entitlementRefreshLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const downloadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false });
@@ -131,6 +142,11 @@ const runtimeEnvCatalog = [
   ["TRIAL_PROMO_DAYS", "trial"],
   ["NORMAL_TRIAL_DAYS", "trial"],
   ["TRIAL_PROMO_END_AT", "trial"],
+  ["ENTITLEMENT_SIGNING_SECRET", "security"],
+  ["DOWNLOAD_SIGNING_SECRET", "security"],
+  ["UPDATE_MANIFEST_SIGNING_SECRET", "security"],
+  ["ADMIN_SESSION_VERSION", "security"],
+  ["ADMIN_SESSION_REVOKED_BEFORE", "security"],
   ["RENDER_API_KEY", "render"],
   ["RENDER_SERVICE_ID", "render"],
   ["RENDER_DEPLOY_HOOK_URL", "render"],
@@ -148,6 +164,7 @@ const requiredRuntimeEnv = [
   "STRIPE_WEBHOOK_SECRET",
   ...PUBLIC_REQUIRED_PRICE_ENVS,
   "FIMA_ADMIN_API_KEY",
+  "ENTITLEMENT_SIGNING_SECRET",
   "DISCORD_BOT_TOKEN",
   "DISCORD_CLIENT_ID",
   "DISCORD_GUILD_ID"
@@ -305,6 +322,7 @@ app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminR
     success: true,
     version: versionPayload(),
     trialPromo: runtimeTrialPromoEnvStatus(),
+    entitlement: runtimeEntitlementEnvStatus(),
     env: runtimeEnvCatalog.map(([envName, category]) => ({
       envName,
       category,
@@ -1463,6 +1481,15 @@ app.get("/api/download", downloadLimiter, async (req, res) => {
   const licenseKey = normalizeLicenseKey(req.query?.licenseKey);
   const settings = await getSiteSettings();
 
+  if (env("NODE_ENV", "development") === "production" && !downloadSecretStatus().configured) {
+    await logDownload(null, licenseKey || "-", "failed", "protected_download_signing_unavailable");
+    return res.status(503).json({
+      success: false,
+      reason: "protected_download_signing_unavailable",
+      message: "Protected downloads are temporarily unavailable. Please contact support."
+    });
+  }
+
   if (settings.downloadEnabled === false) {
     await logDownload(null, licenseKey || "-", "failed", "download_disabled");
     return res.status(403).json({ success: false, reason: "download_disabled", message: "Downloads are currently disabled." });
@@ -1586,6 +1613,17 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
     }
 
     const accountAccess = await buildLicenseAccountAccess(license);
+    if (!entitlementSecretStatus().configured) {
+      await logValidation(license, licenseKey, "failed", "entitlement_unavailable", hwid, appVersion);
+      return res.status(503).json(licenseValidationPayload(license, {
+        valid: false,
+        validLicense: true,
+        reason: "entitlement_unavailable",
+        message: licenseReasonMessage("entitlement_unavailable"),
+        accountAccess,
+        hwid
+      }));
+    }
 
     let hwidBoundNow = false;
     if (!normalizeHwid(license.hwid)) {
@@ -1637,6 +1675,15 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       })
     ]);
 
+    const entitlement = issueAppEntitlement({
+      license,
+      user: accountAccess.user,
+      hwid,
+      appVersion,
+      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", ""),
+      licenseStatus: "active"
+    });
+
     return res.json({
       ...licenseValidationPayload(license, {
         valid: true,
@@ -1658,6 +1705,10 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       canUseApp: true,
       hwidBoundNow,
       missingRequirements: [],
+      entitlementToken: entitlement.token,
+      entitlement: publicEntitlementPayload(entitlement),
+      entitlementExpiresAt: entitlement.expiresAt,
+      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", ""),
       accountEmail: accountAccess.user?.email || license.customerEmail || null,
       robloxUsername: accountAccess.user?.robloxUsername || null,
       robloxAvatarUrl: accountAccess.user?.robloxAvatarUrl || null,
@@ -1673,6 +1724,168 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       message: "License validation failed",
       licenseKey
     }));
+  }
+});
+
+app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (req, res) => {
+  const token = extractEntitlementToken(req);
+  const hwid = normalizeHwid(req.body?.hwid);
+  const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
+  const versionStatus = minimumAppVersionStatus(appVersion, env("MIN_SUPPORTED_APP_VERSION", ""));
+
+  try {
+    if (!entitlementSecretStatus().configured) {
+      return res.status(503).json({
+        valid: false,
+        canUseApp: false,
+        reason: "entitlement_unavailable",
+        message: licenseReasonMessage("entitlement_unavailable")
+      });
+    }
+
+    if (versionStatus.updateRequired) {
+      return res.status(426).json({
+        valid: false,
+        canUseApp: false,
+        reason: "update_required",
+        message: licenseReasonMessage("update_required")
+      });
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        valid: false,
+        canUseApp: false,
+        reason: "entitlement_required",
+        message: licenseReasonMessage("entitlement_required")
+      });
+    }
+
+    if (!hwid) {
+      return res.status(400).json({
+        valid: false,
+        canUseApp: false,
+        reason: "invalid_format",
+        message: "Invalid HWID."
+      });
+    }
+
+    const verified = verifyAppEntitlement(token);
+    if (!verified.ok) {
+      return res.status(401).json({
+        valid: false,
+        canUseApp: false,
+        reason: verified.reason,
+        message: licenseReasonMessage(verified.reason)
+      });
+    }
+
+    const incomingHwidHash = hashDeviceId(hwid);
+    if (!incomingHwidHash || incomingHwidHash !== verified.payload.hwidHash) {
+      return res.status(403).json({
+        valid: false,
+        canUseApp: false,
+        reason: "hwid_mismatch",
+        message: licenseReasonMessage("hwid_mismatch")
+      });
+    }
+
+    let license = await prisma.license.findUnique({ where: { id: verified.payload.licenseId } });
+    if (!license) {
+      return res.status(404).json({
+        valid: false,
+        canUseApp: false,
+        reason: "license_not_found",
+        message: licenseReasonMessage("license_not_found")
+      });
+    }
+
+    const blockedReason = licenseBlockedReason(license);
+    if (blockedReason) {
+      await logValidation(license, license.licenseKey || "-", "failed", blockedReason, hwid, appVersion);
+      return res.status(403).json(licenseValidationPayload(license, {
+        valid: false,
+        reason: blockedReason,
+        message: licenseReasonMessage(blockedReason),
+        hwid
+      }));
+    }
+
+    if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
+      const expiredReason = licenseSource(license) === "Trial" ? "trial_expired" : "expired";
+      await logValidation(license, license.licenseKey || "-", "failed", expiredReason, hwid, appVersion);
+      return res.status(403).json(licenseValidationPayload(license, {
+        valid: false,
+        reason: expiredReason,
+        message: licenseReasonMessage(expiredReason),
+        hwid
+      }));
+    }
+
+    if (!normalizeHwid(license.hwid)) {
+      await prisma.license.updateMany({
+        where: { id: license.id },
+        data: { hwid }
+      });
+      license = await prisma.license.findUnique({ where: { id: license.id } });
+    }
+
+    if (normalizeHwid(license.hwid) !== hwid) {
+      await logValidation(license, license.licenseKey || "-", "failed", "hwid_mismatch", hwid, appVersion);
+      return res.status(403).json(licenseValidationPayload(license, {
+        valid: false,
+        reason: "hwid_mismatch",
+        message: licenseReasonMessage("hwid_mismatch"),
+        hwid,
+        hwidMatches: false
+      }));
+    }
+
+    const accountAccess = await buildLicenseAccountAccess(license);
+    const entitlement = issueAppEntitlement({
+      license,
+      user: accountAccess.user,
+      hwid,
+      appVersion,
+      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", ""),
+      licenseStatus: "active"
+    });
+
+    await prisma.validationLog.create({
+      data: {
+        licenseId: license.id,
+        licenseKey: license.licenseKey,
+        result: "success",
+        reason: "entitlement_refresh",
+        hwidHash: hashHwid(hwid),
+        appVersion
+      }
+    }).catch(() => {});
+
+    return res.json({
+      ...licenseValidationPayload(license, {
+        valid: true,
+        reason: "valid",
+        message: "License valid",
+        accountAccess,
+        hwid,
+        hwidMatches: true
+      }),
+      valid: true,
+      canUseApp: true,
+      entitlementToken: entitlement.token,
+      entitlement: publicEntitlementPayload(entitlement),
+      entitlementExpiresAt: entitlement.expiresAt,
+      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", "")
+    });
+  } catch (error) {
+    console.error("Entitlement refresh failed", publicError(error));
+    return res.status(500).json({
+      valid: false,
+      canUseApp: false,
+      reason: "server_error",
+      message: "License server could not refresh app entitlement right now."
+    });
   }
 });
 
@@ -3616,6 +3829,7 @@ app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 app.listen(port, () => {
   console.log(`Fima payments API listening on ${port}`);
   console.info("Stripe configuration", stripeStatus());
+  logSecurityStartupReadiness();
   startDiscordBot();
   cleanupExpiredMonthlyTrials().catch((error) => {
     console.warn("Monthly trial cleanup failed", publicError(error));
@@ -3677,6 +3891,39 @@ function runtimeTrialPromoEnvStatus() {
     commit: backendCommit,
     nodeEnv: env("NODE_ENV", "development")
   };
+}
+
+function runtimeEntitlementEnvStatus() {
+  const readiness = productionSecurityReadiness(process.env);
+  return {
+    hasEntitlementSigningSecret: readiness.entitlement.present,
+    hasDownloadSigningSecret: readiness.download.present,
+    hasUpdateManifestSigningSecret: readiness.updateManifest.present,
+    entitlementSigningSecretConfigured: readiness.entitlement.configured,
+    downloadSigningSecretConfigured: readiness.download.configured,
+    updateManifestSigningSecretConfigured: readiness.updateManifest.configured,
+    entitlementLifetimeMinutes: readiness.entitlement.lifetimeMinutes,
+    sessionVersionConfigured: readiness.entitlement.sessionVersionConfigured,
+    dangerousFeaturesRefuseEntitlement: readiness.dangerousFeaturesRefuseEntitlement,
+    protectedDownloadsDisabled: readiness.protectedDownloadsDisabled,
+    currentServerTimeUtc: new Date().toISOString(),
+    serviceVersion: backendVersion,
+    commit: backendCommit,
+    nodeEnv: env("NODE_ENV", "development")
+  };
+}
+
+function logSecurityStartupReadiness() {
+  const readiness = productionSecurityReadiness(process.env);
+  if (readiness.production && !readiness.entitlement.configured) {
+    console.error("SECURITY CONFIGURATION ERROR: ENTITLEMENT_SIGNING_SECRET is missing or too short; app entitlement issuance is disabled.");
+  }
+  if (readiness.production && !readiness.download.configured) {
+    console.error("SECURITY CONFIGURATION ERROR: DOWNLOAD_SIGNING_SECRET is missing or too short; protected download tokens are disabled.");
+  }
+  if (readiness.production && !readiness.updateManifest.configured) {
+    console.error("SECURITY CONFIGURATION WARNING: UPDATE_MANIFEST_SIGNING_SECRET is missing or too short; server-side manifest signing is unavailable.");
+  }
 }
 
 function securityFlagEnabled(...names) {
@@ -4746,6 +4993,14 @@ function licenseReasonMessage(reason) {
     gift_not_claimed: "This gift license has not been claimed yet.",
     referral_not_claimed: "This referral reward has not been claimed yet.",
     update_required: "This app version is no longer supported. Please download the latest Fima Macro update.",
+    entitlement_required: "App entitlement is required. Please validate your license again.",
+    entitlement_unavailable: "App entitlement service is not configured. Please contact support.",
+    invalid_entitlement_format: "App entitlement is invalid. Please validate your license again.",
+    invalid_entitlement_payload: "App entitlement is invalid. Please validate your license again.",
+    invalid_entitlement_type: "App entitlement is invalid. Please validate your license again.",
+    invalid_entitlement_signature: "App entitlement is invalid. Please validate your license again.",
+    entitlement_expired: "App entitlement expired. Please validate your license again.",
+    entitlement_session_revoked: "App entitlement was revoked. Please validate your license again.",
     server_error: "License server could not validate this key right now.",
     timeout: "License server timed out. Try again in a moment."
   }[reason] || "Invalid license key.";
@@ -5017,6 +5272,15 @@ function hashHwid(hwid) {
   const value = normalizeHwid(hwid);
   if (!value) return null;
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function extractEntitlementToken(req) {
+  const bodyToken = String(req.body?.entitlementToken || req.body?.entitlement || req.body?.token || "").trim();
+  if (bodyToken) return bodyToken;
+
+  const authorization = String(req.get("authorization") || "").trim();
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
 }
 
 async function ensureCustomer(email) {

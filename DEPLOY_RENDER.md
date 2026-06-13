@@ -104,3 +104,13 @@ Copy the generated Stripe webhook signing secret into Render as `STRIPE_WEBHOOK_
 12. Test HWID reset and ban/unban.
 
 Live mode depends on Render `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, and only these public live price envs: `STRIPE_PRICE_3DAYS`, `STRIPE_PRICE_MONTHLY`, and `STRIPE_PRICE_LIFETIME`. Production/live checkout must use Stripe Price IDs; inline `price_data` fallback is blocked.
+
+Security hardening for v1.0.128 requires backend-only secrets before deploying entitlement enforcement:
+
+- `ENTITLEMENT_SIGNING_SECRET`: 32+ random characters. Required for `/api/license/validate` to issue short-lived app entitlements and for `/api/license/refresh-entitlement`.
+- `DOWNLOAD_SIGNING_SECRET`: 32+ random characters. Required before enabling backend-mediated protected downloads in production.
+- `UPDATE_MANIFEST_SIGNING_SECRET`: 32+ random characters for future server-side manifest signing.
+- `ADMIN_SESSION_VERSION` or `ADMIN_SESSION_REVOKED_BEFORE`: bump after admin secret rotation to invalidate existing app/admin entitlement sessions.
+- `MIN_SUPPORTED_APP_VERSION=1.0.128` only after the v1.0.128 hardened app release is published and verified.
+
+Do not reuse development values and do not put these secrets in the desktop app, website JavaScript, `latest.json`, or Git.
