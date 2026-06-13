@@ -272,6 +272,18 @@ app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminR
   });
 });
 
+app.post(["/api/admin/backup/export-trial-license-data", "/admin/api/backup/export-trial-license-data"], adminRuntimeLimiter, requireRuntimeAdminKey, async (_req, res) => {
+  try {
+    const backup = await buildTrialLicenseBackupExport();
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Disposition", `attachment; filename="fima-trial-license-backup-${backup.createdAt.replace(/[:.]/g, "-")}.json"`);
+    return res.json(backup);
+  } catch (error) {
+    console.error("Trial/license backup export failed", publicError(error));
+    return res.status(500).json({ success: false, error: "backup_export_failed", message: "Trial/license backup export failed." });
+  }
+});
+
 app.post(["/api/admin/deploy/verify-env", "/admin/api/deploy/verify-env"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
   await auditRuntimeAdmin(req, "runtime_verify_env");
   const status = runtimeEnvCatalog.map(([envName, category]) => ({
@@ -3539,6 +3551,192 @@ function requireRuntimeAdminKey(req, res, next) {
   }
 
   return next();
+}
+
+async function buildTrialLicenseBackupExport() {
+  const createdAt = new Date().toISOString();
+  const auditWhere = {
+    OR: [
+      { action: { contains: "trial", mode: "insensitive" } },
+      { action: { contains: "license", mode: "insensitive" } },
+      { action: { contains: "hwid", mode: "insensitive" } },
+      { action: { contains: "gift", mode: "insensitive" } },
+      { action: { contains: "subscription", mode: "insensitive" } },
+      { action: { contains: "download", mode: "insensitive" } },
+      { action: { contains: "payment", mode: "insensitive" } }
+    ]
+  };
+
+  const [
+    users,
+    licenses,
+    orders,
+    customers,
+    giftCodes,
+    giftRedemptions,
+    directGiftPackages,
+    purchases,
+    products,
+    productPrices,
+    paymentSubmissions,
+    oauthLinks,
+    referrals,
+    referralRewards,
+    validationLogs,
+    downloadLogs,
+    webhookEvents,
+    auditLogs
+  ] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        emailNormalized: true,
+        stripeCustomerId: true,
+        discordUserId: true,
+        discordUsername: true,
+        discordEmail: true,
+        robloxUsername: true,
+        robloxUserId: true,
+        emailVerifiedAt: true,
+        trialUsedAt: true,
+        trialExpiresAt: true,
+        nextTrialAvailableAt: true,
+        trialStatus: true,
+        monthlyTrialClaimCount: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.license.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.order.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.customer.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.giftCode.findMany({
+      select: {
+        id: true,
+        codeHash: true,
+        maskedCode: true,
+        plan: true,
+        status: true,
+        maxUses: true,
+        usedCount: true,
+        expiresAt: true,
+        buyerUserId: true,
+        buyerEmail: true,
+        buyerDiscordId: true,
+        buyerRobloxId: true,
+        stripeSessionId: true,
+        stripePaymentIntentId: true,
+        purchasedAt: true,
+        recipientEmail: true,
+        recipientUserId: true,
+        requiresDiscord: true,
+        requiresRoblox: true,
+        createdByAdminId: true,
+        notes: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.giftRedemption.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.directGiftPackage.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.purchase.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.product.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.productPrice.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.paymentSubmission.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.oAuthLink.findMany({
+      select: {
+        id: true,
+        userId: true,
+        provider: true,
+        providerSubject: true,
+        providerUsername: true,
+        providerEmail: true,
+        tokenExpiresAt: true,
+        scopes: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.referral.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.referralReward.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.validationLog.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.downloadLog.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.webhookEvent.findMany({
+      select: {
+        id: true,
+        stripeEventId: true,
+        type: true,
+        processed: true,
+        errorMessage: true,
+        relatedOrderId: true,
+        relatedLicenseId: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true
+      },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.auditLog.findMany({ where: auditWhere, orderBy: { createdAt: "asc" } })
+  ]);
+
+  const records = {
+    users,
+    licenses,
+    orders,
+    customers,
+    giftCodes,
+    giftRedemptions,
+    directGiftPackages,
+    purchases,
+    products,
+    productPrices,
+    paymentSubmissions,
+    oauthLinks,
+    referrals,
+    referralRewards,
+    validationLogs,
+    downloadLogs,
+    webhookEvents,
+    auditLogs
+  };
+  const recordCounts = Object.fromEntries(Object.entries(records).map(([key, rows]) => [key, rows.length]));
+  const exportCore = {
+    success: true,
+    artifact: "trial-license-export",
+    schemaVersion: 1,
+    createdAt,
+    backend: versionPayload(),
+    exportType: "targeted_trial_license_backup",
+    includedCollections: Object.keys(records),
+    recordCounts,
+    totalRecords: Object.values(recordCounts).reduce((sum, count) => sum + count, 0),
+    secretsIncluded: false,
+    excludedSensitiveFields: [
+      "User.passwordHash",
+      "UserSession.tokenHash",
+      "PasswordResetToken.tokenHash",
+      "EmailVerificationToken.tokenHash",
+      "OAuthLink.accessTokenCipher",
+      "OAuthLink.refreshTokenCipher",
+      "GiftCode.codeCipher",
+      "environment variables and API keys"
+    ],
+    paidLicensesIncludedForSafety: true,
+    paidLicensesWillBeModified: false,
+    restoreNotes: [
+      "This is a targeted JSON export for trial/license rollback analysis before the beta 7-day trial reset.",
+      "Use license IDs, user IDs, emails, HWIDs, trial fields and audit rows to inspect or reverse trial eligibility changes.",
+      "Do not publish this file; it contains user/license linkage data needed for recovery."
+    ],
+    records
+  };
+  const checksumSha256 = crypto.createHash("sha256").update(JSON.stringify(exportCore)).digest("hex");
+  return { ...exportCore, checksumSha256 };
 }
 
 function firstConfiguredEnv(names) {
