@@ -154,7 +154,40 @@ const requiredRuntimeEnv = [
 ];
 
 app.set("trust proxy", 1);
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "base-uri": ["'self'"],
+      "object-src": ["'none'"],
+      "frame-ancestors": ["'none'"],
+      "script-src": ["'self'", "'unsafe-inline'"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:", "https:"],
+      "font-src": ["'self'", "data:"],
+      "connect-src": [
+        "'self'",
+        "https://fimamacro.com",
+        "https://www.fimamacro.com",
+        "https://api.fimamacro.com",
+        "https://github.com",
+        "https://api.github.com",
+        "https://api.frankfurter.app",
+        "https://open.er-api.com",
+        "https://get.geojs.io",
+        "https://ipapi.co"
+      ],
+      "form-action": ["'self'"],
+      "upgrade-insecure-requests": []
+    }
+  },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
+}));
+app.use((_req, res, next) => {
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  next();
+});
 app.use(compression());
 app.use(cookieParser());
 app.use(cors({
