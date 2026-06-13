@@ -1,0 +1,61 @@
+{
+    "createdAt":  "2026-06-13T09:09:06.3758776Z",
+    "backupExportCreated":  false,
+    "backupExportMethod":  "admin-only live backend endpoint deployed: POST /api/admin/backup/export-trial-license-data; local fetch helper: node scripts/fetch-trial-license-backup.js",
+    "backupPath":  null,
+    "backupRecordCounts":  null,
+    "backupChecksum":  null,
+    "secretsFound":  false,
+    "endpointProtection":  "unauthenticated POST /api/admin/backup/export-trial-license-data returned 401",
+    "renderPromoEnvActive":  false,
+    "promoEndDate":  null,
+    "apiTrialPromoResult":  {
+                                "normalDays":  1,
+                                "endAt":  null,
+                                "promoDays":  7,
+                                "active":  false,
+                                "days":  1,
+                                "enabled":  false
+                            },
+    "trialResetDryRunPassed":  false,
+    "trialResetConfirmedRun":  false,
+    "paidLicensesAffectedCount":  0,
+    "giftMonthlyLifetimeAffectedCount":  0,
+    "newUser7DayTrialE2EPassed":  false,
+    "oldBrokenExpiredTrialCanClaimPassed":  false,
+    "secondPromoClaimBlocked":  false,
+    "hwidFirstUseBindPassed":  false,
+    "sameHwidValidationPassed":  false,
+    "differentHwidMismatchPassed":  false,
+    "adminHwidResetDebugPassed":  false,
+    "homepageBannerLive":  false,
+    "pricingTextLive":  false,
+    "dashboardAccountTextLive":  false,
+    "loggedInDownloadPassed":  false,
+    "screenshotsPath":  "not created; promo inactive and backup fetch blocked",
+    "logsArtifactsPath":  "artifacts/hotfix-v1.0.127/db-backup-before-trial-reset",
+    "filesEdited":  [
+                        "src/server.js",
+                        "scripts/fetch-trial-license-backup.js",
+                        "artifacts/hotfix-v1.0.127/db-backup-before-trial-reset/backup-summary.json",
+                        "artifacts/checkpoints-v1.0.127/priority-3am-backup-and-activate-7day-trial-promo.json"
+                    ],
+    "liveBackendCommit":  "08689552806ddbcbf10deb917cd5c853e9ace556",
+    "liveBackendVersion":  "/api/version reports version env 1.0.126; commit current",
+    "dbWritesExecuted":  false,
+    "stripeCallsExecuted":  false,
+    "adminRuntimeMutationJobsExecuted":  false,
+    "realCustomerCodesConsumed":  false,
+    "blockers":  [
+                     "FIMA_ADMIN_API_KEY/ADMIN_API_KEY is not available in this shell, so Codex cannot fetch the protected export.",
+                     "RENDER_API_KEY/RENDER_SERVICE_ID is not available, so Codex cannot set Render env vars.",
+                     "Local pg_dump/psql and DATABASE_URL remain unavailable."
+                 ],
+    "exactManualActions":  [
+                               "Set FIMA_ADMIN_API_KEY locally without printing it, then run: node scripts/fetch-trial-license-backup.js",
+                               "Verify trial-license-export.json exists, parses, has non-zero relevant record counts, and checksum matches backup-summary.json.",
+                               "In Render, set TRIAL_PROMO_ENABLED=true, TRIAL_PROMO_DAYS=7, NORMAL_TRIAL_DAYS=1, TRIAL_PROMO_END_AT=\u003cUTC ISO 7 days from activation\u003e. Restart/deploy.",
+                               "Verify /api/trial-promo active=true before running reset dry-run and disposable E2E."
+                           ],
+    "nextRecommendedStep":  "Provide/run the admin-key protected backup fetch outside chat, verify the backup, then configure Render promo env. Resume with dry-run reset and disposable live E2E after backup exists."
+}

@@ -1,0 +1,28 @@
+{
+    "createdAt":  "2026-06-13T09:09:06.3758776Z",
+    "backupCreated":  false,
+    "exportMethod":  "admin-only live backend endpoint deployed: POST /api/admin/backup/export-trial-license-data; local fetch helper: node scripts/fetch-trial-license-backup.js",
+    "endpointProtection":  "unauthenticated POST returned 401",
+    "backendCommit":  "08689552806ddbcbf10deb917cd5c853e9ace556",
+    "exportPath":  null,
+    "tableListPath":  null,
+    "recordCounts":  null,
+    "checksum":  null,
+    "secretsIncluded":  false,
+    "blockers":  [
+                     "FIMA_ADMIN_API_KEY/ADMIN_API_KEY is not available in this shell, so Codex cannot fetch the protected export.",
+                     "RENDER_API_KEY/RENDER_SERVICE_ID is not available, so Codex cannot set Render env vars.",
+                     "Local pg_dump/psql and DATABASE_URL remain unavailable."
+                 ],
+    "manualBackupCommand":  "Set FIMA_ADMIN_API_KEY in the process environment without printing it, then run: node scripts/fetch-trial-license-backup.js",
+    "expectedOutputFiles":  [
+                                "artifacts/hotfix-v1.0.127/db-backup-before-trial-reset/trial-license-export.json",
+                                "artifacts/hotfix-v1.0.127/db-backup-before-trial-reset/schema-table-list.json",
+                                "artifacts/hotfix-v1.0.127/db-backup-before-trial-reset/backup-summary.json"
+                            ],
+    "restoreNotes":  [
+                         "The endpoint excludes password hashes, session/reset/verification token hashes, OAuth token ciphertext, gift code ciphertext, and env secrets.",
+                         "Do not publish the export; it contains user/license linkage data needed for recovery.",
+                         "Do not run trial reset until the export exists, parses, has counts, and checksum verification passes."
+                     ]
+}
