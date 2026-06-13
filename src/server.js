@@ -61,7 +61,8 @@ import {
 const app = express();
 const port = Number(env("PORT", "8080"));
 const publicDir = path.resolve("public");
-const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
+const DEFAULT_MIN_SUPPORTED_APP_VERSION = "1.0.128";
+const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
 const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
@@ -1545,7 +1546,8 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
   const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
   const hwid = normalizeHwid(req.body?.hwid);
   const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
-  const versionStatus = minimumAppVersionStatus(appVersion, env("MIN_SUPPORTED_APP_VERSION", ""));
+  const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
+  const versionStatus = minimumAppVersionStatus(appVersion, minSupportedAppVersion);
 
   try {
     if (versionStatus.updateRequired) {
@@ -1555,7 +1557,9 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         validLicense: false,
         reason: "update_required",
         message: "This app version is no longer supported. Please download the latest Fima Macro update.",
-        licenseKey
+        licenseKey,
+        latestVersion: versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION,
+        downloadUrl: PUBLIC_SETUP_DOWNLOAD_URL
       }));
     }
 
@@ -1680,7 +1684,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       user: accountAccess.user,
       hwid,
       appVersion,
-      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", ""),
+      minSupportedAppVersion,
       licenseStatus: "active"
     });
 
@@ -1708,7 +1712,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       entitlementToken: entitlement.token,
       entitlement: publicEntitlementPayload(entitlement),
       entitlementExpiresAt: entitlement.expiresAt,
-      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", ""),
+      minSupportedAppVersion,
       accountEmail: accountAccess.user?.email || license.customerEmail || null,
       robloxUsername: accountAccess.user?.robloxUsername || null,
       robloxAvatarUrl: accountAccess.user?.robloxAvatarUrl || null,
@@ -1731,7 +1735,8 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
   const token = extractEntitlementToken(req);
   const hwid = normalizeHwid(req.body?.hwid);
   const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
-  const versionStatus = minimumAppVersionStatus(appVersion, env("MIN_SUPPORTED_APP_VERSION", ""));
+  const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
+  const versionStatus = minimumAppVersionStatus(appVersion, minSupportedAppVersion);
 
   try {
     if (!entitlementSecretStatus().configured) {
@@ -1748,7 +1753,9 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
         valid: false,
         canUseApp: false,
         reason: "update_required",
-        message: licenseReasonMessage("update_required")
+        message: "A security update is required. Please update Fima Macro.",
+        latestVersion: versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION,
+        downloadUrl: PUBLIC_SETUP_DOWNLOAD_URL
       });
     }
 
@@ -1847,7 +1854,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       user: accountAccess.user,
       hwid,
       appVersion,
-      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", ""),
+      minSupportedAppVersion,
       licenseStatus: "active"
     });
 
@@ -1876,7 +1883,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       entitlementToken: entitlement.token,
       entitlement: publicEntitlementPayload(entitlement),
       entitlementExpiresAt: entitlement.expiresAt,
-      minSupportedAppVersion: env("MIN_SUPPORTED_APP_VERSION", "")
+      minSupportedAppVersion
     });
   } catch (error) {
     console.error("Entitlement refresh failed", publicError(error));
