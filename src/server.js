@@ -122,7 +122,9 @@ const defaultSiteSettings = {
   checkoutEnabled: true,
   downloadEnabled: true
 };
-const backendVersion = env("APP_VERSION", "1.0.126");
+const DEFAULT_BACKEND_VERSION = "1.0.128";
+const backendVersion = env("BACKEND_VERSION", DEFAULT_BACKEND_VERSION);
+const legacyAppVersionEnv = env("APP_VERSION", "");
 const buildTime = env("BUILD_TIME", new Date().toISOString());
 const backendCommit = env("RENDER_GIT_COMMIT", env("GIT_COMMIT", safeGitCommit()));
 const runtimeEnvCatalog = [
@@ -3874,6 +3876,8 @@ function versionPayload() {
     status: "ok",
     app: env("APP_NAME", "Fima Macro"),
     version: backendVersion,
+    backendVersion,
+    legacyAppVersionEnv: legacyAppVersionEnv || null,
     commit: backendCommit,
     buildTime,
     mode: env("NODE_ENV", "development")
