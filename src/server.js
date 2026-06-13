@@ -2634,15 +2634,46 @@ app.get(["/admin/api/gift-codes", "/api/admin/gift-codes"], adminGiftLimiter, re
     orderBy: { createdAt: "desc" },
     take: 200
   });
-  return res.json({ giftCodes: giftCodes.map(adminGiftCodePayload) });
+  return res.json({ giftCodes: giftCodes.map(adminGiftCodePayload), permissions: giftAdminPermissionSummary() });
+});
+
+app.get(["/admin/api/gift-codes/permissions", "/api/admin/gift-codes/permissions"], adminGiftLimiter, requireAdmin, async (_req, res) => {
+  return res.json({ permissions: giftAdminPermissionSummary() });
 });
 
 app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], adminGiftLimiter, requireAdmin, async (req, res) => {
   try {
+    const permissions = giftAdminPermissionSummary();
+    if (!permissions.canCreateGiftCodes) {
+      await auditGiftPermissionDenied(req, "canCreateGiftCodes");
+      return denyGiftPermission(res, "canCreateGiftCodes");
+    }
     const giftPlan = resolveGiftPlan(req.body);
     if (!giftPlan) return res.status(400).json({ error: "invalid_gift_plan" });
-    const quantity = Math.min(Math.max(toOptionalInt(req.body?.quantity) || 1, 1), 100);
-    const maxUses = Math.min(Math.max(toOptionalInt(req.body?.maxUses) || 1, 1), 100);
+    if (giftPlan.id === "lifetime" && !permissions.canCreateLifetimeGifts) {
+      await auditGiftPermissionDenied(req, "canCreateLifetimeGifts", { plan: giftPlan.id });
+      return denyGiftPermission(res, "canCreateLifetimeGifts", "Lifetime gift creation is locked.");
+    }
+    const quantity = Math.max(toOptionalInt(req.body?.quantity) || 1, 1);
+    const maxUses = Math.max(toOptionalInt(req.body?.maxUses) || 1, 1);
+    if (quantity > 1 && !permissions.canBulkCreateGifts) {
+      await auditGiftPermissionDenied(req, "canBulkCreateGifts", { quantity });
+      return denyGiftPermission(res, "canBulkCreateGifts", "Bulk gift creation is locked.");
+    }
+    if (maxUses > 1 && !permissions.canBulkCreateGifts) {
+      await auditGiftPermissionDenied(req, "canBulkCreateGifts", { maxUses });
+      return denyGiftPermission(res, "canBulkCreateGifts", "Multi-use gift creation is locked.");
+    }
+    if (quantity > permissions.maxBulkQuantity) {
+      return res.status(400).json({ error: "gift_quantity_limit_exceeded", maxQuantity: permissions.maxBulkQuantity });
+    }
+    if (maxUses > permissions.maxUses) {
+      return res.status(400).json({ error: "gift_max_uses_limit_exceeded", maxUses: permissions.maxUses });
+    }
+    const dangerous = quantity > 1 || maxUses > 1 || giftPlan.id === "lifetime";
+    if (dangerous && !hasGiftCreationConfirmation(req.body)) {
+      return res.status(409).json({ error: "gift_creation_confirmation_required", message: "Confirm dangerous gift creation before continuing." });
+    }
     const expiresAt = parseOptionalDate(req.body?.expiresAt);
     const recipientEmail = normalizeEmail(req.body?.recipientEmail);
     const recipientUserId = String(req.body?.recipientUserId || "").trim() || null;
@@ -2670,7 +2701,12 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
           notes
         }
       });
-      created.push({ ...adminGiftCodePayload({ ...giftCode, redemptions: [] }), code });
+      created.push({
+        ...adminGiftCodePayload({ ...giftCode, redemptions: [] }),
+        code,
+        plaintextAvailable: true,
+        shownOnceOnly: true
+      });
     }
 
     await createAuditLog("gift_codes_created", "gift_code", null, {
@@ -2689,8 +2725,17 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
 
 app.post(["/admin/api/gift-codes/create-test", "/api/admin/gift-codes/create-test"], adminGiftLimiter, requireAdmin, async (req, res) => {
   try {
+    const permissions = giftAdminPermissionSummary();
+    if (!permissions.canCreateDisposableTestCodes) {
+      await auditGiftPermissionDenied(req, "canCreateDisposableTestCodes");
+      return denyGiftPermission(res, "canCreateDisposableTestCodes", "Disposable test gift creation is locked.");
+    }
     const plan = resolveGiftPlan({ plan: req.body?.plan || "3days" });
     if (!plan) return res.status(400).json({ error: "invalid_plan" });
+    if (plan.id === "lifetime" && !permissions.canCreateLifetimeGifts) {
+      await auditGiftPermissionDenied(req, "canCreateLifetimeGifts", { plan: plan.id, disposable: true });
+      return denyGiftPermission(res, "canCreateLifetimeGifts", "Lifetime test gift creation is locked.");
+    }
     const code = await generateUniqueGiftCode();
     const giftCode = await prisma.giftCode.create({
       data: {
@@ -2701,9 +2746,10 @@ app.post(["/admin/api/gift-codes/create-test", "/api/admin/gift-codes/create-tes
         status: "unused",
         maxUses: 1,
         usedCount: 0,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         requiresDiscord: false,
         requiresRoblox: false,
-        notes: `disposable_test_gift createdBy:admin plan:${plan.id}`
+        notes: `source:disposable_test createdBy:admin plan:${plan.id} expires:24h`
       },
       include: {
         redemptions: {
@@ -2722,7 +2768,9 @@ app.post(["/admin/api/gift-codes/create-test", "/api/admin/gift-codes/create-tes
       disposable: true,
       giftCode: {
         ...adminGiftCodePayload(giftCode),
-        code
+        code,
+        plaintextAvailable: true,
+        shownOnceOnly: true
       }
     });
   } catch (error) {
@@ -2732,12 +2780,25 @@ app.post(["/admin/api/gift-codes/create-test", "/api/admin/gift-codes/create-tes
 });
 
 app.post(["/admin/api/gift-codes/:id/revoke", "/api/admin/gift-codes/:id/revoke"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  const permissions = giftAdminPermissionSummary();
+  if (!permissions.canRevokeGiftCodes) {
+    await auditGiftPermissionDenied(req, "canRevokeGiftCodes", { giftCodeId: req.params.id });
+    return denyGiftPermission(res, "canRevokeGiftCodes", "Gift revocation is locked.");
+  }
+  const existing = await prisma.giftCode.findUnique({ where: { id: req.params.id }, select: { notes: true } });
+  if (!existing) return res.status(404).json({ error: "gift_code_not_found" });
   const giftCode = await prisma.giftCode.update({
     where: { id: req.params.id },
-    data: { status: "revoked" },
+    data: {
+      status: "revoked",
+      notes: appendGiftSecurityNote(existing.notes, "revokedReason:unauthorized_public_gift_creation_exposure revokedBy:system/security_hotfix")
+    },
     include: { redemptions: { include: { user: true, license: true } } }
   });
-  await createAuditLog("gift_code_revoked", "gift_code", giftCode.id, {});
+  await createAuditLog("gift_code_revoked", "gift_code", giftCode.id, {
+    revokedReason: "unauthorized_public_gift_creation_exposure",
+    revokedBy: "system/security_hotfix"
+  });
   return res.json({ giftCode: adminGiftCodePayload(giftCode) });
 });
 
@@ -2769,8 +2830,20 @@ app.get(["/admin/api/direct-packages", "/api/admin/direct-packages"], adminGiftL
 
 app.post(["/admin/api/direct-packages/send", "/api/admin/direct-packages/send"], adminGiftLimiter, requireAdmin, async (req, res) => {
   try {
+    const permissions = giftAdminPermissionSummary();
+    if (!permissions.canCreateGiftCodes) {
+      await auditGiftPermissionDenied(req, "canCreateGiftCodes", { directGift: true });
+      return denyGiftPermission(res, "canCreateGiftCodes", "Direct gift creation is locked.");
+    }
     const giftPlan = resolveGiftPlan(req.body);
     if (!giftPlan) return res.status(400).json({ error: "invalid_gift_plan" });
+    if (giftPlan.id === "lifetime" && !permissions.canCreateLifetimeGifts) {
+      await auditGiftPermissionDenied(req, "canCreateLifetimeGifts", { plan: giftPlan.id, directGift: true });
+      return denyGiftPermission(res, "canCreateLifetimeGifts", "Lifetime direct gift creation is locked.");
+    }
+    if (giftPlan.id === "lifetime" && !hasGiftCreationConfirmation(req.body)) {
+      return res.status(409).json({ error: "gift_creation_confirmation_required", message: "Confirm lifetime direct gift creation before continuing." });
+    }
     const email = normalizeEmail(req.body?.recipientEmail);
     if (!isValidEmail(email)) return res.status(400).json({ error: "invalid_recipient_email" });
     const emailNormalized = normalizeAccountEmail(email);
@@ -2804,6 +2877,11 @@ app.post(["/admin/api/direct-packages/send", "/api/admin/direct-packages/send"],
 });
 
 app.post(["/admin/api/direct-packages/:id/revoke", "/api/admin/direct-packages/:id/revoke"], adminGiftLimiter, requireAdmin, async (req, res) => {
+  const permissions = giftAdminPermissionSummary();
+  if (!permissions.canRevokeGiftCodes) {
+    await auditGiftPermissionDenied(req, "canRevokeGiftCodes", { directGiftPackageId: req.params.id });
+    return denyGiftPermission(res, "canRevokeGiftCodes", "Direct gift revocation is locked.");
+  }
   const packageRow = await prisma.directGiftPackage.update({
     where: { id: req.params.id },
     data: { status: "revoked" },
@@ -3538,6 +3616,62 @@ function runtimeTrialPromoEnvStatus() {
     commit: backendCommit,
     nodeEnv: env("NODE_ENV", "development")
   };
+}
+
+function giftAdminPermissionSummary() {
+  const createEnabled = isTruthy(env("FIMA_GIFT_CODES_CREATE_ENABLED", "false"));
+  const bulkEnabled = createEnabled && isTruthy(env("FIMA_GIFT_CODES_BULK_ENABLED", "false"));
+  const maxBulkQuantity = Math.min(Math.max(toOptionalInt(env("FIMA_GIFT_CODES_MAX_BULK_QUANTITY")) || 1, 1), 25);
+  const maxUses = Math.min(Math.max(toOptionalInt(env("FIMA_GIFT_CODES_MAX_USES")) || 1, 1), 25);
+  return {
+    canCreateGiftCodes: createEnabled,
+    canCreateDisposableTestCodes: createEnabled && isTruthy(env("FIMA_GIFT_CODES_TEST_ENABLED", "false")),
+    canCreateLifetimeGifts: createEnabled && isTruthy(env("FIMA_GIFT_CODES_LIFETIME_ENABLED", "false")),
+    canBulkCreateGifts: bulkEnabled,
+    canRevokeGiftCodes: isTruthy(env("FIMA_GIFT_CODES_REVOKE_ENABLED", "false")),
+    canViewGiftAuditLogs: isTruthy(env("FIMA_GIFT_CODES_AUDIT_ENABLED", "false")),
+    maxBulkQuantity: bulkEnabled ? maxBulkQuantity : 1,
+    maxUses: bulkEnabled ? maxUses : 1,
+    creationLocked: !createEnabled,
+    permissionsSource: "service_env_flags",
+    requiredEnvFlags: {
+      create: "FIMA_GIFT_CODES_CREATE_ENABLED",
+      disposableTest: "FIMA_GIFT_CODES_TEST_ENABLED",
+      lifetime: "FIMA_GIFT_CODES_LIFETIME_ENABLED",
+      bulk: "FIMA_GIFT_CODES_BULK_ENABLED",
+      revoke: "FIMA_GIFT_CODES_REVOKE_ENABLED"
+    }
+  };
+}
+
+function denyGiftPermission(res, permission, message = "Gift-code administration is locked. Ask a super-admin to enable the required permission.") {
+  return res.status(403).json({
+    error: "gift_permission_denied",
+    permission,
+    message
+  });
+}
+
+async function auditGiftPermissionDenied(req, permission, metadata = {}) {
+  await createAuditLog("gift_permission_denied", "gift_code", null, {
+    permission,
+    path: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+    userAgent: String(req.get("user-agent") || "").slice(0, 160),
+    ...metadata
+  });
+}
+
+function hasGiftCreationConfirmation(body) {
+  const value = body?.confirmGiftCreation ?? body?.confirmDangerousGiftCreation ?? body?.confirmed;
+  return value === true || ["1", "true", "yes", "on", "confirmed"].includes(String(value || "").trim().toLowerCase());
+}
+
+function appendGiftSecurityNote(notes, note) {
+  const existing = String(notes || "").trim();
+  const next = `[${new Date().toISOString()}] ${note}`;
+  return [existing, next].filter(Boolean).join("\n").slice(0, 1000);
 }
 
 function safeGitCommit() {

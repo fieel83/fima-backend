@@ -1,6 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
-  const downloadFallbackPage = "/download-unavailable.html";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
   const page = document.body.dataset.accountPage || "";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -2396,7 +2396,6 @@
           setMessage(t("giftClaimed"), "good");
         } catch (error) {
           setMessage(error.message, "error");
-          window.location.href = downloadFallbackPage;
         } finally {
           submit.disabled = false;
         }
@@ -2492,9 +2491,10 @@
         try {
           const data = await api(`/api/download?licenseKey=${encodeURIComponent(downloadButton.dataset.downloadLicense)}`);
           setMessage(t("downloadReady"), "good");
-          window.location.href = data.downloadUrl;
+          window.location.href = data.downloadUrl || publicSetupUrl;
         } catch (error) {
-          setMessage(error.message, "error");
+          setMessage((error.message || "Download could not be prepared.") + " Opening the public setup download.", "error");
+          window.location.href = publicSetupUrl;
         } finally {
           downloadButton.disabled = false;
         }

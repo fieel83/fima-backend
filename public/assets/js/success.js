@@ -1,6 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
-  const downloadFallbackPage = "/download-unavailable.html";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
 
@@ -173,10 +173,12 @@
       }
       window.location.href = data.downloadUrl;
     } catch (error) {
-      showToast(error.message || "Download could not be prepared.");
+      showToast(error.message || "Download could not be prepared. Opening the public setup download.");
       setDisabled(downloadButton, false, "Download Fima Macro");
-      downloadButton.href = "#download";
-      window.location.href = downloadFallbackPage;
+      downloadButton.href = publicSetupUrl;
+      downloadButton.target = "_blank";
+      downloadButton.rel = "noopener";
+      window.location.href = publicSetupUrl;
     }
   });
 
