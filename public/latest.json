@@ -1,0 +1,18 @@
+﻿{
+    "downloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe",
+    "packageUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.App.zip",
+    "changelog":  "v1.0.127 moves the website/domain routing to Render and verifies it live, polishes Pricing/Gift/Robux UI text, adds the v127 Discord/OG preview image, adds Offline QA mode, fixes tutorial targets and transitions, removes generic Instant Twisted while keeping Right/Left InstantTwi, hardens overlay Alt+Tab behavior, improves Roblox MS/FPS detection wording, allows safer FPS limit apply/reset, improves Loop Dash/Stop All cancellation responsiveness, and polishes Shop/Feedback/Creator Place UI.",
+    "revokedLicenseHashes":  [
+
+                             ],
+    "catalogVersion":  "1.0.127",
+    "catalogUpdatedAt":  "2026-06-13T01:00:23.5549177+00:00",
+    "version":  "1.0.127",
+    "downloadSha256":  "e2000f85ca495aec9542382164b7c5c75ff345e2790605951fbd02bb1a83e44e",
+    "packageSha256":  "ee3e98dd0df1814f7129dd575590f48cf4ca18dd9268cf8d4f4f5928a9053586",
+    "downloadFileSize":  157184,
+    "packageFileSize":  156273520,
+    "fileSize":  157184,
+    "appPackageFileSize":  156273520,
+    "publishedAt":  "2026-06-13T01:15:03.7272784+00:00"
+}
