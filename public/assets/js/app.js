@@ -1090,6 +1090,7 @@
     renderUiTour();
     renderFeatures();
     renderPricing();
+    renderHomeTrialPromoBanner();
     renderFaq();
     hydrateLatestVersion();
     renderSiteAccountNav(currentSiteAccount);
@@ -1319,6 +1320,38 @@
         return `<article class="feature-card"><span class="feature-icon">${label}</span><div><h3>${title}</h3><p>${description}</p></div></article>`;
       })
       .join("");
+  };
+
+  const renderHomeTrialPromoBanner = () => {
+    const host = document.querySelector(".hero-copy");
+    if (!host) return;
+    let banner = $("#homeTrialPromoBanner");
+    if (!trialPromoActive()) {
+      banner?.remove();
+      return;
+    }
+    if (!banner) {
+      banner = document.createElement("article");
+      banner.id = "homeTrialPromoBanner";
+      banner.className = "trial-promo-card home-trial-promo-card";
+      const anchor = host.querySelector(".hero-actions");
+      if (anchor) {
+        anchor.insertAdjacentElement("afterend", banner);
+      } else {
+        host.appendChild(banner);
+      }
+    }
+    banner.innerHTML = `
+      <div>
+        <span>Limited beta offer</span>
+        <strong>Free trials are now ${trialPromoDays()} days for the next week.</strong>
+        <p>One promotional trial per account during this event.</p>
+      </div>
+      <div class="trial-promo-actions">
+        <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
+        <a class="button primary" href="dashboard.html#monthly-trial">Claim ${trialPromoLabel()}</a>
+      </div>
+    `;
   };
 
   const renderPricing = () => {

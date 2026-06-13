@@ -38,6 +38,10 @@
   grid-column: 1 / -1;
 }
 
+.home-trial-promo-card {
+  margin-top: 22px;
+}
+
 .trial-promo-card span {
   color: #bfa8ff;
   font-size: 0.78rem;
