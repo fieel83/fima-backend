@@ -1,0 +1,10 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "oldTrialEligibilityReset":  "not run",
+    "migrationScript":  "scripts/reset-trial-promo-eligibility.js",
+    "dryRunDefault":  true,
+    "confirmFlag":  "--confirm",
+    "paidLicensesTouched":  "no source path touches paid licenses; script only updates user trial eligibility fields and writes audit logs when confirmed",
+    "giftLicensesTouched":  "no",
+    "blocker":  "Live database backup/export still missing; do not run reset script against production until backup exists or owner explicitly accepts risk."
+}

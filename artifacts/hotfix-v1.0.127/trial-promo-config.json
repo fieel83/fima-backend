@@ -1,0 +1,12 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "normalTrialDays":  1,
+    "promoEnabledEnv":  "TRIAL_PROMO_ENABLED=true required on Render",
+    "promoDaysEnv":  "TRIAL_PROMO_DAYS=7",
+    "promoEndAtEnv":  "TRIAL_PROMO_END_AT=2026-06-20T08:47:03.7108092Z",
+    "defaultWhenMissing":  "normal 1-day trial",
+    "source":  "trial_promo_7d_beta",
+    "campaign":  "beta_7_day_promo",
+    "liveEnvPresentInShell":  false,
+    "livePromoEnabled":  "pending Render env configuration and deploy verification"
+}

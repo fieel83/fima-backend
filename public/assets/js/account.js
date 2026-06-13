@@ -1,5 +1,6 @@
-﻿(() => {
+(() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
+  const downloadFallbackPage = "/download-unavailable.html";
   const page = document.body.dataset.accountPage || "";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -178,20 +179,20 @@
         "reconnectRoblox": "Reconnect Roblox",
         "freeMonthlyTrial": "Free Monthly Trial",
         "freeTrialEyebrow": "Free trial",
-        "trialIntro": "Claim one 24-hour trial every month after linking Discord. Roblox is optional on the website.",
+        "trialIntro": "Claim one free trial after linking Discord. Roblox is optional on the website.",
         "trialRequirements": "Free Monthly Trial Requirements",
         "accountLoggedIn": "Fima account logged in",
         "discordConnected": "Discord connected",
         "robloxConnected": "Roblox optional",
-        "claimTrial": "Claim 1-Day Free Trial",
+        "claimTrial": "Claim Free Trial",
         "trialActive": "Trial active",
         "trialAvailable": "Trial available",
         "trialLocked": "Trial locked",
         "trialCooldown": "Trial cooldown",
         "nextTrial": "Next free trial",
-        "connectDiscordTrial": "Connect Discord to unlock your monthly 1-day trial.",
+        "connectDiscordTrial": "Connect Discord to unlock your free trial.",
         "connectRobloxTrial": "Roblox is optional on the website.",
-        "trialClaimed": "1-day trial claimed. Your Trial role is being synced.",
+        "trialClaimed": "Free trial claimed. Your Trial role is being synced.",
         "trialAlreadyActive": "You already have an active monthly trial.",
         "trialCooldownActive": "Your monthly trial cooldown is still active.",
         "discordNotConnected": "Discord is only required for the free trial or optional recovery.",
@@ -414,20 +415,20 @@
         "reconnectRoblox": "Roblox'u Yeniden Ba\u011fla",
         "freeMonthlyTrial": "Ayl\u0131k \u00dccretsiz Trial",
         "freeTrialEyebrow": "\u00dccretsiz deneme",
-        "trialIntro": "Discord'u ba\u011flad\u0131ktan sonra ayda bir kez 24 saatlik trial alabilirsin. Roblox web sitesinde opsiyoneldir.",
+        "trialIntro": "Discord'u ba\u011flad\u0131ktan sonra \u00fccretsiz trial alabilirsin. Roblox web sitesinde opsiyoneldir.",
         "trialRequirements": "Ayl\u0131k Trial Gereksinimleri",
         "accountLoggedIn": "Fima hesab\u0131yla giri\u015f yap\u0131ld\u0131",
         "discordConnected": "Discord ba\u011fl\u0131",
         "robloxConnected": "Roblox opsiyonel",
-        "claimTrial": "1 G\u00fcnl\u00fck Trial Al",
+        "claimTrial": "Free Trial Al",
         "trialActive": "Trial aktif",
         "trialAvailable": "Trial haz\u0131r",
         "trialLocked": "Trial kilitli",
         "trialCooldown": "Trial bekleme s\u00fcresi",
         "nextTrial": "Sonraki \u00fccretsiz trial",
-        "connectDiscordTrial": "Ayl\u0131k 1 g\u00fcnl\u00fck trial i\u00e7in Discord'u ba\u011fla.",
+        "connectDiscordTrial": "Free trial i\u00e7in Discord'u ba\u011fla.",
         "connectRobloxTrial": "Roblox web sitesinde opsiyoneldir.",
-        "trialClaimed": "1 g\u00fcnl\u00fck trial al\u0131nd\u0131. Trial rol\u00fcn senkronize ediliyor.",
+        "trialClaimed": "Free trial al\u0131nd\u0131. Trial rol\u00fcn senkronize ediliyor.",
         "trialAlreadyActive": "Zaten aktif ayl\u0131k trial'\u0131n var.",
         "trialCooldownActive": "Ayl\u0131k trial bekleme s\u00fcren h\u00e2l\u00e2 aktif.",
         "discordNotConnected": "Discord sadece free trial veya opsiyonel kurtarma i\u00e7in gerekir.",
@@ -1809,7 +1810,7 @@
           </div>
         ` : `
           <div class="verification-actions">
-            <a class="button secondary" href="forgot-password.html">Send test recovery code</a>
+            <a class="button secondary" href="forgot-password.html">Test recovery DM</a>
           </div>
         `}
       </div>
@@ -1834,7 +1835,7 @@
           <div>
             <span class="pill">${t("discord")}</span>
             ${profileMini(discord, t("discord"))}
-            <p class="integration-note">Optional for recovery. Required only for the free 1-day trial.</p>
+            <p class="integration-note">Optional for recovery. Required only for the free trial.</p>
           </div>
           <div class="integration-actions">
             <span class="status-pill">${discord.connected ? t("connected") : t("notConnected")}</span>
@@ -1873,7 +1874,20 @@
     const statusText = trial.active ? t("trialActive") : trial.cooldownActive ? t("trialCooldown") : trial.eligible ? t("trialAvailable") : t("trialLocked");
     const missingDiscord = requirements.some((item) => item.id === "discord" && !item.complete);
     const missingRoblox = false;
+    const promo = trial.promo || {};
+    const trialLabel = trial.label || (promo.active ? `${promo.promoDays || promo.days || 7}-Day Free Trial` : t("claimTrial").replace(/^Claim\s+/i, ""));
+    const promoBanner = promo.active ? `
+      <div class="trial-promo-card">
+        <div>
+          <span>Limited beta offer</span>
+          <strong>Free trials are now ${escapeHtml(String(promo.promoDays || promo.days || 7))} days for the next week.</strong>
+          <p>One promotional trial per account during this event.</p>
+        </div>
+        ${promo.endAt ? `<b data-countdown="${escapeHtml(promo.endAt)}"></b>` : ""}
+      </div>
+    ` : "";
     target.innerHTML = `
+      ${promoBanner}
       <div class="trial-card">
         <div class="trial-main">
           <div class="card-top">
@@ -1883,7 +1897,7 @@
             </div>
             <span class="status-pill">${statusText}</span>
           </div>
-          <p>${t("trialIntro")}</p>
+          <p>${promo.active ? `${escapeHtml(trialLabel)} is available during the beta promotion. Discord is required only for trial claims.` : t("trialIntro")}</p>
           <div class="requirement-list">
             ${requirements.map((item) => `<div class="requirement ${item.complete ? "is-complete" : "is-missing"}"><span>${item.complete ? "OK" : "!"}</span><strong>${escapeHtml(requirementLabel(item.id))}</strong></div>`).join("")}
           </div>
@@ -1895,7 +1909,7 @@
           ${trial.active ? `<div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong></div>` : ""}
           ${trial.nextTrialAvailableAt ? `<div><span>${t("nextTrial")}</span><strong>${date(trial.nextTrialAvailableAt)}</strong><small data-countdown="${escapeHtml(trial.nextTrialAvailableAt)}">${duration(trial.cooldownSeconds)}</small></div>` : ""}
           ${trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(trial.activeLicense.licenseKey)}</code></div>` : ""}
-          <button class="button" type="button" data-claim-trial ${trial.eligible ? "" : "disabled"}>${t("claimTrial")}</button>
+          <button class="button" type="button" data-claim-trial ${trial.eligible ? "" : "disabled"}>Claim ${escapeHtml(trialLabel)}</button>
         </aside>
       </div>
     `;
@@ -2382,6 +2396,7 @@
           setMessage(t("giftClaimed"), "good");
         } catch (error) {
           setMessage(error.message, "error");
+          window.location.href = downloadFallbackPage;
         } finally {
           submit.disabled = false;
         }

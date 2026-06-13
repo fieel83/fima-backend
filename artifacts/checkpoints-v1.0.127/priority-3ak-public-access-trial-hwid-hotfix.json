@@ -1,0 +1,53 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "filesEdited":  [
+                        "src/server.js",
+                        "src/trialPromo.js",
+                        "scripts/reset-trial-promo-eligibility.js",
+                        "test/trial-promo.test.js",
+                        "public/assets/js/app.js",
+                        "public/assets/js/account.js",
+                        "public/assets/js/success.js",
+                        "public/assets/css/styles.css",
+                        "public/download-unavailable.html",
+                        "public/*.html meta/download fallback text",
+                        "README.md",
+                        "DEPLOY_RENDER.md",
+                        ".env.example",
+                        "app: Services/LicenseService.cs",
+                        "app: AdminPanelWindow.xaml.cs"
+                    ],
+    "checks":  [
+                   "npm test passed: 22/22",
+                   "node --check passed for server/public JS/reset script",
+                   "dotnet build --no-restore passed",
+                   "backend public/latest.json parse passed",
+                   "public setup unauthenticated download size 157184 passed",
+                   "secret scan clean"
+               ],
+    "downloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe",
+    "setupFileSize":  157184,
+    "trialPromoConfig":  {
+                             "createdAt":  "2026-06-13T08:47:03.6883930Z",
+                             "normalTrialDays":  1,
+                             "promoEnabledEnv":  "TRIAL_PROMO_ENABLED=true required on Render",
+                             "promoDaysEnv":  "TRIAL_PROMO_DAYS=7",
+                             "promoEndAtEnv":  "TRIAL_PROMO_END_AT=2026-06-20T08:47:03.7108092Z",
+                             "defaultWhenMissing":  "normal 1-day trial",
+                             "source":  "trial_promo_7d_beta",
+                             "campaign":  "beta_7_day_promo",
+                             "liveEnvPresentInShell":  false,
+                             "livePromoEnabled":  "pending Render env configuration and deploy verification"
+                         },
+    "trialResetRun":  "no",
+    "dbWritesExecuted":  "no",
+    "stripeCallsExecuted":  "no",
+    "adminRuntimeCallsExecuted":  "no",
+    "releaseBuildExecuted":  "no",
+    "remainingIssues":  [
+                            "Render env vars for 7-day promo are not configured from this shell; live banner/promo remains pending until TRIAL_PROMO_ENABLED/TRIAL_PROMO_DAYS/TRIAL_PROMO_END_AT are set.",
+                            "Production trial-history reset script was not run because DB backup/export is still missing.",
+                            "Live deploy verification pending after backend commit/push."
+                        ],
+    "nextRecommendedStep":  "Commit/push backend hotfix, wait for Render auto-deploy, then verify live download URL and read-only endpoints. Configure Render trial promo env and create DB backup before any production trial reset/job."
+}

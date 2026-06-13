@@ -36,6 +36,7 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { clearAdminCookie, createAdminToken, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
   discordBotHealth,
   giveDiscordRole,
@@ -49,6 +50,7 @@ import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState,
 const app = express();
 const port = Number(env("PORT", "8080"));
 const publicDir = path.resolve("public");
+const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
 const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
@@ -91,7 +93,6 @@ const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
 const usedRobloxOAuthStates = new Map();
-const MONTHLY_TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 const REFERRAL_REWARD_VALID_INVITES = 3;
 const REFERRAL_REWARD_DAYS = 15;
@@ -903,6 +904,24 @@ app.get("/api/me/integrations", requireUser, async (req, res) => {
   });
 });
 
+app.get("/api/trial-promo", async (req, res) => {
+  const promo = getTrialPromoConfig(process.env, new Date());
+  return res.json({
+    success: true,
+    promo: {
+      active: promo.active,
+      enabled: promo.enabled,
+      campaign: promo.campaign,
+      source: promo.source,
+      days: promo.currentTrialDays,
+      promoDays: promo.promoDays,
+      normalDays: promo.normalDays,
+      endAt: promo.endAtIso,
+      label: promo.active ? `${promo.promoDays}-Day Free Trial` : `${promo.normalDays}-Day Free Trial`
+    }
+  });
+});
+
 app.get(["/users/search-gift-recipient", "/api/users/search-gift-recipient"], giftRecipientSearchLimiter, requireUser, async (req, res) => {
   try {
     const query = String(req.query?.q || "").trim();
@@ -1071,24 +1090,59 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
     if (!integrations.discord.connected) return res.status(403).json({ error: "discord_not_connected" });
 
     const now = new Date();
+    const promo = getTrialPromoConfig(process.env, now);
     const activeTrial = await findActiveMonthlyTrial(freshUser, now);
     if (activeTrial) {
+      if (promo.active && !isPromoTrialLicense(activeTrial)) {
+        const promotedExpiresAt = new Date(now.getTime() + promo.ms);
+        const updated = await prisma.license.update({
+          where: { id: activeTrial.id },
+          data: {
+            expiresAt: activeTrial.expiresAt && activeTrial.expiresAt > promotedExpiresAt ? activeTrial.expiresAt : promotedExpiresAt,
+            notes: `${activeTrial.notes || "monthly_trial"} ${promo.source} campaign:${promo.campaign} resetReason:Beta trial/HWID/download issue compensation`
+          }
+        });
+        await prisma.auditLog.create({
+          data: {
+            action: "trial_promo_existing_trial_extended",
+            targetType: "license",
+            targetId: updated.id,
+            metadata: { userId: freshUser.id, campaign: promo.campaign, expiresAt: updated.expiresAt?.toISOString?.() || null }
+          }
+        }).catch(() => {});
+        return res.status(201).json({
+          success: true,
+          license: publicLicense(updated),
+          trial: await buildMonthlyTrialSummary(freshUser, now, integrations),
+          promo: publicTrialPromo(promo),
+          extendedExistingTrial: true
+        });
+      }
       return res.status(409).json({
         error: "trial_already_active",
-        trial: await buildMonthlyTrialSummary(freshUser)
+        trial: await buildMonthlyTrialSummary(freshUser, now, integrations),
+        promo: publicTrialPromo(promo)
       });
     }
-    if (freshUser.nextTrialAvailableAt && freshUser.nextTrialAvailableAt > now) {
+    const promoAlreadyClaimed = promo.active ? await findPromoTrial(freshUser) : null;
+    if (promoAlreadyClaimed) {
+      return res.status(409).json({
+        error: "trial_already_claimed",
+        trial: await buildMonthlyTrialSummary(freshUser, now, integrations),
+        promo: publicTrialPromo(promo)
+      });
+    }
+    if (!promo.active && freshUser.nextTrialAvailableAt && freshUser.nextTrialAvailableAt > now) {
       return res.status(429).json({
         error: "trial_cooldown_active",
         nextTrialAvailableAt: freshUser.nextTrialAvailableAt.toISOString(),
-        trial: await buildMonthlyTrialSummary(freshUser)
+        trial: await buildMonthlyTrialSummary(freshUser, now, integrations)
       });
     }
 
     const plan = getPlan("1day");
     if (!plan) return res.status(500).json({ error: "trial_plan_missing" });
-    const expiresAt = new Date(now.getTime() + MONTHLY_TRIAL_DURATION_MS);
+    const expiresAt = new Date(now.getTime() + promo.ms);
     const nextTrialAvailableAt = addCalendarMonth(now);
     const { license, updatedUser } = await prisma.$transaction(async (tx) => {
       const licenseKey = await generateUniqueLicenseKey(tx);
@@ -1101,7 +1155,7 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
           hwid: null,
           expiresAt,
           lifetime: false,
-          notes: `monthly_trial user:${freshUser.id} discord:${freshUser.discordUserId} roblox:${freshUser.robloxUserId || "optional"}`
+          notes: buildTrialNotes({ user: freshUser, promoConfig: promo })
         }
       });
       const nextUser = await tx.user.update({
@@ -1109,27 +1163,27 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
         data: {
           trialUsedAt: now,
           trialExpiresAt: expiresAt,
-          nextTrialAvailableAt,
-          trialStatus: "active",
+          nextTrialAvailableAt: promo.active ? null : nextTrialAvailableAt,
+          trialStatus: promo.active ? "promo_active" : "active",
           monthlyTrialClaimCount: { increment: 1 }
         }
       });
       await tx.analyticsEvent.create({
         data: {
-          type: "monthly_trial_claimed",
+          type: promo.active ? "trial_promo_claimed" : "monthly_trial_claimed",
           plan: plan.id,
           amount: 0,
           currency: "eur",
           mode: "trial",
-          metadata: { userId: freshUser.id, discordUserId: freshUser.discordUserId, robloxUserId: freshUser.robloxUserId }
+          metadata: { userId: freshUser.id, discordUserId: freshUser.discordUserId, robloxUserId: freshUser.robloxUserId, campaign: promo.active ? promo.campaign : null, trialDays: promo.currentTrialDays }
         }
       });
       await tx.auditLog.create({
         data: {
-          action: "monthly_trial_claimed",
+          action: promo.active ? "trial_promo_claimed" : "monthly_trial_claimed",
           targetType: "license",
           targetId: createdLicense.id,
-          metadata: { userId: freshUser.id, expiresAt: expiresAt.toISOString(), nextTrialAvailableAt: nextTrialAvailableAt.toISOString() }
+          metadata: { userId: freshUser.id, expiresAt: expiresAt.toISOString(), nextTrialAvailableAt: promo.active ? null : nextTrialAvailableAt.toISOString(), campaign: promo.active ? promo.campaign : null, source: promo.active ? promo.source : "monthly_trial" }
         }
       });
       return { license: createdLicense, updatedUser: nextUser };
@@ -1146,7 +1200,8 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
     return res.status(201).json({
       success: true,
       license: publicLicense(license),
-      trial: await buildMonthlyTrialSummary(updatedUser),
+      trial: await buildMonthlyTrialSummary(updatedUser, new Date(), integrations),
+      promo: publicTrialPromo(promo),
       discordRole
     });
   } catch (error) {
@@ -1467,12 +1522,14 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
 
     const accountAccess = await buildLicenseAccountAccess(license);
 
-    if (!license.hwid) {
+    let hwidBoundNow = false;
+    if (!normalizeHwid(license.hwid)) {
       await prisma.license.updateMany({
-        where: { id: license.id, hwid: null },
+        where: { id: license.id },
         data: { hwid }
       });
       license = await prisma.license.findUnique({ where: { id: license.id } });
+      hwidBoundNow = normalizeHwid(license?.hwid) === hwid;
     }
 
     if (normalizeHwid(license.hwid) !== hwid) {
@@ -1483,7 +1540,8 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         message: licenseReasonMessage("hwid_mismatch"),
         accountAccess,
         hwid,
-        hwidMatches: false
+        hwidMatches: false,
+        hwidBoundNow: false
       }));
     }
 
@@ -1521,7 +1579,8 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         message: "License valid",
         accountAccess,
         hwid,
-        hwidMatches: true
+        hwidMatches: true,
+        hwidBoundNow
       }),
       valid: true,
       licenseKey,
@@ -1532,6 +1591,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       discordLinked: accountAccess.discordLinked,
       robloxLinked: accountAccess.robloxLinked,
       canUseApp: true,
+      hwidBoundNow,
       missingRequirements: [],
       accountEmail: accountAccess.user?.email || license.customerEmail || null,
       robloxUsername: accountAccess.user?.robloxUsername || null,
@@ -4029,7 +4089,7 @@ function safeUrl(value) {
 }
 
 async function resolveDownloadInfo() {
-  const fallbackUrl = absoluteFrontendUrl(env("DOWNLOAD_FALLBACK_URL", `${frontendUrl()}/downloads/`));
+  const fallbackUrl = absoluteFrontendUrl(env("DOWNLOAD_FALLBACK_URL", PUBLIC_SETUP_DOWNLOAD_URL));
   const manifestUrl = env("DOWNLOAD_MANIFEST_URL", `${frontendUrl()}/latest.json`);
   try {
     const response = await fetch(manifestUrl, { cache: "no-store" });
@@ -4089,11 +4149,11 @@ function pickDownloadUrl(manifest) {
 
 function absoluteFrontendUrl(value) {
   const text = String(value || "").trim();
-  if (!text) return `${frontendUrl()}/downloads/`;
+  if (!text) return PUBLIC_SETUP_DOWNLOAD_URL;
   try {
     return new URL(text, `${frontendUrl()}/`).toString();
   } catch {
-    return `${frontendUrl()}/downloads/`;
+    return PUBLIC_SETUP_DOWNLOAD_URL;
   }
 }
 
@@ -4127,12 +4187,12 @@ function licenseReasonMessage(reason) {
     license_not_found: "License key was not found.",
     invalid_format: "Invalid license key format.",
     expired: "Your license has expired.",
-    disabled: "This license key has been disabled by an admin.",
+    disabled: "This license was disabled.",
     inactive: "This license key is inactive.",
     banned: "This license has been banned.",
     canceled: "This license was canceled.",
     payment_failed: "Payment for this license was not completed.",
-    hwid_mismatch: "This license key is already bound to another device. Please open a support ticket if this is your key.",
+    hwid_mismatch: "This license is already bound to another PC.",
     account_not_connected: "Your license is valid. A Fima account is optional for app access, but linking an account helps recovery and My Products.",
     discord_not_connected: "Discord is optional except for free trial claims.",
     roblox_not_connected: "Roblox is optional. You can add a username later for profile/community features.",
@@ -4182,8 +4242,11 @@ function licenseValidationPayload(license, options = {}) {
     timeLeftState: timeLeft.state,
     lifetime: Boolean(license?.lifetime),
     boundHwid: boundHwid || null,
+    incomingHwid: normalizedHwid || null,
     hwidBound,
+    hwidUnbound: !hwidBound,
     hwidMatches,
+    hwidBoundNow: Boolean(options.hwidBoundNow),
     hwidStatus: hwidBound ? "Bound" : "Unbound",
     accountConnected,
     discordLinked: accountAccess ? Boolean(accountAccess.discordLinked) : false,
@@ -6060,14 +6123,16 @@ function adminReferralPayload(referral) {
 }
 
 async function buildMonthlyTrialSummary(user, now = new Date(), integrations = null) {
+  const promo = getTrialPromoConfig(process.env, now);
   const linked = integrations || await buildIntegrationSummary(user);
   const activeTrial = await findActiveMonthlyTrial(user, now);
+  const promoAlreadyClaimed = promo.active ? await findPromoTrial(user) : null;
   const requirements = [
     { id: "account", label: "Fima account logged in", complete: Boolean(user?.id), action: null },
     { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" }
   ];
   const missing = requirements.filter((item) => !item.complete).map((item) => item.id);
-  const nextTrialAvailableAt = user?.nextTrialAvailableAt || null;
+  const nextTrialAvailableAt = promo.active ? null : user?.nextTrialAvailableAt || null;
   const cooldownActive = Boolean(nextTrialAvailableAt && nextTrialAvailableAt > now);
   const cooldownSeconds = cooldownActive ? Math.ceil((nextTrialAvailableAt.getTime() - now.getTime()) / 1000) : 0;
   const activeSeconds = activeTrial?.expiresAt ? Math.max(0, Math.ceil((activeTrial.expiresAt.getTime() - now.getTime()) / 1000)) : 0;
@@ -6076,12 +6141,16 @@ async function buildMonthlyTrialSummary(user, now = new Date(), integrations = n
   let disabledReason = null;
   if (activeTrial) disabledReason = "trial_already_active";
   else if (missing.includes("discord")) disabledReason = "discord_not_connected";
+  else if (promoAlreadyClaimed) disabledReason = "trial_already_claimed";
   else if (cooldownActive) disabledReason = "trial_cooldown_active";
 
   return {
+    promo: publicTrialPromo(promo),
+    durationDays: promo.currentTrialDays,
+    label: promo.active ? `${promo.promoDays}-Day Free Trial` : `${promo.normalDays}-Day Free Trial`,
     requirements,
     missing,
-    eligible: requirements.every((item) => item.complete) && !activeTrial && !cooldownActive,
+    eligible: requirements.every((item) => item.complete) && !activeTrial && !promoAlreadyClaimed && !cooldownActive,
     disabledReason,
     active: Boolean(activeTrial),
     activeLicense: activeTrial ? publicLicense(activeTrial) : null,
@@ -6092,6 +6161,8 @@ async function buildMonthlyTrialSummary(user, now = new Date(), integrations = n
     cooldownSeconds,
     status: activeTrial ? "active" : cooldownActive ? "cooldown" : requirements.every((item) => item.complete) ? "available" : "locked",
     claimCount: user?.monthlyTrialClaimCount || 0,
+    promoClaimed: Boolean(promoAlreadyClaimed),
+    promoSource: promoAlreadyClaimed ? promo.source : null,
     paidAccessActive,
     priorityRule: paidAccessActive ? "paid_access_has_priority; monthly trial remains optional" : "trial_access"
   };
@@ -6104,10 +6175,38 @@ async function findActiveMonthlyTrial(user, now = new Date()) {
       customerEmail: user.email,
       status: "active",
       expiresAt: { gt: now },
-      notes: { contains: "monthly_trial", mode: "insensitive" }
+      OR: [
+        { notes: { contains: "monthly_trial", mode: "insensitive" } },
+        { notes: { contains: "trial_promo_7d_beta", mode: "insensitive" } }
+      ]
     },
     orderBy: { expiresAt: "desc" }
   });
+}
+
+async function findPromoTrial(user) {
+  if (!user?.email) return null;
+  return prisma.license.findFirst({
+    where: {
+      customerEmail: user.email,
+      notes: { contains: "trial_promo_7d_beta", mode: "insensitive" }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+}
+
+function publicTrialPromo(promo = getTrialPromoConfig(process.env, new Date())) {
+  return {
+    active: promo.active,
+    enabled: promo.enabled,
+    campaign: promo.campaign,
+    source: promo.source,
+    days: promo.currentTrialDays,
+    promoDays: promo.promoDays,
+    normalDays: promo.normalDays,
+    endAt: promo.endAtIso,
+    label: promo.active ? `${promo.promoDays}-Day Free Trial` : `${promo.normalDays}-Day Free Trial`
+  };
 }
 
 async function hasActivePaidLicense(user, now = new Date()) {
@@ -6124,6 +6223,9 @@ async function hasActivePaidLicense(user, now = new Date()) {
             { NOT: { notes: { contains: "monthly_trial", mode: "insensitive" } } }
           ]
         }
+      ],
+      NOT: [
+        { notes: { contains: "trial_promo_7d_beta", mode: "insensitive" } }
       ]
     },
     select: { id: true }

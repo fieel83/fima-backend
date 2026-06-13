@@ -1,4 +1,5 @@
-﻿(() => {
+(() => {
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
   const storage = {
     theme: "fima.theme",
     language: "fima.language",
@@ -423,9 +424,9 @@
       },
       download: {
         eyebrow: "Download",
-        title: "Download unlocks after checkout.",
-        description: "Fima Macro downloads are delivered from your license page after Stripe creates an active license.",
-        primaryCta: "Buy license to download",
+        title: "Download the current setup.",
+        description: "Install Fima Macro, then use your license key or free trial inside the app.",
+        primaryCta: "Download Fima Macro",
         secondaryCta: "Setup Help",
         latest: "Latest version",
         versionFallback: "Manifest check pending",
@@ -644,9 +645,9 @@
       },
       download: {
         eyebrow: "\u0130ndir",
-        title: "Download odeme sonrasinda acilir.",
-        description: "Fima Macro indirmeni Stripe aktif lisans olusturduktan sonra license sayfandan alirsin.",
-        primaryCta: "Lisans alip indir",
+        title: "Guncel setup'i indir.",
+        description: "Fima Macro'yu kur, sonra lisans keyini veya free trial'ini uygulamada kullan.",
+        primaryCta: "Fima Macro indir",
         secondaryCta: "Kurulum Yard\u0131m\u0131",
         latest: "Son s\u00fcr\u00fcm",
         versionFallback: "Manifest kontrol ediliyor",
@@ -765,7 +766,7 @@
         }
       },
       checkout: { eyebrow: "Sicherer Checkout", title: "E-Mail eingeben, um fortzufahren.", description: "Nach der Stripe-Best\u00e4tigung wird dein Lizenzschl\u00fcssel erstellt und auf der Erfolgsseite angezeigt.", emailLabel: "E-Mail-Adresse", cancel: "Abbrechen", continue: "Weiter zu Stripe", loading: "Checkout wird erstellt...", invalidEmail: "Gib eine g\u00fcltige E-Mail-Adresse ein.", failed: "Checkout konnte nicht gestartet werden. Bitte versuche es gleich erneut.", backendMissing: "Der Zahlungsserver ist noch nicht erreichbar. Bitte nach dem Backend-Deploy erneut versuchen." },
-      download: { eyebrow: "Download", title: "Download wird nach dem Checkout freigeschaltet.", description: "Fima Macro Downloads werden auf deiner Lizenzseite verfuegbar, nachdem Stripe eine aktive Lizenz erstellt.", primaryCta: "Lizenz kaufen", secondaryCta: "Setup-Hilfe", latest: "Neueste Version", versionFallback: "Manifest wird gepr\u00fcft", versionUnavailable: "latest.json nicht gefunden", platform: "Plattform", updater: "Auto Updater", updaterValue: "Unterst\u00fctzt", support: "Support" },
+      download: { eyebrow: "Download", title: "Aktuelles Setup herunterladen.", description: "Installiere Fima Macro und nutze danach deinen Lizenzschluessel oder Free Trial in der App.", primaryCta: "Fima Macro herunterladen", secondaryCta: "Setup-Hilfe", latest: "Neueste Version", versionFallback: "Manifest wird gepr\u00fcft", versionUnavailable: "latest.json nicht gefunden", platform: "Plattform", updater: "Auto Updater", updaterValue: "Unterst\u00fctzt", support: "Support" },
       dashboard: { eyebrow: "Dashboard Vorschau", title: "Lizenzverwaltung erscheint hier nach Backend-Integration.", description: "Dieser Platzhalter zeigt die Richtung: Lizenzlogin, Plan, Ablaufdatum, HWID-Reset, Downloads und Supportlinks.", inputLabel: "Lizenzschl\u00fcssel", button: "Lizenzsystem kommt bald", plan: "Plan", planValue: "Backend erforderlich", hwid: "HWID", hwidValue: "Reset-Anfragen geplant", access: "Downloadzugriff", accessValue: "Nach Login verbunden" },
       faq: {
         title: "H\u00e4ufige Fragen vor dem Kauf.",
@@ -844,7 +845,7 @@
         }
       },
       checkout: { eyebrow: "Checkout s\u00e9curis\u00e9", title: "Entre ton e-mail pour continuer.", description: "Apr\u00e8s confirmation Stripe, ta cl\u00e9 de licence sera cr\u00e9\u00e9e et affich\u00e9e sur la page de succ\u00e8s.", emailLabel: "Adresse e-mail", cancel: "Annuler", continue: "Continuer vers Stripe", loading: "Cr\u00e9ation du checkout...", invalidEmail: "Entre une adresse e-mail valide.", failed: "Impossible de d\u00e9marrer le checkout. R\u00e9essaie dans un instant.", backendMissing: "Le serveur de paiement n'est pas encore joignable. R\u00e9essaie apr\u00e8s le d\u00e9ploiement backend." },
-      download: { eyebrow: "Download", title: "Le download se debloque apres checkout.", description: "Le telechargement Fima Macro est disponible sur ta page de licence apres creation d'une licence active par Stripe.", primaryCta: "Acheter une licence", secondaryCta: "Aide setup", latest: "Derni\u00e8re version", versionFallback: "V\u00e9rification du manifest", versionUnavailable: "latest.json introuvable", platform: "Plateforme", updater: "Auto updater", updaterValue: "Support\u00e9", support: "Support" },
+      download: { eyebrow: "Download", title: "Telecharge le setup actuel.", description: "Installe Fima Macro, puis utilise ta cle de licence ou ton free trial dans l'app.", primaryCta: "Telecharger Fima Macro", secondaryCta: "Aide setup", latest: "Derni\u00e8re version", versionFallback: "V\u00e9rification du manifest", versionUnavailable: "latest.json introuvable", platform: "Plateforme", updater: "Auto updater", updaterValue: "Support\u00e9", support: "Support" },
       dashboard: { eyebrow: "Aper\u00e7u dashboard", title: "La gestion des licences arrivera ici apr\u00e8s backend.", description: "Placeholder pour login licence, plan, expiration, reset HWID, downloads et support.", inputLabel: "Cl\u00e9 de licence", button: "Syst\u00e8me de licence bient\u00f4t", plan: "Plan", planValue: "Backend requis", hwid: "HWID", hwidValue: "Resets pr\u00e9vus", access: "Acc\u00e8s download", accessValue: "Connect\u00e9 apr\u00e8s login" },
       faq: {
         title: "Questions fr\u00e9quentes avant achat.",
@@ -923,7 +924,7 @@
         }
       },
       checkout: { eyebrow: "Siguran checkout", title: "Unesi e-mail za nastavak.", description: "Nakon Stripe potvrde, license key \u0107e biti kreiran i prikazan na success stranici.", emailLabel: "E-mail adresa", cancel: "Otka\u017ei", continue: "Nastavi na Stripe", loading: "Kreiranje checkouta...", invalidEmail: "Unesi validnu e-mail adresu.", failed: "Checkout nije mogao biti pokrenut. Poku\u0161aj ponovo za trenutak.", backendMissing: "Payment server jo\u0161 nije dostupan. Poku\u0161aj ponovo nakon backend deploya." },
-      download: { eyebrow: "Download", title: "Download se otkljucava nakon checkouta.", description: "Fima Macro download je dostupan na license stranici nakon sto Stripe kreira aktivnu licencu.", primaryCta: "Kupi licencu", secondaryCta: "Setup pomo\u0107", latest: "Zadnja verzija", versionFallback: "Provjera manifesta", versionUnavailable: "latest.json nije prona\u0111en", platform: "Platforma", updater: "Auto updater", updaterValue: "Podr\u017eano", support: "Podr\u0161ka" },
+      download: { eyebrow: "Download", title: "Preuzmi trenutni setup.", description: "Instaliraj Fima Macro, zatim koristi license key ili free trial u appu.", primaryCta: "Preuzmi Fima Macro", secondaryCta: "Setup pomo\u0107", latest: "Zadnja verzija", versionFallback: "Provjera manifesta", versionUnavailable: "latest.json nije prona\u0111en", platform: "Platforma", updater: "Auto updater", updaterValue: "Podr\u017eano", support: "Podr\u0161ka" },
       dashboard: { eyebrow: "Dashboard preview", title: "Upravljanje licencom dolazi ovdje nakon backend integracije.", description: "Placeholder pokazuje smjer: login licencom, plan, istek, HWID reset, download i support linkovi.", inputLabel: "License key", button: "License sistem uskoro", plan: "Plan", planValue: "Backend potreban", hwid: "HWID", hwidValue: "Reset zahtjevi planirani", access: "Download pristup", accessValue: "Povezano nakon logina" },
       faq: {
         title: "\u010cesta pitanja prije kupovine.",
@@ -949,7 +950,8 @@
 
   const state = {
     language: "en",
-    currency: "USD"
+    currency: "USD",
+    trialPromo: null
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -1122,6 +1124,15 @@
     if (days > 0) return `${days}d ${hours}h ${minutes}m`;
     if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
     return `${minutes}m ${seconds}s`;
+  };
+
+  const trialPromoActive = () => Boolean(state.trialPromo?.active && state.trialPromo?.endAt);
+  const trialPromoDays = () => Number(state.trialPromo?.promoDays || state.trialPromo?.days || 7);
+  const trialPromoLabel = () => trialPromoActive() ? `${trialPromoDays()}-Day Free Trial` : "Free Trial";
+  const trialPromoDuration = () => trialPromoActive() ? `${trialPromoDays()} days free trial access` : "Free trial access";
+  const trialPromoCountdown = () => {
+    const endAt = state.trialPromo?.endAt ? new Date(state.trialPromo.endAt) : null;
+    return endAt && Number.isFinite(endAt.getTime()) ? formatCountdown(endAt) : "";
   };
 
   const renderStats = () => {
@@ -1331,6 +1342,19 @@
         </div>
       </article>
     ` : "";
+    const promoBanner = trialPromoActive() ? `
+      <article class="trial-promo-card">
+        <div>
+          <span>Limited beta offer</span>
+          <strong>Free trials are now ${trialPromoDays()} days for the next week.</strong>
+          <p>One promotional trial per account during this event.</p>
+        </div>
+        <div class="trial-promo-actions">
+          <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
+          <a class="button primary" href="dashboard.html#monthly-trial">Claim ${trialPromoLabel()}</a>
+        </div>
+      </article>
+    ` : "";
     const accountPrompt = currentSiteAccount ? `
       <article class="pricing-account-prompt">
         <strong>${giftRecipient?.id
@@ -1351,9 +1375,16 @@
         </div>
       </article>
     `;
-    target.innerHTML = saleBanner + accountPrompt + basePlans
+    target.innerHTML = promoBanner + saleBanner + accountPrompt + basePlans
       .map((plan, index) => {
-        const data = pricingCopy.plans[plan.id] || fallbackPricing.plans[plan.id];
+        const data = { ...(pricingCopy.plans[plan.id] || fallbackPricing.plans[plan.id]) };
+        if (plan.trial) {
+          data.name = trialPromoLabel();
+          data.duration = trialPromoDuration();
+          data.features = trialPromoActive()
+            ? [`${trialPromoDays()} days free trial`, "Discord link required only for trial", "Full Fima Macro access", "Updates included"]
+            : ["Free trial", "Discord link required only for trial", "Full Fima Macro access", "Updates included"];
+        }
         const badge = data.badge ? `<span class="price-badge">${data.badge}</span>` : "";
         const features = data.features.map((feature) => `<li>${feature}</li>`).join("");
         const litCount = Math.min(4, index + 1);
@@ -1375,7 +1406,7 @@
           lifetime: "FIMA-LIFE"
         }[plan.id];
         const cardButton = plan.trial
-          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="dashboard.html#monthly-trial">Claim Free Trial</a>`
+          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="dashboard.html#monthly-trial">Claim ${trialPromoLabel()}</a>`
           : `<a class="button ${plan.featured ? "primary" : "secondary"}" href="#checkout" data-checkout-plan="${plan.id}">${pricingCopy.payCard || fallbackPricing.payCard}</a>`;
         const robuxButton = plan.trial ? "" : `<button class="button secondary robux-ticket-button" type="button" data-robux-plan="${plan.id}">${pricingCopy.payRobux || fallbackPricing.payRobux}</button>`;
         const giftIcon = `<svg class="gift-button-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M20 7h-2.2c.2-.5.3-1 .2-1.5A3 3 0 0 0 15 3c-1.4 0-2.4.8-3 1.8A3.5 3.5 0 0 0 9 3a3 3 0 0 0-3 2.5C5.9 6 6 6.5 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1Zm-5-2c.6 0 1 .4 1 1s-.4 1-1 1h-2c.2-.9.8-2 2-2ZM8 6c0-.6.4-1 1-1 1.2 0 1.8 1.1 2 2H9c-.6 0-1-.4-1-1Zm-4 7v7a1 1 0 0 0 1 1h6v-8H4Zm9 0v8h6a1 1 0 0 0 1-1v-7h-7Z"/></svg>`;
@@ -1961,6 +1992,21 @@
     $$("[data-pricing-countdown]").forEach((node) => {
       node.textContent = formatCountdown(saleEndsAt);
     });
+    $$("[data-trial-promo-countdown]").forEach((node) => {
+      node.textContent = trialPromoCountdown();
+    });
+  };
+
+  const hydrateTrialPromo = async () => {
+    try {
+      const response = await fetchWithTimeout(`${apiBase}/api/trial-promo`, {}, 2600);
+      if (!response.ok) return;
+      const data = await response.json();
+      state.trialPromo = data.promo || null;
+      renderPricing();
+    } catch (error) {
+      state.trialPromo = null;
+    }
   };
 
   const loadPublicSiteSettings = async () => {
@@ -2071,7 +2117,11 @@
     const target = $("#latestVersion");
     const preview = $("#previewVersion");
     const downloadButton = $("#downloadButton");
-    if (downloadButton) downloadButton.href = "pricing.html";
+    if (downloadButton) {
+      downloadButton.href = publicSetupUrl;
+      downloadButton.target = "_blank";
+      downloadButton.rel = "noopener";
+    }
     if (!target) return;
 
     const activeCopy = getCopy();
@@ -2252,6 +2302,7 @@
     await loadPublicSiteSettings();
     hydrateDiscordLinks();
     initPreferences();
+    hydrateTrialPromo();
     hydrateSiteAccountNav();
     window.setInterval(updatePricingCountdowns, 1000);
     initMacroVideoGallery();

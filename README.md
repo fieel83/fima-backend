@@ -66,7 +66,7 @@ API_BASE_URL=https://api.fimamacro.com
 DISCORD_INVITE_URL=
 SUPPORT_EMAIL=support@fimamacro.com
 DOWNLOAD_MANIFEST_URL=https://fimamacro.com/latest.json
-DOWNLOAD_FALLBACK_URL=https://fimamacro.com/downloads/
+DOWNLOAD_FALLBACK_URL=https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe
 CORS_ORIGINS=https://fimamacro.com,https://www.fimamacro.com
 ```
 
@@ -124,7 +124,7 @@ Checks the license status, expiry and ban state, logs the download attempt, and 
 ```json
 {
   "success": true,
-  "downloadUrl": "https://fimamacro.com/downloads/...",
+  "downloadUrl": "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe",
   "version": "1.0.0"
 }
 ```

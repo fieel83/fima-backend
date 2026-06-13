@@ -1,0 +1,10 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "newUser7DayTrial":  "source supported; live test pending env + safe DB test approval",
+    "oldExpiredTrialCanClaim":  "source supported by promo ignoring old cooldown/non-promo history; live test not run",
+    "oldBrokenHwidTrialCanClaim":  "source supported; live test not run",
+    "secondPromoClaimBlocked":  "source supported by trial_promo_7d_beta lookup; live test not run",
+    "paidLicenseUnchanged":  "source query excludes trial/promo licenses from paid access; live mutation not run",
+    "postPromoFallback":  "unit test passed",
+    "websiteBanner":  "source added; live requires promo env active"
+}

@@ -1,5 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
+  const downloadFallbackPage = "/download-unavailable.html";
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
 
@@ -175,6 +176,7 @@
       showToast(error.message || "Download could not be prepared.");
       setDisabled(downloadButton, false, "Download Fima Macro");
       downloadButton.href = "#download";
+      window.location.href = downloadFallbackPage;
     }
   });
 

@@ -1,0 +1,9 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "rootCause":  "Validation did first-use bind for null HWID, but response/debug payload did not expose hwidBoundNow/incoming HWID and app wording could still make non-HWID failures look like device binding problems. Trial cooldown also blocked users with old failed/expired trial history.",
+    "backendFix":  "First-use HWID validation now reports hwidBoundNow, incomingHwid, hwidUnbound, exact reason messages, and admin dry-run visibility.",
+    "appFix":  "Desktop app cloud message mapping now says disabled and HWID mismatch reasons precisely; admin debug includes incoming/unbound/boundNow fields.",
+    "firstUseBindingFixed":  "source fixed; local DB E2E not run because DATABASE_URL/backup blocker remains",
+    "errorMessages":  "license_not_found, expired/trial_expired, disabled, hwid_mismatch and trial_already_claimed are distinct in backend/app copy",
+    "adminDebugVisibility":  "source fixed"
+}

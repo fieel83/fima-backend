@@ -1,0 +1,9 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "newTrialFirstUseBind":  "not run against live DB; source path covered by existing validation flow and unit tests",
+    "sameHwidSecondValidation":  "not run against live DB",
+    "differentHwidMismatch":  "not run against live DB",
+    "hwidReset":  "not run against live DB/admin endpoint",
+    "reason":  "Database backup/export is still missing; live DB-writing tests/admin runtime jobs are intentionally not executed.",
+    "disposableTestDataUsed":  "no live disposable license created"
+}

@@ -1,0 +1,13 @@
+{
+    "createdAt":  "2026-06-13T08:47:03.6883930Z",
+    "brokenDownloadUrlFound":  "https://fimamacro.com/downloads/FIMA%20MACRO%20Setup.exe and stale UI paths that sent users to manifest/API fallback instead of the public release asset",
+    "rootCause":  "Website/download fallback still assumed repo-local /downloads or manifest/API-mediated download paths after release assets moved to public GitHub Releases.",
+    "finalWebsiteDownloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe",
+    "downloadedFileName":  "FIMA.MACRO.Setup.3ak.exe",
+    "downloadedFileSize":  157184,
+    "unauthenticatedDownload":  "passed",
+    "prettyPrintNotFound":  "not reproduced after fix; stale paths removed from source and fallback page added",
+    "loggedOutDownload":  "source points directly to public URL; live verification pending deploy",
+    "loggedInDownload":  "account/success downloads use /api/download which resolves to public URL; live verification pending deploy",
+    "incognitoDownload":  "public URL download passed without GitHub authentication"
+}
