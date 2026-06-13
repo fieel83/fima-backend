@@ -125,6 +125,10 @@ const runtimeEnvCatalog = [
   ["STRIPE_TEST_PRICE_3DAYS", "stripe"],
   ["STRIPE_TEST_PRICE_MONTHLY", "stripe"],
   ["STRIPE_TEST_PRICE_LIFETIME", "stripe"],
+  ["TRIAL_PROMO_ENABLED", "trial"],
+  ["TRIAL_PROMO_DAYS", "trial"],
+  ["NORMAL_TRIAL_DAYS", "trial"],
+  ["TRIAL_PROMO_END_AT", "trial"],
   ["RENDER_API_KEY", "render"],
   ["RENDER_SERVICE_ID", "render"],
   ["RENDER_DEPLOY_HOOK_URL", "render"],
@@ -264,6 +268,7 @@ app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminR
   return res.json({
     success: true,
     version: versionPayload(),
+    trialPromo: runtimeTrialPromoEnvStatus(),
     env: runtimeEnvCatalog.map(([envName, category]) => ({
       envName,
       category,
@@ -3512,6 +3517,26 @@ function versionPayload() {
     commit: backendCommit,
     buildTime,
     mode: env("NODE_ENV", "development")
+  };
+}
+
+function runtimeTrialPromoEnvStatus() {
+  const promo = getTrialPromoConfig(process.env, new Date());
+  return {
+    hasTrialPromoEnabled: Boolean(env("TRIAL_PROMO_ENABLED")),
+    hasTrialPromoDays: Boolean(env("TRIAL_PROMO_DAYS")),
+    hasNormalTrialDays: Boolean(env("NORMAL_TRIAL_DAYS")),
+    hasTrialPromoEndAt: Boolean(env("TRIAL_PROMO_END_AT")),
+    parsedTrialPromoEnabled: promo.enabled,
+    parsedTrialPromoDays: promo.promoDays,
+    parsedNormalTrialDays: promo.normalDays,
+    parsedTrialPromoEndAt: promo.endAtIso,
+    active: promo.active,
+    currentTrialDays: promo.currentTrialDays,
+    currentServerTimeUtc: new Date().toISOString(),
+    serviceVersion: backendVersion,
+    commit: backendCommit,
+    nodeEnv: env("NODE_ENV", "development")
   };
 }
 

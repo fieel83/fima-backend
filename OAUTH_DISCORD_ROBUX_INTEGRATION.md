@@ -57,3 +57,35 @@ Keep all values in Render environment variables only:
 - `OAUTH_COOKIE_DOMAIN`
 
 If `APP_ENCRYPTION_KEY` is not set, OAuth access/refresh tokens are not stored. No secret values should be committed to the repo.
+
+## Discord bot embed backlog
+
+Add a professional Fima App embed template flow to the Discord bot, similar in polish to the old TGMacro embed style but using current Fima information only.
+
+Sections to support:
+
+- Setup
+- Price
+- Buy Options
+- Recommended
+- Tutorial
+- Support
+- Download
+
+Required current links and copy:
+
+- Website: `https://fimamacro.com`
+- Download should use the public Fima website/download flow and the working public setup asset.
+- Pricing/trial text should follow the active site config, including `7-Day Free Trial` while the beta promo is active.
+- Do not include old `gettgmacro.com` links.
+- Do not include old SellAuth links unless they are intentionally re-approved.
+- Do not use outdated TGMacro pricing such as old access or Robux amounts.
+
+Buttons to consider:
+
+- Website
+- Download
+- Pricing
+- Support Ticket / Discord Support
+- Tutorial
+- Redeem Gift Code

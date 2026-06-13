@@ -20,6 +20,8 @@
 }
 
 .trial-promo-card {
+  box-sizing: border-box;
+  width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
@@ -30,6 +32,10 @@
   border-radius: 8px;
   background: rgba(28, 20, 52, 0.78);
   box-shadow: 0 18px 48px rgba(4, 2, 14, 0.24);
+}
+
+.pricing-grid > .trial-promo-card {
+  grid-column: 1 / -1;
 }
 
 .trial-promo-card span {
