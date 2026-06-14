@@ -1,6 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe";
   const page = document.body.dataset.accountPage || "";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -2756,4 +2756,3 @@
     if (page === "payment-success") initPaymentSuccess();
   });
 })();
-

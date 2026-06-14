@@ -1,6 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe";
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
 

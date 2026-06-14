@@ -1,5 +1,5 @@
 (() => {
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe";
   const storage = {
     theme: "fima.theme",
     language: "fima.language",
@@ -773,7 +773,7 @@
           lifetime: { name: "Lifetime", duration: "Lifetime Lizenz", badge: "Langfristig", features: ["Einmaliger Beta-Preis", "Voller Fima Macro Zugriff", "K\u00fcnftige Updates inklusive", "Lifetime Lizenz"] }
         }
       },
-      checkout: { eyebrow: "Sicherer Checkout", title: "E-Mail eingeben, um fortzufahren.", description: "Nach der Stripe-Best\u00e4tigung wird dein Lizenzschl\u00fcssel erstellt und auf der Erfolgsseite angezeigt.", emailLabel: "E-Mail-Adresse", cancel: "Abbrechen", continue: "Weiter zu Stripe", loading: "Checkout wird erstellt...", invalidEmail: "Gib eine g\u00fcltige E-Mail-Adresse ein.", failed: "Checkout konnte nicht gestartet werden. Bitte versuche es gleich erneut.", backendMissing: "Der Zahlungsserver ist noch nicht erreichbar. Bitte nach dem Backend-Deploy erneut versuchen." },
+      checkout: { eyebrow: "Sicherer Checkout", title: "Erst einloggen", description: "Deine Lizenz braucht einen Account. Logge dich ein oder registriere dich vor dem Kauf.", loginFirstTitle: "Erst einloggen", loginFirstBody: "Deine Lizenz braucht einen Account. Logge dich ein oder registriere dich vor dem Kauf.", loginButton: "Einloggen", registerButton: "Registrieren", emailLabel: "E-Mail-Adresse", cancel: "Abbrechen", continue: "Weiter zu Stripe", loading: "Checkout wird erstellt...", invalidEmail: "Gib eine gültige E-Mail-Adresse ein.", failed: "Checkout konnte nicht gestartet werden. Bitte versuche es gleich erneut.", backendMissing: "Der Zahlungsserver ist gerade nicht erreichbar. Bitte versuche es gleich erneut." },
       download: { eyebrow: "Download", title: "Aktuelles Setup herunterladen.", description: "Installiere Fima Macro und nutze danach deinen Lizenzschluessel oder Free Trial in der App.", primaryCta: "Fima Macro herunterladen", secondaryCta: "Setup-Hilfe", latest: "Neueste Version", versionFallback: "Manifest wird gepr\u00fcft", versionUnavailable: "latest.json nicht gefunden", platform: "Plattform", updater: "Auto Updater", updaterValue: "Unterst\u00fctzt", support: "Support" },
       dashboard: { eyebrow: "Dashboard Vorschau", title: "Lizenzverwaltung erscheint hier nach Backend-Integration.", description: "Dieser Platzhalter zeigt die Richtung: Lizenzlogin, Plan, Ablaufdatum, HWID-Reset, Downloads und Supportlinks.", inputLabel: "Lizenzschl\u00fcssel", button: "Lizenzsystem kommt bald", plan: "Plan", planValue: "Backend erforderlich", hwid: "HWID", hwidValue: "Reset-Anfragen geplant", access: "Downloadzugriff", accessValue: "Nach Login verbunden" },
       faq: {
@@ -852,7 +852,7 @@
           lifetime: { name: "Lifetime", duration: "Licence \u00e0 vie", badge: "Prix fixe", features: ["Payer une fois, utiliser toujours", "Acc\u00e8s complet Fima Macro", "Futures updates incluses", "Support prioritaire", "Licence \u00e0 vie", "Meilleure valeur long terme"] }
         }
       },
-      checkout: { eyebrow: "Checkout s\u00e9curis\u00e9", title: "Entre ton e-mail pour continuer.", description: "Apr\u00e8s confirmation Stripe, ta cl\u00e9 de licence sera cr\u00e9\u00e9e et affich\u00e9e sur la page de succ\u00e8s.", emailLabel: "Adresse e-mail", cancel: "Annuler", continue: "Continuer vers Stripe", loading: "Cr\u00e9ation du checkout...", invalidEmail: "Entre une adresse e-mail valide.", failed: "Impossible de d\u00e9marrer le checkout. R\u00e9essaie dans un instant.", backendMissing: "Le serveur de paiement n'est pas encore joignable. R\u00e9essaie apr\u00e8s le d\u00e9ploiement backend." },
+      checkout: { eyebrow: "Checkout s\u00e9curis\u00e9", title: "Connecte-toi d'abord", description: "Ta licence a besoin d'un compte. Connecte-toi ou inscris-toi avant d'acheter.", loginFirstTitle: "Connecte-toi d'abord", loginFirstBody: "Ta licence a besoin d'un compte. Connecte-toi ou inscris-toi avant d'acheter.", loginButton: "Connexion", registerButton: "S'inscrire", emailLabel: "Adresse e-mail", cancel: "Annuler", continue: "Continuer vers Stripe", loading: "Cr\u00e9ation du checkout...", invalidEmail: "Entre une adresse e-mail valide.", failed: "Impossible de d\u00e9marrer le checkout. R\u00e9essaie dans un instant.", backendMissing: "Le paiement n'est pas joignable pour l'instant. R\u00e9essaie dans un instant." },
       download: { eyebrow: "Download", title: "Telecharge le setup actuel.", description: "Installe Fima Macro, puis utilise ta cle de licence ou ton free trial dans l'app.", primaryCta: "Telecharger Fima Macro", secondaryCta: "Aide setup", latest: "Derni\u00e8re version", versionFallback: "V\u00e9rification du manifest", versionUnavailable: "latest.json introuvable", platform: "Plateforme", updater: "Auto updater", updaterValue: "Support\u00e9", support: "Support" },
       dashboard: { eyebrow: "Aper\u00e7u dashboard", title: "La gestion des licences arrivera ici apr\u00e8s backend.", description: "Placeholder pour login licence, plan, expiration, reset HWID, downloads et support.", inputLabel: "Cl\u00e9 de licence", button: "Syst\u00e8me de licence bient\u00f4t", plan: "Plan", planValue: "Backend requis", hwid: "HWID", hwidValue: "Resets pr\u00e9vus", access: "Acc\u00e8s download", accessValue: "Connect\u00e9 apr\u00e8s login" },
       faq: {
@@ -931,7 +931,7 @@
           lifetime: { name: "Lifetime", duration: "Do\u017eivotna licenca", badge: "Fiksna cijena", features: ["Plati jednom, koristi zauvijek", "Pun Fima Macro pristup", "Budu\u0107i updates uklju\u010deni", "Prioritetna podr\u0161ka", "Do\u017eivotna licenca", "Najbolja dugoro\u010dna vrijednost"] }
         }
       },
-      checkout: { eyebrow: "Siguran checkout", title: "Unesi e-mail za nastavak.", description: "Nakon Stripe potvrde, license key \u0107e biti kreiran i prikazan na success stranici.", emailLabel: "E-mail adresa", cancel: "Otka\u017ei", continue: "Nastavi na Stripe", loading: "Kreiranje checkouta...", invalidEmail: "Unesi validnu e-mail adresu.", failed: "Checkout nije mogao biti pokrenut. Poku\u0161aj ponovo za trenutak.", backendMissing: "Payment server jo\u0161 nije dostupan. Poku\u0161aj ponovo nakon backend deploya." },
+      checkout: { eyebrow: "Siguran checkout", title: "Prvo se prijavi", description: "Licenca mora biti vezana za account. Prijavi se ili registruj prije kupovine.", loginFirstTitle: "Prvo se prijavi", loginFirstBody: "Licenca mora biti vezana za account. Prijavi se ili registruj prije kupovine.", loginButton: "Login", registerButton: "Register", emailLabel: "E-mail adresa", cancel: "Otkaži", continue: "Nastavi na Stripe", loading: "Kreiranje checkouta...", invalidEmail: "Unesi validnu e-mail adresu.", failed: "Checkout nije mogao biti pokrenut. Pokušaj ponovo za trenutak.", backendMissing: "Payment trenutno nije dostupan. Pokušaj ponovo za trenutak." },
       download: { eyebrow: "Download", title: "Preuzmi trenutni setup.", description: "Instaliraj Fima Macro, zatim koristi license key ili free trial u appu.", primaryCta: "Preuzmi Fima Macro", secondaryCta: "Setup pomo\u0107", latest: "Zadnja verzija", versionFallback: "Provjera manifesta", versionUnavailable: "latest.json nije prona\u0111en", platform: "Platforma", updater: "Auto updater", updaterValue: "Podr\u017eano", support: "Podr\u0161ka" },
       dashboard: { eyebrow: "Dashboard preview", title: "Upravljanje licencom dolazi ovdje nakon backend integracije.", description: "Placeholder pokazuje smjer: login licencom, plan, istek, HWID reset, download i support linkovi.", inputLabel: "License key", button: "License sistem uskoro", plan: "Plan", planValue: "Backend potreban", hwid: "HWID", hwidValue: "Reset zahtjevi planirani", access: "Download pristup", accessValue: "Povezano nakon logina" },
       faq: {
@@ -2273,6 +2273,10 @@
       const version = manifest.version || manifest.latest || manifest.latestVersion || manifest.tag || manifest.name || "Manifest found";
       target.textContent = version;
       if (preview) preview.textContent = String(version).startsWith("v") ? version : `v${version}`;
+      const setupUrl = manifest.downloadUrl || manifest.setupUrl;
+      if (downloadButton && /^https:\/\/github\.com\/fieel83\/fima-macro-releases\/releases\/download\//i.test(setupUrl || "")) {
+        downloadButton.href = setupUrl;
+      }
 
     } catch (error) {
       target.textContent = activeCopy.download.versionUnavailable;
@@ -2452,4 +2456,3 @@
     initCanvas();
   });
 })();
-

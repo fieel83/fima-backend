@@ -64,7 +64,7 @@ const app = express();
 const port = Number(env("PORT", "8080"));
 const publicDir = path.resolve("public");
 const DEFAULT_MIN_SUPPORTED_APP_VERSION = "1.0.128";
-const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
+const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe";
 const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
