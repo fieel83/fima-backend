@@ -1,0 +1,24 @@
+{
+  "priority": "3A18",
+  "phase": "render-deploy-backend-site-discord",
+  "createdAt": "2026-06-14",
+  "expectedCommit": "d87df2c3113e2eed1b2071478d1c9bc9f23ad71c",
+  "oldLiveCommit": "085eeec176e1ecf23630446dfaf3e802c622f4b5",
+  "liveCommit": "d87df2c3113e2eed1b2071478d1c9bc9f23ad71c",
+  "expectedCommitLive": true,
+  "backendVersion": "1.0.128",
+  "renderDeployTriggeredByCodex": false,
+  "renderDeployEvidence": "Live /api/version changed to the pushed commit after the earlier Git push/autodeploy.",
+  "renderCredentialsAvailableInCodex": {
+    "RENDER_DEPLOY_HOOK_URL": false,
+    "FIMA_RENDER_DEPLOY_HOOK": false,
+    "RENDER_API_KEY": false,
+    "RENDER_SERVICE_ID": false
+  },
+  "siteLoads": true,
+  "discordBotRestarted": "not_verifiable_from_codex",
+  "notes": [
+    "No secrets were printed.",
+    "Admin/bot health endpoint is blocked by security containment, so Discord bot live restart could not be proven from this environment."
+  ]
+}

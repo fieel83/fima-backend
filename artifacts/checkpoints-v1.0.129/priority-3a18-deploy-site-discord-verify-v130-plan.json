@@ -1,0 +1,56 @@
+{
+  "priority": "3A18",
+  "createdAt": "2026-06-14",
+  "deploy": {
+    "renderDeployTriggeredByCodex": false,
+    "liveBackendOldCommit": "085eeec176e1ecf23630446dfaf3e802c622f4b5",
+    "liveBackendNewCommit": "d87df2c3113e2eed1b2071478d1c9bc9f23ad71c",
+    "expectedCommitLive": true,
+    "backendSiteDeployed": true,
+    "discordBotRestarted": "not_verifiable"
+  },
+  "websiteLive": {
+    "loggedOutCheckoutBlocked": true,
+    "loginRegisterModalShown": true,
+    "loggedInCheckoutWorks": "not_tested_no_disposable_live_login",
+    "publicJsSecretScanPassed": true,
+    "noPrivateRepoLinks": true
+  },
+  "myProductsLive": {
+    "ownLicensesShown": "not_tested_no_disposable_live_login",
+    "licenseMasked": "live_js_verified",
+    "hwidDiscordRobloxSubscriptionShown": "live_js_verified",
+    "noProductsStateFriendly": "source_verified",
+    "idorTestPassed": "partial_logged_out_401_plus_source_requireUser"
+  },
+  "discordLive": {
+    "buyerRoleCheckCreate": "source_live_commit_verified",
+    "trialRoleCheckCreate": "source_live_commit_verified",
+    "rolePositionHandling": "source_live_commit_verified",
+    "backendValidationForRoleGrant": "source_live_commit_verified",
+    "adminOnlySetupCommand": "source_live_commit_verified",
+    "embedsButtonsVerified": "source_live_commit_verified",
+    "oldTGMacroBuyerFlow": "planned_in_embed_ticket_flow",
+    "botTokenPrinted": false
+  },
+  "appV130Plan": {
+    "appReleaseRequired": true,
+    "planCreated": true,
+    "releasePublished": false
+  },
+  "latestJson": {
+    "changed": false,
+    "version": "1.0.129"
+  },
+  "artifacts": [
+    "artifacts/post-security-backlog/3a18-render-deploy-backend-site-discord.json",
+    "artifacts/post-security-backlog/3a18-live-login-before-checkout-test.json",
+    "artifacts/post-security-backlog/3a18-live-my-products-test.json",
+    "artifacts/post-security-backlog/3a18-live-discord-bot-test.json"
+  ],
+  "remainingBlockers": [
+    "Logged-in checkout and My Products require a disposable live account session.",
+    "Discord slash command and role behavior require Discord admin/non-admin interaction after bot restart.",
+    "App fixes need v1.0.130 build/test/publish in a separate phase."
+  ]
+}

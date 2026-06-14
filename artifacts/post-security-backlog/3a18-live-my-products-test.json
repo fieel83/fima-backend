@@ -1,0 +1,26 @@
+{
+  "priority": "3A18",
+  "phase": "live-my-products-test",
+  "createdAt": "2026-06-14",
+  "liveJsVerification": {
+    "accountJsStatus": 200,
+    "maskedLicenseCopyPresent": true,
+    "v129PublicSetupUrlPresent": true,
+    "privateRepoLinks": false,
+    "publicJsSecretScan": "passed"
+  },
+  "apiSecurity": {
+    "loggedOutApiProductsStatus": 401,
+    "loggedOutApiProductsBody": "{\"error\":\"unauthorized\"}",
+    "idorProtection": "partial_live_logged_out_block_plus_source_requireUser_current_user_query"
+  },
+  "authenticatedUi": {
+    "ownLicensesShown": "not_tested",
+    "licenseMasked": "live_js_verified",
+    "copyButton": "source_verified",
+    "hwidDiscordRobloxSubscriptionShown": "live_js_verified",
+    "noProductStateFriendly": "source_verified",
+    "disabledExpiredStateFriendly": "source_verified"
+  },
+  "blockedReason": "No disposable authenticated website account was available in this Codex environment."
+}

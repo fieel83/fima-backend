@@ -1,0 +1,33 @@
+{
+  "priority": "3A18",
+  "phase": "live-login-before-checkout-test",
+  "createdAt": "2026-06-14",
+  "url": "https://fimamacro.com/pricing.html",
+  "loggedOut": {
+    "plansTested": ["3days", "monthly", "lifetime"],
+    "stripeOpened": false,
+    "modalShown": true,
+    "title": "Log in first",
+    "body": "Your license needs an account, so log in or register before buying.",
+    "loginRoute": "login.html?next=pricing.html%3Fcheckout%3D3days",
+    "registerRoute": "register.html?next=pricing.html%3Fcheckout%3D3days"
+  },
+  "mobile": {
+    "testedWidth": 390,
+    "modalShown": true,
+    "modalOverflowing": false
+  },
+  "loggedIn": {
+    "tested": false,
+    "blockedReason": "No disposable live login session/credentials available in this Codex environment."
+  },
+  "security": {
+    "publicJsSecretScan": "passed",
+    "stripeSecretInFrontend": false,
+    "privateRepoLinks": false
+  },
+  "screenshots": [
+    "artifacts/post-security-backlog/screenshots/3a18/live-pricing-login-before-checkout-modal.png",
+    "artifacts/post-security-backlog/screenshots/3a18/live-pricing-login-before-checkout-mobile.png"
+  ]
+}

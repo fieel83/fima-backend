@@ -1,0 +1,33 @@
+{
+  "priority": "3A18",
+  "phase": "live-discord-bot-test",
+  "createdAt": "2026-06-14",
+  "sourceCommitLive": true,
+  "sourceImplemented": {
+    "buyerRoleCheckCreate": true,
+    "trialRoleCheckCreate": true,
+    "rolePositionHandling": true,
+    "backendValidationForRoleGrant": true,
+    "adminOnlySetupCommand": "/fima_roles_setup",
+    "embedsButtonsImproved": true,
+    "oldTGMacroBuyerFlow": "planned_in_ticket_embed_copy"
+  },
+  "liveVerification": {
+    "botHealthPublicEndpoint": "blocked_by_security_containment",
+    "adminBotHealthStatus": 401,
+    "adminBotHealthReason": "admin_panel_disabled",
+    "slashCommandInteractionTest": "not_run",
+    "nonAdminSetupTest": "not_run",
+    "roleCreateInLiveServer": "not_run"
+  },
+  "security": {
+    "botTokenPrinted": false,
+    "adminMutationStillBlocked": true,
+    "normalPublicDangerousMutationBlocked": true
+  },
+  "remaining": [
+    "Verify /fima_roles_setup from Discord with an admin account after bot restart is visible.",
+    "Verify non-admin cannot run /fima_roles_setup.",
+    "Verify role position warning/creation in a safe Discord server."
+  ]
+}
