@@ -1574,6 +1574,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
 
   try {
     if (versionStatus.updateRequired) {
+      const updateTarget = await latestAppUpdateTarget(versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION);
       await logValidation(null, licenseKey || "-", "failed", "update_required", hwid, appVersion);
       return res.status(426).json(licenseValidationPayload(null, {
         valid: false,
@@ -1581,8 +1582,8 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         reason: "update_required",
         message: "This app version is no longer supported. Please download the latest Fima Macro update.",
         licenseKey,
-        latestVersion: versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION,
-        downloadUrl: PUBLIC_SETUP_DOWNLOAD_URL
+        latestVersion: updateTarget.latestVersion,
+        downloadUrl: updateTarget.downloadUrl
       }));
     }
 
@@ -1772,13 +1773,14 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
     }
 
     if (versionStatus.updateRequired) {
+      const updateTarget = await latestAppUpdateTarget(versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION);
       return res.status(426).json({
         valid: false,
         canUseApp: false,
         reason: "update_required",
         message: "A security update is required. Please update Fima Macro.",
-        latestVersion: versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION,
-        downloadUrl: PUBLIC_SETUP_DOWNLOAD_URL
+        latestVersion: updateTarget.latestVersion,
+        downloadUrl: updateTarget.downloadUrl
       });
     }
 
@@ -4946,6 +4948,14 @@ async function resolveDownloadInfo() {
       manifest: null
     };
   }
+}
+
+async function latestAppUpdateTarget(minimumVersion = DEFAULT_MIN_SUPPORTED_APP_VERSION) {
+  const info = await resolveDownloadInfo();
+  return {
+    latestVersion: info.version || minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION,
+    downloadUrl: info.downloadUrl || PUBLIC_SETUP_DOWNLOAD_URL
+  };
 }
 
 function pickDownloadUrl(manifest) {
