@@ -382,7 +382,7 @@
         robuxModalStaff: "Staff will verify the payment before any license is delivered.",
         robuxModalStripe: "No automatic Stripe checkout is started.",
         robuxOpenTicket: "Open Discord Ticket",
-        accountPrompt: "Already bought? Use Login or Register to see your licenses in My Products.",
+        accountPrompt: "Already bought? Log in to see your licenses in My Products. New here? Register first.",
         plans: {
           "1day": {
             name: "Free Trial",
@@ -412,15 +412,15 @@
       },
       checkout: {
         eyebrow: "Secure checkout",
-        title: "Enter your email to continue.",
-        description: "Your license key will be created after Stripe confirms the payment and shown on the success page.",
+        title: "Log in or register first.",
+        description: "After that, Pay with Card will open Stripe and your license will appear in My Products.",
         emailLabel: "Email address",
         cancel: "Cancel",
         continue: "Continue to Stripe",
         loading: "Creating checkout...",
         invalidEmail: "Enter a valid email address.",
-        failed: "Checkout could not be started. Please try again in a moment.",
-        backendMissing: "The payment server is not reachable yet. Please try again after backend deployment."
+        failed: "Checkout is not ready right now. Try again or open support.",
+        backendMissing: "Payment is not reachable right now. Try again or open support."
       },
       download: {
         eyebrow: "Download",

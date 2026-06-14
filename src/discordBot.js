@@ -172,25 +172,33 @@ function fimaAnnouncementPayload(commandName = "fima_embed") {
   const siteUrl = env("FRONTEND_URL") || "https://fimamacro.com";
   const downloadUrl = `${siteUrl.replace(/\/+$/, "")}/download.html`;
   const pricingUrl = `${siteUrl.replace(/\/+$/, "")}/pricing.html`;
+  const tutorialUrl = `${siteUrl.replace(/\/+$/, "")}/macros.html`;
   const supportUrl = env("DISCORD_SUPPORT_URL") || env("SUPPORT_URL") || siteUrl;
   const title = commandName === "fima_update" ? "Fima Macro Update" : "Fima Macro";
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
     .setTitle(title)
-    .setDescription("Premium Roblox macro app for faster setup, clean macro profiles, tutorials, license management and community macros.")
+    .setDescription("Fima Macros for Roblox movement techs, tutorials, updates and support.")
     .addFields(
-      { name: "Website", value: siteUrl, inline: true },
-      { name: "Download", value: downloadUrl, inline: true },
-      { name: "Features", value: "Macro profiles, tutorials, Creator Place, gift codes and Discord recovery." }
+      { name: "Setup", value: "Download the setup, install Fima Macro, then log in or paste your license key.", inline: false },
+      { name: "Price", value: "Use the website for the current EUR prices and active trial offer.", inline: true },
+      { name: "Buy Options", value: "Card checkout, gift codes and support-assisted Robux orders.", inline: true },
+      { name: "Recommended", value: "Start with the trial if it is active, then pick the plan that fits you.", inline: false },
+      { name: "Tutorial", value: "Open the Macros page for setup notes and video slots.", inline: true },
+      { name: "Support", value: "Open a ticket if your key, HWID, payment or setup needs help.", inline: true },
+      { name: "Download", value: "Use the website download page so the link always follows the latest public release.", inline: false }
     )
     .setImage(`${siteUrl.replace(/\/+$/, "")}/assets/social-preview.png?v=20260531-1`);
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel("Open Website").setStyle(ButtonStyle.Link).setURL(siteUrl),
-    new ButtonBuilder().setLabel("Download App").setStyle(ButtonStyle.Link).setURL(downloadUrl),
+  const mainRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("Website").setStyle(ButtonStyle.Link).setURL(siteUrl),
+    new ButtonBuilder().setLabel("Download").setStyle(ButtonStyle.Link).setURL(downloadUrl),
     new ButtonBuilder().setLabel("Pricing").setStyle(ButtonStyle.Link).setURL(pricingUrl),
     new ButtonBuilder().setLabel("Support").setStyle(ButtonStyle.Link).setURL(supportUrl)
   );
-  return { embeds: [embed], components: [row] };
+  const extraRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("Tutorial").setStyle(ButtonStyle.Link).setURL(tutorialUrl)
+  );
+  return { embeds: [embed], components: [mainRow, extraRow] };
 }
 
 async function createDiscordResetToken(userId) {
