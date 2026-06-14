@@ -1,18 +1,18 @@
 {
-    "downloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe",
-    "packageUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.App.zip",
-    "changelog":  "v1.0.128 is a required security update. It moves premium access to backend-signed app entitlements, removes local license bypass paths, requires valid entitlement checks before official macro execution, adds entitlement refresh handling, hardens protected download and admin session configuration, and blocks vulnerable older clients once the live minimum supported app version is enabled.",
+    "downloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.Setup.exe",
+    "packageUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.App.zip",
+    "changelog":  "v1.0.129 improves the required-update screen so old clients show a clear Update needed state, hides normal activation during update_required, adds a pulsing Update now button with download fallback, and keeps Fima copy short and human.",
     "revokedLicenseHashes":  [
 
                              ],
-    "catalogVersion":  "1.0.128",
-    "catalogUpdatedAt":  "2026-06-13T21:07:21.8856212+00:00",
-    "version":  "1.0.128",
-    "downloadSha256":  "6be9b720d6d5a651142e70a097342013909cc8a7fdbc370e68020590db107538",
-    "packageSha256":  "265ba9670c64cf9e560777d75cf23f4be572de93badaef018aed4cb3ae1d1f04",
+    "catalogVersion":  "1.0.129",
+    "catalogUpdatedAt":  "2026-06-14T11:44:53.3906706+00:00",
+    "version":  "1.0.129",
+    "downloadSha256":  "c96bc885b873ed83cb3f862463afd033789716d1fadf8b18f5f05bf0e93ff0cf",
+    "packageSha256":  "c86bd96211b5d75bc4a12852cb9a3e4fb8731677883d5b1e967e253d92f97966",
     "downloadFileSize":  157184,
-    "packageFileSize":  156275338,
+    "packageFileSize":  156279174,
     "fileSize":  157184,
-    "appPackageFileSize":  156275338,
-    "publishedAt":  "2026-06-13T21:07:21.8856212+00:00"
+    "appPackageFileSize":  156279174,
+    "publishedAt":  "2026-06-14T11:44:53.3906706+00:00"
 }
