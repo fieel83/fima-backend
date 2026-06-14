@@ -1,18 +1,18 @@
 {
-    "downloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.Setup.exe",
-    "packageUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.App.zip",
-    "changelog":  "v1.0.129 improves the required-update screen so old clients show a clear Update needed state, hides normal activation during update_required, adds a pulsing Update now button with download fallback, and keeps Fima copy short and human.",
+    "downloadUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe",
+    "packageUrl":  "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.App.zip",
+    "changelog":  "v1.0.130 improves keybind refresh, keeps button hover text visible, tightens tutorial controls, and keeps the update-required screen clear.",
     "revokedLicenseHashes":  [
 
                              ],
-    "catalogVersion":  "1.0.129",
-    "catalogUpdatedAt":  "2026-06-14T11:44:53.3906706+00:00",
-    "version":  "1.0.129",
-    "downloadSha256":  "c96bc885b873ed83cb3f862463afd033789716d1fadf8b18f5f05bf0e93ff0cf",
-    "packageSha256":  "c86bd96211b5d75bc4a12852cb9a3e4fb8731677883d5b1e967e253d92f97966",
+    "catalogVersion":  "1.0.130",
+    "catalogUpdatedAt":  "2026-06-14T16:58:06.9877700+00:00",
+    "version":  "1.0.130",
+    "downloadSha256":  "78cc1f97eab359d39c89db2cc274558747be0bf820f787d8278c14937e01e90e",
+    "packageSha256":  "f5a23e851e0519f6a825a85ff4434d4afff953e02413731623e736065afdd2b4",
     "downloadFileSize":  157184,
-    "packageFileSize":  156279174,
+    "packageFileSize":  156279249,
     "fileSize":  157184,
-    "appPackageFileSize":  156279174,
-    "publishedAt":  "2026-06-14T11:44:53.3906706+00:00"
+    "appPackageFileSize":  156279249,
+    "publishedAt":  "2026-06-14T16:58:06.9877700+00:00"
 }
