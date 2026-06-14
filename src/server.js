@@ -48,7 +48,7 @@ import {
   sendPaymentSubmissionLog,
   startDiscordBot
 } from "./discordBot.js";
-import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
+import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeKeyMode, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
 import {
   downloadSecretStatus,
   entitlementSecretStatus,
@@ -77,6 +77,8 @@ let lastStripePriceValidation = {
   checkedAt: null,
   results: Object.fromEntries(stripePriceEnvNames.map((name) => [name, { status: "unchecked" }]))
 };
+const STRIPE_RUNTIME_PRICE_SETTING_KEY = "payment_stripe_prices";
+const stripePriceBootstrapLocks = new Map();
 let lastEmailDeliveryState = {
   checkedAt: null,
   provider: "none",
@@ -167,7 +169,6 @@ const runtimeEnvCatalog = [
 const requiredRuntimeEnv = [
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
-  ...PUBLIC_REQUIRED_PRICE_ENVS,
   "FIMA_ADMIN_API_KEY",
   "ENTITLEMENT_SIGNING_SECRET",
   "DISCORD_BOT_TOKEN",
@@ -323,11 +324,13 @@ app.use(emergencyAdminSecurityGate);
 
 app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
   await auditRuntimeAdmin(req, "runtime_env_status");
+  const paymentSetup = await buildPaymentSetupStatus();
   return res.json({
     success: true,
     version: versionPayload(),
     trialPromo: runtimeTrialPromoEnvStatus(),
     entitlement: runtimeEntitlementEnvStatus(),
+    paymentSetup,
     env: runtimeEnvCatalog.map(([envName, category]) => ({
       envName,
       category,
@@ -364,6 +367,31 @@ app.post(["/api/admin/deploy/verify-env", "/admin/api/deploy/verify-env"], admin
   });
 });
 
+app.get(["/api/admin/stripe/payment-setup-status", "/admin/api/stripe/payment-setup-status"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  await auditRuntimeAdmin(req, "stripe_payment_setup_status");
+  const validate = req.query?.validate === "1" || req.query?.validate === "true";
+  return res.json(await buildPaymentSetupStatus({ validate }));
+});
+
+app.post(["/api/admin/stripe/repair-prices", "/admin/api/stripe/repair-prices"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
+  try {
+    await auditRuntimeAdmin(req, "stripe_price_repair_started");
+    const result = await bootstrapRuntimeStripePrices({ source: "runtime_admin_repair" });
+    await createAuditLog("stripe_price_repair_completed", "stripe", null, safeStripeBootstrapAudit(result));
+    return res.json(publicStripeBootstrapResult(result));
+  } catch (error) {
+    const details = publicStripeResolverError(error);
+    console.error("Stripe price repair failed", details);
+    await createAuditLog("stripe_price_repair_failed", "stripe", null, details);
+    return res.status(error.statusCode || 503).json({
+      success: false,
+      error: error.code || "stripe_price_repair_failed",
+      message: "Stripe price repair could not run.",
+      reason: details.code || "stripe_price_repair_failed"
+    });
+  }
+});
+
 app.post(["/api/admin/stripe/setup-products", "/admin/api/stripe/setup-products"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
   try {
     await auditRuntimeAdmin(req, "stripe_setup_products_started");
@@ -375,10 +403,11 @@ app.post(["/api/admin/stripe/setup-products", "/admin/api/stripe/setup-products"
         monthly: "STRIPE_PRICE_MONTHLY",
         lifetime: "STRIPE_PRICE_LIFETIME"
       },
-      updateRenderEnv: req.body?.updateRenderEnv !== false
+      updateRenderEnv: req.body?.updateRenderEnv === true,
+      persistRuntimeConfig: true
     });
     await createAuditLog("stripe_setup_products_completed", "stripe", null, safeStripeSetupAudit(result));
-    return res.json(result);
+    return res.json(publicStripeSetupProductsResult(result));
   } catch (error) {
     console.error("Stripe live setup failed", publicError(error));
     await createAuditLog("stripe_setup_products_failed", "stripe", null, publicError(error));
@@ -397,10 +426,11 @@ app.post(["/api/admin/stripe/setup-test-products", "/admin/api/stripe/setup-test
         monthly: "STRIPE_TEST_PRICE_MONTHLY",
         lifetime: "STRIPE_TEST_PRICE_LIFETIME"
       },
-      updateRenderEnv: req.body?.updateRenderEnv !== false
+      updateRenderEnv: req.body?.updateRenderEnv === true,
+      persistRuntimeConfig: false
     });
     await createAuditLog("stripe_setup_test_products_completed", "stripe", null, safeStripeSetupAudit(result));
-    return res.json(result);
+    return res.json(publicStripeSetupProductsResult(result));
   } catch (error) {
     console.error("Stripe test setup failed", publicError(error));
     await createAuditLog("stripe_setup_test_products_failed", "stripe", null, publicError(error));
@@ -1344,7 +1374,7 @@ app.post("/api/me/licenses/:licenseKey/extend-checkout", storeCheckoutLimiter, r
       amount: commerce.priceCents,
       currency: commerce.currency,
       mode: checkout.session.livemode ? "live" : "test",
-      metadata: { licenseKey: license.licenseKey, priceSource: checkout.priceSource }
+      metadata: { licenseKeyMasked: maskCode(license.licenseKey), priceSource: checkout.priceSource }
     });
 
     return res.json({
@@ -1449,13 +1479,19 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
         priceStatus: error.priceStatus || null
       }
     });
-    const missingStripeEnv = error.code === "missing_env";
-    return res.status(missingStripeEnv ? 503 : 500).json({
+    const missingStripePrice = error.code === "missing_env" && Boolean(error.priceEnv);
+    const missingStripeSecret = error.code === "missing_env" && String(error.message || "").includes("STRIPE_SECRET_KEY");
+    const checkoutUnavailable = missingStripePrice || missingStripeSecret || error.code === "stripe_price_unavailable" || error.code === "stripe_bootstrap_unavailable";
+    return res.status(error.statusCode || (checkoutUnavailable ? 503 : 500)).json({
       error: "checkout_failed",
-      reason: missingStripeEnv ? "stripe_price_env_unavailable" : "stripe_checkout_unavailable",
+      reason: missingStripeSecret
+        ? "stripe_secret_unavailable"
+        : missingStripePrice || error.code === "stripe_price_unavailable" || error.code === "stripe_bootstrap_unavailable"
+          ? "stripe_price_unavailable"
+          : "stripe_checkout_unavailable",
       message: "Checkout could not start. Try again or open a ticket.",
-      missingEnv: missingStripeEnv ? error.priceEnv || null : null,
-      priceStatus: missingStripeEnv ? error.priceStatus || null : null
+      missingEnv: missingStripePrice ? error.priceEnv || null : null,
+      priceStatus: missingStripePrice || error.code === "stripe_price_unavailable" ? error.priceStatus || null : null
     });
   }
 });
@@ -2624,6 +2660,29 @@ app.get("/admin/api/downloads", requireAdmin, async (_req, res) => {
 
 app.get("/admin/api/settings", requireAdmin, async (_req, res) => {
   res.json({ settings: await getSiteSettings() });
+});
+
+app.get("/admin/api/payments/setup-status", requireAdmin, async (req, res) => {
+  const validate = req.query?.validate === "1" || req.query?.validate === "true";
+  res.json(await buildPaymentSetupStatus({ validate }));
+});
+
+app.post("/admin/api/payments/repair-stripe-prices", requireAdmin, async (req, res) => {
+  try {
+    const result = await bootstrapRuntimeStripePrices({ source: "admin_panel_repair" });
+    await createAuditLog("stripe_price_repair_completed", "stripe", null, safeStripeBootstrapAudit(result));
+    return res.json(publicStripeBootstrapResult(result));
+  } catch (error) {
+    const details = publicStripeResolverError(error);
+    console.error("Stripe price repair failed", details);
+    await createAuditLog("stripe_price_repair_failed", "stripe", null, details);
+    return res.status(error.statusCode || 503).json({
+      success: false,
+      error: error.code || "stripe_price_repair_failed",
+      message: "Stripe price repair could not run.",
+      reason: details.code || "stripe_price_repair_failed"
+    });
+  }
 });
 
 app.post("/admin/api/settings", requireAdmin, async (req, res) => {
@@ -4393,6 +4452,411 @@ function firstConfiguredEnv(names) {
   return { name: names[0], value: "" };
 }
 
+function stripeRuntimeMode() {
+  const keyMode = stripeKeyMode(env("STRIPE_SECRET_KEY"));
+  if (keyMode === "live" || keyMode === "test") return keyMode;
+  return "unknown";
+}
+
+function stripePriceBootstrapEnabled() {
+  return String(env("STRIPE_PRICE_BOOTSTRAP_ENABLED", "true")).trim().toLowerCase() !== "false";
+}
+
+async function buildPaymentSetupStatus({ validate = false } = {}) {
+  const config = await getStripeRuntimePriceConfig();
+  let stripeClient = null;
+  const secretPresent = Boolean(env("STRIPE_SECRET_KEY"));
+  const mode = stripeRuntimeMode();
+  if (validate && secretPresent) {
+    try {
+      stripeClient = stripe();
+    } catch (error) {
+      stripeClient = null;
+    }
+  }
+
+  const plans = {};
+  for (const planId of publicCheckoutPlanIds()) {
+    const plan = getPlan(planId);
+    const commerce = getPlanCommerce(plan);
+    const envPriceId = env(commerce.priceEnv, "");
+    const runtimeRow = config.prices?.[plan.id] || null;
+    const envState = stripePriceEnvState(envPriceId);
+    const runtimeState = stripePriceEnvState(runtimeRow?.priceId);
+    const source = envState === "set" ? "env" : runtimeState === "set" ? "db_runtime_config" : "missing";
+    let validation = null;
+    if (stripeClient && source !== "missing") {
+      const candidate = source === "env" ? envPriceId : runtimeRow.priceId;
+      validation = sanitizePriceCheck(await validateStripePriceForPlan(stripeClient, plan, candidate, commerce));
+    }
+    plans[plan.id] = {
+      plan: plan.id,
+      label: plan.name,
+      envName: commerce.priceEnv,
+      envPriceConfigured: envState === "set",
+      runtimeConfigPriceConfigured: runtimeState === "set",
+      configured: envState === "set" || runtimeState === "set",
+      source,
+      mode: runtimeRow?.mode || mode,
+      expected: expectedPriceForPlan(plan, commerce),
+      maskedPriceId: source === "env" ? maskStripeId(envPriceId) : maskStripeId(runtimeRow?.priceId),
+      lastResolvedAt: runtimeRow?.lastResolvedAt || null,
+      validation
+    };
+  }
+
+  return {
+    success: true,
+    stripeSecretPresent: secretPresent,
+    stripeWebhookSecretPresent: Boolean(env("STRIPE_WEBHOOK_SECRET")),
+    mode,
+    bootstrapEnabled: stripePriceBootstrapEnabled(),
+    envPriceIdsPresent: PUBLIC_REQUIRED_PRICE_ENVS.every((name) => stripePriceEnvState(env(name, "")) === "set"),
+    dbRuntimeConfigFallbackCreated: Object.values(config.prices || {}).some((row) => stripePriceEnvState(row?.priceId) === "set"),
+    lastBootstrapAt: config.lastBootstrapAt || null,
+    lastSafeErrorCode: config.lastSafeErrorCode || null,
+    prices: plans,
+    fullSecretsExposed: false,
+    fullPriceIdsExposed: false
+  };
+}
+
+async function resolveStripePriceForCheckout(stripeClient, plan, commerce, options = {}) {
+  const attempts = [];
+  const candidatePriceId = String(options.candidatePriceId || "").trim();
+  if (candidatePriceId) {
+    const envCheck = await validateStripePriceForPlan(stripeClient, plan, candidatePriceId, commerce);
+    recordStripePriceCheck(envCheck);
+    attempts.push({ source: options.candidateSource || "env", check: sanitizePriceCheck(envCheck), maskedPriceId: maskStripeId(candidatePriceId) });
+    if (envCheck.ok) {
+      await persistStripeRuntimePriceRows([{
+        plan: plan.id,
+        envName: commerce.priceEnv,
+        priceId: candidatePriceId,
+        productId: null,
+        productCreated: false,
+        priceCreated: false,
+        amount: commerce.priceCents,
+        currency: commerce.currency,
+        type: plan.subscription ? "recurring" : "one_time",
+        interval: plan.subscription ? "month" : null
+      }], { mode: stripeRuntimeMode(), source: "env_validated" });
+      return { plan: plan.id, priceId: candidatePriceId, source: "env", check: envCheck, attempts };
+    }
+    console.warn("Stripe price env invalid", sanitizePriceCheck(envCheck));
+  } else {
+    const missingCheck = {
+      ok: false,
+      plan: plan.id,
+      priceEnv: commerce.priceEnv,
+      status: "missing_env",
+      expected: expectedPriceForPlan(plan, commerce)
+    };
+    recordStripePriceCheck(missingCheck);
+    attempts.push({ source: "env", check: sanitizePriceCheck(missingCheck), maskedPriceId: null });
+    console.warn("Stripe price env missing", sanitizePriceCheck(missingCheck));
+  }
+
+  const runtimeConfig = await getStripeRuntimePriceConfig();
+  const runtimeRow = runtimeConfig.prices?.[plan.id] || null;
+  if (runtimeRow?.priceId) {
+    const runtimeCheck = await validateStripePriceForPlan(stripeClient, plan, runtimeRow.priceId, commerce);
+    recordStripePriceCheck(runtimeCheck);
+    attempts.push({ source: "db_runtime_config", check: sanitizePriceCheck(runtimeCheck), maskedPriceId: maskStripeId(runtimeRow.priceId) });
+    if (runtimeCheck.ok) {
+      return { plan: plan.id, priceId: runtimeRow.priceId, source: "db_runtime_config", check: runtimeCheck, attempts };
+    }
+    console.warn("Stripe runtime price config invalid", sanitizePriceCheck(runtimeCheck));
+  }
+
+  if (options.allowBootstrap !== false && stripePriceBootstrapEnabled()) {
+    return withStripePriceBootstrapLock(plan.id, async () => {
+      const afterLockConfig = await getStripeRuntimePriceConfig();
+      const afterLockRow = afterLockConfig.prices?.[plan.id] || null;
+      if (afterLockRow?.priceId) {
+        const afterLockCheck = await validateStripePriceForPlan(stripeClient, plan, afterLockRow.priceId, commerce);
+        recordStripePriceCheck(afterLockCheck);
+        attempts.push({ source: "db_runtime_config_after_lock", check: sanitizePriceCheck(afterLockCheck), maskedPriceId: maskStripeId(afterLockRow.priceId) });
+        if (afterLockCheck.ok) {
+          return { plan: plan.id, priceId: afterLockRow.priceId, source: "db_runtime_config", check: afterLockCheck, attempts };
+        }
+      }
+
+      const row = await verifyOrCreateStripePlan(stripeClient, stripeSetupPlanFor(plan, commerce));
+      await persistStripeRuntimePriceRows([row], { mode: stripeRuntimeMode(), source: row.priceCreated ? "stripe_bootstrap_created" : "stripe_bootstrap_reused" });
+      const bootstrapCheck = await validateStripePriceForPlan(stripeClient, plan, row.priceId, commerce);
+      recordStripePriceCheck(bootstrapCheck);
+      attempts.push({ source: row.priceCreated ? "stripe_bootstrap_created" : "stripe_bootstrap_reused", check: sanitizePriceCheck(bootstrapCheck), maskedPriceId: maskStripeId(row.priceId) });
+      if (bootstrapCheck.ok) {
+        await createAuditLog("stripe_runtime_price_resolved", "stripe", null, {
+          plan: plan.id,
+          source: row.priceCreated ? "stripe_bootstrap_created" : "stripe_bootstrap_reused",
+          priceIdMasked: maskStripeId(row.priceId),
+          productCreated: row.productCreated,
+          priceCreated: row.priceCreated,
+          mode: stripeRuntimeMode()
+        });
+        return {
+          plan: plan.id,
+          priceId: row.priceId,
+          source: row.priceCreated ? "stripe_bootstrap_created" : "stripe_bootstrap_reused",
+          check: bootstrapCheck,
+          bootstrap: safeStripePlanRow(row),
+          attempts
+        };
+      }
+      throw stripePriceUnavailableError(plan, commerce, attempts, "stripe_bootstrap_invalid_price");
+    });
+  }
+
+  throw stripePriceUnavailableError(plan, commerce, attempts, "stripe_bootstrap_unavailable");
+}
+
+function stripeSetupPlanFor(plan, commerce = getPlanCommerce(plan)) {
+  return {
+    plan,
+    commerce,
+    envName: commerce.priceEnv,
+    productName: plan.name,
+    metadata: stripePlanMetadata(plan)
+  };
+}
+
+function stripePlanMetadata(plan) {
+  return {
+    app: "fima_macro",
+    fima_plan: plan.id,
+    managed_by: "fima_runtime_setup",
+    product_type: "license",
+    access_days: plan.durationDays ? String(plan.durationDays) : "",
+    subscription: plan.subscription ? "monthly" : "",
+    lifetime: plan.lifetime ? "true" : ""
+  };
+}
+
+async function bootstrapRuntimeStripePrices({ source = "runtime_bootstrap" } = {}) {
+  const stripeClient = stripe();
+  const mode = stripeRuntimeMode();
+  const rows = [];
+  for (const planId of publicCheckoutPlanIds()) {
+    const plan = getPlan(planId);
+    rows.push(await verifyOrCreateStripePlan(stripeClient, stripeSetupPlanFor(plan)));
+  }
+  const config = await persistStripeRuntimePriceRows(rows, { mode, source });
+  return {
+    success: true,
+    mode,
+    source,
+    products: rows,
+    config
+  };
+}
+
+function stripePriceUnavailableError(plan, commerce, attempts, status = "not_configured") {
+  const error = new Error("Stripe checkout price is not configured.");
+  error.code = "stripe_price_unavailable";
+  error.statusCode = 503;
+  error.priceEnv = commerce.priceEnv;
+  error.priceStatus = attempts.at(-1)?.check?.status || status;
+  error.plan = plan.id;
+  error.attempts = attempts.map((attempt) => ({
+    source: attempt.source,
+    status: attempt.check?.status || null,
+    ok: Boolean(attempt.check?.ok),
+    maskedPriceId: attempt.maskedPriceId || null
+  }));
+  updateStripeRuntimePriceConfigError(error.priceStatus).catch(() => {});
+  return error;
+}
+
+async function withStripePriceBootstrapLock(planId, fn) {
+  const key = String(planId || "unknown");
+  if (stripePriceBootstrapLocks.has(key)) return stripePriceBootstrapLocks.get(key);
+  const promise = Promise.resolve()
+    .then(fn)
+    .finally(() => stripePriceBootstrapLocks.delete(key));
+  stripePriceBootstrapLocks.set(key, promise);
+  return promise;
+}
+
+async function getStripeRuntimePriceConfig() {
+  const row = await prisma.setting.findUnique({ where: { key: STRIPE_RUNTIME_PRICE_SETTING_KEY } }).catch(() => null);
+  return normalizeStripeRuntimePriceConfig(row?.value);
+}
+
+function normalizeStripeRuntimePriceConfig(value) {
+  const input = value && typeof value === "object" ? value : {};
+  const prices = {};
+  for (const planId of publicCheckoutPlanIds()) {
+    const row = input.prices?.[planId] || {};
+    prices[planId] = {
+      plan: planId,
+      envName: String(row.envName || getPlanCommerce(getPlan(planId)).priceEnv || ""),
+      priceId: String(row.priceId || ""),
+      productId: String(row.productId || ""),
+      mode: ["live", "test"].includes(row.mode) ? row.mode : "unknown",
+      source: String(row.source || ""),
+      currency: String(row.currency || getPlanCommerce(getPlan(planId)).currency || "eur").toLowerCase(),
+      amount: Number.isFinite(Number(row.amount)) ? Number(row.amount) : getPlanCommerce(getPlan(planId)).priceCents,
+      type: String(row.type || (getPlan(planId)?.subscription ? "recurring" : "one_time")),
+      interval: row.interval ? String(row.interval) : null,
+      productCreated: Boolean(row.productCreated),
+      priceCreated: Boolean(row.priceCreated),
+      lastResolvedAt: row.lastResolvedAt || null
+    };
+  }
+  return {
+    prices,
+    updatedAt: input.updatedAt || null,
+    lastBootstrapAt: input.lastBootstrapAt || null,
+    lastSafeErrorCode: input.lastSafeErrorCode || null,
+    lastErrorAt: input.lastErrorAt || null
+  };
+}
+
+async function persistStripeRuntimePriceRows(rows, { mode = stripeRuntimeMode(), source = "unknown" } = {}) {
+  const current = await getStripeRuntimePriceConfig();
+  const now = new Date().toISOString();
+  for (const row of rows) {
+    current.prices[row.plan] = {
+      ...(current.prices[row.plan] || {}),
+      plan: row.plan,
+      envName: row.envName,
+      priceId: row.priceId,
+      productId: row.productId || current.prices[row.plan]?.productId || "",
+      mode,
+      source,
+      currency: row.currency,
+      amount: row.amount,
+      type: row.type,
+      interval: row.interval,
+      productCreated: Boolean(row.productCreated),
+      priceCreated: Boolean(row.priceCreated),
+      lastResolvedAt: now
+    };
+  }
+  current.updatedAt = now;
+  current.lastBootstrapAt = source.includes("bootstrap") || source.includes("repair") ? now : current.lastBootstrapAt;
+  current.lastSafeErrorCode = null;
+  current.lastErrorAt = null;
+  await prisma.setting.upsert({
+    where: { key: STRIPE_RUNTIME_PRICE_SETTING_KEY },
+    create: { key: STRIPE_RUNTIME_PRICE_SETTING_KEY, value: current },
+    update: { value: current }
+  });
+  return current;
+}
+
+async function updateStripeRuntimePriceConfigError(code) {
+  const current = await getStripeRuntimePriceConfig();
+  current.lastSafeErrorCode = String(code || "stripe_price_unavailable").slice(0, 80);
+  current.lastErrorAt = new Date().toISOString();
+  await prisma.setting.upsert({
+    where: { key: STRIPE_RUNTIME_PRICE_SETTING_KEY },
+    create: { key: STRIPE_RUNTIME_PRICE_SETTING_KEY, value: current },
+    update: { value: current }
+  });
+}
+
+function publicStripePriceResolution(resolution) {
+  return {
+    plan: resolution.plan,
+    source: resolution.source,
+    maskedPriceId: maskStripeId(resolution.priceId),
+    check: sanitizePriceCheck(resolution.check),
+    bootstrap: resolution.bootstrap || null
+  };
+}
+
+function safeStripePlanRow(row) {
+  return {
+    plan: row.plan,
+    envName: row.envName,
+    productIdMasked: maskStripeId(row.productId),
+    priceIdMasked: maskStripeId(row.priceId),
+    productCreated: Boolean(row.productCreated),
+    priceCreated: Boolean(row.priceCreated),
+    currentEnvPriceId: row.currentEnvPriceId,
+    currentEnvMatches: row.currentEnvMatches,
+    amount: row.amount,
+    currency: row.currency,
+    type: row.type,
+    interval: row.interval
+  };
+}
+
+function publicStripeBootstrapResult(result) {
+  return {
+    success: Boolean(result.success),
+    mode: result.mode,
+    source: result.source,
+    products: (result.products || []).map(safeStripePlanRow),
+    config: publicStripeRuntimePriceConfig(result.config),
+    fullSecretsExposed: false,
+    fullPriceIdsExposed: false
+  };
+}
+
+function publicStripeSetupProductsResult(result) {
+  return {
+    success: Boolean(result.success),
+    mode: result.mode,
+    stripeKeyEnv: result.stripeKeyEnv,
+    products: (result.products || []).map(safeStripePlanRow),
+    envUpdates: Object.fromEntries(Object.entries(result.envUpdates || {}).map(([envName, row]) => [envName, {
+      setInProcess: Boolean(row.setInProcess),
+      maskedPriceId: maskStripeId(row.priceId)
+    }])),
+    config: result.config ? publicStripeRuntimePriceConfig(result.config) : null,
+    renderEnv: result.renderEnv,
+    deploy: result.deploy,
+    fullSecretsExposed: false,
+    fullPriceIdsExposed: false
+  };
+}
+
+function publicStripeRuntimePriceConfig(config) {
+  const normalized = normalizeStripeRuntimePriceConfig(config);
+  return {
+    updatedAt: normalized.updatedAt,
+    lastBootstrapAt: normalized.lastBootstrapAt,
+    lastSafeErrorCode: normalized.lastSafeErrorCode,
+    lastErrorAt: normalized.lastErrorAt,
+    prices: Object.fromEntries(Object.entries(normalized.prices).map(([planId, row]) => [planId, {
+      plan: row.plan,
+      envName: row.envName,
+      configured: stripePriceEnvState(row.priceId) === "set",
+      maskedPriceId: maskStripeId(row.priceId),
+      maskedProductId: maskStripeId(row.productId),
+      mode: row.mode,
+      source: row.source,
+      currency: row.currency,
+      amount: row.amount,
+      type: row.type,
+      interval: row.interval,
+      lastResolvedAt: row.lastResolvedAt
+    }]))
+  };
+}
+
+function publicStripeResolverError(error) {
+  return {
+    code: error?.code || "stripe_error",
+    type: error?.type || null,
+    priceEnv: error?.priceEnv || null,
+    priceStatus: error?.priceStatus || null,
+    plan: error?.plan || null,
+    attempts: Array.isArray(error?.attempts) ? error.attempts : undefined
+  };
+}
+
+function maskStripeId(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (text.length <= 8) return "***";
+  return `${text.slice(0, 6)}***${text.slice(-6)}`;
+}
+
 function stripeSetupPlans(envMap) {
   return ["3days", "monthly", "lifetime"].map((planId) => {
     const plan = getPlan(planId);
@@ -4402,16 +4866,12 @@ function stripeSetupPlans(envMap) {
       commerce,
       envName: envMap[planId],
       productName: plan.name,
-      metadata: {
-        app: "fima_macro",
-        fima_plan: plan.id,
-        managed_by: "fima_runtime_setup"
-      }
+      metadata: stripePlanMetadata(plan)
     };
   });
 }
 
-async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv }) {
+async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv, persistRuntimeConfig = false }) {
   const key = firstConfiguredEnv(keyNames);
   if (!key.value) {
     const error = new Error(`${keyNames.join(" or ")} is required in Render runtime.`);
@@ -4430,6 +4890,9 @@ async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv }) 
     envUpdates[item.envName] = row.priceId;
   }
 
+  const config = persistRuntimeConfig
+    ? await persistStripeRuntimePriceRows(products, { mode, source: "admin_setup_products" })
+    : null;
   const renderEnv = updateRenderEnv ? await updateRenderEnvVars(envUpdates) : {
     attempted: false,
     updated: false,
@@ -4442,6 +4905,7 @@ async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv }) 
     stripeKeyEnv: key.name,
     products,
     envUpdates: Object.fromEntries(Object.entries(envUpdates).map(([envName, priceId]) => [envName, { priceId, setInProcess: Boolean(process.env[envName]) }])),
+    config,
     renderEnv,
     deploy
   };
@@ -4456,6 +4920,8 @@ async function verifyOrCreateStripePlan(stripeClient, item) {
       name: productName,
       active: true,
       metadata
+    }, {
+      idempotencyKey: `fima-product-${plan.id}`
     });
     productCreated = true;
   }
@@ -4470,6 +4936,8 @@ async function verifyOrCreateStripePlan(stripeClient, item) {
       unit_amount: commerce.priceCents,
       ...(plan.subscription ? { recurring: { interval: "month" } } : {}),
       metadata
+    }, {
+      idempotencyKey: `fima-price-${plan.id}-${commerce.currency}-${commerce.priceCents}-${plan.subscription ? "month" : "one_time"}`
     });
     priceCreated = true;
   }
@@ -4577,17 +5045,10 @@ async function triggerRenderDeploy() {
 function safeStripeSetupAudit(result) {
   return {
     mode: result.mode,
-    products: result.products?.map((row) => ({
-      plan: row.plan,
-      envName: row.envName,
-      productId: row.productId,
-      priceId: row.priceId,
-      productCreated: row.productCreated,
-      priceCreated: row.priceCreated,
-      currentEnvMatches: row.currentEnvMatches
-    })),
+    products: result.products?.map(safeStripePlanRow),
     renderEnv: result.renderEnv,
-    deploy: result.deploy
+    deploy: result.deploy,
+    fullPriceIdsIncluded: false
   };
 }
 
@@ -4692,43 +5153,28 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
     baseSession.customer_email = customerEmail;
   }
 
-  const normalizedPriceId = String(priceId || "").trim();
-  if (normalizedPriceId) {
-    const priceCheck = await validateStripePriceForPlan(stripeClient, plan, normalizedPriceId, commerce);
-    recordStripePriceCheck(priceCheck);
-    if (priceCheck.ok) {
-      const session = await stripeClient.checkout.sessions.create({
-        ...baseSession,
-        line_items: [{ price: normalizedPriceId, quantity: 1 }]
-      });
-      return { session, priceSource: "stripe_price_id" };
-    }
+  let priceResolution = null;
+  try {
+    priceResolution = await resolveStripePriceForCheckout(stripeClient, plan, commerce, {
+      candidatePriceId: priceId,
+      candidateSource: priceId ? "env" : "env_missing",
+      allowBootstrap: true
+    });
+  } catch (error) {
+    if (productionMode) throw error;
+    console.warn("Stripe price resolver unavailable; using development inline price_data fallback", publicStripeResolverError(error));
+  }
 
-    console.warn("Stripe price env invalid", sanitizePriceCheck(priceCheck));
-    if (productionMode) {
-      const error = new Error(`${commerce.priceEnv} must be a valid Stripe price ID before production checkout can run.`);
-      error.code = "missing_env";
-      error.priceEnv = commerce.priceEnv;
-      error.priceStatus = priceCheck.status;
-      throw error;
-    }
-  } else {
-    const priceCheck = {
-      ok: false,
-      plan: plan.id,
-      priceEnv: commerce.priceEnv,
-      status: "missing_env",
-      expected: expectedPriceForPlan(plan, commerce)
+  if (priceResolution?.priceId) {
+    const session = await stripeClient.checkout.sessions.create({
+      ...baseSession,
+      line_items: [{ price: priceResolution.priceId, quantity: 1 }]
+    });
+    return {
+      session,
+      priceSource: priceResolution.source,
+      priceResolution: publicStripePriceResolution(priceResolution)
     };
-    recordStripePriceCheck(priceCheck);
-    console.warn("Stripe price env missing", sanitizePriceCheck(priceCheck));
-    if (productionMode) {
-      const error = new Error(`${commerce.priceEnv} is missing. Production checkout cannot use inline price_data.`);
-      error.code = "missing_env";
-      error.priceEnv = commerce.priceEnv;
-      error.priceStatus = "missing_env";
-      throw error;
-    }
   }
 
   const session = await stripeClient.checkout.sessions.create({
@@ -6165,6 +6611,14 @@ function normalizeGiftCode(value) {
 
 function hashGiftCode(code) {
   return crypto.createHash("sha256").update(normalizeGiftCode(code)).digest("hex");
+}
+
+function maskCode(code) {
+  const normalized = normalizeGiftCode(code);
+  if (!normalized) return "";
+  const prefix = normalized.startsWith("FIMA-") ? "FIMA" : "CODE";
+  const tail = normalized.replace(/-/g, "").slice(-4);
+  return `${prefix}-****-${tail}`;
 }
 
 function maskGiftCode(code) {
