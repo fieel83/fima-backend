@@ -1,0 +1,18 @@
+{
+  "priority": "3A17",
+  "phase": "human-copy-audit-continued",
+  "status": "started",
+  "changes": {
+    "websiteCheckout": "Log in first / Your license needs an account...",
+    "myProducts": "support prompt is shorter and user-facing",
+    "discord": "help and embeds use friendly Fima wording"
+  },
+  "remaining": [
+    "A broader static HTML copy pass still finds legacy 'Fima Macro Studio' screenshot alt/caption text.",
+    "Full app-wide copy audit should be completed with the next app release."
+  ],
+  "verification": {
+    "roboticCopySearchCompleted": true,
+    "secretsPrinted": false
+  }
+}

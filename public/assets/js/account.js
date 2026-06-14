@@ -1,6 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.Setup.exe";
   const page = document.body.dataset.accountPage || "";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -55,8 +55,17 @@
         "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
         "saleEnds": "Sale ends in",
         "licenseKey": "License key",
+        "maskedLicenseKey": "Masked license key",
         "plan": "Plan",
         "status": "Status",
+        "subscription": "Subscription",
+        "hwid": "HWID",
+        "bound": "Bound",
+        "unbound": "Not bound yet",
+        "yes": "Yes",
+        "no": "No",
+        "needsSupport": "This license needs help. Open a ticket and we will check it.",
+        "openSupport": "Open support",
         "purchased": "Purchased",
         "licenseAccess": "License access",
         "productAccess": "Product access",
@@ -1105,6 +1114,21 @@
 };
 
   const t = (key) => (copy[language()] || copy.en)[key] || copy.en[key] || key;
+  const licenseSecretStore = new Map();
+  const maskSensitiveCode = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const last = text.replace(/[^A-Za-z0-9]/g, "").slice(-4);
+    return last ? `FIMA-****-****-${last}` : "FIMA-****";
+  };
+  const storeLicenseSecret = (license) => {
+    const key = String(license?.licenseKey || "").trim();
+    if (!key) return "";
+    const id = String(license?.id || license?.licenseId || `license-${licenseSecretStore.size + 1}`);
+    licenseSecretStore.set(id, key);
+    return id;
+  };
+  const readLicenseSecret = (id) => licenseSecretStore.get(String(id || "")) || "";
   const setText = (selector, value, root = document) => {
     const node = $(selector, root);
     if (node) node.textContent = value;
@@ -1754,9 +1778,16 @@
     return item.license?.status || item.status || "-";
   };
 
-  const productCard = (item) => {
+  const productCard = (item, context = {}) => {
     const license = item.license;
     const hasLicense = Boolean(license?.licenseKey);
+    const licenseSecretId = hasLicense ? storeLicenseSecret(license) : "";
+    const statusText = String(license?.status || item.status || "").toLowerCase();
+    const needsSupport = Boolean(license?.expired || ["banned", "disabled", "revoked", "canceled", "cancelled"].includes(statusText));
+    const subscriptionStatus = license?.subscriptionStatus || item.subscriptionStatus || (license?.plan === "monthly" ? statusLabel(item) : "-");
+    const hwidBound = Boolean(license?.hwidBound || license?.boundHwid || String(license?.hwidStatus || "").toLowerCase() === "bound");
+    const discordLinked = Boolean(license?.discordLinked || context.user?.discordUserId || context.integrations?.discord?.connected);
+    const robloxLinked = Boolean(license?.robloxLinked || context.user?.robloxUserId || context.integrations?.roblox?.connected);
     return `
       <article class="access-card ${license?.expired ? "is-expired" : ""}">
         <div class="access-head">
@@ -1768,18 +1799,24 @@
         </div>
         ${hasLicense ? `
           <div class="key-box">
-            <span>${t("licenseKey")}</span>
-            <code>${escapeHtml(license.licenseKey)}</code>
+            <span>${t("maskedLicenseKey")}</span>
+            <code>${escapeHtml(maskSensitiveCode(license.licenseKey))}</code>
           </div>
           <div class="metric-grid">
             <div><span>${t("plan")}</span><strong>${escapeHtml(license.planLabel || license.plan)}</strong></div>
+            <div><span>${t("status")}</span><strong>${escapeHtml(statusLabel(item))}</strong></div>
             <div><span>${t("expires")}</span><strong>${license.lifetime ? t("lifetime") : date(license.expiresAt)}</strong></div>
             <div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(license.expiresAt || "")}">${license.lifetime ? t("lifetime") : duration(license.remainingSeconds)}</strong></div>
+            <div><span>${t("subscription")}</span><strong>${escapeHtml(subscriptionStatus)}</strong></div>
+            <div><span>${t("hwid")}</span><strong>${hwidBound ? t("bound") : t("unbound")}</strong></div>
+            <div><span>${t("discord")}</span><strong>${discordLinked ? t("yes") : t("no")}</strong></div>
+            <div><span>${t("roblox")}</span><strong>${robloxLinked ? t("yes") : t("no")}</strong></div>
           </div>
+          ${needsSupport ? `<p class="access-warning">${escapeHtml(t("needsSupport"))} <a href="support.html">${escapeHtml(t("openSupport"))}</a></p>` : ""}
           <div class="access-actions">
-            <button class="button secondary" type="button" data-copy="${escapeHtml(license.licenseKey)}">${t("copyKey")}</button>
-            <button class="button" type="button" data-download-license="${escapeHtml(license.licenseKey)}">${t("download")}</button>
-            ${license.canExtend ? `<button class="button secondary" type="button" data-extend-license="${escapeHtml(license.licenseKey)}" data-plan="${escapeHtml(license.plan)}">${license.expired ? t("renew") : t("extend")}</button>` : ""}
+            <button class="button secondary" type="button" data-copy-license-secret="${escapeHtml(licenseSecretId)}">${t("copyKey")}</button>
+            <button class="button" type="button" data-download-license-secret="${escapeHtml(licenseSecretId)}">${t("download")}</button>
+            ${license.canExtend ? `<button class="button secondary" type="button" data-extend-license-secret="${escapeHtml(licenseSecretId)}" data-plan="${escapeHtml(license.plan)}">${license.expired ? t("renew") : t("extend")}</button>` : ""}
           </div>
         ` : `
           <p>${escapeHtml(item.product?.description || "Purchased product access is linked to this account.")}</p>
@@ -1796,8 +1833,10 @@
   const renderAccountProducts = (items, targetSelector = "#purchases") => {
     const target = $(targetSelector);
     if (!target) return;
+    licenseSecretStore.clear();
+    const context = window.fimaAccountProductContext || {};
     target.innerHTML = items.length
-      ? `<div class="access-grid">${items.map(productCard).join("")}</div>`
+      ? `<div class="access-grid">${items.map((item) => productCard(item, context)).join("")}</div>`
       : `<div class="empty-state"><h3>${t("noProducts")}</h3><a class="button" href="pricing.html">${t("buyPricing")}</a></div>`;
     updateCountdowns();
   };
@@ -1809,7 +1848,7 @@
       ? `<div class="rows">${licenses.map((license) => `
           <div class="row">
             <span>${escapeHtml(license.planLabel || license.plan)}</span>
-            <code>${escapeHtml(license.licenseKey)}</code>
+            <code>${escapeHtml(maskSensitiveCode(license.licenseKey))}</code>
           </div>
         `).join("")}</div>`
       : `<div class="panel panel-pad">${t("noLicenses")}</div>`;
@@ -2311,6 +2350,7 @@
     renderGiftClaims(data.pendingGifts || [], data.integrations || {}, data.purchasedGiftCodes || [], data.giftHistory || []);
     renderMonthlyTrial(data.trial || {});
     renderReferralDashboard(data.referrals || {});
+    window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
     renderAccountProducts(data.products || [], "#purchases");
     renderLicenses(data.licenses || []);
     return data;
@@ -2330,6 +2370,7 @@
     if (!user) return;
     renderAccountHeader(user);
     const data = await api("/api/me/products");
+    window.fimaAccountProductContext = { user: data.user || user || {}, integrations: data.integrations || {} };
     renderAccountProducts(data.products || [], "#purchases");
     renderGiftClaims([], {}, data.purchasedGiftCodes || [], data.giftHistory || []);
   };
@@ -2522,6 +2563,18 @@
         return;
       }
 
+      const copyLicenseButton = event.target.closest("[data-copy-license-secret]");
+      if (copyLicenseButton) {
+        const key = readLicenseSecret(copyLicenseButton.dataset.copyLicenseSecret);
+        if (!key) {
+          setMessage(t("licenseNotFound"), "error");
+          return;
+        }
+        await navigator.clipboard?.writeText(key);
+        setMessage(t("copied"), "good");
+        return;
+      }
+
       const downloadButton = event.target.closest("[data-download-license]");
       if (downloadButton) {
         downloadButton.disabled = true;
@@ -2534,6 +2587,27 @@
           window.location.href = publicSetupUrl;
         } finally {
           downloadButton.disabled = false;
+        }
+        return;
+      }
+
+      const secureDownloadButton = event.target.closest("[data-download-license-secret]");
+      if (secureDownloadButton) {
+        const key = readLicenseSecret(secureDownloadButton.dataset.downloadLicenseSecret);
+        if (!key) {
+          setMessage(t("licenseNotFound"), "error");
+          return;
+        }
+        secureDownloadButton.disabled = true;
+        try {
+          const data = await api(`/api/download?licenseKey=${encodeURIComponent(key)}`);
+          setMessage(t("downloadReady"), "good");
+          window.location.href = data.downloadUrl || publicSetupUrl;
+        } catch (error) {
+          setMessage((error.message || "Download could not be prepared.") + " Opening the public setup download.", "error");
+          window.location.href = publicSetupUrl;
+        } finally {
+          secureDownloadButton.disabled = false;
         }
         return;
       }
@@ -2552,6 +2626,29 @@
         } catch (error) {
           setMessage(error.message, "error");
           extendButton.disabled = false;
+        }
+        return;
+      }
+
+      const secureExtendButton = event.target.closest("[data-extend-license-secret]");
+      if (secureExtendButton) {
+        const key = readLicenseSecret(secureExtendButton.dataset.extendLicenseSecret);
+        if (!key) {
+          setMessage(t("licenseNotFound"), "error");
+          return;
+        }
+        secureExtendButton.disabled = true;
+        setMessage(t("checkout"));
+        try {
+          const checkout = await post(`/api/me/licenses/${encodeURIComponent(key)}/extend-checkout`, {
+            plan: secureExtendButton.dataset.plan,
+            language: language()
+          });
+          window.location.href = checkout.url;
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          secureExtendButton.disabled = false;
         }
         return;
       }

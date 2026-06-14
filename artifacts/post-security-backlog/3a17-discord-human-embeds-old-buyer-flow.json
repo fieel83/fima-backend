@@ -1,0 +1,35 @@
+{
+  "priority": "3A17",
+  "phase": "discord-human-embeds-old-buyer-flow",
+  "status": "implemented_source",
+  "filesChanged": [
+    "src/discordBot.js"
+  ],
+  "changes": {
+    "embedTone": "shorter and less robotic",
+    "sections": [
+      "Setup",
+      "Price",
+      "Buy Options",
+      "Recommended",
+      "Tutorial",
+      "Support",
+      "Download",
+      "Old TGMacro buyer?"
+    ],
+    "buttons": [
+      "Website",
+      "Download",
+      "Pricing",
+      "Support",
+      "Tutorial"
+    ],
+    "oldBuyerFlow": "planned in embed copy: old TGMacro buyers should open a ticket and send proof for staff review"
+  },
+  "verification": {
+    "nodeSyntax": "passed",
+    "oldLinksRemoved": "source_verified_no_new_old_links",
+    "botTokenPrinted": false,
+    "liveDeployed": false
+  }
+}

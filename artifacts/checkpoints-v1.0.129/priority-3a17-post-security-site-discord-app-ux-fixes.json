@@ -1,0 +1,50 @@
+{
+  "priority": "3A17",
+  "createdAt": "2026-06-14",
+  "scope": "post-security UX fixes",
+  "website": {
+    "loginBeforeCheckoutFixed": true,
+    "loggedOutCheckoutBlocked": "source_verified",
+    "friendlyLoginRegisterModal": true,
+    "loggedInCheckoutStillWorks": "source_verified",
+    "myProductsImproved": true,
+    "idorTest": "source_verified_requireUser_current_user_query",
+    "publicJsSecretScan": "passed"
+  },
+  "discordBot": {
+    "buyerRoleCheckCreate": true,
+    "trialRoleCheckCreate": true,
+    "rolePositionHandling": true,
+    "backendValidationForRoleGrant": true,
+    "adminOnlySetupCommand": true,
+    "fimaEmbedsButtonsImproved": true,
+    "oldTGMacroBuyerFlow": "planned_in_embed_ticket_flow",
+    "botTokenPrinted": false
+  },
+  "app": {
+    "keybindDisplayBugFixed": true,
+    "buttonHoverDisappearingBugFixed": true,
+    "tutorialUiFixesStarted": true,
+    "humanCopyImproved": true,
+    "releaseRequired": true,
+    "newAppVersionBuilt": null
+  },
+  "deployRelease": {
+    "backendSiteDeployed": false,
+    "discordBotDeployedRestarted": false,
+    "appReleaseBuildCreated": false,
+    "newReleasePublished": false,
+    "latestJsonChanged": false,
+    "latestJsonVersion": "1.0.129"
+  },
+  "verification": {
+    "backendNodeSyntax": "passed",
+    "appDotnetBuildNoRestore": "passed",
+    "secretScan": "passed_no_secret_values"
+  },
+  "remainingBlockers": [
+    "Backend/site and Discord bot changes are source-implemented but not deployed until pushed/deployed.",
+    "App changes require a future app release, likely v1.0.130, before users receive them.",
+    "Browser screenshot/live logged-in checkout test was not completed in this turn."
+  ]
+}

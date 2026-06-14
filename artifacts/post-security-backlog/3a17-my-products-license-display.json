@@ -1,0 +1,38 @@
+{
+  "priority": "3A17",
+  "phase": "my-products-license-display",
+  "status": "implemented_source",
+  "filesChanged": [
+    "public/assets/js/account.js",
+    "public/assets/css/account.css",
+    "src/server.js"
+  ],
+  "changes": {
+    "maskedLicenseDisplay": true,
+    "copyButton": "kept; resolves the authenticated user's own key from in-memory page state instead of visible markup",
+    "downloadButton": "kept; resolves the authenticated user's own key from in-memory page state",
+    "extraFields": [
+      "plan",
+      "status",
+      "expiry",
+      "time left",
+      "subscription",
+      "HWID bound",
+      "Discord linked",
+      "Roblox linked"
+    ],
+    "disabledExpiredMessage": "friendly support prompt added",
+    "apiContext": "/api/me/products now returns current user and integration summary for the authenticated account"
+  },
+  "verification": {
+    "nodeSyntax": "passed",
+    "idorProtection": "source_verified_requireUser_current_user_query",
+    "fullKeyInProductCardMarkup": false,
+    "publicJsSecretScan": "passed_no_secret_values",
+    "liveDeployed": false
+  },
+  "notes": [
+    "Full keys are not printed in reports or artifacts.",
+    "Legacy success/gift flows may still show user-owned codes at creation/redeem time by design."
+  ]
+}

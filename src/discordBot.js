@@ -118,6 +118,10 @@ async function registerDiscordCommands() {
     new SlashCommandBuilder()
       .setName("fima_update")
       .setDescription("Send the latest Fima update embed.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_roles_setup")
+      .setDescription("Check or create the Fima Buyer and Trial roles.")
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false))
   ].map((command) => command.toJSON());
   const guildId = env("DISCORD_GUILD_ID");
@@ -159,13 +163,32 @@ async function handleDiscordInteraction(interaction) {
     await channel.send(fimaAnnouncementPayload(interaction.commandName));
     return interaction.reply({ content: "Fima embed sent.", ephemeral: true });
   }
+
+  if (interaction.commandName === "fima_roles_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up Fima roles.", ephemeral: true });
+    }
+    const result = await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
+    const lines = [
+      `Buyer role: ${result.roles.buyer?.name || "missing"} (${result.roles.buyer?.created ? "created" : "ready"})`,
+      `Trial role: ${result.roles.trial?.name || "missing"} (${result.roles.trial?.created ? "created" : "ready"})`,
+      result.position?.attempted
+        ? `Position: ${result.position.success ? "updated" : "checked"}`
+        : "Position: not changed"
+    ];
+    if (result.position?.warnings?.length) lines.push(`Note: ${result.position.warnings.join(" ")}`);
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(0x9b5cff).setTitle("Fima roles").setDescription(lines.join("\n"))],
+      ephemeral: true
+    });
+  }
 }
 
 function fimaHelpEmbed() {
   return new EmbedBuilder()
     .setColor(0x9b5cff)
-    .setTitle("Fima Macro Help")
-    .setDescription("Use `/fima_account` to check your linked account and `/fima_recovery` to receive a password reset code by DM. Discord is optional except recovery and free trial access.");
+    .setTitle("Fima help")
+    .setDescription("Need a hand? Use `/fima_account` to check your link or `/fima_recovery` for a reset code. For setup, payments, or old TGMacro proof, open a ticket.");
 }
 
 function fimaAnnouncementPayload(commandName = "fima_embed") {
@@ -178,15 +201,16 @@ function fimaAnnouncementPayload(commandName = "fima_embed") {
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
     .setTitle(title)
-    .setDescription("Fima Macros for Roblox movement techs, tutorials, updates and support.")
+    .setDescription("Need Fima? Start here.")
     .addFields(
-      { name: "Setup", value: "Download the setup, install Fima Macro, then log in or paste your license key.", inline: false },
+      { name: "Setup", value: "Download the app, log in, paste your key, and you are ready.", inline: false },
       { name: "Price", value: "Use the website for the current EUR prices and active trial offer.", inline: true },
       { name: "Buy Options", value: "Card checkout, gift codes and support-assisted Robux orders.", inline: true },
       { name: "Recommended", value: "Start with the trial if it is active, then pick the plan that fits you.", inline: false },
       { name: "Tutorial", value: "Open the Macros page for setup notes and video slots.", inline: true },
-      { name: "Support", value: "Open a ticket if your key, HWID, payment or setup needs help.", inline: true },
-      { name: "Download", value: "Use the website download page so the link always follows the latest public release.", inline: false }
+      { name: "Support", value: "Stuck? Open a ticket and we will help.", inline: true },
+      { name: "Download", value: "Use the website download page so the link always follows the latest public release.", inline: false },
+      { name: "Old TGMacro buyer?", value: "Open a ticket and send proof. Staff can check if a 3-day Fima trial applies.", inline: false }
     )
     .setImage(`${siteUrl.replace(/\/+$/, "")}/assets/social-preview.png?v=20260531-1`);
   const mainRow = new ActionRowBuilder().addComponents(
@@ -374,6 +398,13 @@ async function changeDiscordRole(discordUserId, type, action) {
   if (action === "add") await member.roles.add(role.id);
   else await member.roles.remove(role.id);
 
+  await auditDiscordBotAction(`discord_${type}_role_${action}`, "discord_user", userId, {
+    type,
+    action,
+    roleId: role.id,
+    roleName: role.name
+  });
+
   return {
     success: true,
     action,
@@ -382,6 +413,59 @@ async function changeDiscordRole(discordUserId, type, action) {
     roleId: role.id,
     roleName: role.name
   };
+}
+
+async function ensureFimaRoles({ organize = false, actorId = null } = {}) {
+  const guild = await getGuild();
+  const roles = {};
+  for (const type of Object.keys(ROLE_TYPES)) {
+    const before = await findRole(guild, ROLE_TYPES[type]);
+    const role = await getOrCreateRole(guild, type);
+    roles[type] = {
+      id: role.id,
+      name: role.name,
+      created: !before,
+      position: role.position
+    };
+  }
+  const position = organize ? await organizeRolePositions(guild, roles) : { attempted: false, success: false, warnings: [] };
+  await auditDiscordBotAction("discord_roles_setup", "discord_guild", guild.id, {
+    actorId,
+    roleTypes: Object.keys(roles),
+    created: Object.fromEntries(Object.entries(roles).map(([type, row]) => [type, row.created])),
+    positionAttempted: Boolean(position.attempted),
+    positionSuccess: Boolean(position.success)
+  });
+  return { roles, position };
+}
+
+async function organizeRolePositions(guild, roleSummary) {
+  const warnings = [];
+  const me = guild.members.me || await guild.members.fetchMe();
+  if (!me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+    return { attempted: true, success: false, warnings: ["Bot is missing Manage Roles."] };
+  }
+  const highest = me.roles.highest?.position || 0;
+  let moved = 0;
+  for (const [index, type] of Object.keys(ROLE_TYPES).entries()) {
+    const role = await guild.roles.fetch(roleSummary[type]?.id).catch(() => null);
+    if (!role) {
+      warnings.push(`${ROLE_TYPES[type].fallbackName} was not found.`);
+      continue;
+    }
+    if (role.managed || role.position >= highest) {
+      warnings.push(`${role.name} cannot be moved by the bot.`);
+      continue;
+    }
+    const targetPosition = Math.max(1, highest - 1 - index);
+    if (role.position !== targetPosition) {
+      await role.setPosition(targetPosition, "Fima role setup").catch((error) => {
+        warnings.push(`${role.name} position unchanged: ${error.message}`);
+      });
+      moved += 1;
+    }
+  }
+  return { attempted: true, success: warnings.length === 0, moved, warnings };
 }
 
 async function getOrCreateRole(guild, type) {
@@ -421,6 +505,21 @@ async function findRole(guild, config) {
 
   await guild.roles.fetch().catch(() => null);
   return guild.roles.cache.find((role) => role.name === config.fallbackName) || null;
+}
+
+async function auditDiscordBotAction(action, targetType = null, targetId = null, metadata = {}) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        action,
+        targetType,
+        targetId,
+        metadata
+      }
+    });
+  } catch (error) {
+    console.warn("Discord audit log failed", { action, message: error.message });
+  }
 }
 
 async function getGuild() {

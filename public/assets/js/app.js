@@ -1,5 +1,5 @@
 (() => {
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.129/FIMA.MACRO.Setup.exe";
   const storage = {
     theme: "fima.theme",
     language: "fima.language",
@@ -412,8 +412,12 @@
       },
       checkout: {
         eyebrow: "Secure checkout",
-        title: "Log in or register first.",
-        description: "After that, Pay with Card will open Stripe and your license will appear in My Products.",
+        title: "Log in first",
+        description: "Your license needs an account, so log in or register before buying.",
+        loginFirstTitle: "Log in first",
+        loginFirstBody: "Your license needs an account, so log in or register before buying.",
+        loginButton: "Log in",
+        registerButton: "Register",
         emailLabel: "Email address",
         cancel: "Cancel",
         continue: "Continue to Stripe",
@@ -633,8 +637,12 @@
       },
       checkout: {
         eyebrow: "G\u00fcvenli checkout",
-        title: "Devam etmek i\u00e7in e-postan\u0131 gir.",
-        description: "Stripe \u00f6demeyi onaylad\u0131ktan sonra lisans anahtar\u0131n olu\u015fturulur ve success sayfas\u0131nda g\u00f6sterilir.",
+        title: "\u00d6nce giri\u015f yap",
+        description: "Lisans\u0131n bir hesaba ba\u011flanmal\u0131. Sat\u0131n almadan \u00f6nce giri\u015f yap veya kaydol.",
+        loginFirstTitle: "\u00d6nce giri\u015f yap",
+        loginFirstBody: "Lisans\u0131n bir hesaba ba\u011flanmal\u0131. Sat\u0131n almadan \u00f6nce giri\u015f yap veya kaydol.",
+        loginButton: "Giri\u015f yap",
+        registerButton: "Kaydol",
         emailLabel: "E-posta adresi",
         cancel: "\u0130ptal",
         continue: "Stripe'a devam et",
@@ -1832,6 +1840,70 @@
     document.body.classList.remove("modal-open");
   };
 
+  const checkoutNextUrl = (planId, options = {}) => {
+    const giftRecipient = selectedGiftRecipientForCheckout();
+    const params = new URLSearchParams({ checkout: planId });
+    if (giftRecipient?.id) params.set("giftRecipient", giftRecipient.id);
+    if (options.checkoutType === "gift_code_purchase") params.set("giftCode", "1");
+    return `pricing.html?${params.toString()}`;
+  };
+
+  const ensureLoginBeforeCheckoutModal = () => {
+    let modal = $("#loginBeforeCheckoutModal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.className = "checkout-modal login-before-checkout-modal";
+    modal.id = "loginBeforeCheckoutModal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby="loginBeforeCheckoutTitle">
+        <button class="modal-close" type="button" data-login-checkout-close aria-label="Close">x</button>
+        <p class="eyebrow" data-login-checkout-eyebrow></p>
+        <h2 id="loginBeforeCheckoutTitle" data-login-checkout-title></h2>
+        <p data-login-checkout-body></p>
+        <div class="modal-actions">
+          <a class="button secondary" href="login.html" data-login-checkout-login></a>
+          <a class="button primary" href="register.html" data-login-checkout-register></a>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  };
+
+  const openLoginBeforeCheckoutModal = (planId, options = {}) => {
+    const activeCopy = getCopy().checkout || copy.en.checkout;
+    const modal = ensureLoginBeforeCheckoutModal();
+    const next = checkoutNextUrl(planId, options);
+    const loginHref = `login.html?next=${encodeURIComponent(next)}`;
+    const registerHref = `register.html?next=${encodeURIComponent(next)}`;
+    const title = activeCopy.loginFirstTitle || copy.en.checkout.loginFirstTitle || "Log in first";
+    $("[data-login-checkout-eyebrow]", modal).textContent = activeCopy.eyebrow || copy.en.checkout.eyebrow;
+    $("[data-login-checkout-title]", modal).textContent = title;
+    $("[data-login-checkout-body]", modal).textContent = activeCopy.loginFirstBody || copy.en.checkout.loginFirstBody || copy.en.checkout.description;
+    const login = $("[data-login-checkout-login]", modal);
+    const register = $("[data-login-checkout-register]", modal);
+    if (login) {
+      login.href = loginHref;
+      login.textContent = activeCopy.loginButton || copy.en.checkout.loginButton || "Log in";
+    }
+    if (register) {
+      register.href = registerHref;
+      register.textContent = activeCopy.registerButton || copy.en.checkout.registerButton || "Register";
+    }
+    modal.classList.add("is-visible");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+  };
+
+  const closeLoginBeforeCheckoutModal = () => {
+    const modal = $("#loginBeforeCheckoutModal");
+    if (!modal) return;
+    modal.classList.remove("is-visible");
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+  };
+
   const submitCheckout = async (event) => {
     event.preventDefault();
     const activeCopy = getCopy().checkout || copy.en.checkout;
@@ -1853,7 +1925,7 @@
       }, 15000);
       const data = await response.json().catch(() => ({}));
       if (response.status === 401 || data.error === "account_required") {
-        redirectToRegisterForCheckout(selectedCheckoutPlan);
+        openLoginBeforeCheckoutModal(selectedCheckoutPlan);
         return;
       }
       if (!response.ok || !data.url) {
@@ -1886,12 +1958,12 @@
     if (!basePlans.some((plan) => plan.id === planId)) return;
     selectedCheckoutPlan = planId;
     const activeCopy = getCopy().checkout || copy.en.checkout;
-    showCheckoutNotice(activeCopy.loading || copy.en.checkout.loading);
     const user = await getCurrentAccount();
     if (!user) {
-      redirectToRegisterForCheckout(planId, options);
+      openLoginBeforeCheckoutModal(planId, options);
       return;
     }
+    showCheckoutNotice(activeCopy.loading || copy.en.checkout.loading);
 
     try {
       const response = await fetchWithTimeout(`${apiBase}/api/checkout/create-session`, {
@@ -1902,7 +1974,7 @@
       }, 15000);
       const data = await response.json().catch(() => ({}));
       if (response.status === 401 || data.error === "account_required") {
-        redirectToRegisterForCheckout(planId, options);
+        openLoginBeforeCheckoutModal(planId, options);
         return;
       }
       if (!response.ok || !data.url) throw new Error(checkoutBlockedMessage(data, options));
@@ -2006,11 +2078,17 @@
         event.preventDefault();
         closeCheckoutModal();
       }
+
+      if (event.target.closest("[data-login-checkout-close]") || event.target === $("#loginBeforeCheckoutModal")) {
+        event.preventDefault();
+        closeLoginBeforeCheckoutModal();
+      }
     });
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         closeCheckoutModal();
+        closeLoginBeforeCheckoutModal();
       }
     });
 

@@ -919,6 +919,8 @@ app.get(["/api/me/products", "/api/account/products"], requireUser, async (req, 
   ]);
   return res.json({
     success: true,
+    user: publicUser(req.user),
+    integrations: await buildIntegrationSummary(req.user),
     purchases: purchases.map(publicPurchase),
     licenses: licenses.map(publicLicense),
     pendingGifts: pendingGifts.map(publicDirectGiftPackage),

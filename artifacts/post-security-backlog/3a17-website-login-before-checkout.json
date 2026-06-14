@@ -1,0 +1,29 @@
+{
+  "priority": "3A17",
+  "phase": "website-login-before-checkout",
+  "status": "implemented_source",
+  "filesChanged": [
+    "public/assets/js/app.js"
+  ],
+  "changes": {
+    "loggedOutCheckout": "Pay with Card now opens a friendly login/register modal instead of redirecting or opening Stripe.",
+    "modalCopy": {
+      "title": "Log in first",
+      "body": "Your license needs an account, so log in or register before buying.",
+      "buttons": ["Log in", "Register"]
+    },
+    "checkout401Handling": "Account-required responses reopen the login/register modal.",
+    "downloadFallback": "Public setup URL updated to v1.0.129."
+  },
+  "verification": {
+    "nodeSyntax": "passed",
+    "loggedOutCheckoutBlocked": "source_verified",
+    "loggedInCheckoutStillUsesStripeSession": "source_verified",
+    "publicJsSecretScan": "passed_no_secret_values",
+    "liveDeployed": false
+  },
+  "notes": [
+    "No Stripe checkout is started until an account session exists.",
+    "No latest.json change was made."
+  ]
+}
