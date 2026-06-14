@@ -1442,9 +1442,21 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
   } catch (error) {
     console.error("Checkout session creation failed", { ...publicError(error), stripe: stripeStatus() });
     await createAnalyticsEvent("checkout_failed", {
-      metadata: { code: error.code, type: error.type }
+      metadata: {
+        code: error.code,
+        type: error.type,
+        priceEnv: error.priceEnv || null,
+        priceStatus: error.priceStatus || null
+      }
     });
-    return res.status(error.code === "missing_env" ? 503 : 500).json({ error: "checkout_failed" });
+    const missingStripeEnv = error.code === "missing_env";
+    return res.status(missingStripeEnv ? 503 : 500).json({
+      error: "checkout_failed",
+      reason: missingStripeEnv ? "stripe_price_env_unavailable" : "stripe_checkout_unavailable",
+      message: "Checkout could not start. Try again or open a ticket.",
+      missingEnv: missingStripeEnv ? error.priceEnv || null : null,
+      priceStatus: missingStripeEnv ? error.priceStatus || null : null
+    });
   }
 });
 
@@ -1739,7 +1751,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       entitlement: publicEntitlementPayload(entitlement),
       entitlementExpiresAt: entitlement.expiresAt,
       minSupportedAppVersion,
-      accountEmail: accountAccess.user?.email || license.customerEmail || null,
+      accountEmail: maskEmail(accountAccess.user?.email || license.customerEmail),
       robloxUsername: accountAccess.user?.robloxUsername || null,
       robloxAvatarUrl: accountAccess.user?.robloxAvatarUrl || null,
       discordUsername: accountAccess.user?.discordUsername || null,
@@ -5105,24 +5117,24 @@ function licenseValidationPayload(license, options = {}) {
     canUseApp,
     missingRequirements,
     hasActiveLicense: Boolean(license && license.status === "active"),
-    buyerEmail: user?.email || license?.customerEmail || null,
+    buyerEmail: maskEmail(user?.email || license?.customerEmail),
     buyerEmailMasked: maskEmail(user?.email || license?.customerEmail),
-    accountEmail: user?.email || license?.customerEmail || null,
+    accountEmail: maskEmail(user?.email || license?.customerEmail),
     maskedAccountEmail: maskEmail(user?.email || license?.customerEmail),
-    customerEmail: license?.customerEmail || null,
+    customerEmail: maskEmail(license?.customerEmail),
     accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard.html`,
     connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard.html`,
     connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard.html`,
     optionalProfileMissing: missingRequirements,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
-      id: user.discordUserId || null,
+      id: maskDiscordId(user.discordUserId),
       username: user.discordUsername || null,
       avatar: user.discordAvatarUrl || null
     } : null,
     buyerRoblox: user ? {
       connected: Boolean(accountAccess?.robloxLinked),
-      id: user.robloxUserId || null,
+      id: maskExternalId(user.robloxUserId),
       username: user.robloxUsername || null,
       avatar: user.robloxAvatarUrl || null
     } : null,
@@ -5240,22 +5252,23 @@ function adminLicensePayload(license, user = null) {
   return {
     ...license,
     source: licenseSource(license),
-    userEmail: license.customerEmail,
+    customerEmail: maskEmail(license.customerEmail),
+    userEmail: maskEmail(license.customerEmail),
     robloxUsername: user?.robloxUsername || null,
-    robloxUserId: user?.robloxUserId || null,
+    robloxUserId: maskExternalId(user?.robloxUserId),
     robloxAvatarUrl: user?.robloxAvatarUrl || null,
     discordUsername: user?.discordUsername || null,
-    discordUserId: user?.discordUserId || null,
+    discordUserId: maskDiscordId(user?.discordUserId),
     discordAvatarUrl: user?.discordAvatarUrl || null,
-    stripeCustomerId: user?.stripeCustomerId || null,
+    stripeCustomerId: maskExternalId(user?.stripeCustomerId),
     hwidStatus: license.hwid ? "Bound" : "Unbound",
     enabled: license.status === "active",
     expires: license.lifetime ? "Lifetime" : license.expiresAt,
     timeLeft: timeLeft.label,
     timeLeftSeconds: timeLeft.seconds,
     timeLeftState: timeLeft.state,
-    paymentSessionId: license.stripeSessionId || order?.stripeSessionId || null,
-    paymentIntentId: license.stripePaymentIntentId || order?.stripePaymentIntentId || null,
+    paymentSessionId: maskExternalId(license.stripeSessionId || order?.stripeSessionId),
+    paymentIntentId: maskExternalId(license.stripePaymentIntentId || order?.stripePaymentIntentId),
     orderId: order?.id || null,
     orderAmount: order?.amount || null,
     orderCurrency: order?.currency || null,
@@ -5900,21 +5913,26 @@ function usernameFromSyntheticEmail(email) {
 function publicUser(user) {
   const usernameOnly = isSyntheticUsernameEmail(user.email);
   const username = usernameOnly ? usernameFromSyntheticEmail(user.email) : null;
+  const maskedEmail = usernameOnly ? null : maskEmail(user.email);
   return {
     id: user.id,
-    email: usernameOnly ? null : user.email,
+    email: maskedEmail,
+    emailMasked: maskedEmail,
     username,
-    loginName: username || user.email,
+    loginName: username || maskedEmail,
     usernameOnly,
     emailLinked: !usernameOnly && isValidEmail(user.email),
     passwordResetAvailable: !usernameOnly && Boolean(user.emailVerifiedAt),
-    stripeCustomerId: user.stripeCustomerId || null,
-    discordUserId: user.discordUserId || null,
+    stripeCustomerId: maskExternalId(user.stripeCustomerId),
+    stripeCustomerIdMasked: maskExternalId(user.stripeCustomerId),
+    discordUserId: maskDiscordId(user.discordUserId),
+    discordUserIdMasked: maskDiscordId(user.discordUserId),
     discordUsername: user.discordUsername || null,
-    discordEmail: user.discordEmail || null,
+    discordEmail: maskEmail(user.discordEmail),
     discordAvatarUrl: user.discordAvatarUrl || null,
     robloxUsername: user.robloxUsername || null,
-    robloxUserId: user.robloxUserId || null,
+    robloxUserId: maskExternalId(user.robloxUserId),
+    robloxUserIdMasked: maskExternalId(user.robloxUserId),
     robloxAvatarUrl: user.robloxAvatarUrl || null,
     emailVerified: Boolean(user.emailVerifiedAt),
     emailVerifiedAt: user.emailVerifiedAt || null,
@@ -5944,16 +5962,16 @@ async function buildIntegrationSummary(user) {
   return {
     discord: {
       connected: discordConnected,
-      id: user?.discordUserId || null,
+      id: maskDiscordId(user?.discordUserId),
       username: user?.discordUsername || null,
-      email: user?.discordEmail || null,
+      email: maskEmail(user?.discordEmail),
       avatar: user?.discordAvatarUrl || null,
       connectedAt: byProvider.discord?.createdAt || null,
       updatedAt: byProvider.discord?.updatedAt || null
     },
     roblox: {
       connected: robloxConnected,
-      id: user?.robloxUserId || null,
+      id: maskExternalId(user?.robloxUserId),
       username: user?.robloxUsername || null,
       displayName: byProvider.roblox?.metadata?.displayName || user?.robloxUsername || null,
       avatar: user?.robloxAvatarUrl || null,
@@ -6428,7 +6446,7 @@ function publicDirectGiftPackage(row) {
 function adminDirectGiftPackagePayload(row) {
   return {
     ...publicDirectGiftPackage(row),
-    recipientEmailFull: row.recipientEmail,
+    recipientEmailFull: null,
     recipientUser: row.recipientUser ? publicUser(row.recipientUser) : null,
     sentByAdminId: row.sentByAdminId || null,
     claimedByUserId: row.claimedByUserId || null,
@@ -6483,11 +6501,11 @@ function adminGiftCodePayload(row) {
     usedCount: row.usedCount,
     buyerUserId: row.buyerUserId || null,
     buyerEmail: row.buyerEmail ? maskEmail(row.buyerEmail) : null,
-    buyerEmailFull: row.buyerEmail || null,
-    buyerDiscordId: row.buyerDiscordId || null,
-    buyerRobloxId: row.buyerRobloxId || null,
-    stripeSessionId: row.stripeSessionId || null,
-    stripePaymentIntentId: row.stripePaymentIntentId || null,
+    buyerEmailFull: null,
+    buyerDiscordId: maskDiscordId(row.buyerDiscordId),
+    buyerRobloxId: maskExternalId(row.buyerRobloxId),
+    stripeSessionId: maskExternalId(row.stripeSessionId),
+    stripePaymentIntentId: maskExternalId(row.stripePaymentIntentId),
     purchasedAt: row.purchasedAt ? row.purchasedAt.toISOString() : null,
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
     recipientEmail: row.recipientEmail ? maskEmail(row.recipientEmail) : null,
@@ -6528,6 +6546,13 @@ function maskDiscordId(discordUserId) {
   if (!text) return null;
   if (text.length <= 6) return "***";
   return `${text.slice(0, 3)}***${text.slice(-3)}`;
+}
+
+function maskExternalId(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (text.length <= 8) return "***";
+  return `${text.slice(0, 4)}***${text.slice(-4)}`;
 }
 
 function normalizeReferralCode(value) {
@@ -7191,6 +7216,8 @@ function publicLicense(license) {
   return {
     ...licensePayload(license),
     id: license.id,
+    customerEmail: maskEmail(license.customerEmail),
+    customerEmailMasked: maskEmail(license.customerEmail),
     status: license.status,
     planLabel: plan?.name?.replace(/^Fima Macro\s+/i, "") || license.plan,
     durationDays: plan?.durationDays ?? null,

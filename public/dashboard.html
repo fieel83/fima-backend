@@ -18,7 +18,7 @@
     <meta name="twitter:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
     <title>Dashboard | Fima Macro</title>
     <link rel="icon" href="assets/images/fima-logo.png?v=20260526-2" type="image/png">
-    <link rel="stylesheet" href="assets/css/account.css?v=20260607-1">
+    <link rel="stylesheet" href="assets/css/account.css?v=20260614-3a22">
   </head>
   <body data-account-page="dashboard">
     <header class="account-header"><div class="nav"><a class="brand" href="index.html"><img src="assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="store.html">Store</a><a href="my-products.html">My Products</a><button class="link-button" data-logout>Logout</button></div></div></header>
@@ -29,7 +29,20 @@
         <p class="account-lead">Manage your purchases, license keys, downloads and account access from one clean dashboard.</p>
       </section>
 
-      <section class="panel panel-pad account-summary-card">
+      <nav class="account-section-nav" aria-label="Account sections">
+        <a href="#overview">Overview</a>
+        <a href="my-products.html">My Products</a>
+        <a href="#billing">Billing</a>
+        <a href="#gift-access">Redeem Key</a>
+        <a href="#purchased-gifts">Gift Codes</a>
+        <a href="#referrals">Invite Code</a>
+        <a href="#connected-accounts">Connected Accounts</a>
+        <a href="#security">Security</a>
+        <a href="download.html">Downloads</a>
+        <a href="support.html">Support</a>
+      </nav>
+
+      <section class="panel panel-pad account-summary-card" id="overview">
         <div>
           <h2>Account</h2>
           <p>Username and password are enough. Link Discord later for password recovery or free trial access.</p>
@@ -42,7 +55,7 @@
         </div>
       </section>
 
-      <section class="panel panel-pad account-section email-verification-section" id="account-settings">
+      <section class="panel panel-pad account-section email-verification-section" id="security">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Account Recovery</p>
@@ -53,7 +66,7 @@
         <div id="emailVerification">Loading...</div>
       </section>
 
-      <section class="panel panel-pad account-section">
+      <section class="panel panel-pad account-section" id="connected-accounts">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Account Links</p>
@@ -86,7 +99,7 @@
         <div id="giftClaims">Loading...</div>
       </section>
 
-      <section class="panel panel-pad account-section referral-section">
+      <section class="panel panel-pad account-section referral-section" id="referrals">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Invite Rewards</p>
@@ -97,11 +110,12 @@
         <div id="referralDashboard">Loading...</div>
       </section>
 
-      <section class="panel panel-pad account-section trial-section">
+      <section class="panel panel-pad account-section trial-section" id="monthly-trial">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Free Trial</p>
-            <h2>Free Monthly Trial</h2>
+            <h2>Claim your free trial here</h2>
+            <p>Discord is required only for trial claims. Roblox is optional on the website.</p>
           </div>
         </div>
         <div id="monthlyTrial">Loading...</div>
@@ -130,7 +144,7 @@
       </section>
     </main>
     <script src="assets/js/config.js?v=20260526-9"></script>
-    <script src="assets/js/account.js?v=20260613-3a0" defer></script>
+    <script src="assets/js/account.js?v=20260614-3a22" defer></script>
   </body>
 </html>
 

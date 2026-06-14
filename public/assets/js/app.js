@@ -1357,7 +1357,7 @@
       </div>
       <div class="trial-promo-actions">
         <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
-        <a class="button primary" href="dashboard.html#monthly-trial">Claim ${trialPromoLabel()}</a>
+        <a class="button primary" href="dashboard.html#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
       </div>
     `;
   };
@@ -1392,7 +1392,7 @@
         </div>
         <div class="trial-promo-actions">
           <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
-          <a class="button primary" href="dashboard.html#monthly-trial">Claim ${trialPromoLabel()}</a>
+          <a class="button primary" href="dashboard.html#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
         </div>
       </article>
     ` : "";
@@ -1447,7 +1447,7 @@
           lifetime: "FIMA-LIFE"
         }[plan.id];
         const cardButton = plan.trial
-          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="dashboard.html#monthly-trial">Claim ${trialPromoLabel()}</a>`
+          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="dashboard.html#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>`
           : `<a class="button ${plan.featured ? "primary" : "secondary"}" href="#checkout" data-checkout-plan="${plan.id}">${pricingCopy.payCard || fallbackPricing.payCard}</a>`;
         const robuxButton = plan.trial ? "" : `<button class="button secondary robux-ticket-button" type="button" data-robux-plan="${plan.id}">${pricingCopy.payRobux || fallbackPricing.payRobux}</button>`;
         const giftIcon = `<svg class="gift-button-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M20 7h-2.2c.2-.5.3-1 .2-1.5A3 3 0 0 0 15 3c-1.4 0-2.4.8-3 1.8A3.5 3.5 0 0 0 9 3a3 3 0 0 0-3 2.5C5.9 6 6 6.5 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1Zm-5-2c.6 0 1 .4 1 1s-.4 1-1 1h-2c.2-.9.8-2 2-2ZM8 6c0-.6.4-1 1-1 1.2 0 1.8 1.1 2 2H9c-.6 0-1-.4-1-1Zm-4 7v7a1 1 0 0 0 1 1h6v-8H4Zm9 0v8h6a1 1 0 0 0 1-1v-7h-7Z"/></svg>`;
@@ -1651,6 +1651,7 @@
   let publicSettings = {};
   let checkoutTimer;
   let selectedCheckoutPlan = null;
+  let checkoutInFlight = false;
 
   const showCheckoutNotice = (message) => {
     const toast = $("#checkoutToast");
@@ -1703,9 +1704,55 @@
       return { label: user.discordUsername, sub: "Discord", avatar: user.discordAvatarUrl || "", fallback: "D" };
     }
     if (user?.email) {
-      return { label: user.email.split("@")[0], sub: user.email, avatar: "", fallback: "F" };
+      return { label: user.loginName || user.email.split("@")[0], sub: user.emailMasked || user.email, avatar: "", fallback: "F" };
     }
     return { label: "Fima", sub: "Account", avatar: "", fallback: "F" };
+  };
+
+  const siteProfileMenuItems = (user) => ([
+    ["Account", "dashboard.html#overview", true],
+    ["My Products", "my-products.html", true],
+    ["Billing", "dashboard.html#billing", true],
+    ["Redeem Key", "dashboard.html#gift-access", true],
+    ["Gift Codes", "dashboard.html#purchased-gifts", true],
+    ["Invite Code", "dashboard.html#referrals", true],
+    ["Connected Accounts", "dashboard.html#connected-accounts", true],
+    ["Security / Password", "dashboard.html#security", true],
+    ["Downloads", "download.html", true],
+    ["Support", "support.html", true],
+    ["Admin Panel", "/admin", Boolean(user?.role === "admin" || user?.role === "owner" || user?.role === "super_admin")],
+    ["Logout", "#logout", true]
+  ]).filter((item) => item[2]);
+
+  const wireSiteProfileDropdown = (menu) => {
+    if (!menu || menu.dataset.wired === "1") return;
+    menu.dataset.wired = "1";
+    const toggle = menu.querySelector("[data-site-profile-toggle]");
+    const panel = menu.querySelector("[data-site-profile-panel]");
+    const setOpen = (open) => {
+      if (!panel || !toggle) return;
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    toggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(panel?.hidden);
+    });
+    panel?.addEventListener("click", async (event) => {
+      const logout = event.target.closest("[data-site-logout]");
+      if (!logout) return;
+      event.preventDefault();
+      await fetchWithTimeout(`${apiBase}/api/auth/logout`, { method: "POST", credentials: "include", headers: await csrfHeaders() }, 8000).catch(() => {});
+      currentSiteAccount = null;
+      location.href = "index.html";
+    });
+    document.addEventListener("click", (event) => {
+      if (!menu.contains(event.target)) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
   };
 
   const renderSiteAccountNav = (user) => {
@@ -1739,20 +1786,32 @@
     }
 
     const profile = siteProfileFor(user);
-    const link = document.createElement("a");
-    link.className = "site-profile-chip";
-    link.href = "dashboard.html";
-    link.dataset.siteProfile = "true";
-    link.setAttribute("aria-label", profile.label);
-    link.innerHTML = `
-      ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
-      <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
+    const menu = document.createElement("div");
+    menu.className = "site-profile-menu";
+    menu.dataset.siteProfile = "true";
+    const links = siteProfileMenuItems(user).map(([label, href]) => href === "#logout"
+      ? `<button class="site-dropdown-link" type="button" data-site-logout>${escapeHtml(label)}</button>`
+      : `<a class="site-dropdown-link" href="${escapeHtml(href)}">${escapeHtml(label)}</a>`
+    ).join("");
+    menu.innerHTML = `
+      <button class="site-profile-chip" type="button" data-site-profile-toggle aria-expanded="false" aria-label="${escapeHtml(profile.label)} menu">
+        ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+        <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
+      </button>
+      <div class="site-profile-dropdown" data-site-profile-panel hidden>
+        <div class="site-profile-summary">
+          ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+          <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
+        </div>
+        ${links}
+      </div>
     `;
     if (cta) {
       cta.textContent = user?.subscriptionStatus ? "Manage Plan" : (copy[state.language]?.nav?.cta || copy.en.nav.cta);
       cta.href = "pricing.html";
     }
-    controls.insertBefore(link, cta || null);
+    controls.insertBefore(menu, cta || null);
+    wireSiteProfileDropdown(menu);
   };
 
   const hydrateSiteAccountNav = async () => {
@@ -1841,6 +1900,7 @@
   };
 
   const checkoutNextUrl = (planId, options = {}) => {
+    if (options.next) return options.next;
     const giftRecipient = selectedGiftRecipientForCheckout();
     const params = new URLSearchParams({ checkout: planId });
     if (giftRecipient?.id) params.set("giftRecipient", giftRecipient.id);
@@ -1891,6 +1951,10 @@
       register.href = registerHref;
       register.textContent = activeCopy.registerButton || copy.en.checkout.registerButton || "Register";
     }
+    if (options.trialClaim) {
+      $("[data-login-checkout-title]", modal).textContent = "Log in first";
+      $("[data-login-checkout-body]", modal).textContent = "Claim your free trial from your account. Discord is required only for trial claims. Roblox is optional on the website.";
+    }
     modal.classList.add("is-visible");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -1928,9 +1992,7 @@
         openLoginBeforeCheckoutModal(selectedCheckoutPlan);
         return;
       }
-      if (!response.ok || !data.url) {
-        throw new Error(data.error || "checkout_failed");
-      }
+      if (!response.ok || !data.url) throw new Error(checkoutBlockedMessage(data));
       window.location.href = data.url;
     } catch (error) {
       const message = error?.name === "AbortError"
@@ -1956,6 +2018,7 @@
 
   const startAccountCheckout = async (planId, options = {}) => {
     if (!basePlans.some((plan) => plan.id === planId)) return;
+    if (checkoutInFlight) return;
     selectedCheckoutPlan = planId;
     const activeCopy = getCopy().checkout || copy.en.checkout;
     const user = await getCurrentAccount();
@@ -1964,6 +2027,7 @@
       return;
     }
     showCheckoutNotice(activeCopy.loading || copy.en.checkout.loading);
+    checkoutInFlight = true;
 
     try {
       const response = await fetchWithTimeout(`${apiBase}/api/checkout/create-session`, {
@@ -1984,6 +2048,8 @@
         ? activeCopy.backendMissing
         : (error?.message || activeCopy.failed);
       showCheckoutNotice(message);
+    } finally {
+      checkoutInFlight = false;
     }
   };
 
@@ -2064,6 +2130,15 @@
       if (event.target.closest("[data-robux-close]") || event.target.classList.contains("robux-modal")) {
         event.preventDefault();
         closeRobuxModal();
+        return;
+      }
+
+      const trialClaimTrigger = event.target.closest("[data-trial-claim-link]");
+      if (trialClaimTrigger) {
+        event.preventDefault();
+        const next = "dashboard.html#monthly-trial";
+        if (!currentSiteAccount) openLoginBeforeCheckoutModal("1day", { next, trialClaim: true });
+        else window.location.href = next;
         return;
       }
 

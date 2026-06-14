@@ -1121,6 +1121,18 @@
     const last = text.replace(/[^A-Za-z0-9]/g, "").slice(-4);
     return last ? `FIMA-****-****-${last}` : "FIMA-****";
   };
+  const maskEmailAddress = (value) => {
+    const text = String(value || "").trim();
+    const [local, domain] = text.split("@");
+    if (!local || !domain) return text || "";
+    return `${local.slice(0, 1)}***${local.length > 2 ? local.slice(-1) : ""}@${domain}`;
+  };
+  const maskExternalId = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (text.length <= 8) return "***";
+    return `${text.slice(0, 4)}***${text.slice(-4)}`;
+  };
   const storeLicenseSecret = (license) => {
     const key = String(license?.licenseKey || "").trim();
     if (!key) return "";
@@ -1343,7 +1355,7 @@
     if (user?.robloxUsername) {
       return {
         label: user.robloxUsername,
-        sub: user.robloxUserId || "Roblox",
+        sub: maskExternalId(user.robloxUserId) || "Roblox",
         avatar: user.robloxAvatarUrl || "",
         fallback: "R"
       };
@@ -1351,15 +1363,15 @@
     if (user?.discordUsername) {
       return {
         label: user.discordUsername,
-        sub: user.discordUserId || "Discord",
+        sub: maskExternalId(user.discordUserId) || "Discord",
         avatar: user.discordAvatarUrl || "",
         fallback: "D"
       };
     }
     if (user?.email) {
       return {
-        label: user.email.split("@")[0],
-        sub: user.email,
+        label: user.loginName || user.email.split("@")[0],
+        sub: user.emailMasked || maskEmailAddress(user.email),
         avatar: "",
         fallback: "F"
       };
@@ -1380,6 +1392,9 @@
   const profileDropdown = (user) => {
     const profile = accountProfile(user);
     const planLabel = user?.subscriptionStatus ? String(user.subscriptionStatus) : t("noActiveSubscription");
+    const adminLink = ["admin", "owner", "super_admin"].includes(String(user?.role || "").toLowerCase())
+      ? `<a class="account-dropdown-link" href="/admin">Admin Panel</a>`
+      : "";
     return `
       <div class="account-profile-menu" data-account-menu>
         ${profileChip(user)}
@@ -1388,14 +1403,18 @@
             ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
             <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(planLabel)}</small></div>
           </div>
-          <a class="account-dropdown-link" href="dashboard.html">${t("dashboardNav")}</a>
+          <a class="account-dropdown-link" href="dashboard.html#overview">Account</a>
           <a class="account-dropdown-link" href="my-products.html">${t("myProductsNav")}</a>
-          <a class="account-dropdown-link" href="dashboard.html#gift-access">${t("redeemGiftNav")}</a>
-          <a class="account-dropdown-link" href="dashboard.html#purchased-gifts">${t("purchasedGiftCodesNav")}</a>
           <a class="account-dropdown-link" href="dashboard.html#billing">${t("billingNav")}</a>
-          <a class="account-dropdown-link" href="dashboard.html#account-settings">${t("accountSettingsNav")}</a>
+          <a class="account-dropdown-link" href="dashboard.html#gift-access">Redeem Key</a>
+          <a class="account-dropdown-link" href="dashboard.html#purchased-gifts">Gift Codes</a>
+          <a class="account-dropdown-link" href="dashboard.html#referrals">Invite Code / Referrals</a>
+          <a class="account-dropdown-link" href="dashboard.html#connected-accounts">Connected Accounts</a>
+          <a class="account-dropdown-link" href="dashboard.html#security">${t("accountSettingsNav")}</a>
+          <a class="account-dropdown-link" href="download.html">Downloads</a>
           <a class="account-dropdown-link" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
           <a class="account-dropdown-link" href="support.html">${t("supportNav")}</a>
+          ${adminLink}
           <button class="account-dropdown-link" type="button" data-logout>${t("logoutNav")}</button>
           ${user?.discordUserId ? "" : `<a class="account-dropdown-warning" href="${apiBase}/auth/discord/start">${t("recoveryNotLinked")} - ${t("linkDiscordRecovery")}</a>`}
         </div>
@@ -1857,11 +1876,11 @@
   const renderAccountSummary = (user) => {
     $("#accountUsername") && ($("#accountUsername").textContent = user.username || user.loginName || t("accountNavProfileFallback"));
     $("#accountEmail") && ($("#accountEmail").textContent = user.discordUserId ? t("connected") : t("notConnected"));
-    $("#stripeCustomer") && ($("#stripeCustomer").textContent = user.stripeCustomerId || t("willBeCreated"));
+    $("#stripeCustomer") && ($("#stripeCustomer").textContent = user.stripeCustomerIdMasked || maskExternalId(user.stripeCustomerId) || t("willBeCreated"));
     const roblox = $("#accountRoblox");
     if (roblox) {
       roblox.innerHTML = user.robloxUsername
-        ? `<div class="mini-profile">${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span></span>`}<div><strong>${escapeHtml(user.robloxUsername)}</strong><small>${escapeHtml(user.robloxUserId || "")}</small></div></div>`
+        ? `<div class="mini-profile">${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span></span>`}<div><strong>${escapeHtml(user.robloxUsername)}</strong><small>${escapeHtml(user.robloxUserIdMasked || maskExternalId(user.robloxUserId))}</small></div></div>`
         : t("noRoblox");
     }
   };
@@ -1897,7 +1916,7 @@
     if (!account?.connected) {
       return `<div class="mini-profile is-missing"><div class="avatar-placeholder">!</div><div><strong>${escapeHtml(fallbackLabel)}</strong><small>${t("notConnected")}</small></div></div>`;
     }
-    return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(account.id || "")}</small></div></div>`;
+    return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(maskExternalId(account.id) || "")}</small></div></div>`;
   };
 
   const renderConnectedAccounts = (integrations = {}) => {
@@ -1984,7 +2003,7 @@
         <aside class="trial-side">
           ${trial.active ? `<div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong></div>` : ""}
           ${trial.nextTrialAvailableAt ? `<div><span>${t("nextTrial")}</span><strong>${date(trial.nextTrialAvailableAt)}</strong><small data-countdown="${escapeHtml(trial.nextTrialAvailableAt)}">${duration(trial.cooldownSeconds)}</small></div>` : ""}
-          ${trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(trial.activeLicense.licenseKey)}</code></div>` : ""}
+          ${trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(maskSensitiveCode(trial.activeLicense.licenseKey))}</code></div>` : ""}
           <button class="button" type="button" data-claim-trial ${trial.eligible ? "" : "disabled"}>Claim ${escapeHtml(trialLabel)}</button>
         </aside>
       </div>
@@ -2001,7 +2020,7 @@
   };
 
   const renderPurchasedGiftCodeCard = (item) => {
-    const code = item.giftCode || item.maskedCode || "";
+    const code = item.giftCode ? maskSensitiveCode(item.giftCode) : item.maskedCode || "";
     const used = Boolean(item.used || item.status === "redeemed");
     const generated = item.generatedLicense || null;
     return `
@@ -2022,7 +2041,7 @@
           <span>${t("purchased")}: <b>${date(item.purchasedAt || item.createdAt)}</b></span>
           <span>${t("status")}: <b>${escapeHtml(giftCodeStatusLabel(item.status, used))}</b></span>
           ${item.redeemedAt ? `<span>${t("usedGiftCode")}: <b>${date(item.redeemedAt)}</b></span>` : ""}
-          ${generated?.licenseKey ? `<span>${t("licenseKey")}: <code>${escapeHtml(generated.licenseKey)}</code></span>` : ""}
+          ${generated?.licenseKey ? `<span>${t("licenseKey")}: <code>${escapeHtml(maskSensitiveCode(generated.licenseKey))}</code></span>` : ""}
         </div>
       </article>
     `;
@@ -2037,7 +2056,7 @@
           <small>${escapeHtml(item.maskedCode || "")} ${item.redeemedAt ? `/ ${date(item.redeemedAt)}` : ""}</small>
         </div>
         <span class="status-pill">${escapeHtml(giftCodeStatusLabel(item.status, item.used))}</span>
-        ${license.licenseKey ? `<code>${escapeHtml(license.licenseKey)}</code>` : ""}
+        ${license.licenseKey ? `<code>${escapeHtml(maskSensitiveCode(license.licenseKey))}</code>` : ""}
       </article>
     `;
   };
@@ -2423,14 +2442,14 @@
         ${code ? `
           <div class="gift-modal-key">
             <span>${t("giftCodeTitle")}</span>
-            <code>${escapeHtml(code)}</code>
+            <code>${escapeHtml(maskSensitiveCode(code))}</code>
             <button class="button secondary" type="button" data-copy="${escapeHtml(code)}">${t("copyGiftCode")}</button>
           </div>
         ` : ""}
         ${licenseKey ? `
           <div class="gift-modal-key gift-modal-key-primary">
             <span>${t("newLicenseKey")}</span>
-            <code>${escapeHtml(licenseKey)}</code>
+            <code>${escapeHtml(maskSensitiveCode(licenseKey))}</code>
             <button class="button" type="button" data-copy="${escapeHtml(licenseKey)}">${t("copyLicenseKey")}</button>
           </div>
         ` : ""}
@@ -2735,8 +2754,34 @@
     });
   };
 
+  const initPasswordToggles = () => {
+    $$("input[type='password']").forEach((input) => {
+      if (input.dataset.passwordToggleReady === "1") return;
+      input.dataset.passwordToggleReady = "1";
+      const wrapper = document.createElement("span");
+      wrapper.className = "password-field";
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.appendChild(input);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "password-toggle";
+      button.setAttribute("aria-label", "Show password");
+      button.title = "Show password";
+      button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5c5.2 0 8.7 4.7 9.8 6.4.3.4.3.8 0 1.2C20.7 14.3 17.2 19 12 19s-8.7-4.7-9.8-6.4a1 1 0 0 1 0-1.2C3.3 9.7 6.8 5 12 5Zm0 2C8.2 7 5.4 10.1 4.3 12c1.1 1.9 3.9 5 7.7 5s6.6-3.1 7.7-5C18.6 10.1 15.8 7 12 7Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>';
+      button.addEventListener("click", () => {
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        button.setAttribute("aria-label", show ? "Hide password" : "Show password");
+        button.title = show ? "Hide password" : "Show password";
+        input.focus();
+      });
+      wrapper.appendChild(button);
+    });
+  };
+
   document.addEventListener("DOMContentLoaded", () => {
     applyStaticTranslations();
+    initPasswordToggles();
     initOauthFlash();
     initLogout();
     initAccountActions();
