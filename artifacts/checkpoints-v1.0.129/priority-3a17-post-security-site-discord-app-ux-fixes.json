@@ -32,7 +32,7 @@
   "deployRelease": {
     "backendSiteDeployed": false,
     "discordBotDeployedRestarted": false,
-    "appReleaseBuildCreated": false,
+    "appReleaseBuildCreated": true,
     "newReleasePublished": false,
     "latestJsonChanged": false,
     "latestJsonVersion": "1.0.129"
@@ -40,6 +40,7 @@
   "verification": {
     "backendNodeSyntax": "passed",
     "appDotnetBuildNoRestore": "passed",
+    "appDotnetReleaseBuildNoRestore": "passed",
     "secretScan": "passed_no_secret_values"
   },
   "remainingBlockers": [
