@@ -1,5 +1,5 @@
 (() => {
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
   const storage = {
     theme: "fima.theme",
     language: "fima.language",
@@ -1848,7 +1848,7 @@
       const response = await fetchWithTimeout(`${apiBase}/api/checkout/create-session`, {
         method: "POST",
         credentials: "include",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...(await csrfHeaders()) },
         body: JSON.stringify(checkoutPayload(selectedCheckoutPlan))
       }, 15000);
       const data = await response.json().catch(() => ({}));
@@ -1897,7 +1897,7 @@
       const response = await fetchWithTimeout(`${apiBase}/api/checkout/create-session`, {
         method: "POST",
         credentials: "include",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...(await csrfHeaders()) },
         body: JSON.stringify(checkoutPayload(planId, options))
       }, 15000);
       const data = await response.json().catch(() => ({}));
@@ -2072,6 +2072,34 @@
       return await fetch(url, { ...options, signal: controller.signal, cache: "no-store" });
     } finally {
       window.clearTimeout(timer);
+    }
+  };
+
+  let csrfTokenPromise = null;
+  const getCsrfToken = async () => {
+    if (!csrfTokenPromise) {
+      csrfTokenPromise = fetchWithTimeout(`${apiBase}/api/csrf-token`, {
+        credentials: "include",
+        cache: "no-store"
+      }, 8000)
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.csrfToken) throw new Error("csrf_unavailable");
+          return data.csrfToken;
+        })
+        .catch((error) => {
+          csrfTokenPromise = null;
+          throw error;
+        });
+    }
+    return csrfTokenPromise;
+  };
+
+  const csrfHeaders = async () => {
+    try {
+      return { "x-fima-csrf": await getCsrfToken() };
+    } catch (error) {
+      return {};
     }
   };
 

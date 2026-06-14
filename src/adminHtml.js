@@ -112,8 +112,26 @@ export function adminPage() {
     const date = (v) => v ? new Date(v).toLocaleString() : '-';
     const short = (v,n=18) => !v ? '-' : String(v).length>n ? String(v).slice(0,n)+'...' : String(v);
     const pill = (v) => '<span class="status '+esc(v||'')+'">'+esc(v||'-')+'</span>';
+    let csrfTokenPromise = null;
+    async function csrfToken(){
+      if(!csrfTokenPromise){
+        csrfTokenPromise = fetch('/admin/api/csrf-token',{credentials:'same-origin',cache:'no-store'})
+          .then(async res => {
+            const data = await res.json().catch(()=>({}));
+            if(!res.ok || !data.csrfToken) throw new Error('CSRF token unavailable');
+            return data.csrfToken;
+          })
+          .catch(error => { csrfTokenPromise=null; throw error; });
+      }
+      return csrfTokenPromise;
+    }
     async function api(path, options={}) {
-      const res = await fetch(path,{credentials:'same-origin',headers:{'content-type':'application/json'},...options});
+      const method = String(options.method || 'GET').toUpperCase();
+      const headers = {'content-type':'application/json', ...(options.headers || {})};
+      if(!['GET','HEAD','OPTIONS'].includes(method)){
+        headers['x-fima-csrf'] = await csrfToken();
+      }
+      const res = await fetch(path,{credentials:'same-origin',...options,headers});
       const data = await res.json().catch(()=>({}));
       if(!res.ok) throw new Error(data.error || data.message || 'Request failed');
       return data;

@@ -35,7 +35,8 @@ import {
   normalizeLicenseKey
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
-import { clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
+import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
 import { minimumAppVersionStatus } from "./appVersionPolicy.js";
 import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
@@ -423,6 +424,25 @@ app.post(["/api/admin/stripe/test-clock-e2e", "/admin/api/stripe/test-clock-e2e"
     return res.status(error.statusCode || 500).json({ success: false, error: error.code || "stripe_test_clock_failed", message: error.message });
   }
 });
+
+app.get("/admin/api/csrf-token", requireAdmin, (req, res) => {
+  const session = req.cookies?.[ADMIN_COOKIE_NAME];
+  if (!session) return res.status(400).json({ success: false, error: "csrf_cookie_session_required" });
+  res.setHeader("Cache-Control", "no-store");
+  return res.json(csrfTokenPayload("admin", session));
+});
+
+app.get("/api/csrf-token", async (req, res) => {
+  const session = req.cookies?.[USER_SESSION_COOKIE];
+  if (!session) return res.status(401).json({ success: false, error: "csrf_session_required" });
+  res.setHeader("Cache-Control", "no-store");
+  return res.json(csrfTokenPayload("user", session));
+});
+
+app.use(requireCsrfForCookieMutations({
+  adminCookieName: ADMIN_COOKIE_NAME,
+  userCookieName: USER_SESSION_COOKIE
+}));
 
 app.get("/api/public/site-settings", async (_req, res) => {
   const settings = await getSiteSettings();

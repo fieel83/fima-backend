@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { env, requiredEnv } from "./env.js";
 
-const COOKIE_NAME = "fima_admin_session";
+export const ADMIN_COOKIE_NAME = "fima_admin_session";
+const COOKIE_NAME = ADMIN_COOKIE_NAME;
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 function hmac(value) {

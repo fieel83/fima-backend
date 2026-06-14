@@ -1,6 +1,6 @@
 (() => {
   const apiBase = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
-  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.127/FIMA.MACRO.Setup.exe";
+  const publicSetupUrl = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.128/FIMA.MACRO.Setup.exe";
   const page = document.body.dataset.accountPage || "";
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -1236,13 +1236,50 @@
     return `${minutes}m ${secs}s`;
   };
 
+  let csrfTokenPromise = null;
+  const csrfExemptPaths = new Set([
+    "/api/auth/register",
+    "/api/auth/login",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+    "/api/auth/roblox-preview"
+  ]);
+
+  const getCsrfToken = async () => {
+    if (!csrfTokenPromise) {
+      csrfTokenPromise = fetch(`${apiBase}/api/csrf-token`, {
+        credentials: "include",
+        cache: "no-store"
+      })
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.csrfToken) throw new Error("csrf_unavailable");
+          return data.csrfToken;
+        })
+        .catch((error) => {
+          csrfTokenPromise = null;
+          throw error;
+        });
+    }
+    return csrfTokenPromise;
+  };
+
   const api = async (path, options = {}) => {
     let response;
     try {
+      const method = String(options.method || "GET").toUpperCase();
+      const headers = { "content-type": "application/json", ...(options.headers || {}) };
+      if (!["GET", "HEAD", "OPTIONS"].includes(method) && !csrfExemptPaths.has(path)) {
+        try {
+          headers["x-fima-csrf"] = await getCsrfToken();
+        } catch (error) {
+          // Let the backend return the canonical CSRF/session error for expired sessions.
+        }
+      }
       response = await fetch(`${apiBase}${path}`, {
         credentials: "include",
-        headers: { "content-type": "application/json" },
-        ...options
+        ...options,
+        headers
       });
     } catch (error) {
       throw new Error(t("networkError"));
