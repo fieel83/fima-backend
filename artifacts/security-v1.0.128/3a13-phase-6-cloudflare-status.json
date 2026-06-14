@@ -1,0 +1,12 @@
+{
+  "priority": "3A13",
+  "phase": "6-cloudflare-status",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "cloudflareProxyPreviouslyVerified": true,
+  "wafConfiguredOrVerifiedByCodex": false,
+  "edgeRateLimitingConfiguredOrVerifiedByCodex": false,
+  "turnstileConfiguredOrVerifiedByCodex": false,
+  "cloudflareAccessConfiguredOrVerifiedByCodex": false,
+  "credentialsAvailableToCodex": false,
+  "ownerChecklistPath": "artifacts/security-v1.0.128/cloudflare-owner-final-setup-checklist.md"
+}

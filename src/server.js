@@ -38,6 +38,7 @@ import { adminPage, loginPage } from "./adminHtml.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
 import { minimumAppVersionStatus } from "./appVersionPolicy.js";
+import { runSecurityE2EJobOnce } from "./securityE2EJob.js";
 import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
   discordBotHealth,
@@ -3870,6 +3871,9 @@ app.listen(port, () => {
   }, MONTHLY_TRIAL_CLEANUP_MS).unref?.();
   validateConfiguredStripePrices().catch((error) => {
     console.warn("Stripe price env validation failed", publicError(error));
+  });
+  runSecurityE2EJobOnce({ port, logger: console, backendVersion, backendCommit }).catch((error) => {
+    console.error("Security E2E one-time job crashed", publicError(error));
   });
 });
 

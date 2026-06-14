@@ -1,0 +1,17 @@
+{
+  "priority": "3A13",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "securityGateFullyPassed": false,
+  "reasonNotStarted": "Server-side disposable entitlement E2E job is implemented but has not run on Render yet.",
+  "appKeyLicenseUxFixesStarted": false,
+  "macroAppBugFixesStarted": false,
+  "websiteFixesStarted": false,
+  "discordBotFixesStarted": false,
+  "creatorFeedbackStarted": false,
+  "startAfter": [
+    "Render deploys backend job source",
+    "Owner sets temporary SECURITY_E2E_JOB_* env values",
+    "Job runs once and reports passed",
+    "Owner disables SECURITY_E2E_JOB_ENABLED and clears SECURITY_E2E_JOB_CONFIRM"
+  ]
+}

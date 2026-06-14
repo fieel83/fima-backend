@@ -1,0 +1,41 @@
+{
+  "priority": "3A13",
+  "phase": "0-server-side-job-design",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "jobFile": "src/securityE2EJob.js",
+  "serverHook": "src/server.js app.listen startup hook",
+  "oneTimeJobImplemented": true,
+  "publicEndpointCreated": false,
+  "triggerEnvNames": [
+    "SECURITY_E2E_JOB_ENABLED",
+    "SECURITY_E2E_JOB_RUN_ID",
+    "SECURITY_E2E_JOB_CONFIRM"
+  ],
+  "requiredTriggerValues": {
+    "SECURITY_E2E_JOB_ENABLED": "true",
+    "SECURITY_E2E_JOB_RUN_ID": "security-e2e-2026-06-14-001",
+    "SECURITY_E2E_JOB_CONFIRM": "run-disposable-entitlement-e2e"
+  },
+  "repeatRunProtection": {
+    "enabled": true,
+    "dbMarker": "Setting key security_e2e_job:<runId>",
+    "sameRunIdRerunBehavior": "skipped"
+  },
+  "safeBehavior": {
+    "doesNothingWhenFlagsMissing": true,
+    "doesNothingWhenConfirmMismatch": true,
+    "secretsPrinted": false,
+    "fullLicenseKeysPrinted": false,
+    "fullGiftCodesPrinted": false,
+    "unauthorizedGiftCleanupRerun": false,
+    "publicRouteAdded": false
+  },
+  "cleanupRelockPlan": [
+    "disable disposable test license after checks",
+    "remove disposable normal user session/user created for RBAC check",
+    "write masked result to DB Setting marker",
+    "write masked audit log summary",
+    "owner disables SECURITY_E2E_JOB_ENABLED and clears SECURITY_E2E_JOB_CONFIRM after run"
+  ],
+  "status": "implemented_pending_render_deploy_and_env_trigger"
+}

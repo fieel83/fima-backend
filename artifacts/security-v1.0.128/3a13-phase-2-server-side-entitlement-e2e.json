@@ -1,0 +1,26 @@
+{
+  "priority": "3A13",
+  "phase": "2-server-side-entitlement-e2e",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "implementedIn": "src/securityE2EJob.js",
+  "jobRunStatus": "pending_render_env_trigger",
+  "testsImplemented": {
+    "validV128LicenseReceivesSignedEntitlement": true,
+    "entitlementPayloadExpectedFields": true,
+    "entitlementLifetimeAround15Minutes": true,
+    "refreshWorks": true,
+    "missingTokenReturnsEntitlementRequired": true,
+    "invalidTokenRejected": true,
+    "invalidKeyBlocked": true,
+    "expiredLicenseBlocked": true,
+    "disabledLicenseBlocked": true,
+    "hwidMismatchBlocked": true,
+    "oldV127UpdateRequired": true,
+    "newV128Works": true,
+    "disableLicenseThenRefreshFails": true,
+    "officialMacroBlockedWithoutEntitlementSourceRuntimeGuard": true,
+    "signingSecretNotExposed": true,
+    "fullLicensePrinted": false
+  },
+  "liveRunResult": "not_run_until_render_env_flags_are_set"
+}

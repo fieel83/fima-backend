@@ -1,0 +1,41 @@
+{
+  "priority": "3A13",
+  "phase": "5-render-run-instructions-and-result",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "codexCanSetRenderEnv": false,
+  "jobImplemented": true,
+  "backendDeployRequired": true,
+  "ownerTemporaryRenderEnv": {
+    "SECURITY_E2E_JOB_ENABLED": "true",
+    "SECURITY_E2E_JOB_RUN_ID": "security-e2e-2026-06-14-001",
+    "SECURITY_E2E_JOB_CONFIRM": "run-disposable-entitlement-e2e"
+  },
+  "ownerDisableAfterRun": {
+    "SECURITY_E2E_JOB_ENABLED": "false",
+    "SECURITY_E2E_JOB_CONFIRM": ""
+  },
+  "renderSteps": [
+    "Deploy backend commit containing src/securityE2EJob.js.",
+    "Set the three temporary SECURITY_E2E_JOB_* env values on the production backend service only.",
+    "Redeploy/restart the backend service.",
+    "Confirm Render logs show masked Security E2E one-time job completed output.",
+    "Disable SECURITY_E2E_JOB_ENABLED and clear SECURITY_E2E_JOB_CONFIRM.",
+    "Redeploy/restart again.",
+    "Confirm the same run id does not rerun and dangerous mutation flags remain locked."
+  ],
+  "jobRan": false,
+  "jobDisabledAfterRun": false,
+  "resultStorage": {
+    "dbSettingKey": "security_e2e_job:security-e2e-2026-06-14-001",
+    "auditActions": [
+      "security_e2e_job_started",
+      "security_e2e_disposable_license_created",
+      "security_e2e_disposable_cleanup_completed",
+      "security_e2e_job_completed"
+    ]
+  },
+  "liveBackendBeforeDeploy": {
+    "version": "1.0.128",
+    "commit": "c27c12fcd411e55ab9528f4f81eb64c01914b591"
+  }
+}

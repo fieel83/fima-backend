@@ -1,0 +1,25 @@
+{
+  "priority": "3A13",
+  "phase": "1-disposable-license-create",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "implementedIn": "src/securityE2EJob.js",
+  "jobRunStatus": "pending_render_env_trigger",
+  "disposableLicenseCreatedNow": false,
+  "plannedBehavior": {
+    "createExactlyOneLicense": true,
+    "source": "security_e2e",
+    "createdBy": "system_security_hotfix",
+    "incidentId": "admin_panel_breach_2026_06_13",
+    "testOnly": true,
+    "runIdAttached": true,
+    "shortExpiration": "90 minutes",
+    "disableAfterTests": true,
+    "paidLicensesAffectedExpected": 0
+  },
+  "secretSafety": {
+    "adminKeyRequiredLocally": false,
+    "fullLicensePrinted": false,
+    "fullGiftCodesPrinted": false,
+    "secretsPrinted": false
+  }
+}

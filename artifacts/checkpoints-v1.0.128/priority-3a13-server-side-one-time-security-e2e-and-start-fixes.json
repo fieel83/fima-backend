@@ -1,0 +1,79 @@
+{
+  "priority": "3A13",
+  "createdAt": "2026-06-14T09:19:15.309Z",
+  "status": "implemented_pending_render_run",
+  "oneTimeServerSideJobImplemented": true,
+  "publicEndpointCreated": false,
+  "repeatRunProtection": true,
+  "renderEnvRunRequired": true,
+  "securityE2eJobRunId": "security-e2e-2026-06-14-001",
+  "jobRan": false,
+  "jobDisabledAfterRun": false,
+  "disposableLicense": {
+    "created": false,
+    "fullLicensePrinted": false,
+    "disabledOrRevokedAfterTest": false,
+    "paidLicensesAffected": 0
+  },
+  "entitlementE2e": {
+    "validV128EntitlementIssued": false,
+    "refreshWorks": false,
+    "missingTokenBlocked": false,
+    "invalidTokenBlocked": false,
+    "invalidKeyBlocked": false,
+    "expiredLicenseBlocked": false,
+    "disabledLicenseBlocked": false,
+    "hwidMismatchBlocked": false,
+    "disableLicenseThenLockPassed": false,
+    "officialMacroBlockedWithoutEntitlement": false,
+    "oldV127UpdateRequired": "previously_verified_not_rerun",
+    "newV128Works": false
+  },
+  "adminRbac": {
+    "loggedOutAdminBlocked": "implemented_pending_render_run",
+    "normalUserAdminBlocked": "implemented_pending_render_run",
+    "normalUserAdminJsonBlocked": "implemented_pending_render_run",
+    "adminWithoutPermissionBlocked": "implemented_pending_render_run",
+    "dangerousMutationBlockedWhileRelocked": "implemented_pending_render_run",
+    "auditLogVerified": false
+  },
+  "cloudflare": {
+    "proxyVerified": true,
+    "wafConfiguredOrVerified": false,
+    "edgeRateLimitingConfiguredOrVerified": false,
+    "turnstileConfiguredOrVerified": false,
+    "cloudflareAccessConfiguredOrVerified": false,
+    "ownerChecklistPath": "artifacts/security-v1.0.128/cloudflare-owner-final-setup-checklist.md"
+  },
+  "postSecurity": {
+    "securityGateFullyPassed": false,
+    "appKeyLicenseUxFixesStarted": false,
+    "macroAppBugFixesStarted": false,
+    "websiteFixesStarted": false,
+    "discordBotFixesStarted": false
+  },
+  "filesEdited": [
+    ".env.example",
+    "src/server.js",
+    "src/securityE2EJob.js"
+  ],
+  "checksRun": {
+    "nodeCheckSecurityJob": "passed",
+    "nodeCheckServer": "passed",
+    "npmTest": "passed_29_tests",
+    "liveApiVersionReadOnly": "1.0.128 c27c12fcd411e55ab9528f4f81eb64c01914b591",
+    "liveLatestJsonReadOnly": "1.0.128"
+  },
+  "secretsPrinted": false,
+  "fullLicenseOrGiftCodesPrinted": false,
+  "unauthorizedCleanupRerun": false,
+  "remainingBlockers": [
+    "deploy backend job source",
+    "set temporary SECURITY_E2E_JOB_* Render env values",
+    "run job once on Render",
+    "disable job flags after run",
+    "Cloudflare WAF/Turnstile/Access owner configuration",
+    "obfuscation/code signing not implemented"
+  ],
+  "nextRecommendedStep": "Commit/push the backend job source, let Render deploy, then set the temporary Render env trigger values for one run."
+}
