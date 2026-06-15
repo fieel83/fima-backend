@@ -1,0 +1,32 @@
+{
+  "phase": "3a32r-live-deploy-owner-key-state",
+  "createdAt": "2026-06-16T00:00:00.000Z",
+  "liveChecks": {
+    "siteLoads": true,
+    "securityLoads": true,
+    "latestJsonLoads": true,
+    "latestJsonVersion": "1.0.130",
+    "latestJsonChanged": false,
+    "v10131Published": false,
+    "suspendHeaderPresent": false,
+    "backendVersion": "1.0.128",
+    "liveCommit": "3bc73de35477e29ad2b3db3dcd91312b154112a2",
+    "dashboardProductsRouteLive": false,
+    "dashboardProductsRouteStatus": 404,
+    "downloadRouteRedirectsToGithub": true
+  },
+  "ownerKeyState": {
+    "ownerKeyMasked": "FIMA-D52N-****-****-98LV",
+    "ownerKeyWorksInApp": "owner_observed_yes",
+    "ownerLifetimeActive": "owner_observed_yes",
+    "myProductsLifetimeVisible": "not_verified_without_owner_session",
+    "fullKeyPrinted": false,
+    "fullEmailPrinted": false,
+    "fullHwidPrinted": false
+  },
+  "notes": [
+    "Live backend/site still reports commit 3bc73de35477e29ad2b3db3dcd91312b154112a2.",
+    "Current local source contains dashboard route fixes not yet visible on live Render.",
+    "No Render credentials or protected owner key/HWID env values were visible to Codex."
+  ]
+}

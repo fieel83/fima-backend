@@ -1,10 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
-import { generateUniqueLicenseKey } from "./license.js";
+import { generateUniqueLicenseKey, normalizeHwid, normalizeLicenseKey } from "./license.js";
 import { getPlan } from "./plans.js";
 
-const JOB_CONFIRM_VALUE = "grant-fieelcomplex-lifetime";
+const JOB_CONFIRM_VALUE = "bind-owner-existing-key";
+const LEGACY_JOB_CONFIRM_VALUE = "grant-fieelcomplex-lifetime";
 const JOB_SETTING_PREFIX = "owner_lifetime_grant_job:";
 const OWNER_ROBLOX_USERNAME = "fieelcomplex";
 const OWNER_ROBLOX_ID = "549482728";
@@ -32,6 +33,9 @@ export async function runOwnerLifetimeGrantJobOnce({
     backendCommit,
     ownerRobloxUsername: OWNER_ROBLOX_USERNAME,
     ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID),
+    ownerEmailHintProvided: Boolean(config.ownerEmailNormalized),
+    existingOwnerKeyProvided: Boolean(config.ownerLicenseKey),
+    ownerHwidProvided: Boolean(config.ownerHwid),
     publicEndpointCreated: false,
     repeatRunProtection: true,
     secretsPrinted: false,
@@ -62,10 +66,13 @@ export async function runOwnerLifetimeGrantJobOnce({
       backendVersion,
       backendCommit,
       ownerRobloxUsername: OWNER_ROBLOX_USERNAME,
-      ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID)
+      ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID),
+      ownerEmailHintProvided: Boolean(config.ownerEmailNormalized),
+      existingOwnerKeyProvided: Boolean(config.ownerLicenseKey),
+      ownerHwidProvided: Boolean(config.ownerHwid)
     });
 
-    const owner = await findOwnerAccount();
+    const owner = await findOwnerAccount(config);
     if (!owner) {
       result.status = "blocked";
       result.completedAt = new Date().toISOString();
@@ -75,21 +82,24 @@ export async function runOwnerLifetimeGrantJobOnce({
       await createAuditLog("owner_lifetime_grant_job_blocked", "owner_lifetime_grant_job", maskId(config.runId), {
         reason: result.blockedReason,
         ownerRobloxUsername: OWNER_ROBLOX_USERNAME,
-        ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID)
+        ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID),
+        ownerEmailHintProvided: Boolean(config.ownerEmailNormalized)
       });
       logger.warn("Owner lifetime grant blocked.", {
         reason: result.blockedReason,
         ownerRobloxUsername: OWNER_ROBLOX_USERNAME,
-        ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID)
+        ownerRobloxIdMasked: maskId(OWNER_ROBLOX_ID),
+        ownerEmailHintProvided: Boolean(config.ownerEmailNormalized)
       });
       return result;
     }
 
     result.ownerAccountMatched = true;
     result.ownerUserIdMasked = maskId(owner.id);
+    result.ownerMatchSource = owner.__ownerMatchSource || "unknown";
 
-    const existing = await findExistingOwnerLicense(owner.email);
-    if (existing) {
+    const existing = await findExistingOwnerLicense(owner.email, config.ownerLicenseKey);
+    if (existing && !config.ownerLicenseKey) {
       result.status = "passed";
       result.completedAt = new Date().toISOString();
       result.created = false;
@@ -109,21 +119,24 @@ export async function runOwnerLifetimeGrantJobOnce({
       return result;
     }
 
-    const created = await createOwnerLifetimeLicense(owner, config.runId);
+    const { license: created, created: licenseCreated, alreadyExisted } = await upsertOwnerLifetimeLicense(owner, config, result.ownerMatchSource);
     result.status = "passed";
     result.completedAt = new Date().toISOString();
-    result.created = true;
-    result.alreadyExisted = false;
+    result.created = licenseCreated;
+    result.alreadyExisted = alreadyExisted;
     result.visibleInMyProducts = true;
+    result.ownerHwidBound = Boolean(normalizeHwid(created.hwid));
+    result.adminAccessAttached = true;
     result.licenseIdMasked = maskId(created.id);
     result.licenseKeyMasked = maskLicense(created.licenseKey);
     await writeResult(settingKey, result);
     await createAuditLog("owner_lifetime_grant_job_completed", "owner_lifetime_grant_job", maskId(config.runId), {
       runId: maskId(config.runId),
       status: result.status,
-      created: true,
-      alreadyExisted: false,
+      created: licenseCreated,
+      alreadyExisted,
       licenseIdMasked: result.licenseIdMasked,
+      ownerHwidBound: result.ownerHwidBound,
       paidLicensesAffected: 0
     });
     logger.info("Owner lifetime grant completed.", publicLogSummary(result));
@@ -146,15 +159,21 @@ function readJobConfig() {
   const enabled = isTruthy(process.env.OWNER_LIFETIME_GRANT_ENABLED);
   const runId = String(process.env.OWNER_LIFETIME_GRANT_RUN_ID || "").trim();
   const confirm = String(process.env.OWNER_LIFETIME_GRANT_CONFIRM || "").trim();
+  const ownerEmailNormalized = normalizeEmail(process.env.OWNER_LIFETIME_GRANT_EMAIL);
+  const ownerLicenseKey = normalizeLicenseKey(process.env.OWNER_LIFETIME_LICENSE_KEY);
+  const ownerHwid = normalizeHwid(process.env.OWNER_LIFETIME_OWNER_HWID);
   return {
     enabled,
     runId,
-    confirmed: confirm === JOB_CONFIRM_VALUE
+    confirmed: confirm === JOB_CONFIRM_VALUE || confirm === LEGACY_JOB_CONFIRM_VALUE,
+    ownerEmailNormalized,
+    ownerLicenseKey,
+    ownerHwid
   };
 }
 
-function findOwnerAccount() {
-  return prisma.user.findFirst({
+async function findOwnerAccount(config = {}) {
+  const byRoblox = await prisma.user.findFirst({
     where: {
       OR: [
         { robloxUsername: { equals: OWNER_ROBLOX_USERNAME, mode: "insensitive" } },
@@ -163,26 +182,51 @@ function findOwnerAccount() {
     },
     orderBy: { updatedAt: "desc" }
   });
+  if (byRoblox) return withOwnerMatchSource(byRoblox, "roblox");
+
+  if (!config.ownerEmailNormalized) return null;
+  const byEmail = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { emailNormalized: config.ownerEmailNormalized },
+        { email: { equals: config.ownerEmailNormalized, mode: "insensitive" } }
+      ]
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+  return byEmail ? withOwnerMatchSource(byEmail, "email_hint") : null;
 }
 
-function findExistingOwnerLicense(email) {
+function withOwnerMatchSource(owner, source) {
+  return Object.defineProperty(owner, "__ownerMatchSource", {
+    value: source,
+    enumerable: false
+  });
+}
+
+function findExistingOwnerLicense(email, ownerLicenseKey = "") {
   return prisma.license.findFirst({
     where: {
-      customerEmail: email,
       plan: "lifetime",
       lifetime: true,
       status: "active",
       OR: [
-        { notes: { contains: "owner_internal_lifetime", mode: "insensitive" } },
-        { notes: { contains: `ownerRoblox=${OWNER_ROBLOX_USERNAME}`, mode: "insensitive" } },
-        { notes: { contains: `ownerRobloxId=${OWNER_ROBLOX_ID}`, mode: "insensitive" } }
-      ]
+        ownerLicenseKey ? { licenseKey: ownerLicenseKey } : undefined,
+        {
+          customerEmail: email,
+          OR: [
+            { notes: { contains: "owner_internal_lifetime", mode: "insensitive" } },
+            { notes: { contains: `ownerRoblox=${OWNER_ROBLOX_USERNAME}`, mode: "insensitive" } },
+            { notes: { contains: `ownerRobloxId=${OWNER_ROBLOX_ID}`, mode: "insensitive" } }
+          ]
+        }
+      ].filter(Boolean)
     },
     orderBy: { createdAt: "desc" }
   });
 }
 
-async function createOwnerLifetimeLicense(owner, runId) {
+async function createOwnerLifetimeLicense(owner, runId, matchSource = "unknown") {
   const plan = getPlan("lifetime");
   if (!plan) throw publicError("missing_lifetime_plan", "Lifetime plan is not configured.");
 
@@ -203,6 +247,7 @@ async function createOwnerLifetimeLicense(owner, runId) {
           `createdBy=${CREATED_BY}`,
           `incidentId=${INCIDENT_ID}`,
           `runId=${safeRunId(runId)}`,
+          `ownerMatch=${safeRunId(matchSource)}`,
           `ownerRoblox=${OWNER_ROBLOX_USERNAME}`,
           `ownerRobloxId=${OWNER_ROBLOX_ID}`
         ].join(" ")
@@ -220,6 +265,7 @@ async function createOwnerLifetimeLicense(owner, runId) {
           incidentId: INCIDENT_ID,
           runId: maskId(runId),
           userIdMasked: maskId(owner.id),
+          ownerMatchSource: matchSource,
           robloxUsername: OWNER_ROBLOX_USERNAME,
           robloxIdMasked: maskId(OWNER_ROBLOX_ID),
           licenseKeyPrinted: false
@@ -229,6 +275,85 @@ async function createOwnerLifetimeLicense(owner, runId) {
 
     return license;
   });
+}
+
+async function upsertOwnerLifetimeLicense(owner, config, matchSource = "unknown") {
+  if (!config.ownerLicenseKey) {
+    const license = await createOwnerLifetimeLicense(owner, config.runId, matchSource);
+    return { license, created: true, alreadyExisted: false };
+  }
+
+  const plan = getPlan("lifetime");
+  if (!plan) throw publicError("missing_lifetime_plan", "Lifetime plan is not configured.");
+
+  return prisma.$transaction(async (tx) => {
+    const existingByKey = await tx.license.findUnique({ where: { licenseKey: config.ownerLicenseKey } });
+    const notes = ownerLicenseNotes(config.runId, matchSource, "owner_existing_key_bind");
+    const data = {
+      customerEmail: owner.email,
+      plan: plan.id,
+      status: "active",
+      hwid: config.ownerHwid || existingByKey?.hwid || null,
+      expiresAt: null,
+      lifetime: true,
+      notes: mergeNotes(existingByKey?.notes, notes)
+    };
+
+    const license = existingByKey
+      ? await tx.license.update({ where: { id: existingByKey.id }, data })
+      : await tx.license.create({
+          data: {
+            ...data,
+            licenseKey: config.ownerLicenseKey,
+            stripeSessionId: null,
+            stripePaymentIntentId: null
+          }
+        });
+
+    await tx.auditLog.create({
+      data: {
+        action: existingByKey ? "owner_lifetime_license_attached" : "owner_lifetime_license_created_from_existing_key",
+        targetType: "license",
+        targetId: license.id,
+        metadata: {
+          source: "owner_existing_key_bind",
+          createdBy: CREATED_BY,
+          incidentId: INCIDENT_ID,
+          runId: maskId(config.runId),
+          userIdMasked: maskId(owner.id),
+          ownerMatchSource: matchSource,
+          robloxUsername: OWNER_ROBLOX_USERNAME,
+          robloxIdMasked: maskId(OWNER_ROBLOX_ID),
+          ownerHwidBound: Boolean(normalizeHwid(license.hwid)),
+          licenseKeyMasked: maskLicense(license.licenseKey),
+          licenseKeyPrinted: false
+        }
+      }
+    }).catch(() => null);
+
+    return { license, created: !existingByKey, alreadyExisted: Boolean(existingByKey) };
+  });
+}
+
+function ownerLicenseNotes(runId, matchSource, source = "owner_grant") {
+  return [
+    "owner_internal_lifetime",
+    `source=${source}`,
+    `createdBy=${CREATED_BY}`,
+    `incidentId=${INCIDENT_ID}`,
+    `runId=${safeRunId(runId)}`,
+    `ownerMatch=${safeRunId(matchSource)}`,
+    `ownerRoblox=${OWNER_ROBLOX_USERNAME}`,
+    `ownerRobloxId=${OWNER_ROBLOX_ID}`,
+    "adminAccess=owner_only"
+  ].join(" ");
+}
+
+function mergeNotes(existing, addition) {
+  const current = String(existing || "").trim();
+  if (!current) return addition;
+  if (current.includes("owner_internal_lifetime")) return current;
+  return `${current} ${addition}`.trim();
 }
 
 function writeResult(settingKey, result) {
@@ -260,13 +385,17 @@ function publicLogSummary(result) {
 
 function safeError(error) {
   return {
-    message: String(error?.message || "unknown_error").slice(0, 240),
+    message: maskSensitiveText(String(error?.message || "unknown_error")).slice(0, 240),
     code: error?.code || null
   };
 }
 
 function isTruthy(value) {
   return ["1", "true", "yes", "on", "enabled"].includes(String(value || "").trim().toLowerCase());
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function safeRunId(value) {
@@ -289,6 +418,12 @@ function maskLicense(value) {
   const compact = String(value || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   if (!compact) return null;
   return `FIMA-****-****-****-${compact.slice(-4)}`;
+}
+
+function maskSensitiveText(value) {
+  return String(value || "")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[masked-email]")
+    .replace(/FIMA[-_\s]?[A-Z0-9]{4,}(?:[-_\s]?[A-Z0-9]{4,}){2,}/gi, "FIMA-****");
 }
 
 function publicError(code, message) {

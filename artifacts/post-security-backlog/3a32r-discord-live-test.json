@@ -1,0 +1,14 @@
+{
+  "phase": "3a32r-discord-live-test",
+  "status": "not_run",
+  "reason": "No live Discord interaction/session available to Codex, and live backend still reports old deployed commit.",
+  "checks": {
+    "botOnline": "not_verified",
+    "fimaTicketSetupTested": false,
+    "fimaTrustSetupTested": false,
+    "ticketFlowWorks": "not_verified",
+    "trustSetupWorks": "not_verified",
+    "tokenPrinted": false,
+    "fullEmailsOrKeysInTranscripts": false
+  }
+}

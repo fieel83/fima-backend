@@ -1,0 +1,54 @@
+{
+  "phase": "3a32r-dashboard-real-pages-no-stacked-sections",
+  "status": "source_and_local_preview_verified",
+  "routes": {
+    "/dashboard/overview": "overview",
+    "/dashboard/products": "products",
+    "/dashboard/billing": "billing",
+    "/dashboard/redeem": "redeem",
+    "/dashboard/gifts": "redeem",
+    "/dashboard/referrals": "referrals",
+    "/dashboard/connected-accounts": "connected-accounts",
+    "/dashboard/security": "security",
+    "/dashboard/downloads": "downloads",
+    "/dashboard/support": "support",
+    "/dashboard/settings": "security"
+  },
+  "localRouteChecks": [
+    {
+      "route": "/dashboard/overview",
+      "visibleSections": ["overview"],
+      "hiddenSectionCount": 8,
+      "activeNav": ["overview"],
+      "overflowX": false
+    },
+    {
+      "route": "/dashboard/products",
+      "visibleSections": ["products"],
+      "hiddenSectionCount": 8,
+      "activeNav": ["products"],
+      "overflowX": false
+    },
+    {
+      "route": "/dashboard/redeem",
+      "visibleSections": ["redeem"],
+      "hiddenSectionCount": 8,
+      "activeNav": ["redeem"],
+      "overflowX": false
+    },
+    {
+      "route": "/dashboard/security",
+      "visibleSections": ["security"],
+      "hiddenSectionCount": 8,
+      "activeNav": ["security"],
+      "overflowX": false
+    }
+  ],
+  "browserBackForwardExpected": true,
+  "profileDropdownLinksUseCleanRoutes": true,
+  "uglyHtmlLinksVisible": false,
+  "liveStatus": {
+    "livePatchDeployed": false,
+    "dashboardProductsRouteStatus": 404
+  }
+}

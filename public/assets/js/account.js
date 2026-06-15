@@ -5,6 +5,30 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const language = () => localStorage.getItem("fima.language") || "en";
+  const dashboardRoutes = {
+    overview: "/dashboard/overview",
+    products: "/dashboard/products",
+    billing: "/dashboard/billing",
+    redeem: "/dashboard/redeem",
+    gifts: "/dashboard/gifts",
+    referrals: "/dashboard/referrals",
+    "connected-accounts": "/dashboard/connected-accounts",
+    security: "/dashboard/security",
+    downloads: "/dashboard/downloads",
+    support: "/dashboard/support",
+    settings: "/dashboard/settings"
+  };
+  const dashboardRoute = (name) => dashboardRoutes[name] || dashboardRoutes.overview;
+  const dashboardSectionFromLocation = () => {
+    const pathMatch = location.pathname.match(/^\/dashboard\/([^/]+)\/?$/i);
+    if (pathMatch) return pathMatch[1].toLowerCase();
+    const hash = location.hash.replace(/^#/, "").trim().toLowerCase();
+    return ({
+      "gift-access": "redeem",
+      "purchased-gifts": "gifts",
+      "monthly-trial": "redeem"
+    }[hash] || hash || "overview");
+  };
 
   const copy = {
     "en": {
@@ -1174,10 +1198,10 @@
   };
   const applyStaticTranslations = () => {
     document.documentElement.lang = language();
-    setAllText(".links a[href='store.html']", t("storeNav"));
-    setAllText(".links a[href='login.html']", t("loginNav"));
-    setAllText(".links a[href='dashboard.html']", t("dashboardNav"));
-    setAllText(".links a[href='my-products.html']", t("myProductsNav"));
+    setAllText(".links a[href='/store']", t("storeNav"));
+    setAllText(".links a[href='/login']", t("loginNav"));
+    setAllText(`.links a[href="${dashboardRoute("overview")}"]`, t("dashboardNav"));
+    setAllText(`.links a[href="${dashboardRoute("products")}"]`, t("myProductsNav"));
     setAllText("[data-logout]", t("logoutNav"));
 
     if (page === "register") {
@@ -1198,7 +1222,7 @@
       setLabel("input[name='login']", language() === "tr" ? "Kullanici adi" : "Username");
       setLabel("input[name='password']", t("password"));
       setText("button[type='submit']", t("loginButton"));
-      setText("a[href='forgot-password.html']", t("forgotTitle"));
+      setText("a[href='/forgot-password']", t("forgotTitle"));
     }
     if (page === "forgot") {
       setHeroCopy("Fima Account", t("forgotTitle"), t("forgotIntro"));
@@ -1414,17 +1438,16 @@
             ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
             <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(planLabel)}</small></div>
           </div>
-          <a class="account-dropdown-link" href="dashboard.html#overview">Account</a>
-          <a class="account-dropdown-link" href="my-products.html">${t("myProductsNav")}</a>
-          <a class="account-dropdown-link" href="dashboard.html#billing">${t("billingNav")}</a>
-          <a class="account-dropdown-link" href="dashboard.html#gift-access">Redeem Key</a>
-          <a class="account-dropdown-link" href="dashboard.html#purchased-gifts">Gift Codes</a>
-          <a class="account-dropdown-link" href="dashboard.html#referrals">Invite Code / Referrals</a>
-          <a class="account-dropdown-link" href="dashboard.html#connected-accounts">Connected Accounts</a>
-          <a class="account-dropdown-link" href="dashboard.html#security">${t("accountSettingsNav")}</a>
-          <a class="account-dropdown-link" href="download.html">Downloads</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("overview")}">Account</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("products")}">${t("myProductsNav")}</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("billing")}">${t("billingNav")}</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("redeem")}">Redeem / Gift</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("referrals")}">Invite Code / Referrals</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("connected-accounts")}">Connected Accounts</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("security")}">${t("accountSettingsNav")}</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("downloads")}">Downloads</a>
           <a class="account-dropdown-link" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
-          <a class="account-dropdown-link" href="support.html">${t("supportNav")}</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("support")}">${t("supportNav")}</a>
           ${adminLink}
           <button class="account-dropdown-link" type="button" data-logout>${t("logoutNav")}</button>
           ${user?.discordUserId ? "" : `<a class="account-dropdown-warning" href="${apiBase}/auth/discord/start">${t("recoveryNotLinked")} - ${t("linkDiscordRecovery")}</a>`}
@@ -1441,7 +1464,15 @@
     const panel = $("[data-account-menu-panel]", menu);
     const setOpen = (open) => {
       if (!panel || !toggle) return;
-      panel.hidden = !open;
+      if (open) {
+        panel.hidden = false;
+        window.requestAnimationFrame(() => panel.classList.add("is-open"));
+      } else {
+        panel.classList.remove("is-open");
+        window.setTimeout(() => {
+          if (!panel.classList.contains("is-open")) panel.hidden = true;
+        }, 180);
+      }
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
     };
     toggle?.addEventListener("click", (event) => {
@@ -1461,16 +1492,16 @@
     const nav = $(".account-header .nav");
     if (!nav) return;
     nav.innerHTML = `
-      <a class="brand" href="index.html"><img src="assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a>
+      <a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a>
       <div class="links account-main-links">
         ${user ? `
-          <a class="${page === "my-products" ? "is-active" : ""}" href="my-products.html">${t("myProductsNav")}</a>
-          <a href="dashboard.html#gift-access">${t("redeemGiftNav")}</a>
-          <a href="pricing.html">${t("buyPricing")}</a>
+          <a class="${page === "my-products" ? "is-active" : ""}" href="${dashboardRoute("products")}">${t("myProductsNav")}</a>
+          <a href="${dashboardRoute("redeem")}">${t("redeemGiftNav")}</a>
+          <a href="/pricing">${t("buyPricing")}</a>
         ` : `
-          <a class="${page === "login" ? "is-active" : ""}" href="login.html">${t("loginNav")}</a>
-          <a class="nav-register-cta ${page === "register" ? "is-active" : ""}" href="register.html">${t("registerButton")}</a>
-          <a class="nav-buy-cta" href="pricing.html">${t("buyPricing")}</a>
+          <a class="${page === "login" ? "is-active" : ""}" href="/login">${t("loginNav")}</a>
+          <a class="nav-register-cta ${page === "register" ? "is-active" : ""}" href="/register">${t("registerButton")}</a>
+          <a class="nav-buy-cta" href="/pricing">${t("buyPricing")}</a>
         `}
       </div>
       <div class="account-header-actions">
@@ -1578,7 +1609,7 @@
     try {
       return (await api("/api/auth/me")).user;
     } catch {
-      window.location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+      window.location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
       return null;
     }
   };
@@ -1590,7 +1621,7 @@
       button.disabled = true;
       currentUserPromise = null;
       await post("/api/auth/logout", {});
-      window.location.href = "login.html";
+      window.location.href = "/login";
     });
   };
 
@@ -1656,7 +1687,7 @@
         try {
           const data = await post("/api/auth/roblox-preview", { robloxUsername: username });
           const profile = data.profile;
-          preview.innerHTML = `<img src="${escapeHtml(profile.avatarUrl || "assets/images/fima-logo.png")}" alt=""><div><strong>${escapeHtml(profile.displayName || profile.username)}</strong><span>@${escapeHtml(profile.username)}</span></div>`;
+          preview.innerHTML = `<img src="${escapeHtml(profile.avatarUrl || "/assets/images/fima-logo.png")}" alt=""><div><strong>${escapeHtml(profile.displayName || profile.username)}</strong><span>@${escapeHtml(profile.username)}</span></div>`;
         } catch {
           preview.innerHTML = `<div class="avatar-placeholder">!</div><div><strong>${t("roblox")}</strong><span>${t("robloxNotFound")}</span></div>`;
         }
@@ -1692,7 +1723,7 @@
         const data = await post("/api/auth/forgot-password", { login, username: login, method: "discord" });
         setMessage(data.resetUrl ? `Dev reset URL: ${data.resetUrl}` : (data.message || t("resetCodeSent")), "good");
         window.setTimeout(() => {
-          window.location.href = `reset-password.html?login=${encodeURIComponent(login)}`;
+          window.location.href = `/reset-password?login=${encodeURIComponent(login)}`;
         }, 850);
       } catch (error) {
         setMessage(error.message, "error");
@@ -1739,7 +1770,7 @@
         }
         await post("/api/auth/reset-password", { token: form.token.value, password: form.password.value });
         setMessage(t("resetComplete"), "good");
-        window.setTimeout(() => { window.location.href = "login.html"; }, 900);
+        window.setTimeout(() => { window.location.href = "/login"; }, 900);
       } catch (error) {
         setMessage(error.message, "error");
       } finally {
@@ -1773,7 +1804,7 @@
         <p>${escapeHtml(product.description || "Premium Fima Macro product access.")}</p>
         <button class="button" type="button" data-buy-product="${escapeHtml(product.id)}" ${product.price ? "" : "disabled"}>${t("buyWithStripe")}</button>
       </article>
-    `).join("") : `<div class="empty-state"><h3>${t("noStoreProducts")}</h3><a class="button" href="pricing.html">${t("buyPricing")}</a></div>`;
+    `).join("") : `<div class="empty-state"><h3>${t("noStoreProducts")}</h3><a class="button" href="/pricing">${t("buyPricing")}</a></div>`;
   };
 
   const initStore = async () => {
@@ -1845,7 +1876,7 @@
             <div><span>${t("discord")}</span><strong>${discordLinked ? t("yes") : t("no")}</strong></div>
             <div><span>${t("roblox")}</span><strong>${robloxLinked ? t("yes") : t("no")}</strong></div>
           </div>
-          ${needsSupport ? `<p class="access-warning">${escapeHtml(t("needsSupport"))} <a href="support.html">${escapeHtml(t("openSupport"))}</a></p>` : ""}
+          ${needsSupport ? `<p class="access-warning">${escapeHtml(t("needsSupport"))} <a href="${dashboardRoute("support")}">${escapeHtml(t("openSupport"))}</a></p>` : ""}
           <div class="access-actions">
             <button class="button secondary" type="button" ${licenseRecordId ? `data-copy-license-id="${escapeHtml(licenseRecordId)}"` : `data-copy-license-secret="${escapeHtml(licenseActionId)}"`}>${t("copyKey")}</button>
             <button class="button" type="button" ${licenseRecordId ? `data-download-license-id="${escapeHtml(licenseRecordId)}"` : `data-download-license-secret="${escapeHtml(licenseActionId)}"`}>${t("download")}</button>
@@ -1870,12 +1901,12 @@
     const context = window.fimaAccountProductContext || {};
     target.innerHTML = items.length
       ? `<div class="access-grid">${items.map((item) => productCard(item, context)).join("")}</div>`
-      : `<div class="empty-state"><h3>${t("noProducts")}</h3><a class="button" href="pricing.html">${t("buyPricing")}</a></div>`;
+      : `<div class="empty-state"><h3>${t("noProducts")}</h3><a class="button" href="/pricing">${t("buyPricing")}</a></div>`;
     updateCountdowns();
   };
 
   const renderLicenses = (licenses = []) => {
-    const target = $("#licenses");
+    const target = $("#licenseList");
     if (!target) return;
     target.innerHTML = licenses.length
       ? `<div class="rows">${licenses.map((license) => `
@@ -1917,11 +1948,11 @@
         ${!discordLinked ? `
           <div class="verification-actions">
             <a class="button" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
-            <a class="button secondary" href="forgot-password.html">${t("forgotTitle")}</a>
+            <a class="button secondary" href="/forgot-password">${t("forgotTitle")}</a>
           </div>
         ` : `
           <div class="verification-actions">
-            <a class="button secondary" href="forgot-password.html">Test recovery DM</a>
+            <a class="button secondary" href="/forgot-password">Test recovery DM</a>
           </div>
         `}
       </div>
@@ -1978,8 +2009,8 @@
           <div class="integration-actions">
             <span class="status-pill">${discord.connected ? t("connected") : t("notConnected")}</span>
             ${discord.connected
-              ? `<a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=/dashboard.html">${t("reconnectDiscord")}</a><button class="button danger" type="button" data-disconnect-provider="discord">${t("disconnectDiscord")}</button>`
-              : `<a class="button" href="${apiBase}/auth/discord/start?returnTo=/dashboard.html">${t("connectDiscord")}</a>`}
+              ? `<a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("reconnectDiscord")}</a><button class="button danger" type="button" data-disconnect-provider="discord">${t("disconnectDiscord")}</button>`
+              : `<a class="button" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a>`}
           </div>
         </article>
         <article class="integration-card ${roblox.connected ? "is-connected" : "is-missing"}">
@@ -1991,8 +2022,8 @@
           <div class="integration-actions">
             <span class="status-pill">${roblox.connected ? t("connected") : t("notConnected")}</span>
             ${roblox.connected
-              ? `<a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=/dashboard.html">${t("reconnectRoblox")}</a><button class="button danger" type="button" data-disconnect-provider="roblox">${t("disconnectRoblox")}</button>`
-              : `<a class="button" href="${apiBase}/auth/roblox/start?returnTo=/dashboard.html">${t("connectRoblox")}</a>`}
+              ? `<a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("reconnectRoblox")}</a><button class="button danger" type="button" data-disconnect-provider="roblox">${t("disconnectRoblox")}</button>`
+              : `<a class="button" href="${apiBase}/auth/roblox/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectRoblox")}</a>`}
           </div>
         </article>
       </div>
@@ -2039,8 +2070,8 @@
           <div class="requirement-list">
             ${requirements.map((item) => `<div class="requirement ${item.complete ? "is-complete" : "is-missing"}"><span>${item.complete ? "OK" : "!"}</span><strong>${escapeHtml(requirementLabel(item.id))}</strong></div>`).join("")}
           </div>
-          ${missingDiscord ? `<div class="trial-hint"><span>${t("connectDiscordTrial")}</span><a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=/dashboard.html">${t("connectDiscord")}</a></div>` : ""}
-          ${missingRoblox ? `<div class="trial-hint"><span>${t("connectRobloxTrial")}</span><a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=/dashboard.html">${t("connectRoblox")}</a></div>` : ""}
+          ${missingDiscord ? `<div class="trial-hint"><span>${t("connectDiscordTrial")}</span><a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a></div>` : ""}
+          ${missingRoblox ? `<div class="trial-hint"><span>${t("connectRobloxTrial")}</span><a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectRoblox")}</a></div>` : ""}
           ${!missingDiscord && !trial.active && !trial.cooldownActive ? `<div class="trial-hint is-ready"><span>${t("requirementsComplete")}</span></div>` : ""}
         </div>
         <aside class="trial-side">
@@ -2208,7 +2239,7 @@
     ["monthly", t("giftBuyMonthly")],
     ["lifetime", t("giftBuyLifetime")]
   ]).map(([plan, label]) => `
-    <a class="button ${plan === "monthly" ? "primary" : "secondary"}" href="pricing.html?giftRecipient=${encodeURIComponent(recipientId)}&checkout=${encodeURIComponent(plan)}" data-gift-plan="${escapeHtml(plan)}">${escapeHtml(label)}</a>
+    <a class="button ${plan === "monthly" ? "primary" : "secondary"}" href="/pricing?giftRecipient=${encodeURIComponent(recipientId)}&checkout=${encodeURIComponent(plan)}" data-gift-plan="${escapeHtml(plan)}">${escapeHtml(label)}</a>
   `).join("");
 
   const renderSelectedGiftRecipient = (recipient) => {
@@ -2415,9 +2446,47 @@
     renderMonthlyTrial(data.trial || {});
     renderReferralDashboard(data.referrals || {});
     window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
+    renderAccountProducts(data.products || [], "#dashboardProducts");
     renderAccountProducts(data.products || [], "#purchases");
     renderLicenses(data.licenses || []);
     return data;
+  };
+
+  const applyDashboardSectionRoute = () => {
+    if (page !== "dashboard") return;
+    const section = dashboardSectionFromLocation();
+    const visibleByRoute = {
+      overview: ["overview"],
+      products: ["products"],
+      billing: ["billing"],
+      redeem: ["redeem"],
+      gifts: ["redeem"],
+      referrals: ["referrals"],
+      "connected-accounts": ["connected-accounts"],
+      security: ["security"],
+      settings: ["security"],
+      downloads: ["downloads"],
+      support: ["support"]
+    };
+    const visible = new Set(visibleByRoute[section] || visibleByRoute.overview);
+    document.body.dataset.dashboardSection = section;
+    $$(".account-summary-card, .account-section").forEach((node) => {
+      const id = node.id || "";
+      const show = visible.has(id);
+      node.hidden = !show;
+      node.classList.toggle("is-route-active", show);
+    });
+    $$(".account-dashboard-nav a").forEach((link) => {
+      const key = link.dataset.dashboardLink || "";
+      const active = key === section || (section === "gifts" && key === "redeem") || (section === "settings" && key === "security");
+      link.classList.toggle("is-active", active);
+      if (active) {
+        link.setAttribute("aria-current", "page");
+        link.scrollIntoView?.({ block: "nearest", inline: "center" });
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
   };
 
   const initDashboard = async () => {
@@ -2427,6 +2496,7 @@
     renderAccountSummary(user);
     initGiftRecipientSearch();
     await refreshDashboardAccess();
+    applyDashboardSectionRoute();
   };
 
   const initMyProducts = async () => {
@@ -2450,7 +2520,7 @@
       try {
         const data = await api(`/api/store/result?session_id=${encodeURIComponent(sessionId)}`);
         if (data.success && data.purchase) {
-          target.innerHTML = `<h1>${t("purchaseComplete")}</h1><p>${t("productLinked")}</p><div class="row"><span>${t("product")}</span><strong>${escapeHtml(data.purchase.product?.name || t("product"))}</strong></div><a class="button" href="my-products.html">${t("openMyProducts")}</a>`;
+          target.innerHTML = `<h1>${t("purchaseComplete")}</h1><p>${t("productLinked")}</p><div class="row"><span>${t("product")}</span><strong>${escapeHtml(data.purchase.product?.name || t("product"))}</strong></div><a class="button" href="${dashboardRoute("products")}">${t("openMyProducts")}</a>`;
           return;
         }
       } catch (error) {
@@ -2509,7 +2579,7 @@
           ${giftCode?.status ? `<span>${t("status")}: <b>${escapeHtml(giftCodeStatusLabel(giftCode.status, giftCode.used))}</b></span>` : ""}
         </div>
         <div class="gift-modal-actions">
-          <a class="button secondary" href="my-products.html">${t("openMyProducts")}</a>
+          <a class="button secondary" href="${dashboardRoute("products")}">${t("openMyProducts")}</a>
           ${licenseKey || licenseRecordId ? `<button class="button secondary" type="button" ${licenseRecordId ? `data-download-license-id="${escapeHtml(licenseRecordId)}"` : `data-download-license-secret="${escapeHtml(licenseSecretId)}"`}>${t("downloadApp")}</button>` : ""}
           <button class="button" type="button" data-close-gift-modal>${t("close")}</button>
         </div>
@@ -2900,11 +2970,11 @@
     hydrateAccountHeader();
     window.setInterval(updateCountdowns, 1000);
     if (page === "register") {
-      initAuthForm("/api/auth/register", "dashboard.html");
+      initAuthForm("/api/auth/register", dashboardRoute("overview"));
       initRobloxPreview();
       initReferralPrefill();
     }
-    if (page === "login") initAuthForm("/api/auth/login", "dashboard.html");
+    if (page === "login") initAuthForm("/api/auth/login", dashboardRoute("overview"));
     if (page === "forgot") initForgotPassword();
     if (page === "reset") initResetPassword();
     if (page === "store") initStore();

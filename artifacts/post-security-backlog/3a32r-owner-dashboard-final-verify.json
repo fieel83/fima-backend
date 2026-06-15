@@ -1,0 +1,22 @@
+{
+  "phase": "3a32r-owner-dashboard-final-verify",
+  "status": "local_masked_stub_verified_live_owner_session_not_available",
+  "localMaskedOwnerPreview": {
+    "myProductsShowsActiveLifetime": true,
+    "profileNoActiveSubscriptionFixed": true,
+    "keyMasked": true,
+    "connectedAccountsShownSafely": true,
+    "fullEmailLeaked": false,
+    "fullKeyLeaked": false,
+    "fullHwidLeaked": false,
+    "dashboardNavProfessional": true,
+    "sectionsSeparated": true,
+    "duplicateNavProblemFixed": true,
+    "overflowOrClipping": false
+  },
+  "liveOwnerVerification": {
+    "verified": false,
+    "blocker": "Codex does not have owner-authenticated browser/app session or protected production admin access.",
+    "liveDashboardPatchVisible": false
+  }
+}

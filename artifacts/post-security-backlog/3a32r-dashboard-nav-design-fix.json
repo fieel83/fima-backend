@@ -1,0 +1,29 @@
+{
+  "phase": "3a32r-dashboard-nav-design-fix",
+  "status": "source_and_local_preview_verified",
+  "changes": {
+    "polishedDashboardSidebar": true,
+    "removedChunkyButtonStrip": true,
+    "topActionsRemainAsPrimaryAccountActions": true,
+    "dashboardInternalNavigation": "sidebar_desktop_horizontal_scroll_mobile",
+    "activeStateImproved": true,
+    "hoverFocusStatesImproved": true,
+    "mobileCollapseCleanly": true,
+    "unnecessaryPagesCombined": {
+      "redeemAndGift": true,
+      "securityAndSettings": true,
+      "inviteAndReferrals": true
+    }
+  },
+  "localQa": {
+    "desktop1920NoOverflow": true,
+    "desktop1440NoOverflow": true,
+    "desktop1366NoOverflow": true,
+    "mobileNoOverflow": true,
+    "visibleHtmlLinks": false
+  },
+  "liveStatus": {
+    "livePatchDeployed": false,
+    "blocker": "Render live service still serves old commit; /dashboard/products returns 404."
+  }
+}

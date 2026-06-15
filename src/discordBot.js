@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
 
@@ -15,6 +15,19 @@ const ROLE_TYPES = {
     color: 0x40d6ff
   }
 };
+
+const TICKET_CATEGORIES = [
+  { id: "payment_help", label: "Payment help", description: "Card checkout, invoice or payment question." },
+  { id: "license_hwid_help", label: "License / HWID help", description: "Key, device lock or reset help." },
+  { id: "trial_help", label: "Trial help", description: "Trial claim, expiry or setup help." },
+  { id: "gift_redeem_help", label: "Gift / Redeem help", description: "Gift code, redeem or package help." },
+  { id: "old_tgmacro_buyer", label: "Old TGMacro buyer proof", description: "Send proof for staff review." },
+  { id: "app_bug", label: "App bug", description: "App crash, UI issue or launcher problem." },
+  { id: "macro_timing_problem", label: "Macro timing problem", description: "Ping, FPS, MS or macro timing help." },
+  { id: "security_report", label: "Security report", description: "Suspicious file, fake build or abuse report." },
+  { id: "creator_partnership", label: "Creator / partnership", description: "Creator, macro or partnership request." },
+  { id: "other", label: "Other", description: "Anything else." }
+];
 
 let client = null;
 let started = false;
@@ -122,6 +135,17 @@ async function registerDiscordCommands() {
     new SlashCommandBuilder()
       .setName("fima_roles_setup")
       .setDescription("Check or create the Fima Buyer and Trial roles.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_ticket")
+      .setDescription("Open the Fima support ticket menu."),
+    new SlashCommandBuilder()
+      .setName("fima_ticket_setup")
+      .setDescription("Send the Fima support ticket panel.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_trust_setup")
+      .setDescription("Send the Fima FAQ and safety panel.")
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false))
   ].map((command) => command.toJSON());
   const guildId = env("DISCORD_GUILD_ID");
@@ -130,6 +154,14 @@ async function registerDiscordCommands() {
 }
 
 async function handleDiscordInteraction(interaction) {
+  if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_ticket_category") {
+    return handleTicketCategorySelect(interaction);
+  }
+
+  if (interaction?.isButton?.() && String(interaction.customId || "").startsWith("fima_ticket_")) {
+    return handleTicketButton(interaction);
+  }
+
   if (!interaction?.isChatInputCommand?.()) return;
 
   if (interaction.commandName === "fima_help") {
@@ -182,6 +214,36 @@ async function handleDiscordInteraction(interaction) {
       ephemeral: true
     });
   }
+
+  if (interaction.commandName === "fima_ticket") {
+    return interaction.reply({ ...fimaTicketMenuPayload(), ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_ticket_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up the ticket panel.", ephemeral: true });
+    }
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaTicketPanelPayload());
+    await auditDiscordBotAction("discord_ticket_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id
+    });
+    return interaction.reply({ content: "Ticket panel sent.", ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_trust_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up Fima FAQ and safety posts.", ephemeral: true });
+    }
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaTrustPanelPayload());
+    await auditDiscordBotAction("discord_trust_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id
+    });
+    return interaction.reply({ content: "FAQ and safety panel sent.", ephemeral: true });
+  }
 }
 
 function fimaHelpEmbed() {
@@ -223,6 +285,180 @@ function fimaAnnouncementPayload(commandName = "fima_embed") {
     new ButtonBuilder().setLabel("Tutorial").setStyle(ButtonStyle.Link).setURL(tutorialUrl)
   );
   return { embeds: [embed], components: [mainRow, extraRow] };
+}
+
+function fimaTicketPanelPayload() {
+  const siteUrl = (env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "");
+  const embed = new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Fima Support")
+    .setDescription([
+      "Need help? Pick a category and we will open a private ticket.",
+      "Do not post full license keys, passwords, cookies, tokens or payment details in public.",
+      "Old TGMacro buyer? Choose that category and send proof after staff opens the ticket."
+    ].join("\n"))
+    .addFields(
+      { name: "Helpful links", value: `[Website](${siteUrl}) · [Download](${siteUrl}/download) · [Pricing](${siteUrl}/pricing) · [Security](${siteUrl}/security)`, inline: false }
+    );
+  return { embeds: [embed], components: [ticketCategoryRow()] };
+}
+
+function fimaTicketMenuPayload() {
+  const embed = new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Open a Fima ticket")
+    .setDescription("Choose the closest category. A private ticket opens for you and staff.");
+  return { embeds: [embed], components: [ticketCategoryRow()] };
+}
+
+function ticketCategoryRow() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("fima_ticket_category")
+      .setPlaceholder("Choose a ticket category")
+      .addOptions(TICKET_CATEGORIES.map((category) => ({
+        label: category.label,
+        value: category.id,
+        description: category.description.slice(0, 100)
+      })))
+  );
+}
+
+function ticketActionRows({ claimed = false } = {}) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("fima_ticket_close").setLabel("Close").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("fima_ticket_claim").setLabel(claimed ? "Claimed" : "Claim").setStyle(ButtonStyle.Primary).setDisabled(claimed),
+      new ButtonBuilder().setCustomId("fima_ticket_note").setLabel("Add note").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("fima_ticket_escalate").setLabel("Escalate").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("fima_ticket_transcript").setLabel("Transcript").setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
+
+function fimaTrustPanelPayload() {
+  const siteUrl = (env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "");
+  const embed = new EmbedBuilder()
+    .setColor(0x40d6ff)
+    .setTitle("Fima FAQ and Safety")
+    .setDescription("Short answers for new users.")
+    .addFields(
+      { name: "Official download", value: `Use ${siteUrl}/download. Do not trust random reuploads.`, inline: false },
+      { name: "Is Fima safe?", value: "Fima does not ask for Roblox passwords, Roblox cookies, Discord tokens or browser passwords.", inline: false },
+      { name: "Fake/cracked files", value: "Modified builds are not supported and can be unsafe. Use the public release only.", inline: false },
+      { name: "Pricing and trial", value: `Check ${siteUrl}/pricing for current plans and trial info.`, inline: false },
+      { name: "Old TGMacro buyer", value: "Open a ticket, send proof, and staff can review 3-day access.", inline: false }
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("Website").setStyle(ButtonStyle.Link).setURL(siteUrl),
+    new ButtonBuilder().setLabel("Download").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/download`),
+    new ButtonBuilder().setLabel("Pricing").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/pricing`),
+    new ButtonBuilder().setLabel("Security").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/security`)
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+async function handleTicketCategorySelect(interaction) {
+  const categoryId = interaction.values?.[0] || "other";
+  const category = TICKET_CATEGORIES.find((item) => item.id === categoryId) || TICKET_CATEGORIES.at(-1);
+  const guild = interaction.guild || await getGuild();
+  const ticketChannel = await createTicketChannel(guild, interaction.user, category);
+  await ticketChannel.send({
+    content: `<@${interaction.user.id}>`,
+    embeds: [ticketCreatedEmbed(category, interaction.user.id)],
+    components: ticketActionRows()
+  });
+  await auditDiscordBotAction("discord_ticket_created", "discord_channel", ticketChannel.id, {
+    category: category.id,
+    userId: interaction.user.id,
+    fullKeysMasked: true,
+    fullEmailsMasked: true
+  });
+  return interaction.reply({ content: `Ticket opened: ${ticketChannel}`, ephemeral: true });
+}
+
+async function createTicketChannel(guild, user, category) {
+  const me = guild.members.me || await guild.members.fetchMe();
+  if (!me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+    const error = new Error("discord_bot_missing_manage_channels");
+    error.code = "discord_bot_missing_manage_channels";
+    throw error;
+  }
+
+  const safeUser = String(user.username || user.id).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 20) || "user";
+  const name = `ticket-${category.id.replace(/_/g, "-").slice(0, 18)}-${safeUser}`;
+  const overwrites = [
+    { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+    { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+    { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory, PermissionsBitField.Flags.ManageChannels] }
+  ];
+  const supportRoleId = env("DISCORD_SUPPORT_ROLE_ID");
+  if (supportRoleId) {
+    const role = await guild.roles.fetch(supportRoleId).catch(() => null);
+    if (role) overwrites.push({ id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
+  }
+  const parent = env("DISCORD_TICKET_CATEGORY_ID") || null;
+  return guild.channels.create({
+    name,
+    type: ChannelType.GuildText,
+    parent,
+    permissionOverwrites: overwrites,
+    topic: `Fima ticket: ${category.label}. Keep keys, emails and payment details masked.`,
+    reason: `Fima ticket opened: ${category.id}`
+  });
+}
+
+function ticketCreatedEmbed(category, userId) {
+  const guidance = category.id === "old_tgmacro_buyer"
+    ? "Send proof here. Staff will review and can approve 3-day access if it applies."
+    : "Tell us what happened. Staff will help from here.";
+  return new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle(category.label)
+    .setDescription([
+      guidance,
+      "",
+      "Please mask license keys, gift codes, emails and payment details unless staff asks in private."
+    ].join("\n"))
+    .addFields(
+      { name: "Opened by", value: `<@${userId}>`, inline: true },
+      { name: "Category", value: category.label, inline: true }
+    );
+}
+
+async function handleTicketButton(interaction) {
+  const action = String(interaction.customId || "").replace("fima_ticket_", "");
+  const isStaff = interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageChannels) || interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator);
+  if (!isStaff && !["transcript"].includes(action)) {
+    return interaction.reply({ content: "Staff will handle that button.", ephemeral: true });
+  }
+
+  await auditDiscordBotAction(`discord_ticket_${action}`, "discord_channel", interaction.channelId, {
+    actorId: interaction.user.id,
+    channelId: interaction.channelId,
+    contentStored: false,
+    fullKeysMasked: true,
+    fullEmailsMasked: true
+  });
+
+  if (action === "claim") {
+    await interaction.message.edit({ components: ticketActionRows({ claimed: true }) }).catch(() => {});
+    return interaction.reply({ content: `Claimed by ${interaction.user}.`, ephemeral: false });
+  }
+  if (action === "close") {
+    await interaction.channel?.setName?.(`closed-${String(interaction.channel?.name || "ticket").replace(/^closed-/, "").slice(0, 80)}`).catch(() => {});
+    return interaction.reply({ content: "Ticket marked closed. Staff can archive or delete it after review.", ephemeral: false });
+  }
+  if (action === "note") {
+    return interaction.reply({ content: "Add your staff note as a normal message. Keep keys and emails masked.", ephemeral: true });
+  }
+  if (action === "escalate") {
+    return interaction.reply({ content: "Escalated for senior staff review.", ephemeral: false });
+  }
+  if (action === "transcript") {
+    return interaction.reply({ content: "Transcript marker saved. Full message export is intentionally manual until safe storage is configured.", ephemeral: true });
+  }
+  return interaction.reply({ content: "Ticket action saved.", ephemeral: true });
 }
 
 async function createDiscordResetToken(userId) {

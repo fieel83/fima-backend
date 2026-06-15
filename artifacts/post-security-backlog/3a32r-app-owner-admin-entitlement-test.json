@@ -1,0 +1,26 @@
+{
+  "phase": "3a32r-app-owner-admin-entitlement-test",
+  "status": "source_static_and_release_build_verified",
+  "tests": {
+    "ownerKeyWorksForNormalAppAccess": "owner_observed_yes",
+    "ownerCanEnableMacros": "owner_observed_yes",
+    "validateLicenseAgainBugForOwner": "source_fix_present_not_owner_gui_verified",
+    "adminPanelAppearsForOwnerOnly": "source_fix_present_not_owner_gui_verified",
+    "adminMacroEditorAppearsForOwnerOnly": "source_fix_present_not_owner_gui_verified",
+    "adminSectionsHiddenForNormalPaidUsers": "source_logic_yes_runtime_not_verified",
+    "adminSectionsHiddenForTrialUsers": "source_logic_yes_runtime_not_verified",
+    "wrongHwidBlocked": "backend_source_logic_yes_runtime_not_verified",
+    "runMacroAndTogglesShareEntitlementState": "source_fix_present",
+    "fullKeyInAppLogs": false
+  },
+  "evidence": {
+    "dotnetBuild": "Release build succeeded, 0 warnings, 0 errors.",
+    "ownerAdminAccessHooksFound": true,
+    "backendOwnerWrongAccountOrHwidReasonFound": true
+  },
+  "release": {
+    "latestJsonChanged": false,
+    "v10131Published": false,
+    "localDevBuildOnly": true
+  }
+}

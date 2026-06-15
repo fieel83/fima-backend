@@ -1,0 +1,45 @@
+{
+  "checkpoint": "priority-3a32r-dashboard-ux-owner-admin-app-sections",
+  "createdAt": "2026-06-16T00:00:00.000Z",
+  "latestJsonVersion": "1.0.130",
+  "latestJsonChanged": false,
+  "v10131Published": false,
+  "liveBackend": {
+    "commit": "3bc73de35477e29ad2b3db3dcd91312b154112a2",
+    "version": "1.0.128",
+    "siteLoads": true,
+    "securityLoads": true,
+    "dashboardProductsRouteLive": false
+  },
+  "sourceWorkCompleted": {
+    "dashboardNavigationRedesigned": true,
+    "dashboardRoutesServeDashboardShell": true,
+    "nestedRouteAssetPathsFixed": true,
+    "dashboardOneSectionAtATime": true,
+    "profileDropdownAnimationKept": true,
+    "mobileDashboardNavCompacted": true,
+    "ownerAdminAppSectionsRestoredByEntitlementSource": true,
+    "appReleaseBuildPassed": true
+  },
+  "verification": {
+    "nodeCheckAccountJs": true,
+    "nodeCheckServerJs": true,
+    "dotnetReleaseBuild": true,
+    "localDashboardScreenshots": true,
+    "liveOwnerDashboardVerified": false,
+    "discordLiveTested": false
+  },
+  "privacy": {
+    "fullOwnerKeyPrinted": false,
+    "fullEmailPrinted": false,
+    "fullHwidPrinted": false,
+    "fullGiftCodePrinted": false
+  },
+  "remainingBlockers": [
+    "Render live deployment still needs current patched source; live /dashboard/products returns 404.",
+    "Owner My Products and owner admin app GUI need owner-authenticated live/runtime verification after deploy.",
+    "Discord /fima_ticket_setup and /fima_trust_setup need live server interaction after bot restart.",
+    "App admin section fix requires a future owner-approved app release if users should receive it publicly; v1.0.131 was not published."
+  ],
+  "nextRecommendedStep": "Deploy the patched backend/site source to Render, verify /dashboard/products and account routes live, then run owner-authenticated dashboard/app checks before any v1.0.131 release decision."
+}

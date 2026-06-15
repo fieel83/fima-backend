@@ -1840,6 +1840,18 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       }));
     }
 
+    const ownerBinding = ownerLicenseBindingState(license, hwid);
+    if (!ownerBinding.ok) {
+      await logOwnerKeyAttempt(license, hwid, appVersion, ownerBinding.reason);
+      return invalid(res, ownerBinding.reason, licenseReasonMessage(ownerBinding.reason), licenseValidationPayload(license, {
+        valid: false,
+        reason: ownerBinding.reason,
+        message: licenseReasonMessage(ownerBinding.reason),
+        hwid,
+        hwidMatches: false
+      }));
+    }
+
     const accountAccess = await buildLicenseAccountAccess(license);
     if (!entitlementSecretStatus().configured) {
       await logValidation(license, licenseKey, "failed", "entitlement_unavailable", hwid, appVersion);
@@ -1887,7 +1899,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       prisma.validationLog.create({
         data: {
           licenseId: license.id,
-          licenseKey,
+          licenseKey: validationLogLicenseKey(license, licenseKey),
           result: "success",
           reason: "valid",
           hwidHash: hashHwid(hwid),
@@ -1898,7 +1910,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         data: {
           type: "license_validation",
           plan: license.plan,
-          metadata: { result: "success", appVersion }
+          metadata: { result: "success", appVersion, ownerKey: isOwnerManagedLicense(license) }
         }
       })
     ]);
@@ -2054,6 +2066,18 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       }));
     }
 
+    const ownerBinding = ownerLicenseBindingState(license, hwid);
+    if (!ownerBinding.ok) {
+      await logOwnerKeyAttempt(license, hwid, appVersion, ownerBinding.reason);
+      return res.status(403).json(licenseValidationPayload(license, {
+        valid: false,
+        reason: ownerBinding.reason,
+        message: licenseReasonMessage(ownerBinding.reason),
+        hwid,
+        hwidMatches: false
+      }));
+    }
+
     if (!normalizeHwid(license.hwid)) {
       await prisma.license.updateMany({
         where: { id: license.id },
@@ -2086,7 +2110,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
     await prisma.validationLog.create({
       data: {
         licenseId: license.id,
-        licenseKey: license.licenseKey,
+        licenseKey: validationLogLicenseKey(license, license.licenseKey),
         result: "success",
         reason: "entitlement_refresh",
         hwidHash: hashHwid(hwid),
@@ -4098,6 +4122,25 @@ app.get([
   res.redirect(302, PUBLIC_APP_PACKAGE_URL);
 });
 
+app.get(["/dashboard", "/dashboard/overview"], (_req, res) => {
+  res.sendFile(path.join(publicDir, "dashboard.html"));
+});
+
+app.get([
+  "/dashboard/products",
+  "/dashboard/billing",
+  "/dashboard/redeem",
+  "/dashboard/gifts",
+  "/dashboard/referrals",
+  "/dashboard/connected-accounts",
+  "/dashboard/security",
+  "/dashboard/downloads",
+  "/dashboard/support",
+  "/dashboard/settings"
+], (_req, res) => {
+  res.sendFile(path.join(publicDir, "dashboard.html"));
+});
+
 app.use(express.static(publicDir, {
   extensions: ["html"],
   setHeaders(res, filePath) {
@@ -5678,6 +5721,80 @@ function licenseBlockedReason(license) {
   return "disabled";
 }
 
+function configuredOwnerLicenseKey() {
+  return normalizeLicenseKey(process.env.OWNER_LIFETIME_LICENSE_KEY);
+}
+
+function configuredOwnerEmail() {
+  return normalizeAccountEmail(process.env.OWNER_LIFETIME_GRANT_EMAIL);
+}
+
+function isOwnerManagedLicense(license) {
+  if (!license) return false;
+  const configuredKey = configuredOwnerLicenseKey();
+  if (configuredKey && normalizeLicenseKey(license.licenseKey) === configuredKey) return true;
+  const notes = String(license.notes || "").toLowerCase();
+  return notes.includes("owner_internal_lifetime") || notes.includes("adminaccess=owner_only");
+}
+
+function ownerLicenseBindingState(license, hwid) {
+  if (!isOwnerManagedLicense(license)) return { ok: true, reason: "not_owner_key" };
+
+  const configuredEmail = configuredOwnerEmail();
+  const licenseEmail = normalizeAccountEmail(license.customerEmail);
+  if (configuredEmail && licenseEmail !== configuredEmail) {
+    return { ok: false, reason: "owner_key_wrong_account_or_hwid" };
+  }
+
+  if (!license.lifetime || license.status !== "active") {
+    return { ok: false, reason: "owner_key_wrong_account_or_hwid" };
+  }
+
+  const boundHwid = normalizeHwid(license.hwid);
+  const incomingHwid = normalizeHwid(hwid);
+  if (!boundHwid || !incomingHwid || boundHwid !== incomingHwid) {
+    return { ok: false, reason: "owner_key_wrong_account_or_hwid" };
+  }
+
+  return { ok: true, reason: "owner_key_bound" };
+}
+
+function validationLogLicenseKey(license, fallback = "") {
+  const value = fallback || license?.licenseKey || "-";
+  return isOwnerManagedLicense(license) ? maskCode(value) : value;
+}
+
+async function logOwnerKeyAttempt(license, hwid, appVersion, reason) {
+  await prisma.$transaction([
+    prisma.validationLog.create({
+      data: {
+        licenseId: license?.id || null,
+        licenseKey: validationLogLicenseKey(license, license?.licenseKey || "-"),
+        result: "failed",
+        reason,
+        hwidHash: hashHwid(hwid),
+        appVersion
+      }
+    }),
+    prisma.auditLog.create({
+      data: {
+        action: "owner_key_validation_blocked",
+        targetType: "license",
+        targetId: license?.id || null,
+        metadata: {
+          reason,
+          appVersion,
+          hwidHash: hashHwid(hwid),
+          licenseKeyMasked: maskCode(license?.licenseKey),
+          ownerKey: true,
+          fullKeyPrinted: false,
+          fullEmailPrinted: false
+        }
+      }
+    })
+  ]).catch(() => {});
+}
+
 function licenseReasonMessage(reason) {
   return {
     valid: "License valid",
@@ -5690,6 +5807,7 @@ function licenseReasonMessage(reason) {
     canceled: "This license was canceled.",
     payment_failed: "Payment for this license was not completed.",
     hwid_mismatch: "This license is already bound to another PC.",
+    owner_key_wrong_account_or_hwid: "This owner key is locked to the owner account and device.",
     account_not_connected: "Your license is valid. A Fima account is optional for app access, but linking an account helps recovery and My Products.",
     discord_not_connected: "Discord is optional except for free trial claims.",
     roblox_not_connected: "Roblox is optional. You can add a username later for profile/community features.",
@@ -5737,7 +5855,8 @@ function licenseValidationPayload(license, options = {}) {
     recommendedFix: recommendedLicenseFix(reason),
     latestVersion: options.latestVersion || null,
     downloadUrl: options.downloadUrl || null,
-    licenseKey: license?.licenseKey || options.licenseKey || null,
+    licenseKey: license && isOwnerManagedLicense(license) ? maskCode(license.licenseKey) : license?.licenseKey || options.licenseKey || null,
+    licenseKeyMasked: license ? maskCode(license.licenseKey) : null,
     licenseId: license?.id || null,
     source: license ? licenseSource(license) : null,
     status: license?.status || null,
@@ -5749,6 +5868,7 @@ function licenseValidationPayload(license, options = {}) {
     timeLeftSeconds: timeLeft.seconds,
     timeLeftState: timeLeft.state,
     lifetime: Boolean(license?.lifetime),
+    ownerAdminAccess: Boolean(license && isOwnerManagedLicense(license) && reason === "valid"),
     boundHwid: boundHwid || null,
     incomingHwid: normalizedHwid || null,
     hwidBound,
@@ -5853,6 +5973,7 @@ function recommendedLicenseFix(reason) {
     canceled: "Check the order/payment status before re-enabling.",
     payment_failed: "Ask the user to complete payment or create a manual replacement if appropriate.",
     hwid_mismatch: "Reset HWID from Admin Panel if this is the owner of the license.",
+    owner_key_wrong_account_or_hwid: "Owner key is locked to the owner account and PC. Do not reset unless the owner verified the device.",
     account_not_connected: "Optional only. App access should not be blocked; ask user to link an account only for recovery/My Products.",
     discord_not_connected: "Discord is optional except when claiming the free trial.",
     roblox_not_connected: "Roblox is optional and should never block app access.",

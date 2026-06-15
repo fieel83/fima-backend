@@ -1,0 +1,29 @@
+{
+  "phase": "3a32r-restore-owner-admin-app-sections",
+  "status": "source_and_build_verified",
+  "appChanges": {
+    "licenseValidationCarriesOwnerAdminAccess": true,
+    "licenseServiceParsesOwnerAdminAccess": true,
+    "entitlementManagerStoresOwnerAdminAccess": true,
+    "adminVisibilityUsesSignedEntitlement": true,
+    "localAdminHwidBypassUsedForVisibility": false,
+    "refreshAdminVisibilityAdded": true,
+    "adminPanelHiddenWhenEntitlementMissing": true,
+    "adminMacroEditorClosedWhenEntitlementLost": true
+  },
+  "securityRequirements": {
+    "requiresActiveOwnerAdminEntitlement": true,
+    "requiresBackendSignedShortLivedEntitlement": true,
+    "doesNotGrantByKeyTextAlone": true,
+    "normalUsersShouldNotSeeAdminTools": true,
+    "trialUsersShouldNotSeeAdminTools": true,
+    "wrongHwidShouldNotSeeAdminTools": true
+  },
+  "verification": {
+    "dotnetReleaseBuildPassed": true,
+    "guiOwnerSessionRuntimeTested": false,
+    "reasonRuntimeNotTested": "No owner app GUI session/owner protected runtime context available in Codex.",
+    "v10131Published": false,
+    "latestJsonChanged": false
+  }
+}

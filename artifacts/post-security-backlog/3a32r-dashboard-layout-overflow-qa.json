@@ -1,0 +1,33 @@
+{
+  "phase": "3a32r-dashboard-layout-overflow-qa",
+  "status": "local_preview_verified",
+  "screenshotsPath": "artifacts/post-security-backlog/screenshots/3a32r-dashboard-qa/",
+  "screenshots": [
+    "overview-1920.png",
+    "products-1440.png",
+    "redeem-1366.png",
+    "security-mobile.png",
+    "profile-dropdown-open-1440.png"
+  ],
+  "checks": {
+    "desktop1920Checked": true,
+    "desktop1440Checked": true,
+    "desktop1366Checked": true,
+    "mobileChecked": true,
+    "profileDropdownOpenStateChecked": true,
+    "dashboardNavWrappingChecked": true,
+    "pageContentOverflow": false,
+    "rightSideClipping": false,
+    "buttonSizesAndSpacingChecked": true,
+    "textReadabilityChecked": true,
+    "cardAlignmentChecked": true,
+    "duplicatedNavActionsAwkwardlyRepeated": false,
+    "weirdEmptySpaceMobileHeaderFixed": true,
+    "giantStackedPage": false
+  },
+  "privacy": {
+    "fullEmailShown": false,
+    "fullLicenseKeyShown": false,
+    "maskedOwnerKeyShownOnly": true
+  }
+}
