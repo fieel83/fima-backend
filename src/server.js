@@ -66,6 +66,7 @@ const port = Number(env("PORT", "8080"));
 const publicDir = path.resolve("public");
 const DEFAULT_MIN_SUPPORTED_APP_VERSION = "1.0.128";
 const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe";
+const PUBLIC_APP_PACKAGE_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.App.zip";
 const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
@@ -1338,6 +1339,56 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
   }
 });
 
+app.post("/api/me/license-records/:licenseId/extend-checkout", storeCheckoutLimiter, requireUser, async (req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    if (settings.maintenanceMode || settings.checkoutEnabled === false) {
+      return res.status(503).json({ error: "checkout_disabled" });
+    }
+
+    const license = await findOwnedLicenseById(req.user, req.params.licenseId);
+    if (!license) return res.status(404).json({ error: "license_not_found" });
+    if (license.status === "banned") return res.status(403).json({ error: "license_banned" });
+
+    const plan = getPlan(req.body?.plan || license.plan);
+    if (!plan) return res.status(400).json({ error: "invalid_plan" });
+
+    const commerce = getPlanCommerce(plan);
+    const checkout = await createCheckoutSession({
+      plan,
+      commerce,
+      customerEmail: req.user.email,
+      priceId: env(commerce.priceEnv),
+      selectedCurrency: String(req.body?.currency || commerce.currency).toUpperCase(),
+      language: String(req.body?.language || "en").slice(0, 8),
+      extraMetadata: {
+        checkoutType: "license_extension",
+        extendLicenseKey: license.licenseKey,
+        userId: req.user.id
+      }
+    });
+
+    await createAnalyticsEvent("license_extension_checkout_created", {
+      plan: plan.id,
+      amount: commerce.priceCents,
+      currency: commerce.currency,
+      mode: checkout.session.livemode ? "live" : "test",
+      metadata: { licenseKeyMasked: maskCode(license.licenseKey), priceSource: checkout.priceSource }
+    });
+
+    return res.json({
+      success: true,
+      url: checkout.session.url,
+      mode: checkout.session.livemode ? "live" : "test",
+      checkoutSessionPrefix: stripeSessionPrefix(checkout.session.id),
+      priceSource: checkout.priceSource
+    });
+  } catch (error) {
+    console.error("License extension checkout failed", publicError(error));
+    return res.status(500).json({ error: "checkout_failed" });
+  }
+});
+
 app.post("/api/me/licenses/:licenseKey/extend-checkout", storeCheckoutLimiter, requireUser, async (req, res) => {
   try {
     const settings = await getSiteSettings();
@@ -1525,7 +1576,7 @@ app.get("/api/checkout/result", async (req, res) => {
 
     return res.json({
       success: true,
-      ...licensePayload(order.license)
+      license: publicLicense(order.license)
     });
   } catch (error) {
     console.error("Checkout result failed", publicError(error));
@@ -1549,6 +1600,104 @@ app.post("/api/billing/portal", storeCheckoutLimiter, requireUser, async (req, r
   } catch (error) {
     console.error("Billing portal creation failed", publicError(error));
     return res.status(500).json({ error: "billing_portal_failed" });
+  }
+});
+
+async function findOwnedLicenseById(user, licenseId) {
+  const id = String(licenseId || "").trim();
+  if (!id || !user?.email) return null;
+  return prisma.license.findFirst({
+    where: { id, customerEmail: user.email }
+  });
+}
+
+app.get("/api/me/license-records/:licenseId/key", downloadLimiter, requireUser, async (req, res) => {
+  try {
+    const license = await findOwnedLicenseById(req.user, req.params.licenseId);
+    if (!license) return res.status(404).json({ error: "license_not_found" });
+    const access = licenseAccessState(license);
+    if (!access.valid) return res.status(403).json({ error: access.reason || "license_unavailable" });
+    await createAuditLog("license_key_copied", "license", license.id, {
+      userId: req.user.id,
+      licenseKeyMasked: maskCode(license.licenseKey)
+    });
+    return res.json({
+      success: true,
+      licenseKey: license.licenseKey,
+      licenseKeyMasked: maskCode(license.licenseKey)
+    });
+  } catch (error) {
+    console.error("License key copy failed", publicError(error));
+    return res.status(500).json({ error: "license_key_copy_failed" });
+  }
+});
+
+app.post("/api/me/license-records/:licenseId/download", downloadLimiter, requireUser, async (req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    const license = await findOwnedLicenseById(req.user, req.params.licenseId);
+    const licenseKey = license?.licenseKey || "-";
+
+    if (env("NODE_ENV", "development") === "production" && !downloadSecretStatus().configured) {
+      await logDownload(license, licenseKey, "failed", "protected_download_signing_unavailable");
+      return res.status(503).json({
+        success: false,
+        reason: "protected_download_signing_unavailable",
+        message: "Protected downloads are temporarily unavailable. Please contact support."
+      });
+    }
+
+    if (settings.downloadEnabled === false) {
+      await logDownload(license, licenseKey, "failed", "download_disabled");
+      return res.status(403).json({ success: false, reason: "download_disabled", message: "Downloads are currently disabled." });
+    }
+
+    if (!license) {
+      await logDownload(null, "-", "failed", "license_not_found");
+      return res.status(404).json({ success: false, reason: "license_not_found", message: "Invalid or expired license." });
+    }
+
+    const access = licenseAccessState(license);
+    if (!access.valid) {
+      await logDownload(license, licenseKey, "failed", access.reason);
+      return res.status(403).json({ success: false, reason: access.reason, message: "Invalid or expired license." });
+    }
+
+    const downloadInfo = await resolveDownloadInfo();
+    await prisma.$transaction([
+      prisma.license.update({
+        where: { id: license.id },
+        data: {
+          downloadCount: { increment: 1 },
+          lastDownloadedAt: new Date()
+        }
+      }),
+      prisma.downloadLog.create({
+        data: {
+          licenseId: license.id,
+          licenseKey,
+          result: "success",
+          version: downloadInfo.version || null
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          action: "download_accessed",
+          targetType: "license",
+          targetId: license.id,
+          metadata: { version: downloadInfo.version || null, userId: req.user.id }
+        }
+      })
+    ]);
+
+    return res.json({
+      success: true,
+      downloadUrl: downloadInfo.downloadUrl,
+      version: downloadInfo.version || null
+    });
+  } catch (error) {
+    console.error("Account license download failed", publicError(error));
+    return res.status(500).json({ error: "download_failed" });
   }
 });
 
@@ -3929,7 +4078,53 @@ async function cleanupExpiredMonthlyTrials() {
   }
 }
 
-app.use(express.static(publicDir, { extensions: ["html"] }));
+app.get([
+  "/downloads/FIMA.MACRO.Setup.exe",
+  "/downloads/FIMA%20MACRO%20Setup.exe",
+  "/downloads/FIMA MACRO Setup.exe",
+  "/FIMA.MACRO.Setup.exe",
+  "/FIMA MACRO Setup.exe"
+], (_req, res) => {
+  res.redirect(302, PUBLIC_SETUP_DOWNLOAD_URL);
+});
+
+app.get([
+  "/downloads/FIMA.MACRO.App.zip",
+  "/downloads/FIMA%20MACRO%20App.zip",
+  "/downloads/FIMA MACRO App.zip",
+  "/FIMA.MACRO.App.zip",
+  "/FIMA MACRO App.zip"
+], (_req, res) => {
+  res.redirect(302, PUBLIC_APP_PACKAGE_URL);
+});
+
+app.use(express.static(publicDir, {
+  extensions: ["html"],
+  setHeaders(res, filePath) {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    const normalized = filePath.replace(/\\/g, "/");
+    const extension = path.extname(filePath).toLowerCase();
+    if (normalized.endsWith("/latest.json")) {
+      res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
+      return;
+    }
+    if (extension === ".html") {
+      res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+      return;
+    }
+    if ([".mp4", ".webm", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf"].includes(extension)) {
+      res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=2592000");
+      return;
+    }
+    if ([".css", ".js", ".mjs"].includes(extension)) {
+      res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+      return;
+    }
+    if ([".zip", ".exe", ".msi"].includes(extension)) {
+      res.setHeader("Cache-Control", "no-store");
+    }
+  }
+}));
 app.use((_req, res) => res.status(404).json({ error: "not_found" }));
 
 app.listen(port, () => {
@@ -6622,7 +6817,7 @@ function maskCode(code) {
   if (!normalized) return "";
   const prefix = normalized.startsWith("FIMA-") ? "FIMA" : "CODE";
   const tail = normalized.replace(/-/g, "").slice(-4);
-  return `${prefix}-****-${tail}`;
+  return `${prefix}-****-****-${tail}`;
 }
 
 function maskGiftCode(code) {
@@ -7670,10 +7865,14 @@ function publicLicense(license) {
   const remainingSeconds = license.lifetime
     ? null
     : Math.max(0, Math.floor(((license.expiresAt?.getTime() || Date.now()) - Date.now()) / 1000));
+  const { licenseKey: _licenseKey, customerEmail: _customerEmail, ...safePayload } = licensePayload(license);
 
   return {
-    ...licensePayload(license),
+    ...safePayload,
     id: license.id,
+    hasLicenseKey: Boolean(license.licenseKey),
+    licenseKey: null,
+    licenseKeyMasked: maskCode(license.licenseKey),
     customerEmail: maskEmail(license.customerEmail),
     customerEmailMasked: maskEmail(license.customerEmail),
     status: license.status,

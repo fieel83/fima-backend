@@ -214,6 +214,9 @@
         "emailVerificationIntro": "Email is optional. Link and verify it if you want password reset codes by email.",
         "emailVerified": "Email verified",
         "emailNotVerified": "Email not verified",
+        "addEmail": "Add email",
+        "emailLinkIntro": "Add an email if you want email recovery too.",
+        "emailPlaceholder": "Email address",
         "sendVerificationCode": "Send verification code",
         "confirmVerificationCode": "Confirm code",
         "verificationCode": "6-digit code",
@@ -1140,6 +1143,13 @@
     licenseSecretStore.set(id, key);
     return id;
   };
+  const storeSensitiveSecret = (value, prefix = "secret") => {
+    const key = String(value || "").trim();
+    if (!key) return "";
+    const id = `${prefix}-${licenseSecretStore.size + 1}-${Math.random().toString(36).slice(2, 8)}`;
+    licenseSecretStore.set(id, key);
+    return id;
+  };
   const readLicenseSecret = (id) => licenseSecretStore.get(String(id || "")) || "";
   const setText = (selector, value, root = document) => {
     const node = $(selector, root);
@@ -1799,8 +1809,11 @@
 
   const productCard = (item, context = {}) => {
     const license = item.license;
-    const hasLicense = Boolean(license?.licenseKey);
-    const licenseSecretId = hasLicense ? storeLicenseSecret(license) : "";
+    const hasLicense = Boolean(license?.hasLicenseKey || license?.licenseKey || license?.licenseKeyMasked);
+    const licenseRecordId = String(license?.id || "").trim();
+    const licenseSecretId = hasLicense && license?.licenseKey ? storeLicenseSecret(license) : "";
+    const licenseActionId = licenseRecordId || licenseSecretId;
+    const licenseMasked = license?.licenseKeyMasked || maskSensitiveCode(license?.licenseKey);
     const statusText = String(license?.status || item.status || "").toLowerCase();
     const needsSupport = Boolean(license?.expired || ["banned", "disabled", "revoked", "canceled", "cancelled"].includes(statusText));
     const subscriptionStatus = license?.subscriptionStatus || item.subscriptionStatus || (license?.plan === "monthly" ? statusLabel(item) : "-");
@@ -1819,7 +1832,7 @@
         ${hasLicense ? `
           <div class="key-box">
             <span>${t("maskedLicenseKey")}</span>
-            <code>${escapeHtml(maskSensitiveCode(license.licenseKey))}</code>
+            <code>${escapeHtml(licenseMasked)}</code>
           </div>
           <div class="metric-grid">
             <div><span>${t("plan")}</span><strong>${escapeHtml(license.planLabel || license.plan)}</strong></div>
@@ -1833,9 +1846,9 @@
           </div>
           ${needsSupport ? `<p class="access-warning">${escapeHtml(t("needsSupport"))} <a href="support.html">${escapeHtml(t("openSupport"))}</a></p>` : ""}
           <div class="access-actions">
-            <button class="button secondary" type="button" data-copy-license-secret="${escapeHtml(licenseSecretId)}">${t("copyKey")}</button>
-            <button class="button" type="button" data-download-license-secret="${escapeHtml(licenseSecretId)}">${t("download")}</button>
-            ${license.canExtend ? `<button class="button secondary" type="button" data-extend-license-secret="${escapeHtml(licenseSecretId)}" data-plan="${escapeHtml(license.plan)}">${license.expired ? t("renew") : t("extend")}</button>` : ""}
+            <button class="button secondary" type="button" ${licenseRecordId ? `data-copy-license-id="${escapeHtml(licenseRecordId)}"` : `data-copy-license-secret="${escapeHtml(licenseActionId)}"`}>${t("copyKey")}</button>
+            <button class="button" type="button" ${licenseRecordId ? `data-download-license-id="${escapeHtml(licenseRecordId)}"` : `data-download-license-secret="${escapeHtml(licenseActionId)}"`}>${t("download")}</button>
+            ${license.canExtend ? `<button class="button secondary" type="button" ${licenseRecordId ? `data-extend-license-id="${escapeHtml(licenseRecordId)}"` : `data-extend-license-secret="${escapeHtml(licenseActionId)}"`} data-plan="${escapeHtml(license.plan)}">${license.expired ? t("renew") : t("extend")}</button>` : ""}
           </div>
         ` : `
           <p>${escapeHtml(item.product?.description || "Purchased product access is linked to this account.")}</p>
@@ -1867,7 +1880,7 @@
       ? `<div class="rows">${licenses.map((license) => `
           <div class="row">
             <span>${escapeHtml(license.planLabel || license.plan)}</span>
-            <code>${escapeHtml(maskSensitiveCode(license.licenseKey))}</code>
+            <code>${escapeHtml(license.licenseKeyMasked || maskSensitiveCode(license.licenseKey))}</code>
           </div>
         `).join("")}</div>`
       : `<div class="panel panel-pad">${t("noLicenses")}</div>`;
@@ -1888,17 +1901,19 @@
   const renderEmailVerification = (user = {}) => {
     const target = $("#emailVerification");
     if (!target) return;
-    const linked = Boolean(user.discordUserId || user.discordUsername);
+    const discordLinked = Boolean(user.discordUserId || user.discordUsername);
+    const emailLinked = Boolean(user.emailLinked || user.email || user.emailMasked);
+    const emailVerified = Boolean(user.emailVerified || user.emailVerifiedAt);
     target.innerHTML = `
-      <div class="verification-card ${linked ? "is-verified" : "is-pending"}">
+      <div class="verification-card ${discordLinked ? "is-verified" : "is-pending"}">
         <div class="verification-status">
-          <span class="status-pill">${linked ? t("connected") : t("notConnected")}</span>
+          <span class="status-pill">${discordLinked ? t("connected") : t("notConnected")}</span>
           <div>
-            <strong>${escapeHtml(linked ? (user.discordUsername || user.discordUserId || "Discord recovery linked") : "Discord recovery not linked")}</strong>
-            <small>${linked ? "The Fima bot can DM password reset codes to this Discord account." : "Link Discord to receive password reset codes by DM. Discord is also required for the free trial."}</small>
+            <strong>${escapeHtml(discordLinked ? (user.discordUsername || user.discordUserId || "Discord recovery linked") : "Discord recovery not linked")}</strong>
+            <small>${discordLinked ? "The Fima bot can DM password reset codes to this Discord account." : "Link Discord to receive password reset codes by DM. Discord is also required for the free trial."}</small>
           </div>
         </div>
-        ${!linked ? `
+        ${!discordLinked ? `
           <div class="verification-actions">
             <a class="button" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
             <a class="button secondary" href="forgot-password.html">${t("forgotTitle")}</a>
@@ -1906,6 +1921,33 @@
         ` : `
           <div class="verification-actions">
             <a class="button secondary" href="forgot-password.html">Test recovery DM</a>
+          </div>
+        `}
+      </div>
+      <div class="verification-card ${emailVerified ? "is-verified" : "is-pending"}">
+        <div class="verification-status">
+          <span class="status-pill">${emailVerified ? t("emailVerified") : emailLinked ? t("emailNotVerified") : t("notConnected")}</span>
+          <div>
+            <strong>${escapeHtml(emailLinked ? (user.emailMasked || user.email || t("email")) : t("addEmail"))}</strong>
+            <small>${escapeHtml(emailLinked ? t("emailVerificationIntro") : t("emailLinkIntro"))}</small>
+          </div>
+        </div>
+        ${!emailLinked ? `
+          <form class="verification-actions" data-email-link-form>
+            <label class="sr-only" for="accountEmailLink">${t("email")}</label>
+            <input id="accountEmailLink" name="email" type="email" autocomplete="email" placeholder="${escapeHtml(t("emailPlaceholder"))}" required>
+            <button class="button" type="submit">${t("addEmail")}</button>
+          </form>
+        ` : !emailVerified ? `
+          <form class="verification-actions" data-email-verification-form>
+            <label class="sr-only" for="accountEmailVerificationCode">${t("verificationCode")}</label>
+            <input id="accountEmailVerificationCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="${escapeHtml(t("verificationCode"))}" required>
+            <button class="button" type="submit">${t("confirmVerificationCode")}</button>
+            <button class="button secondary" type="button" data-send-email-verification>${t("sendVerificationCode")}</button>
+          </form>
+        ` : `
+          <div class="verification-actions">
+            <button class="button secondary" type="button" data-send-email-verification>${t("sendVerificationCode")}</button>
           </div>
         `}
       </div>
@@ -2003,7 +2045,7 @@
         <aside class="trial-side">
           ${trial.active ? `<div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong></div>` : ""}
           ${trial.nextTrialAvailableAt ? `<div><span>${t("nextTrial")}</span><strong>${date(trial.nextTrialAvailableAt)}</strong><small data-countdown="${escapeHtml(trial.nextTrialAvailableAt)}">${duration(trial.cooldownSeconds)}</small></div>` : ""}
-          ${trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(maskSensitiveCode(trial.activeLicense.licenseKey))}</code></div>` : ""}
+          ${trial.activeLicense?.hasLicenseKey || trial.activeLicense?.licenseKeyMasked || trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(trial.activeLicense.licenseKeyMasked || maskSensitiveCode(trial.activeLicense.licenseKey))}</code></div>` : ""}
           <button class="button" type="button" data-claim-trial ${trial.eligible ? "" : "disabled"}>Claim ${escapeHtml(trialLabel)}</button>
         </aside>
       </div>
@@ -2023,6 +2065,7 @@
     const code = item.giftCode ? maskSensitiveCode(item.giftCode) : item.maskedCode || "";
     const used = Boolean(item.used || item.status === "redeemed");
     const generated = item.generatedLicense || null;
+    const giftSecretId = item.giftCode && !used ? storeSensitiveSecret(item.giftCode, `gift-${item.id || "code"}`) : "";
     return `
       <article class="gift-code-card ${used ? "is-used" : "is-unused"}">
         <div class="card-top">
@@ -2034,14 +2077,14 @@
         </div>
         <div class="gift-code-box">
           <code>${escapeHtml(code || item.maskedCode || "FIMA-GIFT-****")}</code>
-          ${item.giftCode && !used ? `<button class="button secondary" type="button" data-copy="${escapeHtml(item.giftCode)}">${t("copyGiftCode")}</button>` : ""}
+          ${giftSecretId ? `<button class="button secondary" type="button" data-copy-secret="${escapeHtml(giftSecretId)}">${t("copyGiftCode")}</button>` : ""}
         </div>
         ${item.shownOnceOnly ? `<p class="gift-warning">${t("giftShownOnceOnly")}</p>` : ""}
         <div class="gift-meta-grid">
           <span>${t("purchased")}: <b>${date(item.purchasedAt || item.createdAt)}</b></span>
           <span>${t("status")}: <b>${escapeHtml(giftCodeStatusLabel(item.status, used))}</b></span>
           ${item.redeemedAt ? `<span>${t("usedGiftCode")}: <b>${date(item.redeemedAt)}</b></span>` : ""}
-          ${generated?.licenseKey ? `<span>${t("licenseKey")}: <code>${escapeHtml(maskSensitiveCode(generated.licenseKey))}</code></span>` : ""}
+          ${generated?.hasLicenseKey || generated?.licenseKeyMasked || generated?.licenseKey ? `<span>${t("licenseKey")}: <code>${escapeHtml(generated.licenseKeyMasked || maskSensitiveCode(generated.licenseKey))}</code></span>` : ""}
         </div>
       </article>
     `;
@@ -2056,7 +2099,7 @@
           <small>${escapeHtml(item.maskedCode || "")} ${item.redeemedAt ? `/ ${date(item.redeemedAt)}` : ""}</small>
         </div>
         <span class="status-pill">${escapeHtml(giftCodeStatusLabel(item.status, item.used))}</span>
-        ${license.licenseKey ? `<code>${escapeHtml(maskSensitiveCode(license.licenseKey))}</code>` : ""}
+        ${license.hasLicenseKey || license.licenseKeyMasked || license.licenseKey ? `<code>${escapeHtml(license.licenseKeyMasked || maskSensitiveCode(license.licenseKey))}</code>` : ""}
       </article>
     `;
   };
@@ -2426,7 +2469,11 @@
     const existing = $(".gift-success-overlay");
     existing?.remove();
     const licenseKey = license?.licenseKey || "";
+    const licenseMasked = license?.licenseKeyMasked || maskSensitiveCode(licenseKey);
+    const licenseRecordId = String(license?.id || "").trim();
+    const licenseSecretId = licenseKey ? storeSensitiveSecret(licenseKey, "license-modal") : "";
     const code = giftCode?.giftCode || "";
+    const giftSecretId = code ? storeSensitiveSecret(code, "gift-modal") : "";
     const overlay = document.createElement("div");
     overlay.className = "gift-success-overlay";
     overlay.innerHTML = `
@@ -2443,14 +2490,14 @@
           <div class="gift-modal-key">
             <span>${t("giftCodeTitle")}</span>
             <code>${escapeHtml(maskSensitiveCode(code))}</code>
-            <button class="button secondary" type="button" data-copy="${escapeHtml(code)}">${t("copyGiftCode")}</button>
+            <button class="button secondary" type="button" data-copy-secret="${escapeHtml(giftSecretId)}">${t("copyGiftCode")}</button>
           </div>
         ` : ""}
-        ${licenseKey ? `
+        ${licenseKey || license?.hasLicenseKey || license?.licenseKeyMasked ? `
           <div class="gift-modal-key gift-modal-key-primary">
             <span>${t("newLicenseKey")}</span>
-            <code>${escapeHtml(maskSensitiveCode(licenseKey))}</code>
-            <button class="button" type="button" data-copy="${escapeHtml(licenseKey)}">${t("copyLicenseKey")}</button>
+            <code>${escapeHtml(licenseMasked)}</code>
+            <button class="button" type="button" ${licenseRecordId ? `data-copy-license-id="${escapeHtml(licenseRecordId)}"` : `data-copy-secret="${escapeHtml(licenseSecretId)}"`}>${t("copyLicenseKey")}</button>
           </div>
         ` : ""}
         <div class="gift-meta-grid">
@@ -2461,7 +2508,7 @@
         </div>
         <div class="gift-modal-actions">
           <a class="button secondary" href="my-products.html">${t("openMyProducts")}</a>
-          ${licenseKey ? `<button class="button secondary" type="button" data-download-license="${escapeHtml(licenseKey)}">${t("downloadApp")}</button>` : ""}
+          ${licenseKey || licenseRecordId ? `<button class="button secondary" type="button" ${licenseRecordId ? `data-download-license-id="${escapeHtml(licenseRecordId)}"` : `data-download-license-secret="${escapeHtml(licenseSecretId)}"`}>${t("downloadApp")}</button>` : ""}
           <button class="button" type="button" data-close-gift-modal>${t("close")}</button>
         </div>
       </section>
@@ -2575,10 +2622,38 @@
         return;
       }
 
+      const copySecretButton = event.target.closest("[data-copy-secret]");
+      if (copySecretButton) {
+        const secret = readLicenseSecret(copySecretButton.dataset.copySecret);
+        if (!secret) {
+          setMessage(t("licenseNotFound"), "error");
+          return;
+        }
+        await navigator.clipboard?.writeText(secret);
+        setMessage(t("copied"), "good");
+        return;
+      }
+
       const copyButton = event.target.closest("[data-copy]");
       if (copyButton) {
         await navigator.clipboard?.writeText(copyButton.dataset.copy || "");
         setMessage(t("copied"), "good");
+        return;
+      }
+
+      const copyLicenseIdButton = event.target.closest("[data-copy-license-id]");
+      if (copyLicenseIdButton) {
+        copyLicenseIdButton.disabled = true;
+        try {
+          const data = await api(`/api/me/license-records/${encodeURIComponent(copyLicenseIdButton.dataset.copyLicenseId)}/key`);
+          if (!data.licenseKey) throw new Error(t("licenseNotFound"));
+          await navigator.clipboard?.writeText(data.licenseKey);
+          setMessage(t("copied"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          copyLicenseIdButton.disabled = false;
+        }
         return;
       }
 
@@ -2591,6 +2666,22 @@
         }
         await navigator.clipboard?.writeText(key);
         setMessage(t("copied"), "good");
+        return;
+      }
+
+      const downloadIdButton = event.target.closest("[data-download-license-id]");
+      if (downloadIdButton) {
+        downloadIdButton.disabled = true;
+        try {
+          const data = await post(`/api/me/license-records/${encodeURIComponent(downloadIdButton.dataset.downloadLicenseId)}/download`, {});
+          setMessage(t("downloadReady"), "good");
+          window.location.href = data.downloadUrl || publicSetupUrl;
+        } catch (error) {
+          setMessage((error.message || "Download could not be prepared.") + " Opening the public setup download.", "error");
+          window.location.href = publicSetupUrl;
+        } finally {
+          downloadIdButton.disabled = false;
+        }
         return;
       }
 
@@ -2627,6 +2718,25 @@
           window.location.href = publicSetupUrl;
         } finally {
           secureDownloadButton.disabled = false;
+        }
+        return;
+      }
+
+      const extendIdButton = event.target.closest("[data-extend-license-id]");
+      if (extendIdButton) {
+        extendIdButton.disabled = true;
+        setMessage(t("checkout"));
+        try {
+          const checkout = await post(`/api/me/license-records/${encodeURIComponent(extendIdButton.dataset.extendLicenseId)}/extend-checkout`, {
+            plan: extendIdButton.dataset.plan,
+            currency: localStorage.getItem("fima.currency") || "EUR",
+            language: language()
+          });
+          window.location.href = checkout.url;
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          extendIdButton.disabled = false;
         }
         return;
       }
