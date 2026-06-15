@@ -1271,6 +1271,7 @@
     }).format((amount || 0) / 100);
 
   const date = (value) => value ? new Date(value).toLocaleString(language() === "tr" ? "tr-TR" : undefined) : "-";
+  const cleanPublicLink = (value) => String(value || "").replace(/\/([a-z0-9-]+)\.html(?=[?#]|$)/gi, "/$1");
   const duration = (seconds) => {
     const total = Math.max(0, Number(seconds || 0));
     const days = Math.floor(total / 86400);
@@ -2346,6 +2347,7 @@
     const width = Math.round((current / required) * 100);
     const rewards = summary.rewards || [];
     const referrals = summary.referrals || [];
+    const referralLink = cleanPublicLink(summary.link);
     target.innerHTML = `
       <div class="referral-dashboard">
         <div class="referral-hero-card">
@@ -2358,8 +2360,8 @@
             <button class="button secondary" type="button" data-copy="${escapeHtml(summary.code)}">${t("copyReferralCode")}</button>
           </div>
           <div class="referral-code-box">
-            <code>${escapeHtml(summary.link)}</code>
-            <button class="button" type="button" data-copy="${escapeHtml(summary.link)}">${t("copyReferralLink")}</button>
+            <code>${escapeHtml(referralLink)}</code>
+            <button class="button" type="button" data-copy="${escapeHtml(referralLink)}">${t("copyReferralLink")}</button>
           </div>
         </div>
         <div class="referral-progress-card">
