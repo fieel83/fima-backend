@@ -1042,6 +1042,7 @@
     download: ["download"],
     faq: ["faq"],
     support: ["support"],
+    security: ["security"],
     dashboard: ["dashboard"],
     legal: ["legal"]
   };

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en" data-theme="violet-dragon">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Fima Macro safety notes, official downloads, data use and responsible disclosure.">
+    <meta name="theme-color" content="#090812">
+    <title>Security | Fima Macro</title>
+    <link rel="icon" href="assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260615-3a23">
+  </head>
+  <body data-page="security">
+    <canvas id="ambientCanvas" aria-hidden="true"></canvas>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <div class="nav-shell">
+        <a class="brand" href="index.html" aria-label="Fima Macro home">
+          <img class="brand-logo" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="44" height="44">
+          <span>Fima Macro</span>
+        </a>
+
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="siteMenu" data-menu-toggle>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span class="sr-only">Open menu</span>
+        </button>
+
+        <nav class="site-menu" id="siteMenu" aria-label="Primary navigation" data-menu>
+          <a href="index.html" data-page-link="home">Home</a>
+          <a href="macros.html" data-page-link="macros">Macros</a>
+          <a href="pricing.html" data-page-link="pricing">Pricing</a>
+          <a href="download.html" data-page-link="download">Download</a>
+          <a href="support.html" data-page-link="support">Support</a>
+          <a href="security" data-page-link="security">Security</a>
+          <a href="dashboard.html" data-page-link="dashboard">Dashboard</a>
+        </nav>
+
+        <div class="nav-controls" aria-label="Site preferences">
+          <div class="select-wrap custom-select compact" data-custom-select="languageSelect">
+            <span class="sr-only">Language</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>EN</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="en">EN</button>
+              <button type="button" role="option" data-value="tr">TR</button>
+              <button type="button" role="option" data-value="de">DE</button>
+              <button type="button" role="option" data-value="fr">FR</button>
+              <button type="button" role="option" data-value="bs">BS</button>
+            </div>
+            <select id="languageSelect" class="native-select" aria-label="Language selector" tabindex="-1">
+              <option value="en">EN</option>
+              <option value="tr">TR</option>
+              <option value="de">DE</option>
+              <option value="fr">FR</option>
+              <option value="bs">BS</option>
+            </select>
+          </div>
+          <a class="nav-cta" href="pricing.html">Buy Now</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="section section-band" id="security">
+        <div class="section-heading">
+          <p class="eyebrow">Security</p>
+          <h1>Download Fima from the official link only.</h1>
+          <p>Cracked or re-uploaded files can be unsafe. Use fimamacro.com or the public GitHub release linked below.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="download.html">Download</a>
+            <a class="button secondary" href="https://discord.gg/JnEcaNmutd" data-discord-link>Support</a>
+          </div>
+        </div>
+
+        <div class="security-grid">
+          <article class="security-download-panel">
+            <h3>Current public release</h3>
+            <p>Version 1.0.130</p>
+            <ul>
+              <li>Setup: <a href="https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe">FIMA.MACRO.Setup.exe</a></li>
+              <li><span class="security-hash">SHA256 78cc1f97eab359d39c89db2cc274558747be0bf820f787d8278c14937e01e90e</span></li>
+              <li>ZIP: <a href="https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.App.zip">FIMA.MACRO.App.zip</a></li>
+              <li><span class="security-hash">SHA256 f5a23e851e0519f6a825a85ff4434d4afff953e02413731623e736065afdd2b4</span></li>
+            </ul>
+          </article>
+
+          <article class="security-panel">
+            <h3>What Fima uses</h3>
+            <ul>
+              <li>Your account and license status.</li>
+              <li>HWID for license binding.</li>
+              <li>Discord and Roblox link status if you connect them.</li>
+              <li>Stripe handles card payments.</li>
+            </ul>
+          </article>
+
+          <article class="security-panel">
+            <h3>What Fima does not do</h3>
+            <ul>
+              <li>Does not steal cookies.</li>
+              <li>Does not read browser passwords.</li>
+              <li>Does not collect your Discord token.</li>
+              <li>Does not collect your Roblox cookie or password.</li>
+            </ul>
+          </article>
+
+          <article class="security-panel">
+            <h3>Fake files</h3>
+            <p>Modified builds are not supported. They can steal accounts, break licenses, or hide malware. If a file is not from our site or release page, do not run it.</p>
+          </article>
+
+          <article class="security-panel">
+            <h3>Responsible disclosure</h3>
+            <p>Found a real security problem? Open a ticket and give us the safe details. Do not share internals, bypasses, cracks, patches, decompiled code, or working exploit steps publicly.</p>
+          </article>
+        </div>
+
+        <div class="security-policy-note">
+          <strong>Reverse engineering policy:</strong>
+          high-level questions are okay, but reverse engineering, decompiling, patching, bypassing, cracking, or sharing internals is not allowed. Modified builds are not supported.
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <a class="footer-brand" href="index.html">
+          <img class="brand-logo small" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="38" height="38">
+          <span>Fima Macro</span>
+        </a>
+        <p>Fima Macro is not affiliated with, endorsed by, or sponsored by Roblox Corporation.</p>
+      </div>
+      <nav aria-label="Footer navigation">
+        <a href="terms/">Terms of Service</a>
+        <a href="privacy/">Privacy Policy</a>
+        <a href="security">Security</a>
+        <a href="https://discord.gg/JnEcaNmutd" data-discord-link>Support</a>
+      </nav>
+    </footer>
+
+    <noscript>
+      <div class="noscript">Fima Macro site works best with JavaScript enabled for theme, language and currency preferences.</div>
+    </noscript>
+    <script src="assets/js/app.js?v=20260615-3a23"></script>
+  </body>
+</html>

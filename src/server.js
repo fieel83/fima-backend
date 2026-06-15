@@ -38,6 +38,7 @@ import { adminPage, loginPage } from "./adminHtml.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
 import { minimumAppVersionStatus } from "./appVersionPolicy.js";
+import { runOwnerLifetimeGrantJobOnce } from "./ownerGrantJob.js";
 import { runSecurityE2EJobOnce } from "./securityE2EJob.js";
 import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
@@ -3949,6 +3950,9 @@ app.listen(port, () => {
   });
   runSecurityE2EJobOnce({ port, logger: console, backendVersion, backendCommit }).catch((error) => {
     console.error("Security E2E one-time job crashed", publicError(error));
+  });
+  runOwnerLifetimeGrantJobOnce({ logger: console, backendVersion, backendCommit }).catch((error) => {
+    console.error("Owner lifetime grant one-time job crashed", publicError(error));
   });
 });
 
