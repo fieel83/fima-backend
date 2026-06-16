@@ -1048,8 +1048,8 @@
   };
 
   const pageFromPath = () => {
-    const file = (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
-    if (file === "" || file === "index.html") return "home";
+    const file = (window.location.pathname.split("/").pop() || "/").toLowerCase();
+    if (file === "" || file === "/") return "home";
     return file.replace(/\.html$/, "") || "home";
   };
 
@@ -1358,7 +1358,7 @@
       </div>
       <div class="trial-promo-actions">
         <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
-        <a class="button primary" href="dashboard.html#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
+        <a class="button primary" href="/dashboard/redeem#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
       </div>
     `;
   };
@@ -1393,7 +1393,7 @@
         </div>
         <div class="trial-promo-actions">
           <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
-          <a class="button primary" href="dashboard.html#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
+          <a class="button primary" href="/dashboard/redeem#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
         </div>
       </article>
     ` : "";
@@ -1404,16 +1404,16 @@
           : (state.language === "tr" ? "Hesab\u0131n ba\u011fl\u0131. Sat\u0131n ald\u0131\u011f\u0131n lisanslar My Products i\u00e7inde kal\u0131r." : "Your account is connected. Purchases stay in My Products.")}
         </strong>
         <div>
-          <a href="dashboard.html">${siteAccountLabel()}</a>
-          <a href="my-products.html">My Products</a>
+          <a href="/dashboard/overview">${siteAccountLabel()}</a>
+          <a href="/dashboard/products">My Products</a>
         </div>
       </article>
     ` : `
       <article class="pricing-account-prompt">
         <strong>${pricingCopy.accountPrompt || fallbackPricing.accountPrompt}</strong>
         <div>
-          <a href="login.html">${copy[state.language]?.nav?.dashboard === "Panel" ? "Login" : "Login"}</a>
-          <a href="register.html">${state.language === "tr" ? "Register" : "Register"}</a>
+          <a href="/login">${copy[state.language]?.nav?.dashboard === "Panel" ? "Login" : "Login"}</a>
+          <a href="/register">${state.language === "tr" ? "Register" : "Register"}</a>
         </div>
       </article>
     `;
@@ -1448,7 +1448,7 @@
           lifetime: "FIMA-LIFE"
         }[plan.id];
         const cardButton = plan.trial
-          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="dashboard.html#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>`
+          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="/dashboard/redeem#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>`
           : `<a class="button ${plan.featured ? "primary" : "secondary"}" href="#checkout" data-checkout-plan="${plan.id}">${pricingCopy.payCard || fallbackPricing.payCard}</a>`;
         const robuxButton = plan.trial ? "" : `<button class="button secondary robux-ticket-button" type="button" data-robux-plan="${plan.id}">${pricingCopy.payRobux || fallbackPricing.payRobux}</button>`;
         const giftIcon = `<svg class="gift-button-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M20 7h-2.2c.2-.5.3-1 .2-1.5A3 3 0 0 0 15 3c-1.4 0-2.4.8-3 1.8A3.5 3.5 0 0 0 9 3a3 3 0 0 0-3 2.5C5.9 6 6 6.5 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1Zm-5-2c.6 0 1 .4 1 1s-.4 1-1 1h-2c.2-.9.8-2 2-2ZM8 6c0-.6.4-1 1-1 1.2 0 1.8 1.1 2 2H9c-.6 0-1-.4-1-1Zm-4 7v7a1 1 0 0 0 1 1h6v-8H4Zm9 0v8h6a1 1 0 0 0 1-1v-7h-7Z"/></svg>`;
@@ -1711,16 +1711,16 @@
   };
 
   const siteProfileMenuItems = (user) => ([
-    ["Account", "dashboard.html#overview", true],
-    ["My Products", "my-products.html", true],
-    ["Billing", "dashboard.html#billing", true],
-    ["Redeem Key", "dashboard.html#gift-access", true],
-    ["Gift Codes", "dashboard.html#purchased-gifts", true],
-    ["Invite Code", "dashboard.html#referrals", true],
-    ["Connected Accounts", "dashboard.html#connected-accounts", true],
-    ["Security / Password", "dashboard.html#security", true],
-    ["Downloads", "download.html", true],
-    ["Support", "support.html", true],
+    ["Account", "/dashboard/overview", true],
+    ["My Products", "/dashboard/products", true],
+    ["Billing", "/dashboard/billing", true],
+    ["Redeem Key", "/dashboard/redeem", true],
+    ["Gift Codes", "/dashboard/gifts", true],
+    ["Invite Code", "/dashboard/overview#referrals", true],
+    ["Connected Accounts", "/dashboard/connected-accounts", true],
+    ["Security / Password", "/dashboard/security", true],
+    ["Downloads", "/download", true],
+    ["Support", "/support", true],
     ["Admin Panel", "/admin", Boolean(user?.role === "admin" || user?.role === "owner" || user?.role === "super_admin")],
     ["Logout", "#logout", true]
   ]).filter((item) => item[2]);
@@ -1746,7 +1746,7 @@
       event.preventDefault();
       await fetchWithTimeout(`${apiBase}/api/auth/logout`, { method: "POST", credentials: "include", headers: await csrfHeaders() }, 8000).catch(() => {});
       currentSiteAccount = null;
-      location.href = "index.html";
+      location.href = "/";
     });
     document.addEventListener("click", (event) => {
       if (!menu.contains(event.target)) setOpen(false);
@@ -1759,7 +1759,7 @@
   const renderSiteAccountNav = (user) => {
     const dashboardLink = document.querySelector('[data-page-link="dashboard"]');
     if (dashboardLink) {
-      dashboardLink.href = user ? "dashboard.html" : "login.html";
+      dashboardLink.href = user ? "/dashboard/overview" : "/login";
       dashboardLink.textContent = user ? siteAccountLabel() : loginRegisterLabel();
     }
 
@@ -1772,12 +1772,12 @@
       if (cta) {
         const login = document.createElement("a");
         login.className = "nav-auth-link";
-        login.href = "login.html";
+        login.href = "/login";
         login.dataset.siteAuthLink = "login";
         login.textContent = "Login";
         const register = document.createElement("a");
         register.className = "nav-auth-link nav-auth-register";
-        register.href = "register.html";
+        register.href = "/register";
         register.dataset.siteAuthLink = "register";
         register.textContent = "Register";
         controls.insertBefore(login, cta);
@@ -1809,7 +1809,7 @@
     `;
     if (cta) {
       cta.textContent = user?.subscriptionStatus ? "Manage Plan" : (copy[state.language]?.nav?.cta || copy.en.nav.cta);
-      cta.href = "pricing.html";
+      cta.href = "/pricing";
     }
     controls.insertBefore(menu, cta || null);
     wireSiteProfileDropdown(menu);
@@ -1855,8 +1855,8 @@
     const params = new URLSearchParams({ checkout: planId });
     if (giftRecipient?.id) params.set("giftRecipient", giftRecipient.id);
     if (options.checkoutType === "gift_code_purchase") params.set("giftCode", "1");
-    const next = `pricing.html?${params.toString()}`;
-    window.location.href = `register.html?next=${encodeURIComponent(next)}`;
+    const next = `/pricing?${params.toString()}`;
+    window.location.href = `/register?next=${encodeURIComponent(next)}`;
   };
 
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
@@ -1906,7 +1906,7 @@
     const params = new URLSearchParams({ checkout: planId });
     if (giftRecipient?.id) params.set("giftRecipient", giftRecipient.id);
     if (options.checkoutType === "gift_code_purchase") params.set("giftCode", "1");
-    return `pricing.html?${params.toString()}`;
+    return `/pricing?${params.toString()}`;
   };
 
   const ensureLoginBeforeCheckoutModal = () => {
@@ -1923,8 +1923,8 @@
         <h2 id="loginBeforeCheckoutTitle" data-login-checkout-title></h2>
         <p data-login-checkout-body></p>
         <div class="modal-actions">
-          <a class="button secondary" href="login.html" data-login-checkout-login></a>
-          <a class="button primary" href="register.html" data-login-checkout-register></a>
+          <a class="button secondary" href="/login" data-login-checkout-login></a>
+          <a class="button primary" href="/register" data-login-checkout-register></a>
         </div>
       </div>
     `;
@@ -1936,8 +1936,8 @@
     const activeCopy = getCopy().checkout || copy.en.checkout;
     const modal = ensureLoginBeforeCheckoutModal();
     const next = checkoutNextUrl(planId, options);
-    const loginHref = `login.html?next=${encodeURIComponent(next)}`;
-    const registerHref = `register.html?next=${encodeURIComponent(next)}`;
+    const loginHref = `/login?next=${encodeURIComponent(next)}`;
+    const registerHref = `/register?next=${encodeURIComponent(next)}`;
     const title = activeCopy.loginFirstTitle || copy.en.checkout.loginFirstTitle || "Log in first";
     $("[data-login-checkout-eyebrow]", modal).textContent = activeCopy.eyebrow || copy.en.checkout.eyebrow;
     $("[data-login-checkout-title]", modal).textContent = title;
@@ -2137,7 +2137,7 @@
       const trialClaimTrigger = event.target.closest("[data-trial-claim-link]");
       if (trialClaimTrigger) {
         event.preventDefault();
-        const next = "dashboard.html#monthly-trial";
+        const next = "/dashboard/redeem#monthly-trial";
         if (!currentSiteAccount) openLoginBeforeCheckoutModal("1day", { next, trialClaim: true });
         else window.location.href = next;
         return;

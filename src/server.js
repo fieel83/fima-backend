@@ -605,7 +605,7 @@ app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
     const currentUser = await getOptionalUser(req, res);
     const state = createOAuthState("discord", {
       userId: currentUser?.id || null,
-      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard.html")
+      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard/overview")
     });
     setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
 
@@ -620,7 +620,7 @@ app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
   } catch (error) {
     console.error("Discord OAuth start failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/login.html?error=discord_oauth_unavailable`);
+    return res.redirect(`${frontendUrl()}/login?error=discord_oauth_unavailable`);
   }
 });
 
@@ -642,24 +642,24 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
       created: linked.created
     });
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard.html"}?discord=connected`);
+    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard/overview"}?discord=connected`);
   } catch (error) {
     console.error("Discord OAuth callback failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/login.html?error=discord_oauth_failed`);
+    return res.redirect(`${frontendUrl()}/login?error=discord_oauth_failed`);
   }
 });
 
 app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
   try {
     if (req.cookies?.[ROBLOX_OAUTH_COOLDOWN_COOKIE]) {
-      return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_cooldown&retryAfter=30`);
+      return res.redirect(`${frontendUrl()}/dashboard/overview?error=roblox_oauth_cooldown&retryAfter=30`);
     }
 
     const pkce = createPkcePair();
     const state = createOAuthState("roblox", {
       userId: req.user.id,
-      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard.html")
+      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard/overview")
     });
     setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
     setOAuthCookie(res, OAUTH_PKCE_COOKIE, pkce.verifier);
@@ -686,7 +686,7 @@ app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
   } catch (error) {
     console.error("Roblox OAuth start failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/dashboard.html?error=roblox_oauth_unavailable`);
+    return res.redirect(`${frontendUrl()}/dashboard/overview?error=roblox_oauth_unavailable`);
   }
 });
 
@@ -697,7 +697,7 @@ app.get("/auth/roblox/callback", oauthLimiter, async (req, res) => {
   } catch (error) {
     console.error("Roblox OAuth callback failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/dashboard.html?error=${encodeURIComponent(robloxOAuthPublicError(error))}`);
+    return res.redirect(`${frontendUrl()}/dashboard/overview?error=${encodeURIComponent(robloxOAuthPublicError(error))}`);
   }
 });
 
@@ -711,7 +711,7 @@ app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
     return res.status(400).json({
       success: false,
       error: robloxOAuthPublicError(error),
-      redirectUrl: `${frontendUrl()}/dashboard.html?error=${encodeURIComponent(robloxOAuthPublicError(error))}`
+      redirectUrl: `${frontendUrl()}/dashboard/overview?error=${encodeURIComponent(robloxOAuthPublicError(error))}`
     });
   }
 });
@@ -1590,7 +1590,7 @@ app.post("/api/billing/portal", storeCheckoutLimiter, requireUser, async (req, r
     if (!user.stripeCustomerId) return res.status(400).json({ error: "stripe_customer_missing" });
     const session = await stripe().billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${frontendUrl()}/dashboard.html#billing`
+      return_url: `${frontendUrl()}/dashboard/billing`
     });
     await createAnalyticsEvent("billing_portal_created", {
       mode: stripeStatus().effectiveMode,
@@ -3554,7 +3554,7 @@ function createOAuthState(provider, data = {}) {
     iat: Date.now(),
     exp: Date.now() + 10 * 60 * 1000,
     userId: data.userId || null,
-    returnTo: safeFrontendPath(data.returnTo, "/dashboard.html")
+    returnTo: safeFrontendPath(data.returnTo, "/dashboard/overview")
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const signature = crypto.createHmac("sha256", oauthSecret()).update(encoded).digest("base64url");
@@ -3582,7 +3582,7 @@ function robloxOAuthPublicError(error) {
   return "roblox_oauth_failed";
 }
 
-function safeFrontendPath(value, fallback = "/dashboard.html") {
+function safeFrontendPath(value, fallback = "/dashboard/overview") {
   const text = String(value || "").trim();
   if (!text || !text.startsWith("/") || text.startsWith("//")) return fallback;
   if (/[\r\n]/.test(text)) return fallback;
@@ -3623,7 +3623,7 @@ async function finishRobloxOAuth(req, res, input) {
   clearOAuthCookies(res);
   return {
     user,
-    redirectUrl: `${frontendUrl()}${state.returnTo || "/dashboard.html"}?roblox=connected`
+    redirectUrl: `${frontendUrl()}${state.returnTo || "/dashboard/overview"}?roblox=connected`
   };
 }
 
@@ -4140,6 +4140,36 @@ app.get([
 ], (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
 });
+
+const cleanHtmlRedirects = new Map([
+  ["/index.html", "/"],
+  ["/download.html", "/download"],
+  ["/pricing.html", "/pricing"],
+  ["/macros.html", "/macros"],
+  ["/features.html", "/features"],
+  ["/faq.html", "/faq"],
+  ["/support.html", "/support"],
+  ["/security.html", "/security"],
+  ["/legal.html", "/legal"],
+  ["/login.html", "/login"],
+  ["/register.html", "/register"],
+  ["/forgot-password.html", "/forgot-password"],
+  ["/reset-password.html", "/reset-password"],
+  ["/dashboard.html", "/dashboard/overview"],
+  ["/my-products.html", "/dashboard/products"],
+  ["/store.html", "/store"],
+  ["/success.html", "/success"],
+  ["/payment-success.html", "/success"],
+  ["/payment-cancelled.html", "/payment-cancelled"]
+]);
+
+for (const [legacyPath, cleanPath] of cleanHtmlRedirects) {
+  app.get(legacyPath, (req, res) => {
+    const queryIndex = req.url.indexOf("?");
+    const query = queryIndex >= 0 ? req.url.slice(queryIndex) : "";
+    res.redirect(301, cleanPath + query);
+  });
+}
 
 app.use(express.static(publicDir, {
   extensions: ["html"],
@@ -5364,8 +5394,8 @@ async function createProductCheckoutSession({ user, product, price }) {
     mode: "payment",
     customer: user.stripeCustomerId,
     allow_promotion_codes: true,
-    success_url: `${frontendUrl()}/payment-success.html?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${frontendUrl()}/payment-cancelled.html`,
+    success_url: `${frontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${frontendUrl()}/payment-cancelled`,
     line_items: [{ price: price.stripePriceId, quantity: 1 }],
     metadata: {
       purchase_type: "product",
@@ -5384,7 +5414,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
   const baseSession = {
     mode: subscriptionCheckout ? "subscription" : "payment",
     allow_promotion_codes: true,
-    success_url: `${frontendUrl()}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${frontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${frontendUrl()}/#pricing`,
     metadata: checkoutMetadata(plan, commerce, selectedCurrency, language, extraMetadata)
   };
@@ -5887,9 +5917,9 @@ function licenseValidationPayload(license, options = {}) {
     accountEmail: maskEmail(user?.email || license?.customerEmail),
     maskedAccountEmail: maskEmail(user?.email || license?.customerEmail),
     customerEmail: maskEmail(license?.customerEmail),
-    accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard.html`,
-    connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard.html`,
-    connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard.html`,
+    accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/overview`,
+    connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard/overview`,
+    connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard/overview`,
     optionalProfileMissing: missingRequirements,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
@@ -5979,7 +6009,7 @@ function recommendedLicenseFix(reason) {
     roblox_not_connected: "Roblox is optional and should never block app access.",
     gift_not_claimed: "Ask the user to claim the gift from their dashboard.",
     referral_not_claimed: "Ask the user to claim the referral reward from their dashboard.",
-    update_required: "Install the latest Fima Macro app from fimamacro.com/download.html.",
+    update_required: "Install the latest Fima Macro app from fimamacro.com/download.",
     server_error: "Check backend logs and retry validation.",
     timeout: "Retry after the API connection recovers."
   }[reason] || "Open the license record and inspect status, expiry, HWID and account links.";
@@ -6348,7 +6378,7 @@ async function createDiscordPasswordResetForUser(user, auditAction = "password_r
 
 async function createPasswordResetTokenForUser(user) {
   const token = await generateUniquePasswordResetCode();
-  const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(token)}`;
+  const resetUrl = `${frontendUrl()}/reset-password?token=${encodeURIComponent(token)}`;
   await prisma.$transaction([
     prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
@@ -6366,7 +6396,7 @@ async function createPasswordResetTokenForUser(user) {
 }
 
 async function sendPasswordResetEmail(email, code) {
-  const resetUrl = `${frontendUrl()}/reset-password.html?token=${encodeURIComponent(code)}`;
+  const resetUrl = `${frontendUrl()}/reset-password?token=${encodeURIComponent(code)}`;
   const subject = "Your Fima Macro password reset code";
   const text = [
     "Your Fima Macro password reset code is:",
@@ -7709,7 +7739,7 @@ async function buildReferralSummary(userId, options = {}) {
   const nextProgress = counts.valid % REFERRAL_REWARD_VALID_INVITES;
   return {
     code: code.code,
-    link: `${frontendUrl()}/register.html?ref=${encodeURIComponent(code.code)}`,
+    link: `${frontendUrl()}/register?ref=${encodeURIComponent(code.code)}`,
     rewardRule: {
       requiredValidInvites: REFERRAL_REWARD_VALID_INVITES,
       rewardDays: REFERRAL_REWARD_DAYS

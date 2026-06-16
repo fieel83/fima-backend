@@ -255,9 +255,9 @@ function fimaHelpEmbed() {
 
 function fimaAnnouncementPayload(commandName = "fima_embed") {
   const siteUrl = env("FRONTEND_URL") || "https://fimamacro.com";
-  const downloadUrl = `${siteUrl.replace(/\/+$/, "")}/download.html`;
-  const pricingUrl = `${siteUrl.replace(/\/+$/, "")}/pricing.html`;
-  const tutorialUrl = `${siteUrl.replace(/\/+$/, "")}/macros.html`;
+  const downloadUrl = `${siteUrl.replace(/\/+$/, "")}/download`;
+  const pricingUrl = `${siteUrl.replace(/\/+$/, "")}/pricing`;
+  const tutorialUrl = `${siteUrl.replace(/\/+$/, "")}/macros`;
   const supportUrl = env("DISCORD_SUPPORT_URL") || env("SUPPORT_URL") || siteUrl;
   const title = commandName === "fima_update" ? "Fima Macro Update" : "Fima Macro";
   const embed = new EmbedBuilder()
@@ -463,7 +463,7 @@ async function handleTicketButton(interaction) {
 
 async function createDiscordResetToken(userId) {
   const token = String(crypto.randomInt(100000, 1000000));
-  const resetUrl = `${(env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "")}/reset-password.html?token=${encodeURIComponent(token)}`;
+  const resetUrl = `${(env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
   await prisma.$transaction([
     prisma.passwordResetToken.updateMany({
       where: { userId, usedAt: null, expiresAt: { gt: new Date() } },

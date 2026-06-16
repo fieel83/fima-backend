@@ -186,8 +186,8 @@
       <div class="status" id="status">Checking Roblox callback...</div>
       <div class="loader" id="loader"><span></span></div>
       <div class="actions">
-        <a href="/dashboard.html">Back to dashboard</a>
-        <a href="/support.html">Support</a>
+        <a href="/dashboard/overview">Back to dashboard</a>
+        <a href="/support">Support</a>
       </div>
     </main>
 
@@ -233,7 +233,7 @@
             throw new Error(data.error || "roblox_oauth_failed");
           }
           statusEl.textContent = "Roblox linked. Redirecting...";
-          window.location.replace(data.redirectUrl || "/dashboard.html?roblox=connected");
+          window.location.replace(data.redirectUrl || "/dashboard/overview?roblox=connected");
         } catch (err) {
           fail("Roblox could not be linked. Please log in again and retry from the dashboard.");
         }
