@@ -18,22 +18,16 @@
     <meta name="twitter:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
     <title>Dashboard | Fima Macro</title>
     <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
-    <link rel="stylesheet" href="/assets/css/account.css?v=20260616-3a32r">
+    <link rel="stylesheet" href="/assets/css/account.css?v=20260617-3a39">
   </head>
   <body data-account-page="dashboard">
-    <header class="account-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/store">Store</a><a href="/dashboard/products">My Products</a><button class="link-button" data-logout>Logout</button></div></div></header>
+    <header class="account-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
     <main class="shell account-shell">
-      <section class="account-hero">
-        <p class="eyebrow">Account Dashboard</p>
-        <h1>Your Fima account.</h1>
-        <p class="account-lead">Manage your purchases, license keys, downloads and account access from one clean dashboard.</p>
-      </section>
-
       <div class="account-dashboard-layout">
         <aside class="account-dashboard-sidebar" aria-label="Account sections">
           <div class="account-dashboard-sidebar-title">
-            <span>Dashboard</span>
-            <strong>Account</strong>
+            <span>Fima Account</span>
+            <strong>Dashboard</strong>
           </div>
           <nav class="account-dashboard-nav">
             <a href="/dashboard/overview" data-dashboard-link="overview"><span>Overview</span><small>Account status</small></a>
@@ -41,8 +35,7 @@
             <a href="/dashboard/billing" data-dashboard-link="billing"><span>Billing</span><small>Plans and renewal</small></a>
             <a href="/dashboard/redeem" data-dashboard-link="redeem"><span>Redeem / Gift</span><small>Codes and gifts</small></a>
             <a href="/dashboard/referrals" data-dashboard-link="referrals"><span>Referrals</span><small>Invite rewards</small></a>
-            <a href="/dashboard/connected-accounts" data-dashboard-link="connected-accounts"><span>Connected Accounts</span><small>Discord and Roblox</small></a>
-            <a href="/dashboard/security" data-dashboard-link="security"><span>Security / Settings</span><small>Password and recovery</small></a>
+            <a href="/dashboard/security" data-dashboard-link="security"><span>Security / Settings</span><small>Password, Discord and profile</small></a>
             <a href="/dashboard/downloads" data-dashboard-link="downloads"><span>Downloads</span><small>Latest app</small></a>
             <a href="/dashboard/support" data-dashboard-link="support"><span>Support</span><small>Tickets and help</small></a>
           </nav>
@@ -58,7 +51,7 @@
               <div class="row"><span>Username</span><strong id="accountUsername">Loading...</strong></div>
               <div class="row"><span>Discord recovery</span><strong id="accountEmail">Loading...</strong></div>
               <div class="row"><span>Stripe Customer</span><code id="stripeCustomer">Loading...</code></div>
-              <div class="row"><span>Roblox optional</span><strong id="accountRoblox">Loading...</strong></div>
+              <div class="row"><span>Roblox profile</span><strong id="accountRoblox">Loading...</strong></div>
             </div>
           </section>
 
@@ -71,17 +64,14 @@
               </div>
             </div>
             <div id="emailVerification">Loading...</div>
-          </section>
-
-          <section class="panel panel-pad account-section" id="connected-accounts">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Account Links</p>
-                <h2>Discord recovery and optional profile links</h2>
-                <p>Discord is only required for free trial claims or optional recovery. Roblox is never required on the website.</p>
-              </div>
+            <div class="account-divider"></div>
+            <div>
+              <p class="eyebrow">Account Links</p>
+              <h2>Discord recovery and optional Roblox username</h2>
+              <p>Discord is for recovery and trial claims. Roblox username is optional and only used for profile display or macro personalization.</p>
             </div>
             <div id="connectedAccounts">Loading...</div>
+            <div id="robloxProfileSettings">Loading...</div>
           </section>
 
           <section class="panel panel-pad account-section" id="redeem">
@@ -167,7 +157,7 @@
       </div>
     </main>
     <script src="/assets/js/config.js?v=20260526-9"></script>
-    <script src="/assets/js/account.js?v=20260616-3a32r" defer></script>
+    <script src="/assets/js/account.js?v=20260617-3a39" defer></script>
   </body>
 </html>
 

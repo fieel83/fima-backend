@@ -49,7 +49,6 @@ function isExemptMutationPath(pathname) {
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/forgot-password" ||
     pathname === "/api/auth/reset-password" ||
-    pathname === "/api/auth/roblox-preview" ||
     pathname === "/auth/roblox/finish" ||
     pathname === "/api/license/validate" ||
     pathname === "/api/license/refresh-entitlement";

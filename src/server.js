@@ -501,8 +501,8 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     if (existing) return res.status(409).json({ error: "email_already_registered" });
 
     const wantsRobloxProfile = String(req.body?.robloxUsername || "").trim().length > 0;
-    const robloxProfile = await resolveRobloxProfile(req.body?.robloxUsername);
-    if (wantsRobloxProfile && !robloxProfile) return res.status(400).json({ error: "invalid_roblox_username" });
+    const robloxUsername = normalizeRobloxUsername(req.body?.robloxUsername);
+    if (wantsRobloxProfile && !robloxUsername) return res.status(400).json({ error: "invalid_roblox_username" });
     const stripeCustomerId = await createStripeCustomerIfPossible(email);
     const user = await prisma.user.create({
       data: {
@@ -510,9 +510,9 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
         emailNormalized,
         passwordHash: await hashPassword(password),
         stripeCustomerId,
-        robloxUsername: robloxProfile?.username || null,
-        robloxUserId: robloxProfile?.id || null,
-        robloxAvatarUrl: robloxProfile?.avatarUrl || null,
+        robloxUsername: robloxUsername || null,
+        robloxUserId: null,
+        robloxAvatarUrl: null,
         emailVerifiedAt: null
       }
     });
@@ -535,7 +535,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     await createAuditLog("user_registered", "user", user.id, {
       email,
       emailDomainChecked: emailCheck.mxVerified,
-      robloxLinked: Boolean(robloxProfile),
+      robloxLinked: false,
       usernameOnly,
       username: usernameOnly ? requestedUsername : null,
       referralCode: referralCode || null,
@@ -555,14 +555,11 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
 });
 
 app.post("/api/auth/roblox-preview", authLimiter, async (req, res) => {
-  try {
-    const profile = await resolveRobloxProfile(req.body?.robloxUsername);
-    if (!profile) return res.status(404).json({ success: false, error: "roblox_user_not_found" });
-    return res.json({ success: true, profile });
-  } catch (error) {
-    console.warn("Roblox profile preview failed", publicError(error));
-    return res.status(502).json({ success: false, error: "roblox_lookup_failed" });
-  }
+  return res.status(410).json({
+    success: false,
+    error: "roblox_lookup_removed",
+    message: "Roblox username is optional profile metadata only."
+  });
 });
 
 app.post("/api/auth/login", authLimiter, async (req, res) => {
@@ -651,69 +648,22 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
 });
 
 app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
-  try {
-    if (req.cookies?.[ROBLOX_OAUTH_COOLDOWN_COOKIE]) {
-      return res.redirect(`${frontendUrl()}/dashboard/overview?error=roblox_oauth_cooldown&retryAfter=30`);
-    }
-
-    const pkce = createPkcePair();
-    const state = createOAuthState("roblox", {
-      userId: req.user.id,
-      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard/overview")
-    });
-    setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
-    setOAuthCookie(res, OAUTH_PKCE_COOKIE, pkce.verifier);
-    res.cookie(ROBLOX_OAUTH_COOLDOWN_COOKIE, "1", {
-      httpOnly: true,
-      secure: apiBaseUrl().startsWith("https"),
-      sameSite: "lax",
-      path: "/auth/roblox",
-      maxAge: 30 * 1000,
-      ...(oauthCookieDomain() ? { domain: oauthCookieDomain() } : {})
-    });
-
-    const discovery = await getRobloxOidcDiscovery();
-    const redirectUri = robloxRedirectUri();
-    const url = new URL(discovery.authorization_endpoint);
-    url.searchParams.set("client_id", requiredEnv("ROBLOX_CLIENT_ID"));
-    url.searchParams.set("redirect_uri", redirectUri);
-    url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "openid profile");
-    url.searchParams.set("state", state);
-    url.searchParams.set("code_challenge", pkce.challenge);
-    url.searchParams.set("code_challenge_method", "S256");
-    return res.redirect(url.toString());
-  } catch (error) {
-    console.error("Roblox OAuth start failed", publicError(error));
-    clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/dashboard/overview?error=roblox_oauth_unavailable`);
-  }
+  clearOAuthCookies(res);
+  return res.redirect(`${frontendUrl()}/dashboard/security?error=roblox_oauth_removed`);
 });
 
 app.get("/auth/roblox/callback", oauthLimiter, async (req, res) => {
-  try {
-    const result = await finishRobloxOAuth(req, res, req.query || {});
-    return res.redirect(result.redirectUrl);
-  } catch (error) {
-    console.error("Roblox OAuth callback failed", publicError(error));
-    clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/dashboard/overview?error=${encodeURIComponent(robloxOAuthPublicError(error))}`);
-  }
+  clearOAuthCookies(res);
+  return res.redirect(`${frontendUrl()}/dashboard/security?error=roblox_oauth_removed`);
 });
 
 app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
-  try {
-    const result = await finishRobloxOAuth(req, res, req.body || {});
-    return res.json({ success: true, redirectUrl: result.redirectUrl, user: publicUser(result.user) });
-  } catch (error) {
-    console.error("Roblox OAuth finish failed", publicError(error));
-    clearOAuthCookies(res);
-    return res.status(400).json({
-      success: false,
-      error: robloxOAuthPublicError(error),
-      redirectUrl: `${frontendUrl()}/dashboard/overview?error=${encodeURIComponent(robloxOAuthPublicError(error))}`
-    });
-  }
+  clearOAuthCookies(res);
+  return res.status(410).json({
+    success: false,
+    error: "roblox_oauth_removed",
+    redirectUrl: `${frontendUrl()}/dashboard/security?error=roblox_oauth_removed`
+  });
 });
 
 app.post("/payments/robux/manual/submit", manualPaymentLimiter, requireUser, async (req, res) => {
@@ -1031,6 +981,34 @@ app.get("/api/me/integrations", requireUser, async (req, res) => {
     integrations,
     trial: await buildMonthlyTrialSummary(req.user, new Date(), integrations)
   });
+});
+
+app.post("/api/me/profile", requireUser, async (req, res) => {
+  try {
+    const rawRobloxUsername = String(req.body?.robloxUsername || "").trim();
+    const robloxUsername = normalizeRobloxUsername(rawRobloxUsername);
+    if (rawRobloxUsername && !robloxUsername) {
+      return res.status(400).json({ success: false, error: "invalid_roblox_username" });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        robloxUsername: robloxUsername || null,
+        robloxUserId: null,
+        robloxAvatarUrl: null
+      }
+    });
+    await createAuditLog("profile_roblox_username_updated", "user", user.id, {
+      hasRobloxUsername: Boolean(robloxUsername),
+      proof: "manual_profile_only"
+    });
+    const integrations = await buildIntegrationSummary(user);
+    return res.json({ success: true, user: publicUser(user), integrations });
+  } catch (error) {
+    console.error("Profile update failed", publicError(error));
+    return res.status(500).json({ success: false, error: "profile_update_failed" });
+  }
 });
 
 app.get("/api/trial-promo", async (req, res) => {
@@ -5919,7 +5897,7 @@ function licenseValidationPayload(license, options = {}) {
     customerEmail: maskEmail(license?.customerEmail),
     accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/overview`,
     connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard/overview`,
-    connectRobloxUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/roblox/start?returnTo=/dashboard/overview`,
+    connectRobloxUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/security#roblox-profile`,
     optionalProfileMissing: missingRequirements,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
@@ -5928,10 +5906,11 @@ function licenseValidationPayload(license, options = {}) {
       avatar: user.discordAvatarUrl || null
     } : null,
     buyerRoblox: user ? {
-      connected: Boolean(accountAccess?.robloxLinked),
-      id: maskExternalId(user.robloxUserId),
+      connected: false,
+      id: null,
       username: user.robloxUsername || null,
-      avatar: user.robloxAvatarUrl || null
+      avatar: null,
+      manualOnly: Boolean(user.robloxUsername)
     } : null,
     robloxUsername: user?.robloxUsername || null,
     robloxAvatarUrl: user?.robloxAvatarUrl || null,
@@ -5959,16 +5938,14 @@ async function buildLicenseAccountAccess(license) {
 
   const integrations = await buildIntegrationSummary(user);
   const discordLinked = Boolean(integrations.discord.connected);
-  const robloxLinked = Boolean(integrations.roblox.connected);
   if (!discordLinked) missingRequirements.push("discord_optional");
-  if (!robloxLinked) missingRequirements.push("roblox_optional");
 
-  const message = "Discord and Roblox are optional. You can connect them later for community features.";
+  const message = "Discord is optional for recovery. Roblox username is profile-only and never blocks app access.";
 
   return {
     user,
     discordLinked,
-    robloxLinked,
+    robloxLinked: false,
     canUseApp: true,
     missingRequirements,
     message
@@ -5983,7 +5960,7 @@ async function findUserForLicense(license) {
     where: { OR: [{ email }, { emailNormalized }] },
     include: {
       oauthLinks: {
-        where: { provider: { in: ["discord", "roblox"] } },
+        where: { provider: { in: ["discord"] } },
         orderBy: { updatedAt: "desc" }
       }
     }
@@ -6727,8 +6704,8 @@ function publicUser(user) {
     discordEmail: maskEmail(user.discordEmail),
     discordAvatarUrl: user.discordAvatarUrl || null,
     robloxUsername: user.robloxUsername || null,
-    robloxUserId: maskExternalId(user.robloxUserId),
-    robloxUserIdMasked: maskExternalId(user.robloxUserId),
+    robloxUserId: null,
+    robloxUserIdMasked: null,
     robloxAvatarUrl: user.robloxAvatarUrl || null,
     emailVerified: Boolean(user.emailVerifiedAt),
     emailVerifiedAt: user.emailVerifiedAt || null,
@@ -6747,13 +6724,13 @@ async function buildIntegrationSummary(user) {
     ? user.oauthLinks
     : user?.id
     ? await prisma.oAuthLink.findMany({
-        where: { userId: user.id, provider: { in: ["discord", "roblox"] } },
+        where: { userId: user.id, provider: { in: ["discord"] } },
         orderBy: { updatedAt: "desc" }
       }).catch(() => [])
     : [];
   const byProvider = Object.fromEntries(links.map((link) => [link.provider, link]));
   const discordConnected = Boolean(user?.discordUserId && byProvider.discord);
-  const robloxConnected = Boolean(user?.robloxUserId && byProvider.roblox);
+  const robloxConnected = false;
 
   return {
     discord: {
@@ -6767,12 +6744,13 @@ async function buildIntegrationSummary(user) {
     },
     roblox: {
       connected: robloxConnected,
-      id: maskExternalId(user?.robloxUserId),
+      id: null,
       username: user?.robloxUsername || null,
-      displayName: byProvider.roblox?.metadata?.displayName || user?.robloxUsername || null,
-      avatar: user?.robloxAvatarUrl || null,
-      connectedAt: byProvider.roblox?.createdAt || null,
-      updatedAt: byProvider.roblox?.updatedAt || null
+      displayName: user?.robloxUsername || null,
+      avatar: null,
+      connectedAt: null,
+      updatedAt: null,
+      manualOnly: Boolean(user?.robloxUsername)
     }
   };
 }

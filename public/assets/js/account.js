@@ -199,7 +199,7 @@
         "giftBuyLifetime": "Gift Lifetime",
         "changeGiftRecipient": "Change recipient",
         "accountNavProfileFallback": "Fima account",
-        "connectedAccounts": "Discord recovery and optional profile links",
+        "connectedAccounts": "Discord recovery and optional profile",
         "accountLinksEyebrow": "Account links",
         "discord": "Discord",
         "notConnected": "Not connected",
@@ -207,9 +207,13 @@
         "connectDiscord": "Connect Discord",
         "disconnectDiscord": "Disconnect Discord",
         "reconnectDiscord": "Reconnect Discord",
-        "connectRoblox": "Connect Roblox",
-        "disconnectRoblox": "Disconnect Roblox",
-        "reconnectRoblox": "Reconnect Roblox",
+        "connectRoblox": "Save Roblox username",
+        "disconnectRoblox": "Clear Roblox username",
+        "reconnectRoblox": "Update Roblox username",
+        "robloxProfileNote": "Roblox username is optional. It is used for profile display and macro personalization only.",
+        "saveRobloxUsername": "Save username",
+        "clearRobloxUsername": "Clear username",
+        "profileSaved": "Profile saved.",
         "freeMonthlyTrial": "Free Monthly Trial",
         "freeTrialEyebrow": "Free trial",
         "trialIntro": "Claim one free trial after linking Discord. Roblox is optional on the website.",
@@ -438,7 +442,7 @@
         "giftBuyLifetime": "Lifetime hediye et",
         "changeGiftRecipient": "Al\u0131c\u0131y\u0131 de\u011fi\u015ftir",
         "accountNavProfileFallback": "Fima hesab\u0131",
-        "connectedAccounts": "Discord kurtarma ve opsiyonel profil ba\u011flant\u0131lar\u0131",
+        "connectedAccounts": "Discord kurtarma ve opsiyonel profil",
         "accountLinksEyebrow": "Hesap ba\u011flant\u0131lar\u0131",
         "discord": "Discord",
         "notConnected": "Ba\u011fl\u0131 de\u011fil",
@@ -446,9 +450,13 @@
         "connectDiscord": "Discord Ba\u011fla",
         "disconnectDiscord": "Discord'u Ay\u0131r",
         "reconnectDiscord": "Discord'u Yeniden Ba\u011fla",
-        "connectRoblox": "Roblox Ba\u011fla",
-        "disconnectRoblox": "Roblox'u Ay\u0131r",
-        "reconnectRoblox": "Roblox'u Yeniden Ba\u011fla",
+        "connectRoblox": "Roblox adini kaydet",
+        "disconnectRoblox": "Roblox adini temizle",
+        "reconnectRoblox": "Roblox adini guncelle",
+        "robloxProfileNote": "Roblox username opsiyoneldir. Sadece profil gorunumu ve macro kisisellestirme icin kullanilir.",
+        "saveRobloxUsername": "Username kaydet",
+        "clearRobloxUsername": "Username temizle",
+        "profileSaved": "Profil kaydedildi.",
         "freeMonthlyTrial": "Ayl\u0131k \u00dccretsiz Trial",
         "freeTrialEyebrow": "\u00dccretsiz deneme",
         "trialIntro": "Discord'u ba\u011flad\u0131ktan sonra \u00fccretsiz trial alabilirsin. Roblox web sitesinde opsiyoneldir.",
@@ -1237,41 +1245,30 @@
       setText("button[type='submit']", t("resetButton"));
     }
     if (page === "dashboard") {
-      setHeroCopy(t("dashboardEyebrow"), t("dashboardTitle"), "");
       const rows = $$(".row span");
       if (rows[0]) rows[0].textContent = language() === "tr" ? "Kullanici adi" : "Username";
       if (rows[1]) rows[1].textContent = t("email");
       if (rows[2]) rows[2].textContent = t("stripeCustomer");
-      if (rows[3]) rows[3].textContent = language() === "tr" ? "Roblox opsiyonel" : "Roblox optional";
+      if (rows[3]) rows[3].textContent = language() === "tr" ? "Roblox profil" : "Roblox profile";
       setText(".account-summary-card h2", t("dashboardNav"));
-      const headings = $$(".account-section h2");
-      if (headings[0]) headings[0].textContent = t("emailVerificationTitle");
-      if (headings[1]) headings[1].textContent = t("connectedAccounts");
-      if (headings[2]) headings[2].textContent = t("giftSystemTitle");
-      if (headings[3]) headings[3].textContent = t("giftAccessTitle");
-      if (headings[4]) headings[4].textContent = t("referralRewardsTitle");
-      if (headings[5]) headings[5].textContent = t("freeMonthlyTrial");
-      if (headings[6]) headings[6].textContent = t("myProductsTitle");
-      if (headings[7]) headings[7].textContent = t("licenseAccess");
-      const sections = $$(".account-section");
-      const sectionIntro = (index, value) => {
-        const node = sections[index]?.querySelector(".section-heading p:not(.eyebrow)");
-        if (node) node.textContent = value;
-      };
-      sectionIntro(0, t("emailVerificationIntro"));
-      sectionIntro(1, language() === "tr"
+      setText("#security .section-heading h2", t("emailVerificationTitle"));
+      setText("#security .section-heading p:not(.eyebrow)", t("emailVerificationIntro"));
+      setText("#security > div:not(.section-heading) h2", t("connectedAccounts"));
+      const accountLinksIntro = $("#security > div:not(.section-heading) p:not(.eyebrow)");
+      if (accountLinksIntro) accountLinksIntro.textContent = language() === "tr"
         ? "Discord sadece free trial veya opsiyonel kurtarma icin gerekir. Roblox web sitesinde hicbir islemi engellemez."
-        : "Discord is only required for the free trial or optional recovery. Roblox never blocks website actions.");
-      sectionIntro(2, t("giftSystemIntro"));
-      sectionIntro(3, t("giftAccessIntro"));
-      sectionIntro(4, t("referralRewardsIntro"));
-      const eyebrows = $$(".account-section .eyebrow");
-      if (eyebrows[0]) eyebrows[0].textContent = t("emailVerificationEyebrow");
-      if (eyebrows[1]) eyebrows[1].textContent = t("accountLinksEyebrow");
-      if (eyebrows[2]) eyebrows[2].textContent = t("giftSystemEyebrow");
-      if (eyebrows[3]) eyebrows[3].textContent = t("giftAccessEyebrow");
-      if (eyebrows[4]) eyebrows[4].textContent = t("referralRewardsEyebrow");
-      if (eyebrows[5]) eyebrows[5].textContent = t("freeTrialEyebrow");
+        : "Discord is only required for the free trial or optional recovery. Roblox username is optional and never proves ownership.";
+      setText("#redeem .section-heading h2", t("giftSystemTitle"));
+      setText("#redeem .section-heading p:not(.eyebrow)", t("giftAccessIntro"));
+      setText("#referrals .section-heading h2", t("referralRewardsTitle"));
+      setText("#referrals .section-heading p:not(.eyebrow)", t("referralRewardsIntro"));
+      setText("#products .section-heading h2", t("myProductsTitle"));
+      setText("#billing .section-heading h2", t("licenseAccess"));
+      setText("#security .section-heading .eyebrow", t("emailVerificationEyebrow"));
+      const accountLinksEyebrow = $("#security > div:not(.section-heading) .eyebrow");
+      if (accountLinksEyebrow) accountLinksEyebrow.textContent = t("accountLinksEyebrow");
+      setText("#redeem .section-heading .eyebrow", t("giftAccessEyebrow"));
+      setText("#referrals .section-heading .eyebrow", t("referralRewardsEyebrow"));
     }
     if (page === "my-products") setHeroCopy(t("myProductsEyebrow"), t("myProductsTitle"), "");
     if (page === "store") setHeroCopy(t("storeEyebrow"), t("storeTitle"), t("storeIntro"));
@@ -1312,8 +1309,7 @@
     "/api/auth/register",
     "/api/auth/login",
     "/api/auth/forgot-password",
-    "/api/auth/reset-password",
-    "/api/auth/roblox-preview"
+    "/api/auth/reset-password"
   ]);
 
   const getCsrfToken = async () => {
@@ -1443,8 +1439,7 @@
           <a class="account-dropdown-link" href="${dashboardRoute("billing")}">${t("billingNav")}</a>
           <a class="account-dropdown-link" href="${dashboardRoute("redeem")}">Redeem / Gift</a>
           <a class="account-dropdown-link" href="${dashboardRoute("referrals")}">Invite Code / Referrals</a>
-          <a class="account-dropdown-link" href="${dashboardRoute("connected-accounts")}">Connected Accounts</a>
-          <a class="account-dropdown-link" href="${dashboardRoute("security")}">${t("accountSettingsNav")}</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("security")}">Security / Settings</a>
           <a class="account-dropdown-link" href="${dashboardRoute("downloads")}">Downloads</a>
           <a class="account-dropdown-link" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
           <a class="account-dropdown-link" href="${dashboardRoute("support")}">${t("supportNav")}</a>
@@ -1495,9 +1490,9 @@
       <a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a>
       <div class="links account-main-links">
         ${user ? `
-          <a class="${page === "my-products" ? "is-active" : ""}" href="${dashboardRoute("products")}">${t("myProductsNav")}</a>
-          <a href="${dashboardRoute("redeem")}">${t("redeemGiftNav")}</a>
-          <a href="/pricing">${t("buyPricing")}</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/download">${t("downloadApp")}</a>
+          <a href="/support">${t("supportNav")}</a>
         ` : `
           <a class="${page === "login" ? "is-active" : ""}" href="/login">${t("loginNav")}</a>
           <a class="nav-register-cta ${page === "register" ? "is-active" : ""}" href="/register">${t("registerButton")}</a>
@@ -1590,17 +1585,20 @@
     if (!error) return;
     const messages = {
       roblox_rate_limited: state.language === "tr"
-        ? "Roblox bu ba\u011flant\u0131 denemesini rate limitledi. Birka\u00e7 dakika bekleyip tekrar dene."
-        : "Roblox is rate limiting this login attempt. Please wait a few minutes and try again.",
+        ? "Roblox ba\u011flant\u0131s\u0131 \u015fu an kullan\u0131lm\u0131yor. Kullan\u0131c\u0131 ad\u0131n\u0131 profil i\u00e7in opsiyonel ekleyebilirsin."
+        : "Roblox linking is not used right now. You can add a username for profile display only.",
       roblox_oauth_cooldown: state.language === "tr"
-        ? "Roblox ba\u011flant\u0131s\u0131 zaten ba\u015flat\u0131ld\u0131. L\u00fctfen birka\u00e7 saniye bekle."
-        : "Roblox linking already started. Please wait a few seconds.",
+        ? "Roblox ba\u011flant\u0131s\u0131 \u015fu an kapal\u0131. Kullan\u0131c\u0131 ad\u0131 sadece profil i\u00e7indir."
+        : "Roblox linking is off for now. Username is profile-only.",
       duplicate_oauth_callback: state.language === "tr"
-        ? "Bu Roblox ba\u011flant\u0131 iste\u011fi zaten i\u015flendi. Dashboard'u yenileyebilirsin."
-        : "This Roblox link request was already handled. Refresh the dashboard.",
+        ? "Roblox ba\u011flant\u0131s\u0131 kald\u0131r\u0131ld\u0131. Dashboard'u yenileyebilirsin."
+        : "Roblox linking was removed. You can refresh the dashboard.",
       roblox_oauth_state_invalid: state.language === "tr"
-        ? "Roblox ba\u011flant\u0131 oturumu s\u00fcresi doldu. Tekrar Connect Roblox'a bas."
-        : "Roblox link session expired. Click Connect Roblox again."
+        ? "Roblox ba\u011flant\u0131s\u0131 kald\u0131r\u0131ld\u0131. Kullan\u0131c\u0131 ad\u0131 opsiyonel profil bilgisidir."
+        : "Roblox linking was removed. Username is optional profile info.",
+      roblox_oauth_removed: state.language === "tr"
+        ? "Roblox ba\u011flant\u0131s\u0131 \u015fu an kullan\u0131lm\u0131yor. Kullan\u0131c\u0131 ad\u0131 sadece profil ve makro ki\u015fiselle\u015ftirme i\u00e7indir."
+        : "Roblox linking is not used right now. Username is only for profile and macro personalization."
     };
     setMessage(messages[error] || errorMessage(error), "error");
   };
@@ -1671,30 +1669,16 @@
     const input = $("#robloxUsername");
     const preview = $("#robloxPreview");
     if (!input || !preview) return;
-    let timer;
-    const renderEmpty = () => {
-      preview.innerHTML = `<div class="avatar-placeholder">R</div><div><strong>${t("roblox")}</strong><span>${t("noRoblox")}</span></div>`;
-    };
-    const lookup = () => {
-      window.clearTimeout(timer);
+    const render = () => {
       const username = input.value.trim();
       if (!username) {
-        renderEmpty();
+        preview.innerHTML = `<div class="avatar-placeholder">R</div><div><strong>${t("roblox")}</strong><span>${t("noRoblox")}</span></div>`;
         return;
       }
-      timer = window.setTimeout(async () => {
-        preview.innerHTML = `<div class="avatar-placeholder">...</div><div><strong>${t("roblox")}</strong><span>${t("robloxLookup")}</span></div>`;
-        try {
-          const data = await post("/api/auth/roblox-preview", { robloxUsername: username });
-          const profile = data.profile;
-          preview.innerHTML = `<img src="${escapeHtml(profile.avatarUrl || "/assets/images/fima-logo.png")}" alt=""><div><strong>${escapeHtml(profile.displayName || profile.username)}</strong><span>@${escapeHtml(profile.username)}</span></div>`;
-        } catch {
-          preview.innerHTML = `<div class="avatar-placeholder">!</div><div><strong>${t("roblox")}</strong><span>${t("robloxNotFound")}</span></div>`;
-        }
-      }, 450);
+      preview.innerHTML = `<div class="avatar-placeholder">R</div><div><strong>@${escapeHtml(username)}</strong><span>${t("robloxProfileNote")}</span></div>`;
     };
-    renderEmpty();
-    input.addEventListener("input", lookup);
+    render();
+    input.addEventListener("input", render);
   };
 
   const initReferralPrefill = () => {
@@ -1851,7 +1835,7 @@
     const subscriptionStatus = license?.subscriptionStatus || item.subscriptionStatus || (license?.plan === "monthly" ? statusLabel(item) : "-");
     const hwidBound = Boolean(license?.hwidBound || license?.boundHwid || String(license?.hwidStatus || "").toLowerCase() === "bound");
     const discordLinked = Boolean(license?.discordLinked || context.user?.discordUserId || context.integrations?.discord?.connected);
-    const robloxLinked = Boolean(license?.robloxLinked || context.user?.robloxUserId || context.integrations?.roblox?.connected);
+    const robloxLinked = Boolean(license?.robloxLinked || context.integrations?.roblox?.connected);
     return `
       <article class="access-card ${license?.expired ? "is-expired" : ""}">
         <div class="access-head">
@@ -1987,10 +1971,11 @@
   };
 
   const profileMini = (account, fallbackLabel) => {
-    if (!account?.connected) {
+    if (!account?.connected && !account?.username) {
       return `<div class="mini-profile is-missing"><div class="avatar-placeholder">!</div><div><strong>${escapeHtml(fallbackLabel)}</strong><small>${t("notConnected")}</small></div></div>`;
     }
-    return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(maskExternalId(account.id) || "")}</small></div></div>`;
+    const sub = account.connected ? (maskExternalId(account.id) || t("connected")) : "Profile only";
+    return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(sub)}</small></div></div>`;
   };
 
   const renderConnectedAccounts = (integrations = {}) => {
@@ -2013,20 +1998,40 @@
               : `<a class="button" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a>`}
           </div>
         </article>
-        <article class="integration-card ${roblox.connected ? "is-connected" : "is-missing"}">
+        <article class="integration-card ${roblox.username ? "is-connected" : "is-missing"}">
           <div>
             <span class="pill">${t("roblox")}</span>
             ${profileMini(roblox, t("roblox"))}
-            <p class="integration-note">Optional profile link. Roblox never blocks website purchases, gifts or login.</p>
+            <p class="integration-note">${t("robloxProfileNote")}</p>
           </div>
           <div class="integration-actions">
-            <span class="status-pill">${roblox.connected ? t("connected") : t("notConnected")}</span>
-            ${roblox.connected
-              ? `<a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("reconnectRoblox")}</a><button class="button danger" type="button" data-disconnect-provider="roblox">${t("disconnectRoblox")}</button>`
-              : `<a class="button" href="${apiBase}/auth/roblox/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectRoblox")}</a>`}
+            <span class="status-pill">${roblox.username ? "Profile only" : t("notConnected")}</span>
+            <a class="button secondary" href="${dashboardRoute("security")}#roblox-profile">${roblox.username ? t("reconnectRoblox") : t("connectRoblox")}</a>
           </div>
         </article>
       </div>
+    `;
+  };
+
+  const renderRobloxProfileSettings = (user = {}) => {
+    const target = $("#robloxProfileSettings");
+    if (!target) return;
+    const current = user.robloxUsername || "";
+    target.innerHTML = `
+      <form class="verification-card roblox-profile-form" id="roblox-profile" data-roblox-profile-form>
+        <div class="verification-status">
+          <span class="status-pill">Profile only</span>
+          <div>
+            <strong>${t("robloxUsername")}</strong>
+            <small>${t("robloxProfileNote")}</small>
+          </div>
+        </div>
+        <div class="verification-actions">
+          <input name="robloxUsername" type="text" autocomplete="off" minlength="3" maxlength="20" value="${escapeHtml(current)}" placeholder="${escapeHtml(t("robloxUsername"))}">
+          <button class="button" type="submit">${t("saveRobloxUsername")}</button>
+          ${current ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}
+        </div>
+      </form>
     `;
   };
 
@@ -2071,7 +2076,6 @@
             ${requirements.map((item) => `<div class="requirement ${item.complete ? "is-complete" : "is-missing"}"><span>${item.complete ? "OK" : "!"}</span><strong>${escapeHtml(requirementLabel(item.id))}</strong></div>`).join("")}
           </div>
           ${missingDiscord ? `<div class="trial-hint"><span>${t("connectDiscordTrial")}</span><a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a></div>` : ""}
-          ${missingRoblox ? `<div class="trial-hint"><span>${t("connectRobloxTrial")}</span><a class="button secondary" href="${apiBase}/auth/roblox/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectRoblox")}</a></div>` : ""}
           ${!missingDiscord && !trial.active && !trial.cooldownActive ? `<div class="trial-hint is-ready"><span>${t("requirementsComplete")}</span></div>` : ""}
         </div>
         <aside class="trial-side">
@@ -2440,6 +2444,7 @@
       renderAccountHeader(data.user);
       renderAccountSummary(data.user);
       renderEmailVerification(data.user);
+      renderRobloxProfileSettings(data.user);
     }
     renderConnectedAccounts(data.integrations || {});
     renderGiftClaims(data.pendingGifts || [], data.integrations || {}, data.purchasedGiftCodes || [], data.giftHistory || []);
@@ -2462,7 +2467,7 @@
       redeem: ["redeem"],
       gifts: ["redeem"],
       referrals: ["referrals"],
-      "connected-accounts": ["connected-accounts"],
+      "connected-accounts": ["security"],
       security: ["security"],
       settings: ["security"],
       downloads: ["downloads"],
@@ -2478,7 +2483,10 @@
     });
     $$(".account-dashboard-nav a").forEach((link) => {
       const key = link.dataset.dashboardLink || "";
-      const active = key === section || (section === "gifts" && key === "redeem") || (section === "settings" && key === "security");
+      const active = key === section ||
+        (section === "gifts" && key === "redeem") ||
+        (section === "settings" && key === "security") ||
+        (section === "connected-accounts" && key === "security");
       link.classList.toggle("is-active", active);
       if (active) {
         link.setAttribute("aria-current", "page");
@@ -2593,6 +2601,28 @@
 
   const initAccountActions = () => {
     document.addEventListener("submit", async (event) => {
+      const robloxProfileForm = event.target.closest("[data-roblox-profile-form]");
+      if (robloxProfileForm) {
+        event.preventDefault();
+        const submit = robloxProfileForm.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post("/api/me/profile", { robloxUsername: robloxProfileForm.robloxUsername.value });
+          currentUserPromise = null;
+          renderAccountHeader(data.user || {});
+          renderAccountSummary(data.user || {});
+          renderConnectedAccounts(data.integrations || {});
+          renderRobloxProfileSettings(data.user || {});
+          setMessage(t("profileSaved"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+        return;
+      }
+
       const giftForm = event.target.closest("[data-gift-code-form]");
       if (giftForm) {
         event.preventDefault();
@@ -2690,6 +2720,26 @@
           setMessage(error.message, "error");
         } finally {
           emailButton.disabled = false;
+        }
+        return;
+      }
+
+      const clearRobloxButton = event.target.closest("[data-clear-roblox-username]");
+      if (clearRobloxButton) {
+        clearRobloxButton.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post("/api/me/profile", { robloxUsername: "" });
+          currentUserPromise = null;
+          renderAccountHeader(data.user || {});
+          renderAccountSummary(data.user || {});
+          renderConnectedAccounts(data.integrations || {});
+          renderRobloxProfileSettings(data.user || {});
+          setMessage(t("profileSaved"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          clearRobloxButton.disabled = false;
         }
         return;
       }
