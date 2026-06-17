@@ -1899,7 +1899,8 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       hwid,
       appVersion,
       minSupportedAppVersion,
-      licenseStatus: "active"
+      licenseStatus: "active",
+      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid")
     });
 
     return res.json({
@@ -2082,7 +2083,8 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       hwid,
       appVersion,
       minSupportedAppVersion,
-      licenseStatus: "active"
+      licenseStatus: "active",
+      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid")
     });
 
     await prisma.validationLog.create({
@@ -5737,12 +5739,30 @@ function configuredOwnerEmail() {
   return normalizeAccountEmail(process.env.OWNER_LIFETIME_GRANT_EMAIL);
 }
 
+function isOwnerAccountLifetimeLicense(license) {
+  if (!license) return false;
+  const configuredEmail = configuredOwnerEmail();
+  if (!configuredEmail) return false;
+  const licenseEmail = normalizeAccountEmail(license.customerEmail);
+  return Boolean(license.lifetime && license.status === "active" && licenseEmail && licenseEmail === configuredEmail);
+}
+
 function isOwnerManagedLicense(license) {
   if (!license) return false;
   const configuredKey = configuredOwnerLicenseKey();
   if (configuredKey && normalizeLicenseKey(license.licenseKey) === configuredKey) return true;
   const notes = String(license.notes || "").toLowerCase();
-  return notes.includes("owner_internal_lifetime") || notes.includes("adminaccess=owner_only");
+  return notes.includes("owner_internal_lifetime") ||
+    notes.includes("adminaccess=owner_only") ||
+    isOwnerAccountLifetimeLicense(license);
+}
+
+function ownerAdminAccessForLicense(license, hwid, reason = "valid") {
+  if (reason !== "valid") return false;
+  if (!isOwnerManagedLicense(license)) return false;
+  if (!license?.lifetime || license.status !== "active") return false;
+  const binding = ownerLicenseBindingState(license, hwid);
+  return binding.ok && binding.reason === "owner_key_bound";
 }
 
 function ownerLicenseBindingState(license, hwid) {
@@ -5852,6 +5872,7 @@ function licenseValidationPayload(license, options = {}) {
   const licenseExists = Boolean(license);
   const validLicense = options.validLicense ?? Boolean(license && !["license_not_found", "invalid_format"].includes(reason));
   const canUseApp = Boolean(options.valid && hwidMatches);
+  const ownerAdminAccess = Boolean(options.ownerAdminAccess ?? ownerAdminAccessForLicense(license, normalizedHwid, reason));
 
   return {
     valid: Boolean(options.valid),
@@ -5876,7 +5897,11 @@ function licenseValidationPayload(license, options = {}) {
     timeLeftSeconds: timeLeft.seconds,
     timeLeftState: timeLeft.state,
     lifetime: Boolean(license?.lifetime),
-    ownerAdminAccess: Boolean(license && isOwnerManagedLicense(license) && reason === "valid"),
+    ownerAdminAccess,
+    isOwner: ownerAdminAccess,
+    isAdmin: ownerAdminAccess,
+    adminTools: ownerAdminAccess,
+    capabilities: ownerAdminAccess ? ["owner_admin", "admin_panel", "admin_macro_editor"] : [],
     boundHwid: boundHwid || null,
     incomingHwid: normalizedHwid || null,
     hwidBound,

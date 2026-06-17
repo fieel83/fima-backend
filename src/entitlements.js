@@ -109,13 +109,18 @@ export function issueAppEntitlement({
   appVersion = null,
   minSupportedAppVersion = "",
   licenseStatus = null,
-  allowedFeatures = null
+  allowedFeatures = null,
+  ownerAdminAccess = false
 }) {
   const secret = requiredEnv("ENTITLEMENT_SIGNING_SECRET");
   const now = new Date();
   const expiresAt = new Date(now.getTime() + entitlementLifetimeMinutes() * 60 * 1000);
   const sessionVersion = env("ADMIN_SESSION_VERSION", env("ADMIN_SESSION_REVOKED_BEFORE", ""));
   const plan = license?.plan || null;
+  const baseFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : allowedFeaturesForPlan(plan);
+  const safeFeatures = ownerAdminAccess
+    ? Array.from(new Set([...baseFeatures, "owner_admin", "admin_panel", "admin_macro_editor"]))
+    : baseFeatures;
   const payload = {
     tokenType: TOKEN_TYPE,
     entitlementVersion: TOKEN_VERSION,
@@ -125,7 +130,12 @@ export function issueAppEntitlement({
     userId: user?.id || null,
     accountId: user?.id || null,
     plan,
-    allowedFeatures: Array.isArray(allowedFeatures) ? allowedFeatures : allowedFeaturesForPlan(plan),
+    allowedFeatures: safeFeatures,
+    ownerAdminAccess: Boolean(ownerAdminAccess),
+    isOwner: Boolean(ownerAdminAccess),
+    isAdmin: Boolean(ownerAdminAccess),
+    adminTools: Boolean(ownerAdminAccess),
+    capabilities: ownerAdminAccess ? ["owner_admin", "admin_panel", "admin_macro_editor"] : [],
     issuedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     appVersion: appVersion || null,
@@ -193,6 +203,11 @@ export function publicEntitlementPayload(entitlement) {
     accountId: payload.accountId || null,
     plan: payload.plan || null,
     allowedFeatures: payload.allowedFeatures || [],
+    ownerAdminAccess: Boolean(payload.ownerAdminAccess),
+    isOwner: Boolean(payload.isOwner),
+    isAdmin: Boolean(payload.isAdmin),
+    adminTools: Boolean(payload.adminTools),
+    capabilities: payload.capabilities || [],
     issuedAt: payload.issuedAt || null,
     expiresAt: payload.expiresAt || null,
     appVersion: payload.appVersion || null,
