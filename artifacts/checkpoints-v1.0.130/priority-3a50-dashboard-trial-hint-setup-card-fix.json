@@ -1,0 +1,24 @@
+{
+    "priority":  "3a50-dashboard-trial-hint-setup-card-fix",
+    "createdAt":  "2026-06-21T14:47:42.6349226+02:00",
+    "issue":  "Dashboard overview trial/Roblox verification hint collapsed into a narrow grid column; setup/help cards had cramped text and plain corners.",
+    "rootCause":  "overview-trial-hint was the third child inside .account-summary-card grid and did not span both columns, so it rendered in a single narrow column.",
+    "fixes":  [
+                  "Added grid-column: 1 / -1, full width, wider copy area, and no-wrap button for .overview-trial-hint.",
+                  "Added angled clipped corners, stronger glass gradient, more padding, and better paragraph line-height for .setup-card.",
+                  "Bumped public CSS query strings to v=20260621-3a50 so browsers do not keep stale broken CSS."
+              ],
+    "verification":  {
+                         "localDashboardScreenshot":  "artifacts/post-security-backlog/screenshots/3a50-dashboard-overview-local.png",
+                         "localDashboardResult":  "Trial hint renders full width with button separated on the right; no vertical word stacking or overlap seen.",
+                         "howToGetKeyRoute":  "src/server.js maps /how-to-get-key to public/how-to-get-key.html; local .html request returned 200.",
+                         "latestJsonChanged":  false,
+                         "v10131Published":  false,
+                         "fullSecretsPrinted":  false
+                     },
+    "filesEdited":  [
+                        "public/assets/css/account.css",
+                        "public/assets/css/styles.css",
+                        "public/*.html CSS cache-bust links only"
+                    ]
+}

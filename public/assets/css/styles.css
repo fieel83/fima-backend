@@ -1123,12 +1123,18 @@ h3 {
 
 .setup-card {
   margin-top: 18px;
-  padding: 16px;
+  padding: 20px 22px;
+  border-radius: 18px 6px 18px 6px;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  background:
+    linear-gradient(135deg, rgba(155, 92, 255, 0.13), rgba(66, 217, 255, 0.055)),
+    rgba(255, 255, 255, 0.045);
 }
 
 .setup-card p {
-  margin: 7px 0 0;
+  margin: 10px 0 0;
   color: var(--muted);
+  line-height: 1.58;
 }
 
 .floating-card {
