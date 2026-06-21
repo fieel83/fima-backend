@@ -207,20 +207,27 @@
         "connectDiscord": "Connect Discord",
         "disconnectDiscord": "Disconnect Discord",
         "reconnectDiscord": "Reconnect Discord",
-        "connectRoblox": "Save Roblox username",
-        "disconnectRoblox": "Clear Roblox username",
-        "reconnectRoblox": "Update Roblox username",
-        "robloxProfileNote": "Roblox username is optional. It is used for profile display and macro personalization only.",
-        "saveRobloxUsername": "Save username",
-        "clearRobloxUsername": "Clear username",
+        "connectRoblox": "Verify Roblox",
+        "disconnectRoblox": "Clear Roblox",
+        "reconnectRoblox": "Verify again",
+        "robloxProfileNote": "Roblox verification proves this profile is yours. Put the FIMA code in your Roblox About/Description, then confirm.",
+        "saveRobloxUsername": "Start verification",
+        "clearRobloxUsername": "Clear Roblox",
+        "robloxVerified": "Roblox verified",
+        "robloxPending": "Verification pending",
+        "robloxVerifyIntro": "Enter your Roblox username. We will give you a FIMA verification code to place in your Roblox profile About/Description.",
+        "robloxVerifyInstructions": "Copy this code into your Roblox profile About/Description, save it, then press Confirm verification.",
+        "copyVerifyCode": "Copy code",
+        "confirmRobloxVerification": "Confirm verification",
+        "openRobloxProfile": "Open Roblox profile",
         "profileSaved": "Profile saved.",
         "freeMonthlyTrial": "Free Monthly Trial",
         "freeTrialEyebrow": "Free trial",
-        "trialIntro": "Claim one free trial after linking Discord. Roblox is optional on the website.",
+        "trialIntro": "Claim one free trial after linking Discord and verifying your Roblox profile.",
         "trialRequirements": "Free Monthly Trial Requirements",
         "accountLoggedIn": "Fima account logged in",
         "discordConnected": "Discord connected",
-        "robloxConnected": "Roblox optional",
+        "robloxConnected": "Roblox verified",
         "claimTrial": "Claim Free Trial",
         "trialActive": "Trial active",
         "trialAvailable": "Trial available",
@@ -228,8 +235,11 @@
         "trialCooldown": "Trial cooldown",
         "nextTrial": "Next free trial",
         "connectDiscordTrial": "Connect Discord to unlock your free trial.",
-        "connectRobloxTrial": "Roblox is optional on the website.",
+        "connectRobloxTrial": "Verify your Roblox profile to unlock your free trial.",
         "trialClaimed": "Free trial claimed. Your Trial role is being synced.",
+        "trialReadyTitle": "Your trial key is ready",
+        "trialReadyText": "Copy your license key, then open Fima and activate it on the key screen.",
+        "trialReadyPrivacy": "For privacy, screenshots and reports show the masked key only. The Copy button copies the full key for this signed-in account.",
         "trialAlreadyActive": "You already have an active monthly trial.",
         "trialCooldownActive": "Your monthly trial cooldown is still active.",
         "discordNotConnected": "Discord is only required for the free trial or optional recovery.",
@@ -450,20 +460,27 @@
         "connectDiscord": "Discord Ba\u011fla",
         "disconnectDiscord": "Discord'u Ay\u0131r",
         "reconnectDiscord": "Discord'u Yeniden Ba\u011fla",
-        "connectRoblox": "Roblox adını kaydet",
-        "disconnectRoblox": "Roblox adını temizle",
-        "reconnectRoblox": "Roblox adını güncelle",
-        "robloxProfileNote": "Roblox kullanıcı adı isteğe bağlıdır. Sadece profil görünümü ve makro kişiselleştirme için kullanılır.",
-        "saveRobloxUsername": "Kullanıcı adını kaydet",
-        "clearRobloxUsername": "Kullanıcı adını temizle",
+        "connectRoblox": "Roblox doğrula",
+        "disconnectRoblox": "Roblox'u temizle",
+        "reconnectRoblox": "Tekrar doğrula",
+        "robloxProfileNote": "Roblox doğrulama bu profilin sana ait olduğunu kanıtlar. FIMA kodunu Roblox About/Description kısmına yazıp onayla.",
+        "saveRobloxUsername": "Doğrulamayı başlat",
+        "clearRobloxUsername": "Roblox'u temizle",
+        "robloxVerified": "Roblox doğrulandı",
+        "robloxPending": "Doğrulama bekliyor",
+        "robloxVerifyIntro": "Roblox kullanıcı adını gir. Sana Roblox profilinin About/Description kısmına koyacağın FIMA doğrulama kodunu vereceğiz.",
+        "robloxVerifyInstructions": "Bu kodu Roblox profilinin About/Description kısmına kopyala, kaydet, sonra Doğrulamayı onayla tuşuna bas.",
+        "copyVerifyCode": "Kodu kopyala",
+        "confirmRobloxVerification": "Doğrulamayı onayla",
+        "openRobloxProfile": "Roblox profilini aç",
         "profileSaved": "Profil kaydedildi.",
         "freeMonthlyTrial": "Ayl\u0131k \u00dccretsiz Trial",
         "freeTrialEyebrow": "\u00dccretsiz deneme",
-        "trialIntro": "Discord'u ba\u011flad\u0131ktan sonra \u00fccretsiz trial alabilirsin. Roblox web sitesinde opsiyoneldir.",
+        "trialIntro": "Discord'u bağlayıp Roblox profilini doğruladıktan sonra ücretsiz trial alabilirsin.",
         "trialRequirements": "Ayl\u0131k Trial Gereksinimleri",
         "accountLoggedIn": "Fima hesab\u0131yla giri\u015f yap\u0131ld\u0131",
         "discordConnected": "Discord ba\u011fl\u0131",
-        "robloxConnected": "Roblox opsiyonel",
+        "robloxConnected": "Roblox doğrulandı",
         "claimTrial": "Free Trial Al",
         "trialActive": "Trial aktif",
         "trialAvailable": "Trial haz\u0131r",
@@ -471,8 +488,11 @@
         "trialCooldown": "Trial bekleme s\u00fcresi",
         "nextTrial": "Sonraki \u00fccretsiz trial",
         "connectDiscordTrial": "Free trial i\u00e7in Discord'u ba\u011fla.",
-        "connectRobloxTrial": "Roblox web sitesinde opsiyoneldir.",
+        "connectRobloxTrial": "Free trial için Roblox profilini doğrula.",
         "trialClaimed": "Free trial al\u0131nd\u0131. Trial rol\u00fcn senkronize ediliyor.",
+        "trialReadyTitle": "Trial key'in haz\u0131r",
+        "trialReadyText": "License key'i kopyala, sonra Fima'y\u0131 a\u00e7\u0131p key ekran\u0131nda aktive et.",
+        "trialReadyPrivacy": "Gizlilik i\u00e7in ekran g\u00f6r\u00fcnt\u00fcleri ve raporlarda sadece maskeli key g\u00f6sterilir. Copy butonu tam key'i bu giri\u015f yapm\u0131\u015f hesap i\u00e7in kopyalar.",
         "trialAlreadyActive": "Zaten aktif ayl\u0131k trial'\u0131n var.",
         "trialCooldownActive": "Ayl\u0131k trial bekleme s\u00fcren h\u00e2l\u00e2 aktif.",
         "discordNotConnected": "Discord sadece free trial veya opsiyonel kurtarma i\u00e7in gerekir.",
@@ -1974,7 +1994,7 @@
     if (!account?.connected && !account?.username) {
       return `<div class="mini-profile is-missing"><div class="avatar-placeholder">!</div><div><strong>${escapeHtml(fallbackLabel)}</strong><small>${t("notConnected")}</small></div></div>`;
     }
-    const sub = account.connected ? (maskExternalId(account.id) || t("connected")) : "Profile only";
+    const sub = account.connected ? (maskExternalId(account.id) || t("connected")) : (account.pending ? t("robloxPending") : t("notConnected"));
     return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(sub)}</small></div></div>`;
   };
 
@@ -1998,15 +2018,15 @@
               : `<a class="button" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a>`}
           </div>
         </article>
-        <article class="integration-card ${roblox.username ? "is-connected" : "is-missing"}">
+        <article class="integration-card ${roblox.connected ? "is-connected" : "is-missing"}">
           <div>
             <span class="pill">${t("roblox")}</span>
             ${profileMini(roblox, t("roblox"))}
             <p class="integration-note">${t("robloxProfileNote")}</p>
           </div>
           <div class="integration-actions">
-            <span class="status-pill">${roblox.username ? "Profile only" : t("notConnected")}</span>
-            <a class="button secondary" href="${dashboardRoute("security")}#roblox-profile">${roblox.username ? t("reconnectRoblox") : t("connectRoblox")}</a>
+            <span class="status-pill">${roblox.connected ? t("robloxVerified") : roblox.pending ? t("robloxPending") : t("notConnected")}</span>
+            <a class="button secondary" href="${dashboardRoute("overview")}#roblox-profile">${roblox.connected ? t("reconnectRoblox") : t("connectRoblox")}</a>
           </div>
         </article>
       </div>
@@ -2017,19 +2037,50 @@
     const target = $("#robloxProfileSettings");
     if (!target) return;
     const current = user.robloxUsername || "";
+    const integrations = window.fimaAccountProductContext?.integrations || {};
+    const roblox = integrations.roblox || {};
+    const pending = roblox.pending || null;
+    const verified = Boolean(user.robloxVerified || roblox.connected);
+    const avatar = user.robloxAvatarUrl || roblox.avatar || pending?.avatar || "";
+    const profileUrl = roblox.profileUrl || pending?.profileUrl || "";
+    const verifiedCard = verified ? `
+      <div class="verified-roblox-profile">
+        ${avatar ? `<img src="${escapeHtml(avatar)}" alt="">` : `<span>R</span>`}
+        <div>
+          <strong>@${escapeHtml(current || roblox.username || t("roblox"))}</strong>
+          <small>${t("robloxVerified")} ${user.robloxUserIdMasked ? `- ${escapeHtml(user.robloxUserIdMasked)}` : ""}</small>
+        </div>
+        ${profileUrl ? `<a class="button secondary" href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener">${t("openRobloxProfile")}</a>` : ""}
+      </div>
+    ` : "";
+    const pendingCard = pending ? `
+      <div class="roblox-verify-pending">
+        <p>${t("robloxVerifyInstructions")}</p>
+        <div class="verify-code-box">
+          <code>${escapeHtml(pending.code || "")}</code>
+          <button class="button secondary" type="button" data-copy-roblox-code="${escapeHtml(pending.code || "")}">${t("copyVerifyCode")}</button>
+        </div>
+        <div class="verification-actions">
+          ${pending.profileUrl ? `<a class="button secondary" href="${escapeHtml(pending.profileUrl)}" target="_blank" rel="noopener">${t("openRobloxProfile")}</a>` : ""}
+          <button class="button" type="button" data-confirm-roblox-verification>${t("confirmRobloxVerification")}</button>
+        </div>
+      </div>
+    ` : "";
     target.innerHTML = `
-      <form class="verification-card roblox-profile-form" id="roblox-profile" data-roblox-profile-form>
+      <form class="verification-card roblox-profile-form ${verified ? "is-verified" : ""}" id="roblox-profile" data-roblox-profile-form>
         <div class="verification-status">
-          <span class="status-pill">Profile only</span>
+          <span class="status-pill">${verified ? t("robloxVerified") : pending ? t("robloxPending") : t("notConnected")}</span>
           <div>
             <strong>${t("robloxUsername")}</strong>
-            <small>${t("robloxProfileNote")}</small>
+            <small>${verified ? t("robloxProfileNote") : t("robloxVerifyIntro")}</small>
           </div>
         </div>
+        ${verifiedCard}
+        ${pendingCard}
         <div class="verification-actions">
           <input name="robloxUsername" type="text" autocomplete="off" minlength="3" maxlength="20" value="${escapeHtml(current)}" placeholder="${escapeHtml(t("robloxUsername"))}">
           <button class="button" type="submit">${t("saveRobloxUsername")}</button>
-          ${current ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}
+          ${current || verified || pending ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}
         </div>
       </form>
     `;
@@ -2047,7 +2098,7 @@
     const requirements = trial.requirements || [];
     const statusText = trial.active ? t("trialActive") : trial.cooldownActive ? t("trialCooldown") : trial.eligible ? t("trialAvailable") : t("trialLocked");
     const missingDiscord = requirements.some((item) => item.id === "discord" && !item.complete);
-    const missingRoblox = false;
+    const missingRoblox = requirements.some((item) => item.id === "roblox" && !item.complete);
     const promo = trial.promo || {};
     const trialLabel = trial.label || (promo.active ? `${promo.promoDays || promo.days || 7}-Day Free Trial` : t("claimTrial").replace(/^Claim\s+/i, ""));
     const promoBanner = promo.active ? `
@@ -2071,12 +2122,13 @@
             </div>
             <span class="status-pill">${statusText}</span>
           </div>
-          <p>${promo.active ? `${escapeHtml(trialLabel)} is available during the beta promotion. Discord is required only for trial claims.` : t("trialIntro")}</p>
+          <p>${promo.active ? `${escapeHtml(trialLabel)} is available during the beta promotion. Discord and verified Roblox are required for trial claims.` : t("trialIntro")}</p>
           <div class="requirement-list">
             ${requirements.map((item) => `<div class="requirement ${item.complete ? "is-complete" : "is-missing"}"><span>${item.complete ? "OK" : "!"}</span><strong>${escapeHtml(requirementLabel(item.id))}</strong></div>`).join("")}
           </div>
           ${missingDiscord ? `<div class="trial-hint"><span>${t("connectDiscordTrial")}</span><a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a></div>` : ""}
-          ${!missingDiscord && !trial.active && !trial.cooldownActive ? `<div class="trial-hint is-ready"><span>${t("requirementsComplete")}</span></div>` : ""}
+          ${missingRoblox ? `<div class="trial-hint"><span>${t("connectRobloxTrial")}</span><a class="button secondary" href="${dashboardRoute("overview")}#roblox-profile">${t("connectRoblox")}</a></div>` : ""}
+          ${!missingDiscord && !missingRoblox && !trial.active && !trial.cooldownActive ? `<div class="trial-hint is-ready"><span>${t("requirementsComplete")}</span></div>` : ""}
         </div>
         <aside class="trial-side">
           ${trial.active ? `<div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong></div>` : ""}
@@ -2440,6 +2492,7 @@
 
   const refreshDashboardAccess = async () => {
     const data = await api("/api/me/dashboard");
+    window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
     if (data.user) {
       renderAccountHeader(data.user);
       renderAccountSummary(data.user);
@@ -2450,7 +2503,6 @@
     renderGiftClaims(data.pendingGifts || [], data.integrations || {}, data.purchasedGiftCodes || [], data.giftHistory || []);
     renderMonthlyTrial(data.trial || {});
     renderReferralDashboard(data.referrals || {});
-    window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
     renderAccountProducts(data.products || [], "#dashboardProducts");
     renderAccountProducts(data.products || [], "#purchases");
     renderLicenses(data.licenses || []);
@@ -2461,15 +2513,15 @@
     if (page !== "dashboard") return;
     const section = dashboardSectionFromLocation();
     const visibleByRoute = {
-      overview: ["overview"],
+      overview: ["overview", "security"],
       products: ["products"],
       billing: ["billing"],
       redeem: ["redeem"],
       gifts: ["redeem"],
       referrals: ["referrals"],
-      "connected-accounts": ["security"],
-      security: ["security"],
-      settings: ["security"],
+      "connected-accounts": ["overview", "security"],
+      security: ["overview", "security"],
+      settings: ["overview", "security"],
       downloads: ["downloads"],
       support: ["support"]
     };
@@ -2599,6 +2651,57 @@
     updateCountdowns();
   };
 
+  const showTrialClaimModal = (trial, license) => {
+    const existing = $(".gift-success-overlay");
+    existing?.remove();
+    const activeLicense = license || trial?.activeLicense || {};
+    const fullKey = activeLicense.licenseKey || "";
+    const maskedKey = activeLicense.licenseKeyMasked || maskSensitiveCode(fullKey);
+    const licenseRecordId = String(activeLicense.id || activeLicense.licenseId || "").trim();
+    const licenseSecretId = fullKey ? storeSensitiveSecret(fullKey, "trial-license") : "";
+    const copyAttribute = licenseRecordId
+      ? `data-copy-license-id="${escapeHtml(licenseRecordId)}"`
+      : licenseSecretId
+        ? `data-copy-secret="${escapeHtml(licenseSecretId)}"`
+        : "";
+    const overlay = document.createElement("div");
+    overlay.className = "gift-success-overlay trial-success-overlay";
+    overlay.innerHTML = `
+      <section class="gift-success-modal trial-success-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(t("trialClaimed"))}">
+        <div class="card-top">
+          <div>
+            <span class="pill">${escapeHtml(trial?.label || t("freeMonthlyTrial"))}</span>
+            <h3>${escapeHtml(t("trialReadyTitle") || "Your trial key is ready")}</h3>
+            <p>${escapeHtml(t("trialReadyText") || "Copy your license key, then open Fima and activate it on the key screen.")}</p>
+          </div>
+          <button class="link-button" type="button" data-close-gift-modal>${t("close")}</button>
+        </div>
+        <div class="gift-modal-key gift-modal-key-primary trial-license-display">
+          <span>${t("licenseKey")}</span>
+          <code>${escapeHtml(maskedKey || "FIMA-****")}</code>
+          ${copyAttribute ? `<button class="button" type="button" ${copyAttribute}>${t("copyLicenseKey")}</button>` : ""}
+        </div>
+        <div class="gift-meta-grid">
+          ${trial?.expiresAt ? `<span>${t("expires")}: <b>${date(trial.expiresAt)}</b></span>` : ""}
+          ${trial?.expiresAt ? `<span>${t("remaining")}: <b data-countdown="${escapeHtml(trial.expiresAt)}"></b></span>` : ""}
+          <span>${t("status")}: <b>${escapeHtml(t("trialActive") || "Trial active")}</b></span>
+        </div>
+        <div class="trial-success-note">
+          ${escapeHtml(t("trialReadyPrivacy") || "For privacy, screenshots and reports should show the masked key only. The Copy button copies the full key for this signed-in account.")}
+        </div>
+        <div class="gift-modal-actions">
+          <a class="button secondary" href="${dashboardRoute("products")}">${t("openMyProducts")}</a>
+          <a class="button secondary" href="/download">${t("downloadApp")}</a>
+          <button class="button" type="button" data-close-gift-modal>OK</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(overlay);
+    document.body.classList.add("modal-open");
+    window.setTimeout(() => overlay.classList.add("is-visible"), 20);
+    updateCountdowns();
+  };
+
   const initAccountActions = () => {
     document.addEventListener("submit", async (event) => {
       const robloxProfileForm = event.target.closest("[data-roblox-profile-form]");
@@ -2608,13 +2711,15 @@
         submit.disabled = true;
         setMessage(t("working"));
         try {
-          const data = await post("/api/me/profile", { robloxUsername: robloxProfileForm.robloxUsername.value });
+          const data = await post("/api/me/roblox/start-verification", { robloxUsername: robloxProfileForm.robloxUsername.value });
           currentUserPromise = null;
+          window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
           renderAccountHeader(data.user || {});
           renderAccountSummary(data.user || {});
           renderConnectedAccounts(data.integrations || {});
           renderRobloxProfileSettings(data.user || {});
-          setMessage(t("profileSaved"), "good");
+          renderMonthlyTrial(data.trial || {});
+          setMessage(t("robloxPending"), "good");
         } catch (error) {
           setMessage(error.message, "error");
         } finally {
@@ -2729,17 +2834,48 @@
         clearRobloxButton.disabled = true;
         setMessage(t("working"));
         try {
-          const data = await post("/api/me/profile", { robloxUsername: "" });
+          const data = await post("/api/me/roblox/clear", {});
           currentUserPromise = null;
+          window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
           renderAccountHeader(data.user || {});
           renderAccountSummary(data.user || {});
           renderConnectedAccounts(data.integrations || {});
           renderRobloxProfileSettings(data.user || {});
+          renderMonthlyTrial(data.trial || {});
           setMessage(t("profileSaved"), "good");
         } catch (error) {
           setMessage(error.message, "error");
         } finally {
           clearRobloxButton.disabled = false;
+        }
+        return;
+      }
+
+      const copyRobloxCodeButton = event.target.closest("[data-copy-roblox-code]");
+      if (copyRobloxCodeButton) {
+        await navigator.clipboard?.writeText(copyRobloxCodeButton.dataset.copyRobloxCode || "");
+        setMessage(t("copied"), "good");
+        return;
+      }
+
+      const confirmRobloxButton = event.target.closest("[data-confirm-roblox-verification]");
+      if (confirmRobloxButton) {
+        confirmRobloxButton.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await post("/api/me/roblox/confirm-verification", {});
+          currentUserPromise = null;
+          window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
+          renderAccountHeader(data.user || {});
+          renderAccountSummary(data.user || {});
+          renderConnectedAccounts(data.integrations || {});
+          renderRobloxProfileSettings(data.user || {});
+          renderMonthlyTrial(data.trial || {});
+          setMessage(t("robloxVerified"), "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          confirmRobloxButton.disabled = false;
         }
         return;
       }
@@ -2962,8 +3098,9 @@
         trialButton.disabled = true;
         setMessage(t("working"));
         try {
-          await post("/api/trial/monthly/claim", {});
+          const data = await post("/api/trial/monthly/claim", {});
           await refreshDashboardAccess();
+          showTrialClaimModal(data.trial, data.license);
           setMessage(t("trialClaimed"), "good");
         } catch (error) {
           setMessage(error.message, "error");

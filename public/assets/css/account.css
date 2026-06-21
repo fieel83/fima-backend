@@ -1339,6 +1339,36 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
   transform: translateY(0) scale(1);
 }
 
+.trial-success-modal {
+  width: min(660px, calc(100vw - 28px));
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(22, 12, 42, .98), rgba(8, 5, 18, .99)),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--primary) 34%, transparent), transparent 42%);
+}
+
+.trial-license-display {
+  min-height: 92px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 15px;
+}
+
+.trial-license-display code {
+  font-size: 1.1rem;
+  color: #f5eaff;
+  letter-spacing: .04em;
+}
+
+.trial-success-note {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: rgba(255, 255, 255, .035);
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
 .gift-modal-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1455,6 +1485,66 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
 
 .roblox-profile-form .verification-actions {
   grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.verified-roblox-profile,
+.roblox-verify-pending {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(158, 82, 255, .12), rgba(52, 211, 153, .055));
+}
+
+.verified-roblox-profile {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.verified-roblox-profile img,
+.verified-roblox-profile > span {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  background: rgba(158, 82, 255, .18);
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, transparent);
+  color: var(--text);
+  font-weight: 900;
+}
+
+.verified-roblox-profile strong,
+.verified-roblox-profile small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.verified-roblox-profile small,
+.roblox-verify-pending p {
+  color: var(--muted);
+}
+
+.verify-code-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.verify-code-box code {
+  display: block;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 44%, transparent);
+  background: rgba(4, 2, 10, .72);
+  color: #f0dbff;
+  font-weight: 900;
+  letter-spacing: .03em;
+  overflow-wrap: anywhere;
 }
 
 .verification-actions form {

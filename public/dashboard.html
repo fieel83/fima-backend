@@ -35,7 +35,6 @@
             <a href="/dashboard/billing" data-dashboard-link="billing"><span>Billing</span><small>Plans and renewal</small></a>
             <a href="/dashboard/redeem" data-dashboard-link="redeem"><span>Redeem / Gift</span><small>Codes and gifts</small></a>
             <a href="/dashboard/referrals" data-dashboard-link="referrals"><span>Referrals</span><small>Invite rewards</small></a>
-            <a href="/dashboard/security" data-dashboard-link="security"><span>Security / Settings</span><small>Password, Discord and profile</small></a>
             <a href="/dashboard/downloads" data-dashboard-link="downloads"><span>Downloads</span><small>Latest app</small></a>
             <a href="/dashboard/support" data-dashboard-link="support"><span>Support</span><small>Tickets and help</small></a>
           </nav>
@@ -45,7 +44,7 @@
           <section class="panel panel-pad account-summary-card" id="overview">
             <div>
               <h2>Account</h2>
-              <p>Username and password are enough. Link Discord later for password recovery or free trial access.</p>
+              <p>Manage your profile, recovery, Roblox verification and trial requirements from this overview.</p>
             </div>
             <div class="summary-grid">
               <div class="row"><span>Username</span><strong id="accountUsername">Loading...</strong></div>
@@ -53,22 +52,26 @@
               <div class="row"><span>Stripe Customer</span><code id="stripeCustomer">Loading...</code></div>
               <div class="row"><span>Roblox profile</span><strong id="accountRoblox">Loading...</strong></div>
             </div>
+            <div class="trial-hint is-ready">
+              <span>Need the free trial? Verify your Roblox profile here, then claim the trial from Redeem / Gift.</span>
+              <a class="button secondary" href="#roblox-profile">Verify Roblox profile</a>
+            </div>
           </section>
 
           <section class="panel panel-pad account-section email-verification-section" id="security">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Security / Settings</p>
-                <h2>Account security</h2>
-                <p>Manage recovery, password changes and account verification from one place.</p>
+                <h2>Account setup and verification</h2>
+                <p>Connect Discord for recovery and verify Roblox with a FIMA profile code before claiming a trial.</p>
               </div>
             </div>
             <div id="emailVerification">Loading...</div>
             <div class="account-divider"></div>
             <div>
               <p class="eyebrow">Account Links</p>
-              <h2>Discord recovery and optional Roblox username</h2>
-              <p>Discord is for recovery and trial claims. Roblox username is optional and only used for profile display or macro personalization.</p>
+              <h2>Discord recovery and Roblox verification</h2>
+              <p>Roblox is verified by placing a generated FIMA code in your Roblox profile About/Description. A typed username alone is never proof.</p>
             </div>
             <div id="connectedAccounts">Loading...</div>
             <div id="robloxProfileSettings">Loading...</div>

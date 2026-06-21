@@ -500,9 +500,6 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
     });
     if (existing) return res.status(409).json({ error: "email_already_registered" });
 
-    const wantsRobloxProfile = String(req.body?.robloxUsername || "").trim().length > 0;
-    const robloxUsername = normalizeRobloxUsername(req.body?.robloxUsername);
-    if (wantsRobloxProfile && !robloxUsername) return res.status(400).json({ error: "invalid_roblox_username" });
     const stripeCustomerId = await createStripeCustomerIfPossible(email);
     const user = await prisma.user.create({
       data: {
@@ -510,7 +507,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
         emailNormalized,
         passwordHash: await hashPassword(password),
         stripeCustomerId,
-        robloxUsername: robloxUsername || null,
+        robloxUsername: null,
         robloxUserId: null,
         robloxAvatarUrl: null,
         emailVerifiedAt: null
@@ -558,7 +555,7 @@ app.post("/api/auth/roblox-preview", authLimiter, async (req, res) => {
   return res.status(410).json({
     success: false,
     error: "roblox_lookup_removed",
-    message: "Roblox username is optional profile metadata only."
+    message: "Use dashboard Roblox profile verification. Username text alone does not prove ownership."
   });
 });
 
@@ -1011,6 +1008,175 @@ app.post("/api/me/profile", requireUser, async (req, res) => {
   }
 });
 
+app.post("/api/me/roblox/start-verification", requireUser, async (req, res) => {
+  try {
+    const rawRobloxUsername = String(req.body?.robloxUsername || "").trim();
+    const robloxUsername = normalizeRobloxUsername(rawRobloxUsername);
+    if (!robloxUsername) return res.status(400).json({ success: false, error: "invalid_roblox_username" });
+
+    const profile = await resolveRobloxProfile(robloxUsername);
+    if (!profile?.id) return res.status(404).json({ success: false, error: "roblox_profile_not_found" });
+
+    const duplicate = await prisma.user.findFirst({
+      where: { robloxUserId: profile.id, id: { not: req.user.id } },
+      select: { id: true }
+    });
+    if (duplicate) return res.status(409).json({ success: false, error: "roblox_profile_already_verified" });
+
+    const code = generateRobloxVerifyCode();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await prisma.$transaction(async (tx) => {
+      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "roblox_profile_verify" } });
+      await tx.oAuthLink.create({
+        data: {
+          userId: req.user.id,
+          provider: "roblox_profile_verify",
+          providerSubject: req.user.id,
+          providerUsername: profile.username,
+          metadata: {
+            code,
+            expiresAt: expiresAt.toISOString(),
+            robloxUserId: profile.id,
+            username: profile.username,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            method: "profile_description"
+          }
+        }
+      });
+      await tx.user.update({
+        where: { id: req.user.id },
+        data: {
+          robloxUsername: profile.username,
+          robloxUserId: null,
+          robloxAvatarUrl: profile.avatarUrl || null
+        }
+      });
+    });
+    await createAuditLog("roblox_profile_verification_started", "user", req.user.id, {
+      robloxUserIdMasked: maskExternalId(profile.id),
+      username: profile.username,
+      expiresAt: expiresAt.toISOString()
+    });
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const integrations = await buildIntegrationSummary(user);
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      integrations,
+      trial: await buildMonthlyTrialSummary(user, new Date(), integrations)
+    });
+  } catch (error) {
+    console.error("Roblox verification start failed", publicError(error));
+    return res.status(500).json({ success: false, error: "roblox_verification_start_failed" });
+  }
+});
+
+app.post("/api/me/roblox/confirm-verification", requireUser, async (req, res) => {
+  try {
+    const pending = await prisma.oAuthLink.findFirst({
+      where: { userId: req.user.id, provider: "roblox_profile_verify" },
+      orderBy: { updatedAt: "desc" }
+    });
+    const metadata = pending?.metadata || {};
+    const expiresAt = metadata.expiresAt ? new Date(metadata.expiresAt) : null;
+    if (!pending || !metadata.code || !metadata.username || !expiresAt || expiresAt <= new Date()) {
+      return res.status(400).json({ success: false, error: "roblox_verification_expired" });
+    }
+
+    const profile = await resolveRobloxProfileWithDescription(metadata.username);
+    if (!profile?.id) return res.status(404).json({ success: false, error: "roblox_profile_not_found" });
+    if (String(profile.id) !== String(metadata.robloxUserId || "")) {
+      return res.status(409).json({ success: false, error: "roblox_profile_changed" });
+    }
+    const description = String(profile.description || "").toUpperCase();
+    const code = String(metadata.code || "").toUpperCase();
+    if (!description.includes(code)) {
+      return res.status(400).json({
+        success: false,
+        error: "roblox_code_not_found",
+        message: "Add the FIMA verification code to your Roblox profile About/Description, save it, then try again."
+      });
+    }
+
+    const duplicate = await prisma.user.findFirst({
+      where: { robloxUserId: profile.id, id: { not: req.user.id } },
+      select: { id: true }
+    });
+    if (duplicate) return res.status(409).json({ success: false, error: "roblox_profile_already_verified" });
+
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "roblox_profile_verify" } });
+      await tx.oAuthLink.upsert({
+        where: { provider_providerSubject: { provider: "roblox", providerSubject: profile.id } },
+        create: {
+          userId: req.user.id,
+          provider: "roblox",
+          providerSubject: profile.id,
+          providerUsername: profile.username,
+          metadata: { verifiedBy: "profile_description", verifiedAt: new Date().toISOString(), displayName: profile.displayName }
+        },
+        update: {
+          userId: req.user.id,
+          providerUsername: profile.username,
+          metadata: { verifiedBy: "profile_description", verifiedAt: new Date().toISOString(), displayName: profile.displayName }
+        }
+      });
+      return tx.user.update({
+        where: { id: req.user.id },
+        data: {
+          robloxUsername: profile.username,
+          robloxUserId: profile.id,
+          robloxAvatarUrl: profile.avatarUrl || null
+        }
+      });
+    });
+    await createAuditLog("roblox_profile_verified", "user", user.id, {
+      robloxUserIdMasked: maskExternalId(profile.id),
+      username: profile.username,
+      method: "profile_description"
+    });
+    const integrations = await buildIntegrationSummary(user);
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      integrations,
+      trial: await buildMonthlyTrialSummary(user, new Date(), integrations)
+    });
+  } catch (error) {
+    console.error("Roblox verification confirm failed", publicError(error));
+    return res.status(500).json({ success: false, error: "roblox_verification_confirm_failed" });
+  }
+});
+
+app.post("/api/me/roblox/clear", requireUser, async (req, res) => {
+  try {
+    const previousRobloxUserId = req.user.robloxUserId;
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: { in: ["roblox", "roblox_profile_verify"] } } });
+      return tx.user.update({
+        where: { id: req.user.id },
+        data: {
+          robloxUsername: null,
+          robloxUserId: null,
+          robloxAvatarUrl: null
+        }
+      });
+    });
+    await createAuditLog("roblox_profile_cleared", "user", user.id, { previousRobloxUserIdMasked: maskExternalId(previousRobloxUserId) });
+    const integrations = await buildIntegrationSummary(user);
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      integrations,
+      trial: await buildMonthlyTrialSummary(user, new Date(), integrations)
+    });
+  } catch (error) {
+    console.error("Roblox clear failed", publicError(error));
+    return res.status(500).json({ success: false, error: "roblox_clear_failed" });
+  }
+});
+
 app.get("/api/trial-promo", async (req, res) => {
   const promo = getTrialPromoConfig(process.env, new Date());
   return res.json({
@@ -1163,7 +1329,7 @@ app.post(["/auth/roblox/disconnect", "/api/auth/roblox/disconnect"], requireUser
   const previousRobloxUserId = req.user.robloxUserId;
   try {
     const user = await prisma.$transaction(async (tx) => {
-      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "roblox" } });
+      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: { in: ["roblox", "roblox_profile_verify"] } } });
       return tx.user.update({
         where: { id: req.user.id },
         data: {
@@ -1195,6 +1361,7 @@ app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, asy
     if (!freshUser) return res.status(401).json({ error: "not_logged_in" });
     const integrations = await buildIntegrationSummary(freshUser);
     if (!integrations.discord.connected) return res.status(403).json({ error: "discord_not_connected" });
+    if (!integrations.roblox.connected) return res.status(403).json({ error: "roblox_not_verified" });
 
     const now = new Date();
     const promo = getTrialPromoConfig(process.env, now);
@@ -1914,7 +2081,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
         hwidBoundNow
       }),
       valid: true,
-      licenseKey,
+      licenseKey: maskCode(license.licenseKey),
       plan: license.plan,
       expiresAt: license.expiresAt ? license.expiresAt.toISOString() : null,
       lifetime: license.lifetime,
@@ -4128,6 +4295,7 @@ const cleanHtmlRedirects = new Map([
   ["/macros.html", "/macros"],
   ["/features.html", "/features"],
   ["/faq.html", "/faq"],
+  ["/how-to-get-key.html", "/how-to-get-key"],
   ["/support.html", "/support"],
   ["/security.html", "/security"],
   ["/legal.html", "/legal"],
@@ -6228,6 +6396,45 @@ async function resolveRobloxProfile(value) {
   };
 }
 
+async function resolveRobloxProfileWithDescription(value) {
+  const profile = await resolveRobloxProfile(value);
+  if (!profile?.id) return null;
+  const profileResponse = await fetchWithAbort(`https://users.roblox.com/v1/users/${encodeURIComponent(profile.id)}`, {}, 4500).catch(() => null);
+  const profileData = profileResponse?.ok ? await profileResponse.json().catch(() => ({})) : {};
+  return {
+    ...profile,
+    username: profileData?.name || profile.username,
+    displayName: profileData?.displayName || profile.displayName || profile.username,
+    description: String(profileData?.description || "")
+  };
+}
+
+function generateRobloxVerifyCode() {
+  return `FIMA-VERIFY-${crypto.randomBytes(9).toString("base64url").replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 13)}`;
+}
+
+function robloxProfileUrl(robloxUserId) {
+  const id = String(robloxUserId || "").replace(/\D/g, "");
+  return id ? `https://www.roblox.com/users/${id}/profile` : null;
+}
+
+function publicRobloxPendingLink(link) {
+  if (!link?.metadata) return null;
+  const metadata = link.metadata || {};
+  const expiresAt = metadata.expiresAt ? new Date(metadata.expiresAt) : null;
+  if (!metadata.code || !expiresAt || expiresAt <= new Date()) return null;
+  return {
+    pending: true,
+    code: metadata.code,
+    expiresAt: expiresAt.toISOString(),
+    username: metadata.username || link.providerUsername || null,
+    displayName: metadata.displayName || metadata.username || link.providerUsername || null,
+    idMasked: maskExternalId(metadata.robloxUserId),
+    avatar: safeUrl(metadata.avatarUrl),
+    profileUrl: robloxProfileUrl(metadata.robloxUserId)
+  };
+}
+
 async function fetchWithAbort(url, options = {}, timeoutMs = 4000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -6730,8 +6937,9 @@ function publicUser(user) {
     discordAvatarUrl: user.discordAvatarUrl || null,
     robloxUsername: user.robloxUsername || null,
     robloxUserId: null,
-    robloxUserIdMasked: null,
+    robloxUserIdMasked: maskExternalId(user.robloxUserId),
     robloxAvatarUrl: user.robloxAvatarUrl || null,
+    robloxVerified: Boolean(user.robloxUserId),
     emailVerified: Boolean(user.emailVerifiedAt),
     emailVerifiedAt: user.emailVerifiedAt || null,
     trialUsedAt: user.trialUsedAt || null,
@@ -6749,13 +6957,14 @@ async function buildIntegrationSummary(user) {
     ? user.oauthLinks
     : user?.id
     ? await prisma.oAuthLink.findMany({
-        where: { userId: user.id, provider: { in: ["discord"] } },
+        where: { userId: user.id, provider: { in: ["discord", "roblox", "roblox_profile_verify"] } },
         orderBy: { updatedAt: "desc" }
       }).catch(() => [])
     : [];
   const byProvider = Object.fromEntries(links.map((link) => [link.provider, link]));
   const discordConnected = Boolean(user?.discordUserId && byProvider.discord);
-  const robloxConnected = false;
+  const robloxConnected = Boolean(user?.robloxUserId && byProvider.roblox);
+  const pendingRoblox = publicRobloxPendingLink(byProvider.roblox_profile_verify);
 
   return {
     discord: {
@@ -6769,13 +6978,16 @@ async function buildIntegrationSummary(user) {
     },
     roblox: {
       connected: robloxConnected,
-      id: null,
+      verified: robloxConnected,
+      id: maskExternalId(user?.robloxUserId),
       username: user?.robloxUsername || null,
-      displayName: user?.robloxUsername || null,
-      avatar: null,
-      connectedAt: null,
-      updatedAt: null,
-      manualOnly: Boolean(user?.robloxUsername)
+      displayName: byProvider.roblox?.metadata?.displayName || user?.robloxUsername || null,
+      avatar: user?.robloxAvatarUrl || pendingRoblox?.avatar || null,
+      profileUrl: robloxProfileUrl(user?.robloxUserId),
+      connectedAt: byProvider.roblox?.createdAt || null,
+      updatedAt: byProvider.roblox?.updatedAt || null,
+      manualOnly: Boolean(user?.robloxUsername && !robloxConnected),
+      pending: pendingRoblox
     }
   };
 }
@@ -7822,7 +8034,8 @@ async function buildMonthlyTrialSummary(user, now = new Date(), integrations = n
   const promoAlreadyClaimed = promo.active ? await findPromoTrial(user) : null;
   const requirements = [
     { id: "account", label: "Fima account logged in", complete: Boolean(user?.id), action: null },
-    { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" }
+    { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" },
+    { id: "roblox", label: "Roblox profile verified", complete: Boolean(linked.roblox?.connected), action: "verify_roblox" }
   ];
   const missing = requirements.filter((item) => !item.complete).map((item) => item.id);
   const nextTrialAvailableAt = promo.active ? null : user?.nextTrialAvailableAt || null;
@@ -7834,6 +8047,7 @@ async function buildMonthlyTrialSummary(user, now = new Date(), integrations = n
   let disabledReason = null;
   if (activeTrial) disabledReason = "trial_already_active";
   else if (missing.includes("discord")) disabledReason = "discord_not_connected";
+  else if (missing.includes("roblox")) disabledReason = "roblox_not_verified";
   else if (promoAlreadyClaimed) disabledReason = "trial_already_claimed";
   else if (cooldownActive) disabledReason = "trial_cooldown_active";
 

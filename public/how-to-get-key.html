@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en" data-theme="violet-dragon">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Learn how to get, copy, and activate your Fima Macro license key safely.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Fima Macro">
+    <meta property="og:title" content="How to get a Fima key">
+    <meta property="og:description" content="A short guide for buying, claiming, copying, and activating your Fima Macro license key.">
+    <meta property="og:url" content="https://fimamacro.com/how-to-get-key">
+    <meta property="og:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="theme-color" content="#090812">
+    <title>How to get a key | Fima Macro</title>
+    <link rel="icon" href="assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="assets/css/styles.css?v=20260614-3a22">
+    <style>
+      :root {
+        --key-bg: #070511;
+        --key-panel: rgba(15, 11, 28, 0.82);
+        --key-panel-strong: rgba(25, 16, 45, 0.9);
+        --key-border: rgba(188, 98, 255, 0.35);
+        --key-border-soft: rgba(188, 98, 255, 0.18);
+        --key-text: #fff8ff;
+        --key-muted: #cabce0;
+        --key-purple: #b55cff;
+        --key-purple-strong: #8c2cff;
+        --key-cyan: #54e4ff;
+        --key-green: #72ffba;
+      }
+
+      body.key-guide-page {
+        background:
+          radial-gradient(circle at 18% 14%, rgba(165, 75, 255, 0.26), transparent 34rem),
+          radial-gradient(circle at 84% 20%, rgba(55, 191, 255, 0.12), transparent 34rem),
+          linear-gradient(180deg, #080511 0%, #0d0718 58%, #080511 100%);
+        color: var(--key-text);
+      }
+
+      .key-guide {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .key-guide::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(7, 5, 17, 0.96), rgba(7, 5, 17, 0.42), rgba(7, 5, 17, 0.96)),
+          url("assets/images/fima-full-home.png?v=20260619") center/cover no-repeat;
+        opacity: 0.18;
+        filter: saturate(1.2);
+      }
+
+      .key-guide .section-shell {
+        position: relative;
+        z-index: 1;
+      }
+
+      .key-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 1.4rem;
+        align-items: stretch;
+        padding-top: 5.5rem;
+        padding-bottom: 2rem;
+      }
+
+      .key-hero-card,
+      .key-checklist,
+      .key-side-card,
+      .key-step,
+      .key-trouble-card {
+        border: 1px solid var(--key-border-soft);
+        background: linear-gradient(145deg, rgba(22, 15, 39, 0.88), rgba(8, 5, 16, 0.9));
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(18px);
+      }
+
+      .key-hero-card {
+        border-color: var(--key-border);
+        border-radius: 28px;
+        padding: clamp(1.25rem, 3vw, 2.4rem);
+        min-height: 430px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .key-hero-card::after {
+        content: "";
+        position: absolute;
+        inset: auto -18% -24% 20%;
+        height: 220px;
+        background: radial-gradient(circle, rgba(178, 75, 255, 0.34), transparent 62%);
+        pointer-events: none;
+      }
+
+      .key-eyebrow {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1px solid rgba(188, 98, 255, 0.28);
+        border-radius: 999px;
+        padding: 0.45rem 0.75rem;
+        color: #e5c5ff;
+        background: rgba(117, 35, 221, 0.16);
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .key-hero h1 {
+        margin: 1rem 0 0.75rem;
+        max-width: 780px;
+        font-size: clamp(2.25rem, 5vw, 5rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .key-hero p {
+        max-width: 720px;
+        color: var(--key-muted);
+        font-size: 1.08rem;
+        line-height: 1.7;
+      }
+
+      .key-cta-row,
+      .key-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      .key-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.55rem;
+        min-height: 48px;
+        padding: 0.78rem 1rem;
+        border-radius: 14px;
+        border: 1px solid rgba(207, 128, 255, 0.42);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 900;
+        background: linear-gradient(135deg, #bb67ff 0%, #7a22e8 58%, #5b16ca 100%);
+        box-shadow: 0 16px 36px rgba(120, 35, 225, 0.34);
+        transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+      }
+
+      .key-button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(255, 255, 255, 0.6);
+        box-shadow: 0 18px 44px rgba(166, 78, 255, 0.42);
+      }
+
+      .key-button.secondary {
+        background: rgba(15, 9, 28, 0.72);
+        box-shadow: none;
+        color: #eadcff;
+      }
+
+      .key-checklist {
+        border-radius: 24px;
+        padding: 1.15rem;
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .key-checklist h2 {
+        margin: 0 0 0.25rem;
+        font-size: 1.35rem;
+      }
+
+      .key-check {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 0.8rem;
+        align-items: start;
+        border-radius: 18px;
+        padding: 0.85rem;
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .key-check span {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: #fff;
+        font-weight: 950;
+        background: radial-gradient(circle at 35% 30%, #d99aff, #7420df 72%);
+        box-shadow: 0 0 24px rgba(172, 78, 255, 0.36);
+      }
+
+      .key-check strong {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+
+      .key-check p,
+      .key-step p,
+      .key-trouble-card p,
+      .key-side-card p {
+        margin: 0;
+        color: var(--key-muted);
+        line-height: 1.55;
+      }
+
+      .key-section {
+        position: relative;
+        z-index: 1;
+        padding: 1.5rem 0 4rem;
+      }
+
+      .key-section h2 {
+        margin: 0 0 0.7rem;
+        font-size: clamp(1.9rem, 3vw, 3rem);
+      }
+
+      .key-section-intro {
+        max-width: 720px;
+        color: var(--key-muted);
+        line-height: 1.65;
+      }
+
+      .key-steps-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1.2rem;
+      }
+
+      .key-step {
+        border-radius: 22px;
+        padding: 1.05rem;
+        min-height: 210px;
+      }
+
+      .key-step .step-number {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: #fff;
+        font-weight: 950;
+        background: rgba(153, 66, 255, 0.24);
+        border: 1px solid rgba(207, 128, 255, 0.34);
+        margin-bottom: 0.8rem;
+      }
+
+      .key-step h3,
+      .key-trouble-card h3,
+      .key-side-card h3 {
+        margin: 0 0 0.45rem;
+        font-size: 1.08rem;
+      }
+
+      .key-trouble-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1.15rem;
+      }
+
+      .key-trouble-card {
+        border-radius: 22px;
+        padding: 1.05rem;
+      }
+
+      .key-safe-strip {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        align-items: center;
+        margin-top: 1.3rem;
+        border: 1px solid rgba(114, 255, 186, 0.24);
+        border-radius: 22px;
+        padding: 1rem;
+        background: linear-gradient(135deg, rgba(18, 83, 60, 0.24), rgba(15, 9, 28, 0.88));
+      }
+
+      .key-safe-strip strong {
+        color: var(--key-green);
+      }
+
+      @media (max-width: 980px) {
+        .key-hero,
+        .key-steps-grid,
+        .key-trouble-grid,
+        .key-safe-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .key-hero {
+          padding-top: 4rem;
+        }
+      }
+    </style>
+  </head>
+  <body class="key-guide-page" data-page="how-to-get-key">
+    <canvas id="ambientCanvas" aria-hidden="true"></canvas>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <div class="nav-shell">
+        <a class="brand" href="/" aria-label="Fima Macro home">
+          <img class="brand-logo" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="44" height="44">
+          <span>Fima Macro</span>
+        </a>
+
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="siteMenu" data-menu-toggle>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span class="sr-only">Open menu</span>
+        </button>
+
+        <nav class="site-menu" id="siteMenu" aria-label="Primary navigation" data-menu>
+          <a href="/" data-page-link="home">Home</a>
+          <a href="/macros" data-page-link="macros">Macros</a>
+          <a href="/features" data-page-link="features">Features</a>
+          <a href="/pricing" data-page-link="pricing">Pricing</a>
+          <a href="/download" data-page-link="download">Download</a>
+          <a href="/faq" data-page-link="faq">FAQ</a>
+          <a href="/support" data-page-link="support">Support</a>
+          <a href="/security" data-page-link="security">Security</a>
+          <a href="/dashboard/overview" data-page-link="dashboard">Dashboard</a>
+        </nav>
+
+        <div class="nav-controls" aria-label="Site preferences">
+          <a class="btn btn-ghost" href="/pricing">Buy Now</a>
+          <a class="btn btn-primary" href="/download">Download</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" class="key-guide">
+      <section class="section-shell key-hero" aria-labelledby="keyGuideTitle">
+        <article class="key-hero-card">
+          <div>
+            <span class="key-eyebrow">License guide</span>
+            <h1 id="keyGuideTitle">How to get your FIMA key</h1>
+            <p>
+              Use this page when the app asks where to get a key. It shows the safe path:
+              choose a plan, finish checkout, copy your masked license from Fima, then paste it
+              into the app once. Never buy from fake links or share your full key.
+            </p>
+          </div>
+          <div class="key-cta-row">
+            <a class="key-button" href="/pricing">Choose a plan</a>
+            <a class="key-button secondary" href="/dashboard/products">Open My Products</a>
+            <a class="key-button secondary" href="/download">Download app</a>
+          </div>
+        </article>
+
+        <aside class="key-checklist" aria-label="Quick key checklist">
+          <h2>Quick checklist</h2>
+          <div class="key-check">
+            <span>1</span>
+            <p><strong>Buy, claim, or redeem.</strong> Paid keys come from checkout. Trial and gift keys show in your account after claim or redeem.</p>
+          </div>
+          <div class="key-check">
+            <span>2</span>
+            <p><strong>Copy from Fima only.</strong> Use the success page or <a href="/dashboard/products">My Products</a>. Keys are masked on-screen for privacy.</p>
+          </div>
+          <div class="key-check">
+            <span>3</span>
+            <p><strong>Paste into the app.</strong> The app binds access to your account/device and stores a safe entitlement instead of showing the full key again.</p>
+          </div>
+          <div class="key-check">
+            <span>4</span>
+            <p><strong>Need help?</strong> If payment worked but the key is missing, open support with your masked order/key details only.</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section-shell key-section" aria-labelledby="stepsTitle">
+        <h2 id="stepsTitle">Step-by-step</h2>
+        <p class="key-section-intro">
+          These steps work for monthly access, lifetime access, gift/redeem keys, and trial access.
+          The flow may look slightly different depending on whether you are buying, claiming a trial,
+          or redeeming a gift.
+        </p>
+        <div class="key-steps-grid">
+          <article class="key-step">
+            <div class="step-number">01</div>
+            <h3>Go to Pricing</h3>
+            <p>Open <a href="/pricing">fimamacro.com/pricing</a>, choose the plan you want, and start checkout. Do not use old SellAuth or unofficial links.</p>
+          </article>
+          <article class="key-step">
+            <div class="step-number">02</div>
+            <h3>Finish checkout or claim</h3>
+            <p>Stripe opens for paid plans. Trial, gift, and redeem flows happen inside your Fima account so the key is linked safely.</p>
+          </article>
+          <article class="key-step">
+            <div class="step-number">03</div>
+            <h3>Copy your key</h3>
+            <p>After checkout, use the success page or <a href="/dashboard/products">My Products</a>. The page shows a masked key and a Copy button.</p>
+          </article>
+          <article class="key-step">
+            <div class="step-number">04</div>
+            <h3>Activate in the app</h3>
+            <p>Open FIMA MACRO, paste the key, and press Activate License. If your device changed, support can help with HWID reset.</p>
+          </article>
+        </div>
+
+        <div class="key-safe-strip">
+          <div>
+            <strong>Security note:</strong>
+            Fima never needs your Roblox password, cookies, Discord token, or browser session token.
+            Only enter your license key inside the official Fima app or website.
+          </div>
+          <a class="key-button secondary" href="/security">Read security page</a>
+        </div>
+      </section>
+
+      <section class="section-shell key-section" aria-labelledby="troubleTitle">
+        <h2 id="troubleTitle">If something goes wrong</h2>
+        <p class="key-section-intro">
+          Most activation problems are account, payment, or device-binding issues. Use masked details
+          when asking for help.
+        </p>
+        <div class="key-trouble-grid">
+          <article class="key-trouble-card">
+            <h3>I paid but cannot find my key</h3>
+            <p>Open <a href="/dashboard/products">My Products</a>. If it is still missing, contact support with the payment time and masked account info.</p>
+          </article>
+          <article class="key-trouble-card">
+            <h3>The app says the key is for another device</h3>
+            <p>Your HWID may have changed. Open support and request a reset. Do not post full HWID or full key in public channels.</p>
+          </article>
+          <article class="key-trouble-card">
+            <h3>The app asks me to validate again</h3>
+            <p>Make sure you are using the latest QA/approved build. If it repeats, open a ticket and mention “license refresh loop”.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="section-shell footer-grid">
+        <div>
+          <a class="brand" href="/">
+            <img class="brand-logo" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="40" height="40">
+            <span>Fima Macro</span>
+          </a>
+          <p>Official Fima license help. Keep your key private and use clean official links.</p>
+        </div>
+        <div>
+          <h3>Key help</h3>
+          <a href="/pricing">Pricing</a>
+          <a href="/dashboard/products">My Products</a>
+          <a href="/success">Success page</a>
+          <a href="/support">Support</a>
+        </div>
+        <div>
+          <h3>Trust</h3>
+          <a href="/security">Security</a>
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/download">Official download</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="assets/js/config.js?v=20260614-3a22"></script>
+    <script src="assets/js/app.js?v=20260614-3a22"></script>
+  </body>
+</html>

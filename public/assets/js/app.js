@@ -429,7 +429,7 @@
       download: {
         eyebrow: "Download",
         title: "Download the current setup.",
-        description: "Install Fima Macro, then use your license key or free trial inside the app.",
+        description: "Install Fima Macro, then activate your copied key or trial key inside the app. Need help? Open the key guide.",
         primaryCta: "Download Fima Macro",
         secondaryCta: "Setup Help",
         latest: "Latest version",
@@ -458,6 +458,7 @@
         description: "Short, clear answers about access, updates, licenses, refunds and the move away from SellAuth.",
         items: [
           ["What is Fima Macro?", "Fima Macro is a premium macro app built around clean timing, keybind profiles, ping-aware setups and scaling for resolution and sensitivity."],
+          ["How do I get my key?", "After checkout or trial claim, Fima shows your key on the success page and in My Products. Use the Copy button, then paste it into the app key screen."],
           ["Is this a one-time purchase or subscription?", "Both are available: 3 Days and Lifetime are one-time, Monthly is a cancellable subscription, and the free trial is 1 day."],
           ["Do I get updates?", "Yes. Active licenses include updates during the access period, and lifetime includes future updates."],
           ["Can I change my PC?", "The license system is planned around HWID locking with reset requests handled through support or the dashboard."],
@@ -654,7 +655,7 @@
       download: {
         eyebrow: "\u0130ndir",
         title: "Guncel setup'i indir.",
-        description: "Fima Macro'yu kur, sonra lisans keyini veya free trial'ini uygulamada kullan.",
+        description: "Fima Macro'yu kur, sonra kopyaladigin key'i veya trial key'ini uygulamada aktive et. Yardim gerekiyorsa key rehberini ac.",
         primaryCta: "Fima Macro indir",
         secondaryCta: "Kurulum Yard\u0131m\u0131",
         latest: "Son s\u00fcr\u00fcm",
@@ -683,6 +684,7 @@
         description: "Eri\u015fim, g\u00fcncellemeler, lisans, iade ve SellAuth'tan ayr\u0131lma hakk\u0131nda k\u0131sa cevaplar.",
         items: [
           ["Fima Macro nedir?", "Fima Macro; temiz zamanlama, keybind profilleri, ping'e duyarl\u0131 kurulum ve \u00e7\u00f6z\u00fcn\u00fcrl\u00fck/sensitivity \u00f6l\u00e7ekleme etraf\u0131nda geli\u015ftirilen premium macro uygulamas\u0131d\u0131r."],
+          ["Key'imi nasil alirim?", "Checkout veya trial claim sonrasi Fima key'ini success sayfasinda ve My Products icinde gosterir. Copy butonuyla kopyalayip app key ekranina yapistir."],
           ["Tek seferlik sat\u0131n alma m\u0131 abonelik mi?", "Ikisi de var: 3 Gun ve Lifetime tek seferlik, Monthly iptal edilebilir abonelik, free trial ise 1 gundur."],
           ["G\u00fcncelleme alacak m\u0131y\u0131m?", "Evet. Aktif lisanslar eri\u015fim s\u00fcresi boyunca g\u00fcncelleme al\u0131r; lifetime gelecekteki g\u00fcncellemeleri kapsar."],
           ["Bilgisayar\u0131m\u0131 de\u011fi\u015ftirebilir miyim?", "Lisans sistemi HWID kilidi ve destek/dashboard \u00fczerinden reset talepleri mant\u0131\u011f\u0131yla planlan\u0131yor."],
@@ -1954,7 +1956,7 @@
     }
     if (options.trialClaim) {
       $("[data-login-checkout-title]", modal).textContent = "Log in first";
-      $("[data-login-checkout-body]", modal).textContent = "Claim your free trial from your account. Discord is required only for trial claims. Roblox is optional on the website.";
+      $("[data-login-checkout-body]", modal).textContent = "Claim your free trial from your account after connecting Discord and verifying your Roblox profile.";
     }
     modal.classList.add("is-visible");
     modal.setAttribute("aria-hidden", "false");
@@ -2013,7 +2015,7 @@
       return data?.message || pricingCopy.giftCodeBlocked || copy.en.pricing.giftCodeBlocked;
     }
     if (code === "discord_not_connected") return data?.message || (state.language === "tr" ? "Bu islem icin Discord gerekirse hesap ayarlarindan bagla." : "Connect Discord from account settings if this action requires it.");
-    if (code === "roblox_not_connected") return data?.message || (state.language === "tr" ? "Roblox web sitesinde opsiyoneldir." : "Roblox is optional on the website.");
+    if (code === "roblox_not_connected" || code === "roblox_not_verified") return data?.message || (state.language === "tr" ? "Free trial icin Roblox profilini dogrula." : "Verify your Roblox profile for the free trial.");
     return data?.message || activeCopy.failed;
   };
 
