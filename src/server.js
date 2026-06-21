@@ -646,12 +646,12 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
 
 app.get("/auth/roblox/start", oauthLimiter, requireUser, async (req, res) => {
   clearOAuthCookies(res);
-  return res.redirect(`${frontendUrl()}/dashboard/security?error=roblox_oauth_removed`);
+  return res.redirect(`${frontendUrl()}/dashboard/overview?error=roblox_oauth_removed#roblox-profile`);
 });
 
 app.get("/auth/roblox/callback", oauthLimiter, async (req, res) => {
   clearOAuthCookies(res);
-  return res.redirect(`${frontendUrl()}/dashboard/security?error=roblox_oauth_removed`);
+  return res.redirect(`${frontendUrl()}/dashboard/overview?error=roblox_oauth_removed#roblox-profile`);
 });
 
 app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
@@ -659,7 +659,7 @@ app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
   return res.status(410).json({
     success: false,
     error: "roblox_oauth_removed",
-    redirectUrl: `${frontendUrl()}/dashboard/security?error=roblox_oauth_removed`
+    redirectUrl: `${frontendUrl()}/dashboard/overview?error=roblox_oauth_removed#roblox-profile`
   });
 });
 
@@ -6090,7 +6090,7 @@ function licenseValidationPayload(license, options = {}) {
     customerEmail: maskEmail(license?.customerEmail),
     accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/overview`,
     connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard/overview`,
-    connectRobloxUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/security#roblox-profile`,
+    connectRobloxUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/overview#roblox-profile`,
     optionalProfileMissing: missingRequirements,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
