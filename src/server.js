@@ -4273,6 +4273,10 @@ app.get(["/dashboard", "/dashboard/overview"], (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
 });
 
+app.get("/how-to-get-key", (_req, res) => {
+  res.sendFile(path.join(publicDir, "how-to-get-key.html"));
+});
+
 app.get([
   "/dashboard/products",
   "/dashboard/billing",
@@ -6410,7 +6414,7 @@ async function resolveRobloxProfileWithDescription(value) {
 }
 
 function generateRobloxVerifyCode() {
-  return `FIMA-VERIFY-${crypto.randomBytes(9).toString("base64url").replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 13)}`;
+  return `FIMAVERIFY-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
 function robloxProfileUrl(robloxUserId) {

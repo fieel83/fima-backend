@@ -216,7 +216,7 @@
         "robloxVerified": "Roblox verified",
         "robloxPending": "Verification pending",
         "robloxVerifyIntro": "Enter your Roblox username. We will give you a FIMA verification code to place in your Roblox profile About/Description.",
-        "robloxVerifyInstructions": "Copy this code into your Roblox profile About/Description, save it, then press Confirm verification.",
+        "robloxVerifyInstructions": "Copy this FIMAVERIFY code into your Roblox profile About/Description, save it, then press Confirm verification.",
         "copyVerifyCode": "Copy code",
         "confirmRobloxVerification": "Confirm verification",
         "openRobloxProfile": "Open Roblox profile",
@@ -469,7 +469,7 @@
         "robloxVerified": "Roblox doğrulandı",
         "robloxPending": "Doğrulama bekliyor",
         "robloxVerifyIntro": "Roblox kullanıcı adını gir. Sana Roblox profilinin About/Description kısmına koyacağın FIMA doğrulama kodunu vereceğiz.",
-        "robloxVerifyInstructions": "Bu kodu Roblox profilinin About/Description kısmına kopyala, kaydet, sonra Doğrulamayı onayla tuşuna bas.",
+        "robloxVerifyInstructions": "Bu FIMAVERIFY kodunu Roblox profilinin About/Description kısmına kopyala, kaydet, sonra Doğrulamayı onayla tuşuna bas.",
         "copyVerifyCode": "Kodu kopyala",
         "confirmRobloxVerification": "Doğrulamayı onayla",
         "openRobloxProfile": "Roblox profilini aç",
@@ -1975,7 +1975,7 @@
             <button class="button" type="submit">${t("addEmail")}</button>
           </form>
         ` : !emailVerified ? `
-          <form class="verification-actions" data-email-verification-form>
+          <form class="verification-actions email-code-actions" data-email-verification-form>
             <label class="sr-only" for="accountEmailVerificationCode">${t("verificationCode")}</label>
             <input id="accountEmailVerificationCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="${escapeHtml(t("verificationCode"))}" required>
             <button class="button" type="submit">${t("confirmVerificationCode")}</button>
@@ -2077,7 +2077,7 @@
         </div>
         ${verifiedCard}
         ${pendingCard}
-        <div class="verification-actions">
+        <div class="verification-actions roblox-username-actions">
           <input name="robloxUsername" type="text" autocomplete="off" minlength="3" maxlength="20" value="${escapeHtml(current)}" placeholder="${escapeHtml(t("robloxUsername"))}">
           <button class="button" type="submit">${t("saveRobloxUsername")}</button>
           ${current || verified || pending ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}

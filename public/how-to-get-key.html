@@ -442,7 +442,7 @@
           </article>
           <article class="key-trouble-card">
             <h3>The app asks me to validate again</h3>
-            <p>Make sure you are using the latest QA/approved build. If it repeats, open a ticket and mention “license refresh loop”.</p>
+            <p>Make sure you are using the latest approved build. If it repeats, open a ticket and mention "license refresh loop".</p>
           </article>
         </div>
       </section>
@@ -474,7 +474,17 @@
       </div>
     </footer>
 
-    <script src="assets/js/config.js?v=20260614-3a22"></script>
-    <script src="assets/js/app.js?v=20260614-3a22"></script>
+    <script>
+      (() => {
+        const toggle = document.querySelector("[data-menu-toggle]");
+        const menu = document.querySelector("[data-menu]");
+        if (!toggle || !menu) return;
+        toggle.addEventListener("click", () => {
+          const open = toggle.getAttribute("aria-expanded") === "true";
+          toggle.setAttribute("aria-expanded", String(!open));
+          menu.classList.toggle("is-open", !open);
+        });
+      })();
+    </script>
   </body>
 </html>
