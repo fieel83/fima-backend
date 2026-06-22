@@ -1700,10 +1700,21 @@ app.get("/api/checkout/result", async (req, res) => {
 
     let order = await findOrderBySession(sessionId);
     let giftCode = await findGiftCodeBySession(sessionId);
-    if (!order) {
+    let purchase = null;
+    if (!order?.license && !giftCode) {
       const fulfillment = await tryFulfillFromStripeSession(sessionId);
       order = fulfillment?.order || fulfillment || null;
       giftCode = fulfillment?.giftCode || giftCode;
+      purchase = fulfillment?.purchase || null;
+    }
+
+    if (purchase && !order?.license && !giftCode) {
+      return res.json({
+        success: true,
+        status: "product_purchase_ready",
+        productPurchase: true,
+        purchase: publicPurchase(purchase)
+      });
     }
 
     if (giftCode) {
@@ -8862,7 +8873,11 @@ function appendNote(current, addition) {
 async function tryFulfillFromStripeSession(sessionId) {
   try {
     const session = await stripe().checkout.sessions.retrieve(sessionId);
-    if (session.payment_status === "paid") return fulfillCheckoutSession(session);
+    if (session.payment_status === "paid") {
+      return isProductCheckoutSession(session)
+        ? fulfillProductCheckoutSession(session)
+        : fulfillCheckoutSession(session);
+    }
   } catch (error) {
     console.error("Session retrieve failed", publicError(error));
   }

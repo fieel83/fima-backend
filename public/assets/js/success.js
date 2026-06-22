@@ -73,7 +73,8 @@
   };
 
   const showLicense = (data) => {
-    activeLicenseKey = data.licenseKey || "";
+    const license = data.license || data;
+    activeLicenseKey = license.licenseKey || "";
     activeGiftCode = "";
     title.textContent = "Your license is ready.";
     message.textContent = "Copy this key and keep it safe. Your download is unlocked from this page.";
@@ -81,9 +82,9 @@
     licenseBox.hidden = false;
     if (copyButton) copyButton.textContent = "Copy License Key";
     meta.innerHTML = `
-      <div><span>Plan</span><strong>${formatPlan(data.plan)}</strong></div>
-      <div><span>Expires</span><strong>${data.lifetime ? "Never expires" : new Date(data.expiresAt).toLocaleString()}</strong></div>
-      <div><span>Email</span><strong>${data.customerEmail || "-"}</strong></div>
+      <div><span>Plan</span><strong>${formatPlan(license.plan)}</strong></div>
+      <div><span>Expires</span><strong>${license.lifetime ? "Never expires" : new Date(license.expiresAt).toLocaleString()}</strong></div>
+      <div><span>Email</span><strong>${license.customerEmail || "-"}</strong></div>
     `;
     setDisabled(downloadButton, false, "Download Fima Macro");
     if (downloadButton) downloadButton.href = "#download";
@@ -110,6 +111,22 @@
     showToast(activeGiftCode ? "Gift code created." : "Gift code created. Contact support if you need the full code again.");
   };
 
+  const showProductPurchase = (data) => {
+    const purchase = data.purchase || {};
+    activeLicenseKey = "";
+    activeGiftCode = "";
+    title.textContent = "Your purchase is ready.";
+    message.textContent = "This order was added to your account. Open My Products to view it and download from the official GitHub release.";
+    licenseBox.hidden = true;
+    meta.innerHTML = `
+      <div><span>Product</span><strong>${purchase.product?.name || "Fima Macro product"}</strong></div>
+      <div><span>Status</span><strong>${purchase.status || "ready"}</strong></div>
+      <div><span>Account</span><strong>Open My Products</strong></div>
+    `;
+    setDisabled(downloadButton, false, "Open My Products");
+    if (downloadButton) downloadButton.href = "/dashboard/products";
+  };
+
   const pollResult = async (attempt = 0) => {
     if (!sessionId) {
       title.textContent = "Missing checkout session.";
@@ -125,21 +142,27 @@
           showGiftCode(data);
           return;
         }
+        if (data.productPurchase || data.status === "product_purchase_ready") {
+          showProductPurchase(data);
+          return;
+        }
         showLicense(data);
         return;
       }
 
-      if (attempt < 15) {
+      if (attempt < 30) {
         title.textContent = "Processing your payment...";
-        message.textContent = "Stripe confirmed the checkout. We are waiting for the license record to finish.";
+        message.textContent = "Stripe confirmed the checkout. Fima is checking your account and creating the license record automatically.";
         window.setTimeout(() => pollResult(attempt + 1), 2000);
         return;
       }
 
-      title.textContent = "Payment received, license is still being generated.";
-      message.textContent = "Contact support with your checkout session ID if this does not update soon.";
+      title.textContent = "Payment received. We are still syncing the license.";
+      message.textContent = "Open My Products in a minute. If it is still missing, contact support and mention that checkout sync is delayed.";
+      setDisabled(downloadButton, false, "Open My Products");
+      if (downloadButton) downloadButton.href = "/dashboard/products";
     } catch (error) {
-      if (attempt < 15) {
+      if (attempt < 30) {
         title.textContent = "Processing your payment...";
         message.textContent = "The license server did not answer yet. Retrying automatically.";
         window.setTimeout(() => pollResult(attempt + 1), 2000);
