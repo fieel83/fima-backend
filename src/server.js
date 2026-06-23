@@ -115,7 +115,7 @@ const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
 const usedRobloxOAuthStates = new Map();
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 const REFERRAL_REWARD_VALID_INVITES = 3;
-const REFERRAL_REWARD_DAYS = 15;
+const REFERRAL_REWARD_DAYS = 7;
 
 const defaultSiteSettings = {
   discordInviteUrl: env("DISCORD_INVITE_URL", ""),

@@ -41,6 +41,10 @@ button, input { font: inherit; }
   backdrop-filter: blur(18px);
 }
 
+body[data-account-page="dashboard"] .dashboard-header {
+  display: none;
+}
+
 .nav {
   width: min(1320px, calc(100vw - 32px));
   min-height: 76px;
@@ -372,9 +376,78 @@ button, input { font: inherit; }
   align-items: start;
 }
 
+.account-summary-card > .overview-trial-hint,
+.account-summary-card > .overview-security-block {
+  grid-column: 1 / -1;
+}
+
 .summary-grid {
   display: grid;
   gap: 10px;
+}
+
+.summary-grid .row {
+  min-width: 0;
+}
+
+.summary-grid .reveal-row {
+  grid-template-columns: minmax(120px, .55fr) minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.reveal-row strong,
+.reveal-row code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reveal-button {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .045);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.reveal-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.reveal-button:hover {
+  border-color: color-mix(in srgb, var(--primary) 72%, white 10%);
+  background: linear-gradient(135deg, rgba(158, 82, 255, .22), rgba(92, 219, 255, .08));
+}
+
+.overview-trial-hint {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.overview-trial-hint span {
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.overview-trial-hint .button {
+  min-width: 190px;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.overview-security-block {
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
 }
 
 .account-section {
@@ -391,7 +464,7 @@ button, input { font: inherit; }
 
 .account-dashboard-sidebar {
   position: sticky;
-  top: 84px;
+  top: 24px;
   display: grid;
   gap: 12px;
   padding: 14px;
@@ -1509,7 +1582,8 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
 }
 
 .roblox-profile-form .verification-actions {
-  grid-template-columns: minmax(260px, 1fr) auto auto;
+  grid-template-columns: minmax(320px, 1fr) minmax(170px, auto) minmax(150px, auto);
+  width: 100%;
 }
 
 .verification-card {
@@ -1540,12 +1614,40 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
 }
 
 .roblox-username-actions input[name="robloxUsername"] {
-  min-width: 260px;
+  min-width: 0;
   width: 100%;
 }
 
 .roblox-username-actions .button {
-  min-width: 150px;
+  min-width: 170px;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.billing-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.billing-action-card {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(158, 82, 255, .11), rgba(255, 255, 255, .035));
+}
+
+.billing-action-card strong {
+  font-size: 1.04rem;
+}
+
+.billing-action-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .verified-roblox-profile,
@@ -1714,7 +1816,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
 code { color: var(--primary-strong); }
 
 @media (max-width: 920px) {
-  .hero-grid, .grid, .cards, .access-grid, .auth-shell, .account-summary-card, .integration-grid, .integration-card, .trial-card, .requirement-list, .verification-card, .verification-actions, .verification-actions form, .roblox-profile-form .verification-actions, .gift-claim-grid, .gift-redeem-card form, .gift-package-card, .gift-code-box, .gift-history-row, .gift-modal-key, .referral-dashboard, .referral-apply-card form, .referral-code-box { grid-template-columns: 1fr; }
+  .hero-grid, .grid, .cards, .access-grid, .auth-shell, .account-summary-card, .integration-grid, .integration-card, .trial-card, .requirement-list, .verification-card, .verification-actions, .verification-actions form, .roblox-profile-form .verification-actions, .gift-claim-grid, .gift-redeem-card form, .gift-package-card, .gift-code-box, .gift-history-row, .gift-modal-key, .referral-dashboard, .referral-apply-card form, .referral-code-box, .billing-summary-grid { grid-template-columns: 1fr; }
   .account-dashboard-layout { grid-template-columns: 1fr; }
   .account-dashboard-sidebar { position: static; }
   .account-dashboard-nav {

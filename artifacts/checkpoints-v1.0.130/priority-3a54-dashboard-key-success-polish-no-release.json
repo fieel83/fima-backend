@@ -1,0 +1,22 @@
+{
+  "checkpoint": "priority-3a54-dashboard-key-success-polish-no-release",
+  "createdAt": "2026-06-23T00:00:00+02:00",
+  "latestJsonChanged": false,
+  "v10131Published": false,
+  "publicReleaseCreated": false,
+  "backendSitePatchReady": true,
+  "appLocalQaExported": true,
+  "ownerFolder": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son sürüm",
+  "ownerOpenCommand": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son sürüm\\Open FIMA MACRO.cmd",
+  "notes": [
+    "Dashboard Overview now contains account setup, email recovery and Roblox verification.",
+    "Roblox profile verification layout widened to prevent narrow-column text stacking.",
+    "Referral reward changed to 7 days.",
+    "Checkout success fallback keeps polling longer and opens My Products when sync is delayed.",
+    "Local QA app export includes signed fima.integrity.json."
+  ],
+  "remainingBlockers": [
+    "Real owner admin runtime verification not proven from protected real owner entitlement.",
+    "FPS unlock before/after not proven."
+  ]
+}

@@ -1511,7 +1511,8 @@ h3 {
 .ui-tour-display img {
   width: 100%;
   aspect-ratio: 1220 / 760;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   border: 1px solid rgba(255, 255, 255, 0.085);
   border-radius: var(--radius);
   background: #070510;

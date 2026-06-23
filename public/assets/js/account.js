@@ -291,7 +291,7 @@
         "recentInvites": "Recent invites",
         "noReferralsYet": "No referrals yet. Share your link with friends.",
         "incomingReferral": "Incoming referral",
-        "rewardRule": "3 verified invites = 15 days free access"
+        "rewardRule": "3 verified invites = 7 days free access"
     },
     "tr": {
         "working": "\u00c7al\u0131\u015f\u0131yor...",
@@ -541,7 +541,7 @@
         "recentInvites": "Son davetler",
         "noReferralsYet": "Hen\u00fcz davet yok. Linkini arkada\u015flar\u0131nla payla\u015f.",
         "incomingReferral": "Kullan\u0131lan davet",
-        "rewardRule": "3 do\u011frulanm\u0131\u015f davet = 15 g\u00fcn \u00fccretsiz eri\u015fim"
+        "rewardRule": "3 do\u011frulanm\u0131\u015f davet = 7 g\u00fcn \u00fccretsiz eri\u015fim"
     },
     "de": {
         "working": "Wird verarbeitet...",
@@ -1283,7 +1283,10 @@
       setText("#referrals .section-heading h2", t("referralRewardsTitle"));
       setText("#referrals .section-heading p:not(.eyebrow)", t("referralRewardsIntro"));
       setText("#products .section-heading h2", t("myProductsTitle"));
-      setText("#billing .section-heading h2", t("licenseAccess"));
+      setText("#billing .section-heading h2", language() === "tr" ? "Faturalama ve abonelik" : "Billing and subscription");
+      setText("#billing .section-heading p:not(.eyebrow)", language() === "tr"
+        ? "Uzatma, yenileme ve abonelik iptali burada yonetilir. Lisans kartlari My Products bolumunde kalir."
+        : "Renewals, extensions and cancellation help are handled here. License cards stay in My Products.");
       setText("#security .section-heading .eyebrow", t("emailVerificationEyebrow"));
       const accountLinksEyebrow = $("#security > div:not(.section-heading) .eyebrow");
       if (accountLinksEyebrow) accountLinksEyebrow.textContent = t("accountLinksEyebrow");
@@ -1922,9 +1925,15 @@
       : `<div class="panel panel-pad">${t("noLicenses")}</div>`;
   };
 
+  const dashboardRevealValues = new Map();
+
   const renderAccountSummary = (user) => {
-    $("#accountUsername") && ($("#accountUsername").textContent = user.username || user.loginName || t("accountNavProfileFallback"));
-    $("#accountEmail") && ($("#accountEmail").textContent = user.discordUserId ? t("connected") : t("notConnected"));
+    const username = user.username || user.loginName || t("accountNavProfileFallback");
+    const emailMasked = user.emailMasked || maskEmailAddress(user.email);
+    dashboardRevealValues.set("accountUsername", username);
+    dashboardRevealValues.set("accountEmail", user.email || emailMasked || "");
+    $("#accountUsername") && ($("#accountUsername").textContent = username);
+    $("#accountEmail") && ($("#accountEmail").textContent = emailMasked || (user.discordUserId ? t("connected") : t("notConnected")));
     $("#stripeCustomer") && ($("#stripeCustomer").textContent = user.stripeCustomerIdMasked || maskExternalId(user.stripeCustomerId) || t("willBeCreated"));
     const roblox = $("#accountRoblox");
     if (roblox) {
@@ -1932,6 +1941,35 @@
         ? `<div class="mini-profile">${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span></span>`}<div><strong>${escapeHtml(user.robloxUsername)}</strong><small>${escapeHtml(user.robloxUserIdMasked || maskExternalId(user.robloxUserId))}</small></div></div>`
         : t("noRoblox");
     }
+  };
+
+  const renderBillingSummary = (products = [], licenses = []) => {
+    const target = $("#billingSummary");
+    if (!target) return;
+    const active = products.filter((item) => String(item.status || "").toLowerCase() === "active");
+    const recurring = products.filter((item) => /monthly|subscription/i.test(`${item.plan || ""} ${item.planLabel || ""} ${item.productName || ""}`));
+    target.innerHTML = `
+      <div class="billing-summary-grid">
+        <article class="billing-action-card">
+          <span class="pill">Billing</span>
+          <strong>Renew or extend access</strong>
+          <p>Use this area for renewals and subscription actions. Your license cards stay under My Products.</p>
+          <a class="button" href="/pricing">Renew / extend</a>
+        </article>
+        <article class="billing-action-card">
+          <span class="pill">Subscriptions</span>
+          <strong>${recurring.length || 0} subscription record${recurring.length === 1 ? "" : "s"}</strong>
+          <p>Need to cancel or change a subscription? Open support with masked account/order details only.</p>
+          <a class="button secondary" href="/support">Open billing support</a>
+        </article>
+        <article class="billing-action-card">
+          <span class="pill">Access</span>
+          <strong>${active.length || licenses.length || 0} active/access record${(active.length || licenses.length) === 1 ? "" : "s"}</strong>
+          <p>Copy keys, download the app and check HWID status from My Products.</p>
+          <a class="button secondary" href="/dashboard/products">Go to My Products</a>
+        </article>
+      </div>
+    `;
   };
 
   const renderEmailVerification = (user = {}) => {
@@ -2504,7 +2542,7 @@
     renderMonthlyTrial(data.trial || {});
     renderReferralDashboard(data.referrals || {});
     renderAccountProducts(data.products || [], "#dashboardProducts");
-    renderAccountProducts(data.products || [], "#purchases");
+    renderBillingSummary(data.products || [], data.licenses || []);
     renderLicenses(data.licenses || []);
     return data;
   };
@@ -2814,6 +2852,18 @@
     });
 
     document.addEventListener("click", async (event) => {
+      const revealButton = event.target.closest("[data-reveal-target]");
+      if (revealButton) {
+        const target = document.getElementById(revealButton.dataset.revealTarget || "");
+        const value = dashboardRevealValues.get(revealButton.dataset.revealTarget || "");
+        if (target && value) {
+          target.textContent = value;
+          revealButton.setAttribute("aria-label", "Shown");
+          revealButton.disabled = true;
+        }
+        return;
+      }
+
       const emailButton = event.target.closest("[data-send-email-verification]");
       if (emailButton) {
         emailButton.disabled = true;

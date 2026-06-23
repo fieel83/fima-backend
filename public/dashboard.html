@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="/assets/css/account.css?v=20260621-3a50">
   </head>
   <body data-account-page="dashboard">
-    <header class="account-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
+    <header class="account-header dashboard-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
     <main class="shell account-shell">
       <div class="account-dashboard-layout">
         <aside class="account-dashboard-sidebar" aria-label="Account sections">
@@ -30,6 +30,7 @@
             <strong>Dashboard</strong>
           </div>
           <nav class="account-dashboard-nav">
+            <a href="/" data-dashboard-home-link><span>Home</span><small>Main website</small></a>
             <a href="/dashboard/overview" data-dashboard-link="overview"><span>Overview</span><small>Account status</small></a>
             <a href="/dashboard/products" data-dashboard-link="products"><span>Products</span><small>Keys and access</small></a>
             <a href="/dashboard/billing" data-dashboard-link="billing"><span>Billing</span><small>Plans and renewal</small></a>
@@ -47,34 +48,34 @@
               <p>Manage your profile, recovery, Roblox verification and trial requirements from this overview.</p>
             </div>
             <div class="summary-grid">
-              <div class="row"><span>Username</span><strong id="accountUsername">Loading...</strong></div>
-              <div class="row"><span>Discord recovery</span><strong id="accountEmail">Loading...</strong></div>
+              <div class="row reveal-row"><span>Username</span><strong id="accountUsername">Loading...</strong><button class="reveal-button" type="button" data-reveal-target="accountUsername" aria-label="Show username"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5c5.1 0 8.4 4.6 9.3 6.1.2.3.2.5 0 .8-.9 1.5-4.2 6.1-9.3 6.1s-8.4-4.6-9.3-6.1a.8.8 0 0 1 0-.8c.9-1.5 4.2-6.1 9.3-6.1Zm0 2c-3.7 0-6.4 3-7.3 4.5.9 1.5 3.6 4.5 7.3 4.5s6.4-3 7.3-4.5C18.4 10.5 15.7 7.5 12 7.5Zm0 2.1a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z"/></svg></button></div>
+              <div class="row reveal-row"><span>Email</span><strong id="accountEmail">Loading...</strong><button class="reveal-button" type="button" data-reveal-target="accountEmail" aria-label="Show email"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5c5.1 0 8.4 4.6 9.3 6.1.2.3.2.5 0 .8-.9 1.5-4.2 6.1-9.3 6.1s-8.4-4.6-9.3-6.1a.8.8 0 0 1 0-.8c.9-1.5 4.2-6.1 9.3-6.1Zm0 2c-3.7 0-6.4 3-7.3 4.5.9 1.5 3.6 4.5 7.3 4.5s6.4-3 7.3-4.5C18.4 10.5 15.7 7.5 12 7.5Zm0 2.1a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z"/></svg></button></div>
               <div class="row"><span>Stripe Customer</span><code id="stripeCustomer">Loading...</code></div>
               <div class="row"><span>Roblox profile</span><strong id="accountRoblox">Loading...</strong></div>
             </div>
             <div class="trial-hint is-ready overview-trial-hint">
-              <span>Need the free trial? First verify your Roblox profile here with a FIMA profile code. After verification, open Redeem / Gift and claim your trial key.</span>
+              <span>Need the free trial? Verify your Roblox profile here first. Fima gives you a FIMAVERIFY code, you place it in your Roblox profile About/Description, then you can claim the trial from Redeem / Gift.</span>
               <a class="button secondary" href="#roblox-profile">Verify Roblox profile</a>
             </div>
-          </section>
 
-          <section class="panel panel-pad account-section email-verification-section" id="security">
-            <div class="section-heading">
+            <div class="account-section email-verification-section overview-security-block" id="security">
+              <div class="section-heading">
               <div>
                 <p class="eyebrow">Security / Settings</p>
                 <h2>Account setup and verification</h2>
                 <p>Connect Discord for recovery and verify Roblox with a FIMA profile code before claiming a trial.</p>
               </div>
+              </div>
+              <div id="emailVerification">Loading...</div>
+              <div class="account-divider"></div>
+              <div>
+                <p class="eyebrow">Account Links</p>
+                <h2>Discord recovery and Roblox verification</h2>
+                <p>Roblox is verified by placing a generated FIMA code in your Roblox profile About/Description. A typed username alone is never proof.</p>
+              </div>
+              <div id="connectedAccounts">Loading...</div>
+              <div id="robloxProfileSettings">Loading...</div>
             </div>
-            <div id="emailVerification">Loading...</div>
-            <div class="account-divider"></div>
-            <div>
-              <p class="eyebrow">Account Links</p>
-              <h2>Discord recovery and Roblox verification</h2>
-              <p>Roblox is verified by placing a generated FIMA code in your Roblox profile About/Description. A typed username alone is never proof.</p>
-            </div>
-            <div id="connectedAccounts">Loading...</div>
-            <div id="robloxProfileSettings">Loading...</div>
           </section>
 
           <section class="panel panel-pad account-section" id="redeem">
@@ -97,7 +98,7 @@
               <div>
                 <p class="eyebrow">Invite Rewards</p>
                 <h2>Referral rewards</h2>
-                <p>Invite real users. Every 3 verified invites gives 15 days of Fima access.</p>
+                <p>Invite real users. Every 3 verified invites gives 7 days of Fima access.</p>
               </div>
             </div>
             <div id="referralDashboard">Loading...</div>
@@ -121,11 +122,12 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Billing</p>
-                <h2>Products and subscription</h2>
+                <h2>Billing and subscription</h2>
+                <p>Renew active access, extend subscriptions, or open support for cancellation and billing help. Product keys stay in My Products.</p>
               </div>
-              <a class="button secondary" href="/pricing">Buy another license</a>
+              <a class="button secondary" href="/dashboard/products">My Products</a>
             </div>
-            <div id="purchases">Loading...</div>
+            <div id="billingSummary">Loading...</div>
             <div id="licenseList">Loading...</div>
           </section>
 

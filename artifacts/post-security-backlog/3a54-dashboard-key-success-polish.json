@@ -1,0 +1,35 @@
+{
+  "phase": "3a54-dashboard-key-success-polish",
+  "createdAt": "2026-06-23T00:00:00+02:00",
+  "summary": {
+    "dashboardOverview": "Security / Settings content moved into Overview, dashboard top header hidden, Home link added to sidebar, Roblox verification layout widened.",
+    "privacyReveal": "Masked username/email rows now have reveal buttons. Full values are only shown after local click and are not logged.",
+    "billing": "Billing page changed to subscription/renewal/cancellation help; product license cards remain in My Products.",
+    "referrals": "Referral reward copy and backend reward days changed from 15 days to 7 days.",
+    "howToGetKey": "How-to-get-key page converted to compact modal-style guide with close button and friendlier copy direction.",
+    "successSync": "Checkout success polling extended and fallback now opens My Products instead of blocking the button when the key is still syncing.",
+    "appLocalQa": "Local QA app exported to owner desktop folder with signed fima.integrity.json so the manifest-missing startup error is avoided."
+  },
+  "security": {
+    "latestJsonChanged": false,
+    "publicReleaseCreated": false,
+    "v10131Published": false,
+    "fullKeysEmailsHwidsPrinted": false
+  },
+  "verification": {
+    "backendSyntax": "node --check passed for public/assets/js/account.js, public/assets/js/success.js, src/server.js",
+    "appBuild": "dotnet build .\\FimaMacroStudio.csproj -c Release passed",
+    "ownerFolderSmoke": "FimaMacroStudio.exe started from owner folder and stayed alive after 7 seconds",
+    "integrityManifestPresent": true
+  },
+  "paths": {
+    "qaZip": "C:\\Users\\PC\\Documents\\Codex\\2026-05-13\\benim-visual-studio-yu-bagla\\FimaMacroStudio\\artifacts\\local-qa-v1.0.131\\FIMA.MACRO.App-1.0.131-qa-local.zip",
+    "ownerFolder": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son sürüm",
+    "ownerOpenCommand": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son sürüm\\Open FIMA MACRO.cmd",
+    "screenshot": "artifacts/post-security-backlog/screenshots/3a54-owner-app-smoke/owner-folder-app-open-smoke.png"
+  },
+  "remainingBlockers": [
+    "Real owner admin runtime entitlement still needs protected owner-key/session verification.",
+    "Fima Stats FPS unlock before/after is still not proven as an exact FPS-unlock validation."
+  ]
+}

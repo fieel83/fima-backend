@@ -47,6 +47,13 @@
     window.setTimeout(() => toast.classList.remove("is-visible"), 3000);
   };
 
+  const maskEmail = (value) => {
+    const text = String(value || "").trim();
+    const [name, domain] = text.split("@");
+    if (!name || !domain) return text ? "masked" : "-";
+    return `${name.slice(0, 1)}***@${domain}`;
+  };
+
   const loadSiteSettings = async () => {
     try {
       const response = await fetch(`${apiBase}/api/public/site-settings`, { cache: "no-store" });
@@ -84,7 +91,7 @@
     meta.innerHTML = `
       <div><span>Plan</span><strong>${formatPlan(license.plan)}</strong></div>
       <div><span>Expires</span><strong>${license.lifetime ? "Never expires" : new Date(license.expiresAt).toLocaleString()}</strong></div>
-      <div><span>Email</span><strong>${license.customerEmail || "-"}</strong></div>
+      <div><span>Email</span><strong>${license.customerEmailMasked || maskEmail(license.customerEmail)}</strong></div>
     `;
     setDisabled(downloadButton, false, "Download Fima Macro");
     if (downloadButton) downloadButton.href = "#download";
@@ -150,19 +157,19 @@
         return;
       }
 
-      if (attempt < 30) {
+      if (attempt < 90) {
         title.textContent = "Processing your payment...";
         message.textContent = "Stripe confirmed the checkout. Fima is checking your account and creating the license record automatically.";
         window.setTimeout(() => pollResult(attempt + 1), 2000);
         return;
       }
 
-      title.textContent = "Payment received. We are still syncing the license.";
-      message.textContent = "Open My Products in a minute. If it is still missing, contact support and mention that checkout sync is delayed.";
+      title.textContent = "Payment received. Your key is still syncing.";
+      message.textContent = "Open My Products; Fima keeps checking your account there. If it is still missing after a few minutes, contact support with masked order details only.";
       setDisabled(downloadButton, false, "Open My Products");
       if (downloadButton) downloadButton.href = "/dashboard/products";
     } catch (error) {
-      if (attempt < 30) {
+      if (attempt < 90) {
         title.textContent = "Processing your payment...";
         message.textContent = "The license server did not answer yet. Retrying automatically.";
         window.setTimeout(() => pollResult(attempt + 1), 2000);
@@ -181,6 +188,8 @@
   });
 
   downloadButton?.addEventListener("click", async (event) => {
+    const href = downloadButton.getAttribute("href") || "";
+    if (href && href !== "#download") return;
     event.preventDefault();
     if (!activeLicenseKey) {
       showToast("Your license is not ready yet.");

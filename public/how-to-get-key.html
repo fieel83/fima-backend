@@ -306,6 +306,122 @@
           padding-top: 4rem;
         }
       }
+
+      .key-guide-page {
+        overflow-x: hidden;
+      }
+
+      .key-guide {
+        position: relative;
+        min-height: calc(100vh - 76px);
+        padding: 6.4rem 1.25rem 2rem;
+      }
+
+      .key-guide::before {
+        content: "";
+        position: fixed;
+        inset: 76px 0 0;
+        z-index: -1;
+        background:
+          radial-gradient(circle at 22% 18%, rgba(164, 75, 255, .26), transparent 28%),
+          radial-gradient(circle at 78% 18%, rgba(92, 219, 255, .14), transparent 30%),
+          linear-gradient(135deg, rgba(6, 3, 15, .88), rgba(8, 5, 20, .74));
+        backdrop-filter: blur(12px);
+      }
+
+      .key-guide-modal-shell {
+        width: min(960px, calc(100vw - 2.5rem));
+        margin: 0 auto;
+        position: relative;
+      }
+
+      .key-guide-close {
+        position: absolute;
+        top: -1.15rem;
+        right: -1.15rem;
+        z-index: 4;
+        width: 46px;
+        height: 46px;
+        border: 1px solid rgba(205, 132, 255, .38);
+        border-radius: 16px;
+        background: linear-gradient(135deg, rgba(22, 12, 42, .96), rgba(9, 5, 20, .96));
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 950;
+        cursor: pointer;
+        box-shadow: 0 18px 46px rgba(0, 0, 0, .38), 0 0 24px rgba(164, 75, 255, .12);
+      }
+
+      .key-guide-close:hover {
+        border-color: rgba(216, 127, 255, .72);
+        transform: translateY(-1px);
+      }
+
+      .key-hero,
+      .key-section {
+        width: 100%;
+        max-width: 960px;
+        margin-inline: auto;
+        border-radius: 28px;
+        background: linear-gradient(145deg, rgba(13, 7, 28, .94), rgba(8, 5, 18, .88));
+        box-shadow: 0 28px 90px rgba(0, 0, 0, .42);
+      }
+
+      .key-hero {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+        padding: 1.15rem;
+        animation: keyGuideIn .28s ease-out both;
+      }
+
+      .key-hero-card,
+      .key-checklist,
+      .key-step,
+      .key-safe-strip,
+      .key-trouble-card {
+        background: linear-gradient(145deg, rgba(255, 255, 255, .055), rgba(164, 75, 255, .04));
+      }
+
+      .key-hero h1 {
+        max-width: 15ch;
+        font-size: clamp(2.25rem, 4.6vw, 4.1rem);
+        line-height: 1;
+      }
+
+      .key-steps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .key-hero p,
+      .key-check p,
+      .key-step p,
+      .key-trouble-card p {
+        line-height: 1.58;
+      }
+
+      .key-section {
+        margin-top: 1.05rem;
+        padding: 1.3rem;
+      }
+
+      .site-footer {
+        display: none;
+      }
+
+      @keyframes keyGuideIn {
+        from { opacity: 0; transform: translateY(18px) scale(.985); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      @media (max-width: 900px) {
+        .key-hero {
+          grid-template-columns: 1fr;
+        }
+
+        .key-guide-close {
+          right: .35rem;
+        }
+      }
     </style>
   </head>
   <body class="key-guide-page" data-page="how-to-get-key">
@@ -346,6 +462,8 @@
     </header>
 
     <main id="main" class="key-guide">
+      <div class="key-guide-modal-shell">
+        <button class="key-guide-close" type="button" data-key-guide-close aria-label="Close key guide">X</button>
       <section class="section-shell key-hero" aria-labelledby="keyGuideTitle">
         <article class="key-hero-card">
           <div>
@@ -446,6 +564,7 @@
           </article>
         </div>
       </section>
+      </div>
     </main>
 
     <footer class="site-footer">
@@ -483,6 +602,17 @@
           const open = toggle.getAttribute("aria-expanded") === "true";
           toggle.setAttribute("aria-expanded", String(!open));
           menu.classList.toggle("is-open", !open);
+        });
+      })();
+
+      (() => {
+        const close = document.querySelector("[data-key-guide-close]");
+        close?.addEventListener("click", () => {
+          if (history.length > 1) {
+            history.back();
+            return;
+          }
+          location.href = "/";
         });
       })();
     </script>
