@@ -1,0 +1,45 @@
+{
+  "phase": "3a54-live-deploy-dashboard-key-success-verify",
+  "createdAt": "2026-06-23T23:50:00+02:00",
+  "deploy": {
+    "pushedCommit": "e8fd2de6f2e25ffa007ed83b3f971fbe4778772f",
+    "liveCommit": "e8fd2de6f2e25ffa007ed83b3f971fbe4778772f",
+    "backendVersion": "1.0.128",
+    "latestJsonVersion": "1.0.130",
+    "latestJsonChanged": false,
+    "v10131Published": false,
+    "publicReleaseCreated": false
+  },
+  "liveChecks": {
+    "siteLoads": true,
+    "securityLoads": true,
+    "howToGetKeyLoads": true,
+    "howToGetKeyModalShell": true,
+    "dashboardOverviewLoads": true,
+    "dashboardHomeSidebarLink": true,
+    "dashboardRevealButtons": true,
+    "overviewSecuritySettingsBlock": true,
+    "robloxVerificationCopyVisible": true,
+    "billingSummarySeparateFromProducts": true,
+    "referralRewardDays": 7,
+    "successSyncFallbackInLiveJs": true,
+    "successFallbackOpensMyProducts": true,
+    "downloadsStillGithub": true
+  },
+  "appQa": {
+    "ownerFolderExported": true,
+    "ownerFolder": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son s\u00fcr\u00fcm",
+    "ownerOpenCommand": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son s\u00fcr\u00fcm\\Open FIMA MACRO.cmd",
+    "integrityManifestPresent": true,
+    "ownerFolderAppSmoke": "started and stayed alive after 7 seconds",
+    "screenshot": "artifacts/post-security-backlog/screenshots/3a54-owner-app-smoke/owner-folder-app-open-smoke.png"
+  },
+  "security": {
+    "fullKeysEmailsHwidsPrinted": false,
+    "secretsPrinted": false
+  },
+  "remainingBlockers": [
+    "Real owner admin runtime entitlement still needs protected real owner verification.",
+    "FPS unlock before/after is still not proven."
+  ]
+}

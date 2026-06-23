@@ -1,0 +1,22 @@
+{
+  "checkpoint": "priority-3a54-live-deploy-dashboard-key-success-verify",
+  "createdAt": "2026-06-23T23:50:00+02:00",
+  "liveCommit": "e8fd2de6f2e25ffa007ed83b3f971fbe4778772f",
+  "backendVersion": "1.0.128",
+  "latestJsonVersion": "1.0.130",
+  "latestJsonChanged": false,
+  "v10131Published": false,
+  "publicReleaseCreated": false,
+  "sitePatchLive": true,
+  "dashboardOverviewRobloxVerificationLive": true,
+  "howToGetKeyModalLive": true,
+  "referralRewardDays": 7,
+  "successSyncFallbackLive": true,
+  "ownerFolderAppExported": true,
+  "ownerFolder": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son s\u00fcr\u00fcm",
+  "ownerOpenCommand": "C:\\Users\\PC\\Desktop\\Fieel icin Fima Macro Son s\u00fcr\u00fcm\\Open FIMA MACRO.cmd",
+  "remainingBlockers": [
+    "Real owner admin runtime entitlement still needs protected real owner verification.",
+    "FPS unlock before/after is still not proven."
+  ]
+}
