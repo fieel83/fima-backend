@@ -5,7 +5,7 @@
   "releaseAttempted": false,
   "latestJsonUpdated": false,
   "v10131Published": false,
-  "criticalBlocker": "Render Manual Deploy for commit 215ce1a was attempted, but the build failed because Render PostgreSQL fima-macro-db is expired/suspended. Live backend remains old commit a13496e, /account remains 404, and /api/license/validate remains HTTP 500.",
+  "criticalBlocker": "Render Manual Deploy for commit 215ce1a was attempted, but the build failed because Render PostgreSQL fima-macro-db is expired/suspended. Source has now advanced to commit 879d1d6 with Discord/community setup and auth recovery UX fixes, but live backend still serves old commit a13496e, /account remains 404, and /api/license/validate remains HTTP 500.",
   "coreGates": {
     "appStartupCrash": "LOCAL RUNTIME VERIFIED",
     "integritySigning": "LOCAL RUNTIME VERIFIED",
@@ -13,7 +13,9 @@
     "keyScreenMainApp": "BLOCKED BY MISSING ACCESS",
     "macroLicenseCore": "BLOCKED BY MISSING ACCESS",
     "fimaStatsRuntime": "BLOCKED BY MISSING ACCESS",
-    "websiteAccountRoute": "SOURCE ONLY",
+    "websiteAccountRoute": "SOURCE ONLY; live still 404 because old backend is deployed",
+    "websiteLoginRecoveryUx": "SOURCE ONLY; source supports username/email labels and safer reset redirect, but live is blocked by old deploy/database",
+    "discordCommunitySecurityTraining": "SOURCE ONLY; source commands and safe setup schemas added, but live bot deployment is blocked by backend/deploy state",
     "renderDeploy": "FAILED",
     "renderDatabase": "BLOCKED BY MISSING ACCESS"
   },
@@ -22,5 +24,5 @@
     "Creator/Feedback backend completion can remain gated if normal app core passes later",
     "Exact FPS/MS can remain estimated/unavailable if honestly labeled after main app runtime opens"
   ],
-  "nextExactAction": "Upgrade or restore Render PostgreSQL fima-macro-db, then rerun Render Manual Deploy for commit 215ce1a or newer."
+  "nextExactAction": "Upgrade or restore Render PostgreSQL fima-macro-db, then rerun Render Manual Deploy for commit 879d1d6 or newer."
 }

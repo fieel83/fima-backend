@@ -3,7 +3,9 @@
   "phase": "3A57 Render deploy 215ce1a",
   "createdAt": "2026-06-26T15:44:00+02:00",
   "repoCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+  "latestSourceCommitAfterFollowup": "879d1d660eb7e6f177d5ecd357ace6f3eac9a439",
   "liveCommitBefore": "a13496ec46bc664ac8934ae1f403092622a31c74",
+  "liveCommitAfterFollowupCheck": "a13496ec46bc664ac8934ae1f403092622a31c74",
   "deployAccess": {
     "renderDashboardSession": "available",
     "renderApiEnv": "missing",
@@ -15,6 +17,7 @@
     "method": "Render dashboard Manual Deploy",
     "serviceId": "srv-d8as6m8jo6nc7381a2l0",
     "targetCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+    "followupTargetCommitWaitingForDbRestore": "879d1d660eb7e6f177d5ecd357ace6f3eac9a439",
     "envMutated": false,
     "secretValuesPrinted": false
   },
@@ -37,7 +40,7 @@
       "v1.0.131 release"
     ]
   },
-  "requiredOwnerAction": "Upgrade or restore the Render PostgreSQL database fima-macro-db from the Render dashboard. This is a paid plan/payment action and was not performed automatically.",
+  "requiredOwnerAction": "Upgrade or restore the Render PostgreSQL database fima-macro-db from the Render dashboard, then deploy commit 879d1d6 or newer. This is a paid plan/payment action and was not performed automatically.",
   "latestJsonChanged": false,
   "publicReleaseCreated": false
 }
