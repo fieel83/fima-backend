@@ -35,6 +35,7 @@ import {
   normalizeLicenseKey
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
+import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
 import { minimumAppVersionStatus } from "./appVersionPolicy.js";
@@ -564,10 +565,9 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     const login = String(req.body?.email || req.body?.login || req.body?.username || "").trim();
     const email = login.includes("@") ? normalizeEmail(login) : syntheticEmailForUsername(login);
     const password = String(req.body?.password || "");
-    const emailNormalized = normalizeAccountEmail(email);
-    const user = await prisma.user.findFirst({ where: { OR: [{ email }, { emailNormalized }] } });
+    const user = await findUserByLoginEmail(email);
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
-      await createAuditLog("user_login_failed", "user", null, { email });
+      await createAuditLog("user_login_failed", "user", null, { emailMasked: maskEmail(email) });
       return res.status(401).json({ error: "invalid_credentials" });
     }
 
@@ -2350,6 +2350,11 @@ app.get("/admin/health/bot", async (_req, res) => {
 
 app.get("/admin/api/bot/health", requireAdmin, async (_req, res) => {
   res.json({ success: true, bot: await discordBotHealth() });
+});
+
+app.get("/admin/api/rbac/permissions", requireAdmin, async (req, res) => {
+  await createAuditLog("admin_rbac_permissions_viewed", "admin", null, { ipHash: hashHwid(req.ip || "") });
+  res.json({ success: true, ...adminRbacSummary() });
 });
 
 app.post("/admin/roles/sync", requireAdmin, async (req, res) => {
@@ -4284,6 +4289,10 @@ app.get(["/dashboard", "/dashboard/overview"], (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
 });
 
+app.get(["/account", "/account/overview"], (_req, res) => {
+  res.redirect(302, "/dashboard/overview");
+});
+
 app.get("/how-to-get-key", (_req, res) => {
   res.sendFile(path.join(publicDir, "how-to-get-key.html"));
 });
@@ -4301,6 +4310,21 @@ app.get([
   "/dashboard/settings"
 ], (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
+});
+
+app.get([
+  "/account/products",
+  "/account/billing",
+  "/account/redeem",
+  "/account/gifts",
+  "/account/referrals",
+  "/account/connected-accounts",
+  "/account/security",
+  "/account/downloads",
+  "/account/support",
+  "/account/settings"
+], (req, res) => {
+  res.redirect(302, req.path.replace(/^\/account/, "/dashboard"));
 });
 
 const cleanHtmlRedirects = new Map([
@@ -6056,6 +6080,9 @@ function licenseValidationPayload(license, options = {}) {
   const validLicense = options.validLicense ?? Boolean(license && !["license_not_found", "invalid_format"].includes(reason));
   const canUseApp = Boolean(options.valid && hwidMatches);
   const ownerAdminAccess = Boolean(options.ownerAdminAccess ?? ownerAdminAccessForLicense(license, normalizedHwid, reason));
+  const licenseKeyMasked = license ? maskCode(license.licenseKey) : options.licenseKey ? maskCode(options.licenseKey) : null;
+  const boundHwidMasked = boundHwid ? maskExternalId(boundHwid) : null;
+  const incomingHwidMasked = normalizedHwid ? maskExternalId(normalizedHwid) : null;
 
   return {
     valid: Boolean(options.valid),
@@ -6067,8 +6094,8 @@ function licenseValidationPayload(license, options = {}) {
     recommendedFix: recommendedLicenseFix(reason),
     latestVersion: options.latestVersion || null,
     downloadUrl: options.downloadUrl || null,
-    licenseKey: license && isOwnerManagedLicense(license) ? maskCode(license.licenseKey) : license?.licenseKey || options.licenseKey || null,
-    licenseKeyMasked: license ? maskCode(license.licenseKey) : null,
+    licenseKey: licenseKeyMasked,
+    licenseKeyMasked,
     licenseId: license?.id || null,
     source: license ? licenseSource(license) : null,
     status: license?.status || null,
@@ -6085,8 +6112,8 @@ function licenseValidationPayload(license, options = {}) {
     isAdmin: ownerAdminAccess,
     adminTools: ownerAdminAccess,
     capabilities: ownerAdminAccess ? ["owner_admin", "admin_panel", "admin_macro_editor"] : [],
-    boundHwid: boundHwid || null,
-    incomingHwid: normalizedHwid || null,
+    boundHwid: boundHwidMasked,
+    incomingHwid: incomingHwidMasked,
     hwidBound,
     hwidUnbound: !hwidBound,
     hwidMatches,
@@ -6163,15 +6190,33 @@ async function buildLicenseAccountAccess(license) {
 async function findUserForLicense(license) {
   const email = normalizeEmail(license?.customerEmail);
   if (!isValidEmail(email)) return null;
-  const emailNormalized = normalizeAccountEmail(email);
-  return prisma.user.findFirst({
-    where: { OR: [{ email }, { emailNormalized }] },
-    include: {
-      oauthLinks: {
-        where: { provider: { in: ["discord"] } },
-        orderBy: { updatedAt: "desc" }
-      }
+  return findUserByLoginEmail(email, {
+    oauthLinks: {
+      where: { provider: { in: ["discord"] } },
+      orderBy: { updatedAt: "desc" }
     }
+  });
+}
+
+async function findUserByLoginEmail(email, include = undefined) {
+  const normalizedEmail = normalizeAccountEmail(email);
+  const queryOptions = include ? { include } : {};
+  try {
+    return await prisma.user.findFirst({
+      where: { OR: [{ email }, { emailNormalized: normalizedEmail }] },
+      ...queryOptions
+    });
+  } catch (error) {
+    console.warn("User normalized-email lookup failed; retrying email-only lookup.", {
+      emailMasked: maskEmail(email),
+      code: error?.code || null,
+      name: error?.name || "Error"
+    });
+  }
+
+  return prisma.user.findFirst({
+    where: { email },
+    ...queryOptions
   });
 }
 

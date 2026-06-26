@@ -13,8 +13,72 @@ const ROLE_TYPES = {
     envName: "DISCORD_TRIAL_ROLE_ID",
     fallbackName: "Fima Trial",
     color: 0x40d6ff
+  },
+  mediaLinksApproved: {
+    envName: "DISCORD_MEDIA_LINKS_APPROVED_ROLE_ID",
+    fallbackName: "Media & Links Approved",
+    color: 0x2ecc71
+  },
+  coachHelper: {
+    envName: "DISCORD_COACH_HELPER_ROLE_ID",
+    fallbackName: "Fima Coach Helper",
+    color: 0xffc857
+  },
+  languageTurkish: {
+    envName: "DISCORD_LANGUAGE_TR_ROLE_ID",
+    fallbackName: "Language: Turkish",
+    color: 0xe74c3c
+  },
+  languageEnglish: {
+    envName: "DISCORD_LANGUAGE_EN_ROLE_ID",
+    fallbackName: "Language: English",
+    color: 0x3498db
+  },
+  languageGerman: {
+    envName: "DISCORD_LANGUAGE_DE_ROLE_ID",
+    fallbackName: "Language: German",
+    color: 0xf1c40f
+  },
+  languageFrench: {
+    envName: "DISCORD_LANGUAGE_FR_ROLE_ID",
+    fallbackName: "Language: French",
+    color: 0x5865f2
+  },
+  languageBosnian: {
+    envName: "DISCORD_LANGUAGE_BS_ROLE_ID",
+    fallbackName: "Language: Bosnian",
+    color: 0x1abc9c
   }
 };
+
+const LANGUAGE_CHOICES = [
+  { id: "tr", label: "Turkish", roleType: "languageTurkish" },
+  { id: "en", label: "English", roleType: "languageEnglish" },
+  { id: "de", label: "German", roleType: "languageGerman" },
+  { id: "fr", label: "French", roleType: "languageFrench" },
+  { id: "bs", label: "Bosnian", roleType: "languageBosnian" }
+];
+
+const COMMUNITY_CHANNEL_BLUEPRINT = [
+  { name: "official-downloads", topic: "Official Fima download links and build hash notices." },
+  { name: "security-and-trust", topic: "Trust copy, fake file warnings and security notes." },
+  { name: "how-to-get-key", topic: "Friendly license/key guide and My Products links." },
+  { name: "open-ticket", topic: "Open support tickets from the Fima support panel." },
+  { name: "macro-help", topic: "Macro setup, timing and MS/sensitivity help." },
+  { name: "media", topic: "Approved media, clips and showcase posts." },
+  { name: "training-signup", topic: "Community training queue and practice signup." },
+  { name: "training-results", topic: "Training and event result submissions." },
+  { name: "event-results", topic: "Event result summaries and highlights." }
+];
+
+const FIMA_KNOWLEDGE_BASE = [
+  { id: "download.official", title: "Official download", summary: "Use fimamacro.com/download and verify hashes on the security page." },
+  { id: "security.no-secrets", title: "No cookie/token/password stealing", summary: "Fima never asks for Roblox cookies, Discord tokens or browser passwords." },
+  { id: "license.hwid", title: "License and HWID", summary: "Keys bind to an account/device after activation. HWID help belongs in a private ticket with masked details." },
+  { id: "setup.basics", title: "App setup basics", summary: "Choose language, set sensitivity/MS, configure screen, assign a bind, then test safely." },
+  { id: "fpsms.honesty", title: "FPS/MS source", summary: "Fima labels values exact, estimated or unavailable and does not read Roblox panels as source." },
+  { id: "support.escalate", title: "Escalation", summary: "If the bot is unsure, it should open or escalate a ticket for staff." }
+];
 
 const TICKET_CATEGORIES = [
   { id: "payment_help", label: "Payment help", description: "Card checkout, invoice or payment question." },
@@ -137,6 +201,9 @@ async function registerDiscordCommands() {
       .setDescription("Check or create the Fima Buyer and Trial roles.")
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
     new SlashCommandBuilder()
+      .setName("fima_roles_sync")
+      .setDescription("Check or create the Fima Buyer and Trial roles."),
+    new SlashCommandBuilder()
       .setName("fima_ticket")
       .setDescription("Open the Fima support ticket menu."),
     new SlashCommandBuilder()
@@ -146,7 +213,43 @@ async function registerDiscordCommands() {
     new SlashCommandBuilder()
       .setName("fima_trust_setup")
       .setDescription("Send the Fima FAQ and safety panel.")
-      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false))
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_faq_setup")
+      .setDescription("Send the Fima FAQ panel.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_buy_setup")
+      .setDescription("Send the Fima buy/options panel.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_language_setup")
+      .setDescription("Send the Fima language selector.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_server_audit")
+      .setDescription("Audit Fima server roles and channels without deleting anything."),
+    new SlashCommandBuilder()
+      .setName("fima_status")
+      .setDescription("Show Fima bot and community system status."),
+    new SlashCommandBuilder()
+      .setName("fima_security_setup")
+      .setDescription("Send anti-scam and official-download safety guidance.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_training_setup")
+      .setDescription("Send the Fima community training panel.")
+      .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_training_signup")
+      .setDescription("Join the Fima community training queue.")
+      .addStringOption((option) => option.setName("mode").setDescription("Training mode, e.g. 5v5, glads, timing practice").setRequired(false)),
+    new SlashCommandBuilder()
+      .setName("fima_training_result")
+      .setDescription("Submit a training or event result summary.")
+      .addStringOption((option) => option.setName("mode").setDescription("Training mode").setRequired(true))
+      .addStringOption((option) => option.setName("result").setDescription("Short result summary").setRequired(true))
+      .addStringOption((option) => option.setName("notes").setDescription("Optional notes").setRequired(false))
   ].map((command) => command.toJSON());
   const guildId = env("DISCORD_GUILD_ID");
   if (guildId) await client.application.commands.set(commands, guildId);
@@ -156,6 +259,10 @@ async function registerDiscordCommands() {
 async function handleDiscordInteraction(interaction) {
   if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_ticket_category") {
     return handleTicketCategorySelect(interaction);
+  }
+
+  if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_language_select") {
+    return handleLanguageSelect(interaction);
   }
 
   if (interaction?.isButton?.() && String(interaction.customId || "").startsWith("fima_ticket_")) {
@@ -196,7 +303,7 @@ async function handleDiscordInteraction(interaction) {
     return interaction.reply({ content: "Fima embed sent.", ephemeral: true });
   }
 
-  if (interaction.commandName === "fima_roles_setup") {
+  if (interaction.commandName === "fima_roles_setup" || interaction.commandName === "fima_roles_sync") {
     if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({ content: "Only admins can set up Fima roles.", ephemeral: true });
     }
@@ -244,6 +351,118 @@ async function handleDiscordInteraction(interaction) {
     });
     return interaction.reply({ content: "FAQ and safety panel sent.", ephemeral: true });
   }
+
+  if (interaction.commandName === "fima_faq_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up Fima FAQ posts.", ephemeral: true });
+    }
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaFaqPanelPayload());
+    await auditDiscordBotAction("discord_faq_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id
+    });
+    return interaction.reply({ content: "FAQ panel sent.", ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_buy_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up Fima buy posts.", ephemeral: true });
+    }
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaBuyPanelPayload());
+    await auditDiscordBotAction("discord_buy_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id
+    });
+    return interaction.reply({ content: "Buy panel sent.", ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_language_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up language selection.", ephemeral: true });
+    }
+    await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaLanguagePanelPayload());
+    await auditDiscordBotAction("discord_language_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id,
+      languages: LANGUAGE_CHOICES.map((item) => item.id)
+    });
+    return interaction.reply({ content: "Language panel sent.", ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_server_audit") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can run a server audit.", ephemeral: true });
+    }
+    const audit = await buildServerAudit(interaction.guild || await getGuild());
+    await auditDiscordBotAction("discord_server_audit", "discord_guild", audit.guildId, {
+      actorId: interaction.user.id,
+      rolesChecked: audit.roles.length,
+      channelsChecked: audit.channels.length
+    });
+    return interaction.reply({ embeds: [serverAuditEmbed(audit)], ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_status") {
+    const health = await discordBotHealth();
+    return interaction.reply({ embeds: [discordStatusEmbed(health)], ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_security_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up Fima security posts.", ephemeral: true });
+    }
+    await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaSecurityPanelPayload());
+    await auditDiscordBotAction("discord_security_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id
+    });
+    return interaction.reply({ content: "Security panel sent. Use Discord AutoMod for link/image enforcement where possible.", ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_training_setup") {
+    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
+      return interaction.reply({ content: "Only admins can set up Fima training posts.", ephemeral: true });
+    }
+    const channel = interaction.options.getChannel("channel") || interaction.channel;
+    if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
+    await channel.send(fimaTrainingPanelPayload());
+    await auditDiscordBotAction("discord_training_panel_sent", "discord_channel", channel.id, {
+      actorId: interaction.user.id
+    });
+    return interaction.reply({ content: "Training panel sent.", ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_training_signup") {
+    const mode = interaction.options.getString("mode") || "timing practice";
+    await auditDiscordBotAction("discord_training_signup", "discord_user", interaction.user.id, {
+      mode: mode.slice(0, 80)
+    });
+    return interaction.reply({
+      content: `Training signup received for **${mode.slice(0, 80)}**. Staff/helpers can organize the queue from the training channel.`,
+      ephemeral: true
+    });
+  }
+
+  if (interaction.commandName === "fima_training_result") {
+    const mode = interaction.options.getString("mode");
+    const result = interaction.options.getString("result");
+    const notes = interaction.options.getString("notes") || "";
+    await auditDiscordBotAction("discord_training_result", "discord_user", interaction.user.id, {
+      mode: mode.slice(0, 80),
+      result: result.slice(0, 160),
+      notesLength: notes.length
+    });
+    return interaction.reply({
+      embeds: [trainingResultEmbed(interaction.user.id, mode, result, notes)],
+      ephemeral: false
+    });
+  }
 }
 
 function fimaHelpEmbed() {
@@ -251,6 +470,138 @@ function fimaHelpEmbed() {
     .setColor(0x9b5cff)
     .setTitle("Fima help")
     .setDescription("Need a hand? Use `/fima_account` to check your link or `/fima_recovery` for a reset code. For setup, payments, or old TGMacro proof, open a ticket.");
+}
+
+function fimaLanguagePanelPayload() {
+  const embed = new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Choose your Fima language")
+    .setDescription("Pick the language you want for support messages. The bot will not DM you repeatedly after you choose.");
+  const row = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId("fima_language_select")
+      .setPlaceholder("Select language")
+      .addOptions(LANGUAGE_CHOICES.map((language) => ({
+        label: language.label,
+        value: language.id,
+        description: `Use ${language.label} for Fima support where available.`
+      })))
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+async function handleLanguageSelect(interaction) {
+  const selected = LANGUAGE_CHOICES.find((item) => item.id === interaction.values?.[0]);
+  if (!selected) return interaction.reply({ content: "That language is not available yet.", ephemeral: true });
+
+  const guild = interaction.guild || await getGuild();
+  const role = await getOrCreateRole(guild, selected.roleType);
+  const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+  if (!member) return interaction.reply({ content: "Could not find your server member profile.", ephemeral: true });
+
+  const languageRoleIds = [];
+  for (const language of LANGUAGE_CHOICES) {
+    const languageRole = await findRole(guild, ROLE_TYPES[language.roleType]).catch(() => null);
+    if (languageRole) languageRoleIds.push(languageRole.id);
+  }
+  for (const roleId of languageRoleIds) {
+    if (roleId !== role.id && member.roles.cache.has(roleId)) {
+      await member.roles.remove(roleId).catch(() => {});
+    }
+  }
+  await member.roles.add(role.id);
+  await auditDiscordBotAction("discord_language_selected", "discord_user", interaction.user.id, {
+    language: selected.id,
+    roleId: role.id
+  });
+  return interaction.reply({ content: `Language set to **${selected.label}**.`, ephemeral: true });
+}
+
+function fimaSecurityPanelPayload() {
+  const siteUrl = (env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "");
+  const embed = new EmbedBuilder()
+    .setColor(0xff4d6d)
+    .setTitle("Fima security rules")
+    .setDescription("Use official links only. Keep the community clean from scam links, fake builds and stolen-account spam.")
+    .addFields(
+      { name: "Official downloads", value: `${siteUrl}/download and ${siteUrl}/security are the only official download/hash pages.`, inline: false },
+      { name: "Links and media", value: "Only approved roles should post invite links, external links, images or attachments outside media/showcase channels.", inline: false },
+      { name: "Fake/cracked files", value: "Do not upload modified builds. Staff should quarantine suspicious files and ask users to redownload from the official page.", inline: false },
+      { name: "Sensitive data", value: "Never post full license keys, emails, HWIDs, cookies, tokens or payment details.", inline: false }
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("Security page").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/security`),
+    new ButtonBuilder().setLabel("Official download").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/download`)
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function fimaTrainingPanelPayload() {
+  const embed = new EmbedBuilder()
+    .setColor(0x40d6ff)
+    .setTitle("Fima training hub")
+    .setDescription("Community practice is for timing, movement, setup help and friendly 5v5/glads-style practice. Fima is not a clan; this is a support/training system.")
+    .addFields(
+      { name: "Signup", value: "Use `/fima_training_signup mode:5v5` or `/fima_training_signup mode:timing practice`.", inline: false },
+      { name: "Results", value: "Use `/fima_training_result` after a session. Keep screenshots in approved media/result channels.", inline: false },
+      { name: "Safety", value: "No harassment, stolen account spam, fake downloads or suspicious links.", inline: false }
+    );
+  return { embeds: [embed] };
+}
+
+function trainingResultEmbed(userId, mode, result, notes) {
+  const cleanMode = String(mode || "training").slice(0, 80);
+  const cleanResult = String(result || "submitted").slice(0, 160);
+  const cleanNotes = String(notes || "").slice(0, 240);
+  const embed = new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Fima training result")
+    .addFields(
+      { name: "Submitted by", value: `<@${userId}>`, inline: true },
+      { name: "Mode", value: cleanMode, inline: true },
+      { name: "Result", value: cleanResult, inline: false }
+    );
+  if (cleanNotes) embed.addFields({ name: "Notes", value: cleanNotes, inline: false });
+  return embed;
+}
+
+async function buildServerAudit(guild) {
+  await guild.roles.fetch().catch(() => null);
+  await guild.channels.fetch().catch(() => null);
+  const roles = Object.entries(ROLE_TYPES).map(([type, config]) => {
+    const role = guild.roles.cache.find((item) => item.id === env(config.envName) || item.name === config.fallbackName);
+    return { type, expected: config.fallbackName, found: Boolean(role), id: role?.id || null };
+  });
+  const channels = COMMUNITY_CHANNEL_BLUEPRINT.map((channel) => {
+    const found = guild.channels.cache.find((item) => item.name === channel.name);
+    return { name: channel.name, found: Boolean(found), id: found?.id || null };
+  });
+  return { guildId: guild.id, guildName: guild.name, roles, channels };
+}
+
+function serverAuditEmbed(audit) {
+  const missingRoles = audit.roles.filter((role) => !role.found).map((role) => role.expected);
+  const missingChannels = audit.channels.filter((channel) => !channel.found).map((channel) => channel.name);
+  return new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Fima server audit")
+    .setDescription("No channels or roles were deleted. This is a safe audit summary.")
+    .addFields(
+      { name: "Roles", value: missingRoles.length ? `Missing: ${missingRoles.slice(0, 12).join(", ")}` : "All expected roles found.", inline: false },
+      { name: "Channels", value: missingChannels.length ? `Missing: ${missingChannels.slice(0, 12).join(", ")}` : "All suggested channels found.", inline: false }
+    );
+}
+
+function discordStatusEmbed(health) {
+  return new EmbedBuilder()
+    .setColor(health.botReady ? 0x2ecc71 : 0xffc857)
+    .setTitle("Fima bot status")
+    .addFields(
+      { name: "Bot", value: health.botReady ? "Ready" : "Not ready", inline: true },
+      { name: "Guild", value: health.guildFound ? "Found" : "Missing", inline: true },
+      { name: "Manage roles", value: health.manageRolesPermission ? "Yes" : "No", inline: true },
+      { name: "Last error", value: health.lastError ? String(health.lastError).slice(0, 180) : "None", inline: false }
+    );
 }
 
 function fimaAnnouncementPayload(commandName = "fima_embed") {
@@ -329,8 +680,11 @@ function ticketActionRows({ claimed = false } = {}) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("fima_ticket_close").setLabel("Close").setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId("fima_ticket_claim").setLabel(claimed ? "Claimed" : "Claim").setStyle(ButtonStyle.Primary).setDisabled(claimed),
+      new ButtonBuilder().setCustomId("fima_ticket_reopen").setLabel("Reopen").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId("fima_ticket_note").setLabel("Add note").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("fima_ticket_escalate").setLabel("Escalate").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("fima_ticket_escalate").setLabel("Escalate").setStyle(ButtonStyle.Secondary)
+    ),
+    new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("fima_ticket_transcript").setLabel("Transcript").setStyle(ButtonStyle.Secondary)
     )
   ];
@@ -353,6 +707,45 @@ function fimaTrustPanelPayload() {
     new ButtonBuilder().setLabel("Website").setStyle(ButtonStyle.Link).setURL(siteUrl),
     new ButtonBuilder().setLabel("Download").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/download`),
     new ButtonBuilder().setLabel("Pricing").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/pricing`),
+    new ButtonBuilder().setLabel("Security").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/security`)
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function fimaFaqPanelPayload() {
+  const siteUrl = (env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "");
+  const embed = new EmbedBuilder()
+    .setColor(0x9b5cff)
+    .setTitle("Fima FAQ")
+    .setDescription("Quick answers for buying, trials, licenses, HWID and safe downloads.")
+    .addFields(
+      { name: "How trial works", value: "Trial access is claimed from your Fima account. Free trial requirements can include Discord and Roblox profile verification.", inline: false },
+      { name: "License and HWID", value: "Keys are device-bound after activation. If your PC changed, open a License / HWID ticket with masked details only.", inline: false },
+      { name: "Old TGMacro buyer proof", value: "Open an Old TGMacro buyer proof ticket, send proof privately, and staff will review eligibility.", inline: false },
+      { name: "Support rules", value: "Never post full keys, emails, HWIDs, tokens, passwords or cookies. Staff only needs masked details.", inline: false }
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("How to get a key").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/how-to-get-key`),
+    new ButtonBuilder().setLabel("My Products").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/dashboard/products`),
+    new ButtonBuilder().setLabel("Support").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/support`)
+  );
+  return { embeds: [embed], components: [row] };
+}
+
+function fimaBuyPanelPayload() {
+  const siteUrl = (env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "");
+  const embed = new EmbedBuilder()
+    .setColor(0x40d6ff)
+    .setTitle("Buy Fima safely")
+    .setDescription("Use only fimamacro.com for pricing, checkout and downloads. Do not use old SellAuth links or random reuploads.")
+    .addFields(
+      { name: "Official checkout", value: `${siteUrl}/pricing`, inline: true },
+      { name: "After payment", value: "Your masked key appears on the success page and My Products. If it is still syncing, wait a moment or open a payment ticket.", inline: false },
+      { name: "Robux orders", value: "Robux orders are staff-assisted only. Open a Purchase / Payment ticket and wait for staff confirmation.", inline: false }
+    );
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel("Pricing").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/pricing`),
+    new ButtonBuilder().setLabel("Download").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/download`),
     new ButtonBuilder().setLabel("Security").setStyle(ButtonStyle.Link).setURL(`${siteUrl}/security`)
   );
   return { embeds: [embed], components: [row] };
@@ -448,6 +841,10 @@ async function handleTicketButton(interaction) {
   if (action === "close") {
     await interaction.channel?.setName?.(`closed-${String(interaction.channel?.name || "ticket").replace(/^closed-/, "").slice(0, 80)}`).catch(() => {});
     return interaction.reply({ content: "Ticket marked closed. Staff can archive or delete it after review.", ephemeral: false });
+  }
+  if (action === "reopen") {
+    await interaction.channel?.setName?.(String(interaction.channel?.name || "ticket").replace(/^closed-/, "").slice(0, 90)).catch(() => {});
+    return interaction.reply({ content: "Ticket reopened for follow-up.", ephemeral: false });
   }
   if (action === "note") {
     return interaction.reply({ content: "Add your staff note as a normal message. Keep keys and emails masked.", ephemeral: true });
