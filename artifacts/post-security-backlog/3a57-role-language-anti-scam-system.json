@@ -1,0 +1,49 @@
+{
+  "label": "SOURCE ONLY",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "implementedInSource": {
+    "roles": [
+      "Fima Buyer",
+      "Fima Trial",
+      "Media & Links Approved",
+      "Fima Coach Helper",
+      "Fima Support",
+      "Security Staff",
+      "Training Hoster",
+      "Referee",
+      "Language: Turkish",
+      "Language: English",
+      "Language: German",
+      "Language: French",
+      "Language: Bosnian",
+      "Ping: App Updates",
+      "Ping: Macro Updates",
+      "Ping: Training",
+      "Ping: Tournament",
+      "Ping: Events",
+      "Ping: Giveaways",
+      "Ping: Gamenight"
+    ],
+    "selectors": [
+      "fima_language_select",
+      "fima_ping_roles_select"
+    ],
+    "commands": [
+      "/rolepicker_setup",
+      "/language",
+      "/language_broadcast",
+      "/fima_security_setup"
+    ]
+  },
+  "antiScamPolicy": {
+    "inviteLinks": "Only owner/approved roles should post invite links.",
+    "mediaLinks": "Use Media & Links Approved role and designated media/showcase channels.",
+    "fakeFiles": "Direct users to official download/security pages and quarantine suspicious files.",
+    "sensitiveData": "Never post full license keys, emails, HWIDs, tokens, cookies or payment details.",
+    "liveAutomationStatus": "SOURCE ONLY until Discord bot is deployed and permissions are verified."
+  },
+  "releaseImpact": {
+    "criticalReleaseBlocker": false,
+    "safeToGate": true
+  }
+}

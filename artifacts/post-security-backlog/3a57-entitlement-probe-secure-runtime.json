@@ -1,0 +1,41 @@
+{
+  "phase": "3a57-secure-entitlement-probe",
+  "label": "FAILED",
+  "valuePrinted": false,
+  "fullKeyPrinted": false,
+  "fullEmailPrinted": false,
+  "fullHwidPrinted": false,
+  "dpapiOwnerKeyRead": true,
+  "probeCommand": "powershell -ExecutionPolicy Bypass -File .\\tools\\local\\Invoke-FimaEntitlementProbe.ps1",
+  "probeWorkingDirectory": "C:\\Users\\PC\\Documents\\Codex\\2026-05-13\\benim-visual-studio-yu-bagla\\FimaMacroStudio",
+  "maskedProbeResult": {
+    "licenseKeyMasked": "FIMA...98LV",
+    "hwidMasked": "TTW5...BVQB",
+    "validated": false,
+    "statusCode": 500,
+    "responseReason": "server_error",
+    "responseMessage": "License validation failed",
+    "failureCategory": "backend_server_error"
+  },
+  "technicalConclusion": "The local DPAPI secret is available and readable. The blocker is the live backend /api/license/validate route returning HTTP 500, not a missing local key.",
+  "sourceFixesPushed": {
+    "commit": "215ce1a",
+    "changes": [
+      "login lookup now supports username/email through a fallback-safe account lookup",
+      "license validate payload masks licenseKey, boundHwid and incomingHwid in all cases",
+      "account lookup falls back to email-only if emailNormalized lookup fails at runtime",
+      "/account clean route exists in source"
+    ],
+    "tests": {
+      "nodeCheckServer": "passed",
+      "npmTest": "passed 32/32"
+    }
+  },
+  "liveStateAfterPush": {
+    "apiHealthCommit": "a13496ec46bc664ac8934ae1f403092622a31c74",
+    "expectedCommit": "215ce1a",
+    "accountRoute": "404",
+    "probeStillBlocked": true
+  },
+  "nextRequiredAction": "Deploy backend commit 215ce1a to Render or provide Render API/deploy hook access so Codex can trigger the deploy without printing secrets."
+}

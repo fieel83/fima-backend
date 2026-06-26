@@ -1,0 +1,55 @@
+{
+  "label": "SOURCE ONLY",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "sourceFile": "src/discordBot.js",
+  "newOrExpandedCommands": [
+    "/fima_support_ai",
+    "/setupfieelscommunity",
+    "/setupfieelsclan",
+    "/setup",
+    "/rolepicker_setup",
+    "/language",
+    "/language_broadcast",
+    "/training_create",
+    "/training_end",
+    "/training_cancel",
+    "/tournament_create",
+    "/tournament_result",
+    "/event_create",
+    "/activity_log",
+    "/activity_summary",
+    "/staff_quota",
+    "/application_setup"
+  ],
+  "existingCommandsKept": [
+    "/fima_ticket_setup",
+    "/fima_trust_setup",
+    "/fima_faq_setup",
+    "/fima_buy_setup",
+    "/fima_roles_sync",
+    "/fima_language_setup",
+    "/fima_server_audit",
+    "/fima_status",
+    "/fima_security_setup",
+    "/fima_training_setup",
+    "/fima_training_signup",
+    "/fima_training_result"
+  ],
+  "schemaSafety": {
+    "hardDelete": false,
+    "destructiveChanges": false,
+    "applyMode": "apply_missing_only",
+    "requiresAdministrator": true,
+    "snapshotArtifacts": [
+      "3a57-discord-guild-snapshot-before-setup.json",
+      "3a57-discord-guild-setup-preview.json",
+      "3a57-discord-guild-rollback-plan.json"
+    ]
+  },
+  "verification": {
+    "nodeCheckDiscordBot": "passed",
+    "npmTest": "passed 32/32",
+    "liveDiscordRegistered": "BLOCKED BY MISSING ACCESS",
+    "blocker": "Production bot cannot run the new commit until Render DB/deploy blocker is resolved."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "label": "SOURCE ONLY",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "liveBlocker": "Production backend remains old because Render deploy failed while the database was expired/suspended.",
+  "sourceChanges": {
+    "login": [
+      "login form label changed to Username or email",
+      "dynamic account copy changed to username or email",
+      "backend login already accepts email/login/username and normalizes input"
+    ],
+    "forgotPassword": [
+      "forgot-password page label changed to Fima username or email",
+      "forgot copy changed to username or email",
+      "reset redirect no longer puts the typed login/email into the URL query string"
+    ],
+    "security": [
+      "no full login/email is written to reset page URL",
+      "server errors still use safe generic messages",
+      "Discord recovery still requires linked Discord and bot availability"
+    ]
+  },
+  "ownerVisibleIssue": {
+    "loginFailedLive": "FAILED",
+    "reason": "Live site is still running old commit and live DB is suspended; source fix cannot be visible until Render DB/deploy is restored.",
+    "doNotAskForPassword": true
+  },
+  "verification": {
+    "nodeCheckAccountJs": "passed",
+    "nodeCheckServerJs": "passed",
+    "npmTest": "passed 32/32"
+  }
+}

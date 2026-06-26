@@ -1,0 +1,25 @@
+{
+  "phase": "3a57-live-auth-login-blocker",
+  "label": "SOURCE ONLY",
+  "liveVerification": {
+    "accountRoute": {
+      "url": "https://fimamacro.com/account",
+      "status": 404,
+      "expectedAfterDeploy": "302 -> /dashboard/overview"
+    },
+    "loginRuntime": "not live verified because backend/site is still serving old commit",
+    "ownerLogin": "not attempted with password; no password requested or exposed"
+  },
+  "sourceFixes": [
+    "/account and /account/* redirects are present in src/server.js",
+    "login supports username/email through a normalized lookup with email-only fallback",
+    "failed login audit now stores masked email only",
+    "generic invalid_credentials remains used for bad password/user mismatch"
+  ],
+  "commit": "215ce1a",
+  "tests": {
+    "nodeCheckServer": "passed",
+    "npmTest": "passed 32/32"
+  },
+  "remainingBlocker": "Live Render service has not deployed commit 215ce1a, so /account and login fixes are not visible on fimamacro.com yet."
+}

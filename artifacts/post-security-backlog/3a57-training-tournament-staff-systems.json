@@ -1,0 +1,43 @@
+{
+  "label": "SOURCE ONLY",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "implementedInSource": {
+    "training": [
+      "/training_create",
+      "/training_end",
+      "/training_cancel",
+      "/fima_training_signup",
+      "/fima_training_result"
+    ],
+    "tournamentAndEvents": [
+      "/tournament_create",
+      "/tournament_result",
+      "/event_create"
+    ],
+    "staffActivity": [
+      "/activity_log",
+      "/activity_summary",
+      "/staff_quota"
+    ],
+    "applications": [
+      "/application_setup"
+    ]
+  },
+  "policy": {
+    "autoDemote": false,
+    "autoPromote": false,
+    "recommendationsOnly": true,
+    "staffReviewRequired": true,
+    "proofHandling": "Proof links/notes are marked for staff review; full sensitive data must not be posted."
+  },
+  "mappedFromResearch": [
+    "5v5/glads training queue",
+    "training hoster/referee channels",
+    "score/result approval cards",
+    "leaderboard/result channels"
+  ],
+  "releaseImpact": {
+    "criticalReleaseBlocker": false,
+    "safeToGate": true
+  }
+}

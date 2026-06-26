@@ -1,0 +1,29 @@
+{
+  "checkpoint": "priority-3a57-dpapi-owner-key-probe-render-auth-continue",
+  "status": "blocked",
+  "latestJsonChanged": false,
+  "v10131Published": false,
+  "publicReleaseCreated": false,
+  "dpapiOwnerKeyRead": true,
+  "probeResult": "FAILED",
+  "probeFailure": "live backend /api/license/validate returned HTTP 500 server_error",
+  "sourceFixCommit": "215ce1a",
+  "githubPush": "pushed to origin/main",
+  "renderAccess": {
+    "label": "BLOCKED BY MISSING ACCESS",
+    "missing": [
+      "RENDER_API_KEY",
+      "RENDER_SERVICE_ID or RENDER_DEPLOY_HOOK_URL"
+    ],
+    "autoDeployObserved": false,
+    "liveCommit": "a13496ec46bc664ac8934ae1f403092622a31c74"
+  },
+  "safeSecretHandling": {
+    "fullKeyPrinted": false,
+    "fullEmailPrinted": false,
+    "fullHwidPrinted": false,
+    "tokenPrinted": false,
+    "envValuePrinted": false
+  },
+  "nextExactAction": "Deploy backend commit 215ce1a to Render and rerun Invoke-FimaEntitlementProbe.ps1."
+}

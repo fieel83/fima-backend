@@ -1,0 +1,57 @@
+{
+  "label": "BLOCKED BY MISSING ACCESS",
+  "createdAt": "2026-06-26T15:45:00+02:00",
+  "summary": "Backend source fix commit 215ce1a was pushed and Render Manual Deploy was triggered, but deploy failed because Render PostgreSQL fima-macro-db is expired/suspended.",
+  "completed": [
+    "DPAPI owner key path remains usable without printing the key.",
+    "GitHub source commit 215ce1a is on main.",
+    "Render dashboard session was found and used.",
+    "Manual Deploy latest commit was triggered from Render dashboard.",
+    "Root cause for live login/license failure was identified as expired/suspended Render PostgreSQL.",
+    "No latest.json change.",
+    "No v1.0.131 release."
+  ],
+  "blocked": [
+    {
+      "item": "Live /account redirect",
+      "reason": "Source fix is not deployed because Render build failed."
+    },
+    {
+      "item": "Live login/account dashboard",
+      "reason": "Database is expired/suspended and unavailable."
+    },
+    {
+      "item": "License validation / entitlement probe",
+      "reason": "Live backend old deployment still returns 500; database unavailable."
+    },
+    {
+      "item": "Key screen to main app runtime",
+      "reason": "Requires valid backend entitlement validation."
+    },
+    {
+      "item": "Macro/license soak and Fima Stats runtime",
+      "reason": "Requires main app activation with valid entitlement."
+    },
+    {
+      "item": "Auto-release v1.0.131",
+      "reason": "Critical release gates are blocked."
+    }
+  ],
+  "render": {
+    "service": "fima-backend",
+    "serviceId": "srv-d8as6m8jo6nc7381a2l0",
+    "database": "fima-macro-db",
+    "databaseStatus": "expired/suspended by Render",
+    "manualDeployAttempted": true,
+    "deployCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+    "deployResult": "failed during prisma migrate deploy with P1001 database unreachable"
+  },
+  "ownerNextAction": "Upgrade or restore the Render PostgreSQL database fima-macro-db from the Render dashboard, then rerun Render Manual Deploy for commit 215ce1a or newer.",
+  "secretLeakCheck": {
+    "fullKeyPrinted": false,
+    "fullEmailPrinted": false,
+    "fullHwidPrinted": false,
+    "tokensPrinted": false,
+    "renderSecretsPrinted": false
+  }
+}

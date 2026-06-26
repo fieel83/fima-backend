@@ -1,0 +1,43 @@
+{
+  "label": "FAILED",
+  "phase": "3A57 Render deploy 215ce1a",
+  "createdAt": "2026-06-26T15:44:00+02:00",
+  "repoCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+  "liveCommitBefore": "a13496ec46bc664ac8934ae1f403092622a31c74",
+  "deployAccess": {
+    "renderDashboardSession": "available",
+    "renderApiEnv": "missing",
+    "deployHookEnv": "missing",
+    "githubWebhook": "missing",
+    "githubActionsDeployment": "missing"
+  },
+  "actionTaken": {
+    "method": "Render dashboard Manual Deploy",
+    "serviceId": "srv-d8as6m8jo6nc7381a2l0",
+    "targetCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+    "envMutated": false,
+    "secretValuesPrinted": false
+  },
+  "deployResult": {
+    "status": "failed",
+    "errorCode": "Prisma P1001",
+    "safeErrorSummary": "Build failed during prisma migrate deploy because Render PostgreSQL host was unreachable.",
+    "rootCause": "Render PostgreSQL service fima-macro-db is expired and suspended by Render."
+  },
+  "releaseImpact": {
+    "isCriticalReleaseBlocker": true,
+    "blockedItems": [
+      "live login",
+      "account dashboard",
+      "license validation",
+      "DPAPI entitlement probe",
+      "key screen to main app runtime",
+      "macro/license soak",
+      "Fima Stats runtime after entitlement",
+      "v1.0.131 release"
+    ]
+  },
+  "requiredOwnerAction": "Upgrade or restore the Render PostgreSQL database fima-macro-db from the Render dashboard. This is a paid plan/payment action and was not performed automatically.",
+  "latestJsonChanged": false,
+  "publicReleaseCreated": false
+}

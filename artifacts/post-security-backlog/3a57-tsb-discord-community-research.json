@@ -1,0 +1,145 @@
+{
+  "label": "SOURCE ONLY",
+  "createdAt": "2026-06-26T15:45:00+02:00",
+  "scope": "Public research for The Strongest Battlegrounds Discord/community patterns and how to adapt them to Fima without making Fima a clan.",
+  "sources": [
+    {
+      "title": "Top.gg TSB community listing",
+      "url": "https://top.gg/discord/servers/759954778144133120",
+      "observedPatterns": [
+        "large active community",
+        "beginner friendly combo/counter/movement learning",
+        "competitive events",
+        "tournaments",
+        "ranked ladders",
+        "clan wars",
+        "active moderation"
+      ]
+    },
+    {
+      "title": "DISBOARD the-strongest-battlegrounds listings",
+      "url": "https://disboard.org/en/servers/tag/the-strongest-battlegrounds",
+      "observedPatterns": [
+        "competitive hubs",
+        "skill improvement",
+        "leaderboards",
+        "regional communities",
+        "clanning tags"
+      ]
+    },
+    {
+      "title": "Official Yielding Arts Discord listing",
+      "url": "https://discord.com/invite/yieldingarts",
+      "observedPatterns": [
+        "official large community",
+        "update/event/support style server role"
+      ]
+    },
+    {
+      "title": "DISBOARD strongest-battlegrounds listings",
+      "url": "https://disboard.org/en/servers/tag/strongest-battlegrounds",
+      "observedPatterns": [
+        "daily training",
+        "ranking system",
+        "wide community spaces"
+      ]
+    },
+    {
+      "title": "DISBOARD tsb-clan listings",
+      "url": "https://disboard.org/servers/tag/tsb-clan",
+      "observedPatterns": [
+        "tryouts",
+        "trainings",
+        "scrims",
+        "war/raid activity",
+        "internal tournaments",
+        "ranked role progression",
+        "partnership flow"
+      ]
+    }
+  ],
+  "fimaCommunityAdaptation": {
+    "principle": "Fima is a macro/support community, not a clan. Use TSB server mechanics only for training, education, result tracking and safe community engagement.",
+    "recommendedChannels": {
+      "information": [
+        "welcome",
+        "rules",
+        "announcements",
+        "official-downloads",
+        "security-and-trust",
+        "faq",
+        "how-to-buy",
+        "how-to-get-key",
+        "trial-info",
+        "update-notes",
+        "status"
+      ],
+      "support": [
+        "open-ticket",
+        "ticket-logs",
+        "bug-reports",
+        "license-help",
+        "payment-help",
+        "hwid-help",
+        "macro-help"
+      ],
+      "community": [
+        "general",
+        "media",
+        "clips",
+        "suggestions",
+        "macro-discussion",
+        "success-results",
+        "events"
+      ],
+      "training": [
+        "training-signup",
+        "training-results",
+        "event-results",
+        "macro-timing-practice",
+        "coach-apply",
+        "leaderboards"
+      ]
+    },
+    "recommendedRoles": [
+      "Owner",
+      "Admin",
+      "Support Staff",
+      "Moderator",
+      "Coach / Helper",
+      "Buyer",
+      "Trial",
+      "Media & Links Approved",
+      "Turkish",
+      "English",
+      "German",
+      "French",
+      "Bosnian"
+    ],
+    "antiScamRules": [
+      "block invite links except owner/approved role",
+      "block suspicious external links outside approved channels",
+      "block image/link attachments outside media channels unless Media & Links Approved",
+      "log moderation actions",
+      "warn first offense instead of instant ban",
+      "escalate repeated violations to staff"
+    ],
+    "botCommands": [
+      "/fima_ticket_setup",
+      "/fima_trust_setup",
+      "/fima_faq_setup",
+      "/fima_buy_setup",
+      "/fima_roles_sync",
+      "/fima_language_setup",
+      "/fima_server_audit",
+      "/fima_status",
+      "/fima_training_setup",
+      "/fima_training_signup",
+      "/fima_training_result",
+      "/fima_security_setup",
+      "/leaderboard",
+      "/coach_apply"
+    ]
+  },
+  "implementationStatus": "Source commands were previously added in backend commit 215ce1a, but live Discord/server verification is not complete because core backend deployment is blocked by expired Render database."
+}

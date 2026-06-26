@@ -1,0 +1,70 @@
+{
+  "label": "SOURCE ONLY",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "scope": "Fieel's Community and optional Fieel's Clan Discord system",
+  "liveBlocker": "Render production deploy is blocked because fima-macro-db is expired/suspended, so the live bot cannot run the new command set yet.",
+  "implementedInSource": {
+    "safeSetupCommands": [
+      "/setupfieelscommunity",
+      "/setupfieelsclan",
+      "/setup mode:community",
+      "/setup mode:clan"
+    ],
+    "safetyModel": [
+      "guild snapshot before setup",
+      "setup preview artifact",
+      "rollback metadata artifact",
+      "apply_missing_only creates missing categories/channels only",
+      "no hard delete",
+      "existing useful outfit/cape/vouch channels are preserved/rehome candidates"
+    ],
+    "communityCategories": [
+      "INFO",
+      "ONBOARDING",
+      "SUPPORT",
+      "COMMUNITY",
+      "TRAINING & EVENTS",
+      "STAFF"
+    ],
+    "clanCategories": [
+      "CLAN INFO",
+      "OPERATIONS",
+      "APPLICATIONS",
+      "LOGS"
+    ],
+    "preservedExistingContent": [
+      "outfits",
+      "capes",
+      "vouches",
+      "fake-headless-korbox",
+      "fima-macro",
+      "announcements",
+      "updates",
+      "rules",
+      "training-results",
+      "challenge-results",
+      "leaderboard-na",
+      "leaderboard-eu",
+      "scores"
+    ]
+  },
+  "researchInputs": {
+    "ownerScreenshots": [
+      "Fieel's Community existing channel layout",
+      "TSB clan/training server examples",
+      "score approval bot cards",
+      "hoster/referee/staff activity channels"
+    ],
+    "publicResearch": [
+      "Top.gg The Strongest Battlegrounds Discord listing",
+      "DISBOARD TSB/strongest-battlegrounds/clan listings",
+      "Yielding Arts public Discord invite/listing"
+    ],
+    "adaptationDecision": "Fima is not a clan, so clan-style features are adapted only as community training, result, event, hoster and referee workflows."
+  },
+  "releaseImpact": {
+    "criticalReleaseBlocker": false,
+    "canShipIfGated": true,
+    "gatingRequirement": "Do not claim LIVE VERIFIED until deployed bot commands are registered and tested in Discord."
+  }
+}

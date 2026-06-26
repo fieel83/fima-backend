@@ -111,10 +111,10 @@
         "password": "Password",
         "registerButton": "Register",
         "loginTitle": "Get back into Fima.",
-        "loginIntro": "Sign in with your Fima username.",
+        "loginIntro": "Sign in with your Fima username or email.",
         "loginButton": "Login",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Set a new password.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -364,10 +364,10 @@
         "password": "\u015eifre",
         "registerButton": "Kay\u0131t ol",
         "loginTitle": "Giri\u015f yap.",
-        "loginIntro": "Fima kullan\u0131c\u0131 ad\u0131nla giri\u015f yap.",
+        "loginIntro": "Fima kullan\u0131c\u0131 ad\u0131n veya e-posta ile giri\u015f yap.",
         "loginButton": "Giri\u015f yap",
         "forgotTitle": "Discord ile s\u0131f\u0131rla.",
-        "forgotIntro": "Fima kullan\u0131c\u0131 ad\u0131n\u0131 gir. Discord recovery ba\u011fl\u0131ysa Fima bot DM ile tek kullan\u0131ml\u0131k reset kodu g\u00f6nderir.",
+        "forgotIntro": "Fima kullan\u0131c\u0131 ad\u0131n\u0131 veya e-postan\u0131 gir. Discord recovery ba\u011fl\u0131ysa Fima bot DM ile tek kullan\u0131ml\u0131k reset kodu g\u00f6nderir.",
         "forgotButton": "Discord kodu g\u00f6nder",
         "resetTitle": "Yeni \u015fifre belirle.",
         "resetIntro": "Fima Discord botundan gelen reset kodunu yap\u0131\u015ft\u0131r ve yeni \u015fifreni se\u00e7.",
@@ -606,7 +606,7 @@
         "loginIntro": "Oeffne dein Fima Dashboard, Produkte und Lizenzkeys.",
         "loginButton": "Einloggen",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Neues Passwort setzen.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -695,7 +695,7 @@
         "loginIntro": "Ouvre ton dashboard Fima, tes produits et tes cles.",
         "loginButton": "Connexion",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Definir un nouveau mot de passe.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -784,7 +784,7 @@
         "loginIntro": "Otvori Fima dashboard, proizvode i license keyeve.",
         "loginButton": "Prijavi se",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Postavi novu lozinku.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -870,10 +870,10 @@
         "password": "Password",
         "registerButton": "Register",
         "loginTitle": "Get back into Fima.",
-        "loginIntro": "Sign in with your Fima username.",
+        "loginIntro": "Sign in with your Fima username or email.",
         "loginButton": "Login",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Set a new password.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -959,10 +959,10 @@
         "password": "Password",
         "registerButton": "Register",
         "loginTitle": "Get back into Fima.",
-        "loginIntro": "Sign in with your Fima username.",
+        "loginIntro": "Sign in with your Fima username or email.",
         "loginButton": "Login",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Set a new password.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -1048,10 +1048,10 @@
         "password": "Password",
         "registerButton": "Register",
         "loginTitle": "Get back into Fima.",
-        "loginIntro": "Sign in with your Fima username.",
+        "loginIntro": "Sign in with your Fima username or email.",
         "loginButton": "Login",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Set a new password.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -1137,10 +1137,10 @@
         "password": "Password",
         "registerButton": "Register",
         "loginTitle": "Get back into Fima.",
-        "loginIntro": "Sign in with your Fima username.",
+        "loginIntro": "Sign in with your Fima username or email.",
         "loginButton": "Login",
         "forgotTitle": "Reset with Discord.",
-        "forgotIntro": "Enter your Fima username. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
+        "forgotIntro": "Enter your Fima username or email. If Discord recovery is linked, the Fima bot will DM a one-time reset code.",
         "forgotButton": "Send Discord code",
         "resetTitle": "Set a new password.",
         "resetIntro": "Paste the reset code from the Fima Discord bot and choose a new password.",
@@ -1247,14 +1247,14 @@
     }
     if (page === "login") {
       setHeroCopy("Fima Account", t("loginTitle"), t("loginIntro"));
-      setLabel("input[name='login']", language() === "tr" ? "Kullanici adi" : "Username");
+      setLabel("input[name='login']", language() === "tr" ? "Kullanici adi veya e-posta" : "Username or email");
       setLabel("input[name='password']", t("password"));
       setText("button[type='submit']", t("loginButton"));
       setText("a[href='/forgot-password']", t("forgotTitle"));
     }
     if (page === "forgot") {
       setHeroCopy("Fima Account", t("forgotTitle"), t("forgotIntro"));
-      setLabel("input[name='login']", language() === "tr" ? "Fima kullanici adi" : "Fima username");
+      setLabel("input[name='login']", language() === "tr" ? "Fima kullanici adi veya e-posta" : "Fima username or email");
       setText("button[type='submit']", t("forgotButton"));
     }
     if (page === "reset") {
@@ -1730,7 +1730,7 @@
         const data = await post("/api/auth/forgot-password", { login, username: login, method: "discord" });
         setMessage(data.resetUrl ? `Dev reset URL: ${data.resetUrl}` : (data.message || t("resetCodeSent")), "good");
         window.setTimeout(() => {
-          window.location.href = `/reset-password?login=${encodeURIComponent(login)}`;
+          window.location.href = "/reset-password";
         }, 850);
       } catch (error) {
         setMessage(error.message, "error");

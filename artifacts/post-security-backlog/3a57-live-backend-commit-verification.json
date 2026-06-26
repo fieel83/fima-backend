@@ -1,0 +1,31 @@
+{
+  "label": "FAILED",
+  "createdAt": "2026-06-26T15:44:00+02:00",
+  "expectedCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+  "liveHealthz": {
+    "url": "https://api.fimamacro.com/healthz",
+    "version": "1.0.128",
+    "backendVersion": "1.0.128",
+    "commit": "a13496ec46bc664ac8934ae1f403092622a31c74",
+    "result": "old deployment still live"
+  },
+  "liveLatestJson": {
+    "url": "https://fimamacro.com/latest.json",
+    "version": "1.0.130",
+    "changed": false
+  },
+  "accountRoute": {
+    "url": "https://fimamacro.com/account",
+    "status": 404,
+    "sourceFix": "present in commit 215ce1a",
+    "liveFix": "not live because deploy failed"
+  },
+  "validationRoute": {
+    "url": "https://api.fimamacro.com/api/license/validate",
+    "dpapiProbe": "FAILED",
+    "status": 500,
+    "reason": "backend_server_error on old live deployment and expired database"
+  },
+  "rootCause": "Render PostgreSQL fima-macro-db is expired/suspended, blocking deployment and runtime database access.",
+  "nextAction": "Restore/upgrade Render PostgreSQL fima-macro-db, then redeploy commit 215ce1a or newer."
+}

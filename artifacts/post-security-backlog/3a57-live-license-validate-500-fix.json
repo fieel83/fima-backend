@@ -1,0 +1,35 @@
+{
+  "label": "BLOCKED BY MISSING ACCESS",
+  "createdAt": "2026-06-26T15:44:00+02:00",
+  "problem": "Live /api/license/validate returns HTTP 500, blocking entitlement runtime tests.",
+  "sourceFixStatus": {
+    "commit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+    "pushedToGithub": true,
+    "testsPassed": true,
+    "summary": "Login lookup fallback, safe masked audit, license validation masking, /account redirect, RBAC and Discord/community command source updates are committed."
+  },
+  "liveStatus": {
+    "liveCommit": "a13496ec46bc664ac8934ae1f403092622a31c74",
+    "liveStillOld": true,
+    "validateStatus": 500,
+    "accountRouteStatus": 404
+  },
+  "deploymentAttempt": {
+    "method": "Render dashboard Manual Deploy",
+    "targetCommit": "215ce1a03f8c273f9c6fb25d45a504282e1825aa",
+    "result": "failed",
+    "failure": "Prisma P1001 database unreachable during build"
+  },
+  "rootCause": {
+    "databaseService": "fima-macro-db",
+    "renderStatus": "expired and suspended by Render",
+    "paymentOrPlanActionRequired": true
+  },
+  "whyNotFixedLiveYet": "The source fix cannot become live until the Render PostgreSQL database is restored/upgraded and the backend deploy can complete.",
+  "secretLeakCheck": {
+    "fullLicensePrinted": false,
+    "fullEmailPrinted": false,
+    "fullHwidPrinted": false,
+    "renderSecretPrinted": false
+  }
+}

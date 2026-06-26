@@ -1,0 +1,28 @@
+{
+  "label": "BLOCKED BY MISSING ACCESS",
+  "createdAt": "2026-06-26T00:00:00.000Z",
+  "completedSourceWork": [
+    "Discord community/clan safe setup commands added",
+    "Guild snapshot, preview and rollback artifacts added",
+    "Language and ping role picker fallback added",
+    "Training/tournament/event/staff activity commands added",
+    "Safe Fima knowledge-base helper added",
+    "Website login/recovery copy supports username or email",
+    "Forgot-password no longer redirects with login/email in URL"
+  ],
+  "verification": [
+    "node --check src/discordBot.js passed",
+    "node --check src/server.js passed",
+    "node --check public/assets/js/account.js passed",
+    "npm test passed 32/32"
+  ],
+  "liveBlocker": {
+    "status": "FAILED",
+    "reason": "Render deployment of commit 215ce1a failed because fima-macro-db is expired/suspended. Live backend remains old, /account remains 404, /api/license/validate remains HTTP 500, and login is not fixed live."
+  },
+  "releaseDecision": {
+    "v10131Published": false,
+    "latestJsonChanged": false,
+    "criticalBlocker": "Production database must be restored/upgraded so backend commit 215ce1a or newer can deploy and entitlement/login runtime tests can run."
+  }
+}
