@@ -680,6 +680,7 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
   const login = String(req.body?.login || req.body?.username || req.body?.email || "").trim();
   try {
     if (!login) return res.status(400).json({ error: "invalid_recovery_login" });
+    const requestedMethod = String(req.body?.method || "auto").trim().toLowerCase();
     const loginEmail = login.includes("@") ? normalizeEmail(login) : syntheticEmailForUsername(login);
     const loginEmailNormalized = normalizeAccountEmail(loginEmail);
     const user = await prisma.user.findFirst({
@@ -694,49 +695,102 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
     if (!user) {
       return res.json({
         success: true,
-        method: "discord",
-        message: "If that Fima account has linked Discord recovery, the bot will DM a reset code."
+        method: "auto",
+        message: "If that Fima account has email or Discord recovery, a reset code will be sent."
       });
     }
 
-    if (!user.discordUserId) {
-      await createAuditLog("password_reset_discord_unavailable", "user", user.id, {
-        requestedBy: "forgot_password_page",
-        reason: "discord_not_linked"
-      });
-      return res.status(400).json({
-        error: "discord_not_linked",
-        message: "This account has no linked Discord recovery. Contact support so an admin can verify ownership."
-      });
-    }
+    const canEmailReset = isValidEmail(user.email) && !isSyntheticUsernameEmail(user.email);
+    const shouldTryDiscordFirst = requestedMethod === "discord";
+    const recoveryErrors = [];
 
-    const result = await createDiscordPasswordResetForUser(user, "password_reset_discord_sent", {
-      requestedBy: "forgot_password_page"
-    });
-    const response = {
-      success: true,
-      method: "discord",
-      message: "A reset code was sent to your linked Discord DM."
+    const tryEmailRecovery = async () => {
+      if (!canEmailReset) return null;
+      try {
+        const result = await createPasswordResetForUser(user, "password_reset_email_sent", {
+          requestedBy: "forgot_password_page",
+          requireDelivery: true
+        });
+        return {
+          success: true,
+          method: "email",
+          message: "A reset code was sent to the email linked to this Fima account.",
+          provider: result.provider || "email"
+        };
+      } catch (error) {
+        recoveryErrors.push(error.code || "email_delivery_failed");
+        return null;
+      }
     };
-    if (env("NODE_ENV", "development") !== "production") {
-      response.resetUrl = result.resetUrl;
+
+    const tryDiscordRecovery = async () => {
+      if (!user.discordUserId) {
+        recoveryErrors.push("discord_not_linked");
+        return null;
+      }
+      try {
+        const result = await createDiscordPasswordResetForUser(user, "password_reset_discord_sent", {
+          requestedBy: "forgot_password_page"
+        });
+        const response = {
+          success: true,
+          method: "discord",
+          message: "A reset code was sent to your linked Discord DM."
+        };
+        if (env("NODE_ENV", "development") !== "production") {
+          response.resetUrl = result.resetUrl;
+        }
+        return response;
+      } catch (error) {
+        recoveryErrors.push(error.code || "discord_recovery_failed");
+        return null;
+      }
+    };
+
+    let response = shouldTryDiscordFirst ? await tryDiscordRecovery() : await tryEmailRecovery();
+    if (!response) response = shouldTryDiscordFirst ? await tryEmailRecovery() : await tryDiscordRecovery();
+    if (response) return res.json(response);
+
+    await createAuditLog("password_reset_recovery_unavailable", "user", user.id, {
+      requestedBy: "forgot_password_page",
+      methodsTried: recoveryErrors.slice(0, 4)
+    });
+
+    if (recoveryErrors.includes("email_delivery_failed") || recoveryErrors.includes("email_not_configured")) {
+      return res.status(503).json({
+        error: "recovery_delivery_unavailable",
+        message: "Recovery delivery is temporarily unavailable. Contact support so staff can verify ownership."
+      });
     }
-    return res.json(response);
+
+    return res.status(400).json({
+      error: "recovery_not_linked",
+      message: "This account has no available recovery method. Contact support so staff can verify ownership."
+    });
   } catch (error) {
-    console.error("Discord password reset request failed", publicError(error));
-    const code = ["discord_dm_blocked", "discord_bot_not_ready", "discord_user_not_found", "discord_user_not_linked"].includes(error.code)
+    console.error("Password recovery request failed", publicError(error));
+    const code = [
+      "discord_dm_blocked",
+      "discord_bot_not_ready",
+      "discord_user_not_found",
+      "discord_user_not_linked",
+      "email_delivery_failed",
+      "email_not_configured"
+    ].includes(error.code)
       ? error.code
-      : "discord_recovery_failed";
+      : "recovery_delivery_unavailable";
     const messages = {
       discord_dm_blocked: "The Fima bot could not DM you. Enable DMs from server members or use the Discord server recovery command.",
       discord_bot_not_ready: "Discord recovery is temporarily unavailable because the Fima bot is not online.",
       discord_user_not_found: "The linked Discord user could not be found. Re-link Discord or contact support.",
       discord_user_not_linked: "This account has no linked Discord recovery. Contact support so an admin can verify ownership.",
-      discord_recovery_failed: "Discord recovery could not be prepared right now."
+      email_delivery_failed: "Email recovery could not be delivered right now. Contact support if this keeps happening.",
+      email_not_configured: "Email recovery is temporarily unavailable. Contact support so staff can verify ownership.",
+      recovery_delivery_unavailable: "Recovery could not be prepared right now. Contact support if this keeps happening."
     };
     return res.status(code === "discord_dm_blocked" ? 403 : 503).json({
       error: code,
-      message: messages[code] || messages.discord_recovery_failed,
+      message: messages[code] || messages.recovery_delivery_unavailable,
       bot: await discordBotHealth().catch(() => undefined)
     });
   }

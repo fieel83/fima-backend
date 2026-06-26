@@ -1,0 +1,41 @@
+{
+  "checkpoint": "priority-3a57-paid-db-finish-everything-release-gate",
+  "createdAt": "2026-06-26T20:49:05+02:00",
+  "status": "in_progress",
+  "latestJsonChanged": false,
+  "v10131Published": false,
+  "confirmed": {
+    "paidDbBackendHealth": "LIVE VERIFIED",
+    "accountRedirect": "LIVE VERIFIED",
+    "dpapiEntitlementProbe": "LIVE VERIFIED",
+    "ownerAdminEntitlementInProbe": "LIVE VERIFIED",
+    "sourceTests": "LOCAL RUNTIME VERIFIED"
+  },
+  "currentPatch": {
+    "loginCopySupportsUsernameOrEmail": true,
+    "forgotPasswordEmailFirstDiscordFallback": true,
+    "recoveryTranslationsUpdated": [
+      "en",
+      "tr",
+      "de",
+      "fr",
+      "bs"
+    ],
+    "pendingCommitAndDeploy": true
+  },
+  "remainingCriticalGates": [
+    "Deploy this recovery patch to live.",
+    "Verify live forgot-password/login recovery after deploy.",
+    "Launch owner-folder app and verify key screen to main app runtime using signed entitlement.",
+    "Verify Home/Macros/Settings runtime.",
+    "Run macro/license refresh simulation or soak.",
+    "Verify release package/updater/public asset flow before latest.json change."
+  ],
+  "secretHandling": {
+    "fullKeyPrinted": false,
+    "fullEmailPrinted": false,
+    "fullHwidPrinted": false,
+    "tokensPrinted": false,
+    "envValuesPrinted": false
+  }
+}

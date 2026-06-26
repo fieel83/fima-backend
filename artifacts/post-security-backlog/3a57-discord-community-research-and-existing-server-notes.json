@@ -1,0 +1,33 @@
+{
+  "phase": "3A57 Discord community/clan research synthesis",
+  "createdAt": "2026-06-26T20:49:05+02:00",
+  "label": "SOURCE ONLY",
+  "inputsReviewed": [
+    "owner Discord screenshots",
+    "pasted research expansion file",
+    "public Discord/TSB community search results",
+    "current src/discordBot.js command/schema source"
+  ],
+  "observedExistingServerPatterns": [
+    "Fieel's Community already has moderation logs, ticket transcript logs, welcome/rules, announcements/updates/uploads, shop-like sales channels, support tickets, social outfit/cape channels, and basic voice channels.",
+    "TSB-style clan screenshots show center/important/tryout-training/ticket/general/leaderboard/voice/hoster/referee categories.",
+    "Competitive servers repeatedly use challenge tickets, referee approval, pending score approval, rank/spot leaderboards, training hoster activity logs, tryout result channels, hoster promotion/stay/demotion summaries, and region-specific channels."
+  ],
+  "recommendedImplementation": [
+    "Keep community and clan as two separate owner-only setup modes; never blind-delete the guild.",
+    "Snapshot roles/channels/permissions before setup, create preview/diff, require Discord-side owner confirmation, and prefer archiving over hard deletion.",
+    "Use Discord-native Community Onboarding, Rules Screening, Server Guide, Forum channels, slash commands, buttons, select menus, modals, and attachment command options where possible.",
+    "Use DM language prompts only as best-effort; keep a public choose-language/choose-pings fallback.",
+    "Use Media & Links Approved plus AutoMod/bot fallback to reduce stolen-account scam links/images without false-banning first mistakes.",
+    "For TSB-inspired systems, add training sessions, training results, tournament bracket/simple modes, challenge tickets, referee approvals, staff activity quotas, and leaderboard history, but keep Fima community separate from a pure clan identity."
+  ],
+  "sourceStatus": {
+    "discordBotCommunityClanCommands": "SOURCE ONLY",
+    "liveDiscordSetup": "BLOCKED BY MISSING ACCESS OR NOT YET RUNTIME TESTED",
+    "ownerConfirmationNeededForDestructiveServerRebuild": true
+  },
+  "secretHandling": {
+    "discordTokenPrinted": false,
+    "guildSecretsPrinted": false
+  }
+}

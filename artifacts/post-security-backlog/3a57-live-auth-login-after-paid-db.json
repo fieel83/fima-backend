@@ -1,0 +1,47 @@
+{
+  "phase": "3A57 live auth/login after paid DB",
+  "createdAt": "2026-06-26T20:49:05+02:00",
+  "label": "SOURCE ONLY",
+  "liveChecksBeforePatchDeploy": {
+    "accountRoute": {
+      "url": "https://fimamacro.com/account",
+      "result": "302 to /dashboard/overview then 200",
+      "label": "LIVE VERIFIED"
+    },
+    "loginPage": {
+      "url": "https://fimamacro.com/login",
+      "status": 200,
+      "label": "LIVE VERIFIED"
+    },
+    "latestJson": {
+      "version": "1.0.130",
+      "changed": false,
+      "label": "LIVE VERIFIED"
+    }
+  },
+  "sourcePatch": {
+    "loginSupportsUsernameOrEmail": true,
+    "forgotPasswordMethod": "auto email-first with Discord fallback",
+    "safeUserFacingErrors": true,
+    "noAccountEnumeration": true,
+    "productionDoesNotReturnResetToken": true,
+    "languagesUpdated": [
+      "en",
+      "tr",
+      "de",
+      "fr",
+      "bs"
+    ]
+  },
+  "postDeployNeeded": [
+    "Verify live /forgot-password copy no longer says email reset is disabled.",
+    "Verify live POST /api/auth/forgot-password returns safe generic/specific recovery response without leaking account existence.",
+    "Verify owner login with real credentials through browser/session if available."
+  ],
+  "secretHandling": {
+    "passwordPrinted": false,
+    "emailPrinted": false,
+    "licenseKeyPrinted": false,
+    "tokenPrinted": false
+  }
+}

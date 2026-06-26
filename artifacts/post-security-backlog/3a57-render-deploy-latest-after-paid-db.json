@@ -1,0 +1,22 @@
+{
+  "phase": "3A57 deploy latest backend after paid DB",
+  "createdAt": "2026-06-26T20:49:05+02:00",
+  "label": "LIVE VERIFIED",
+  "beforeKnownOldCommit": "a13496e",
+  "liveCommitBeforeThisPatch": "766ee545bc3e965519f5500af7f97d7652b2da6e",
+  "latestJsonStatus": {
+    "checked": true,
+    "version": "1.0.130",
+    "changed": false
+  },
+  "deploymentState": {
+    "latestBackendAlreadyLiveBeforeRecoveryPatch": true,
+    "recoveryPatchRequiresNewDeploy": true,
+    "deployMethodExpected": "Git push / Render auto deploy if configured"
+  },
+  "secretHandling": {
+    "renderApiKeyPrinted": false,
+    "deployHookPrinted": false,
+    "envValuesPrinted": false
+  }
+}

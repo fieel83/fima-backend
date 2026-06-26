@@ -1,0 +1,25 @@
+{
+  "phase": "3A57 paid DB verification",
+  "createdAt": "2026-06-26T20:49:05+02:00",
+  "label": "LIVE VERIFIED",
+  "checks": {
+    "backendHealthEndpoint": "https://api.fimamacro.com/healthz",
+    "backendHealthStatus": "ok",
+    "backendVersion": "1.0.128",
+    "liveCommit": "766ee545bc3e965519f5500af7f97d7652b2da6e",
+    "mode": "production",
+    "dpapiEntitlementProbe": "LIVE VERIFIED",
+    "licenseValidate500ResolvedByProbe": true
+  },
+  "secretHandling": {
+    "databaseUrlPrinted": false,
+    "envValuesPrinted": false,
+    "licenseKeyPrinted": false,
+    "emailPrinted": false,
+    "hwidPrinted": false
+  },
+  "notes": [
+    "Live backend can answer health and entitlement validation after the paid DB recovery.",
+    "Direct Render database plan metadata was not printed or mutated; health is inferred from live backend and successful entitlement validation."
+  ]
+}

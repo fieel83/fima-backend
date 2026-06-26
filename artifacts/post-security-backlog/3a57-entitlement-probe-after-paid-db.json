@@ -1,0 +1,33 @@
+{
+  "phase": "3A57 DPAPI entitlement probe after paid DB",
+  "createdAt": "2026-06-26T20:49:05+02:00",
+  "label": "LIVE VERIFIED",
+  "probe": {
+    "script": "tools/local/Invoke-FimaEntitlementProbe.ps1",
+    "secretSource": "Windows DPAPI CurrentUser local secret",
+    "dpapiRead": true,
+    "backendValidation": true,
+    "valid": true,
+    "canUseApp": true,
+    "status": "active",
+    "plan": "lifetime",
+    "lifetime": true,
+    "ownerAdminAccess": true,
+    "isOwner": true,
+    "isAdmin": true,
+    "capabilities": [
+      "admin_macro_editor",
+      "admin_panel",
+      "owner_admin"
+    ],
+    "entitlementReturned": true,
+    "validated": true
+  },
+  "secretHandling": {
+    "valuePrinted": false,
+    "licenseKeyMaskedOnly": true,
+    "hwidMaskedOnly": true,
+    "emailPrinted": false,
+    "tokenPrinted": false
+  }
+}
