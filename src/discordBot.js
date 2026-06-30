@@ -4,6 +4,7 @@ import path from "node:path";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
+import { handleParadiseInteraction, initializeParadise, paradiseCommands } from "./paradise3a59.js";
 
 const ROLE_TYPES = {
   buyer: {
@@ -319,6 +320,10 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Discord command registration failed", { message: error.message });
     });
+    await initializeParadise(client).catch((error) => {
+      lastError = error.message;
+      console.warn("Paradise initialization failed", { message: error.message });
+    });
   });
 
   client.on("interactionCreate", (interaction) => {
@@ -356,6 +361,7 @@ export function startDiscordBot() {
 async function registerDiscordCommands() {
   if (!client?.application) return;
   const commands = [
+    ...paradiseCommands(),
     new SlashCommandBuilder().setName("fima_account").setDescription("Show your linked Fima account."),
     new SlashCommandBuilder().setName("fima_recovery").setDescription("Send a password reset code to your Discord DM."),
     new SlashCommandBuilder().setName("fima_help").setDescription("Show Fima account, trial and support help."),
@@ -538,6 +544,7 @@ async function registerDiscordCommands() {
 }
 
 async function handleDiscordInteraction(interaction) {
+  if (await handleParadiseInteraction(interaction)) return;
   if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_ticket_category") {
     return handleTicketCategorySelect(interaction);
   }
