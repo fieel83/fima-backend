@@ -35,6 +35,7 @@ import {
   normalizeLicenseKey
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
+import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
@@ -592,6 +593,57 @@ app.post("/api/auth/logout", async (req, res) => {
 
 app.get("/api/auth/me", requireUser, async (req, res) => {
   return res.json({ success: true, user: publicUser(req.user) });
+});
+
+app.get("/paradise", requireUser, requireParadiseOwner, (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.type("html").send(paradiseDashboardHtml({ clientId: env("DISCORD_CLIENT_ID", "") }));
+});
+
+app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, res) => {
+  const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+  const state = row?.value && typeof row.value === "object" ? row.value : {};
+  return res.json({
+    success: true,
+    config: state.config || {},
+    summary: {
+      verifiedProfiles: Object.keys(state.profiles || {}).length,
+      pendingTryouts: Object.values(state.pendingTryouts || {}).filter(item => item.status !== "approved").length,
+      pendingChallenges: Object.values(state.pendingChallenges || {}).filter(item => ["open", "pending"].includes(item.status)).length,
+      activeSessions: Object.values(state.trainings || {}).filter(item => item.status !== "ended").length,
+      whitelists: Object.keys(state.whitelists || {}).length
+    }
+  });
+});
+
+app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && new URL(origin).host !== new URL(apiBaseUrl()).host) return res.status(403).json({ error: "origin_mismatch" });
+  const kind = String(req.body?.kind || "");
+  if (!["mainer", "quotas", "channels"].includes(kind)) return res.status(400).json({ error: "invalid_config_kind" });
+  const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+  const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
+  state.config = state.config && typeof state.config === "object" ? state.config : {};
+  if (kind === "mainer") {
+    const code = String(req.body?.value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
+    if (!code) return res.status(400).json({ error: "invalid_mainer_code" });
+    state.config.mainerCode = code;
+  } else if (kind === "quotas") {
+    if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_quotas" });
+    state.config.weeklyQuotas = req.body.value;
+  } else {
+    if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_channels" });
+    state.config.commandChannels = req.body.value;
+  }
+  await prisma.setting.upsert({
+    where: { key: "paradise_3a59_state_v1" },
+    update: { value: state },
+    create: { key: "paradise_3a59_state_v1", value: state }
+  });
+  await createAuditLog("paradise_owner_config_updated", "discord_user", "762858334440521739", { kind, userId: req.user.id });
+  return res.json({ success: true, kind });
 });
 
 app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
@@ -6985,6 +7037,25 @@ async function requireUser(req, res, next) {
   } catch (error) {
     console.error("User auth failed", publicError(error));
     return res.status(500).json({ error: "auth_failed" });
+  }
+}
+
+async function requireParadiseOwner(req, res, next) {
+  try {
+    const link = await prisma.oAuthLink.findFirst({
+      where: { userId: req.user.id, provider: "discord", providerSubject: "762858334440521739" },
+      select: { id: true, providerSubject: true, providerUsername: true }
+    });
+    if (!link) {
+      if (req.path.startsWith("/api/")) return res.status(403).json({ error: "paradise_owner_discord_required" });
+      const returnTo = encodeURIComponent("/paradise");
+      return res.redirect(`/auth/discord/start?returnTo=${returnTo}`);
+    }
+    req.paradiseOwnerDiscord = link;
+    return next();
+  } catch (error) {
+    console.error("Paradise owner authorization failed", publicError(error));
+    return res.status(500).json({ error: "paradise_owner_auth_failed" });
   }
 }
 

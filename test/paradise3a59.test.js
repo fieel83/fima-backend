@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canAssignRank, compareRanks, rankPower, rankToRoleName } from "../src/paradise3a59.js";
+import { canAssignRank, compareRanks, paradiseCommands, rankPower, rankToRoleName } from "../src/paradise3a59.js";
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
   assert.equal(compareRanks(
@@ -28,4 +28,17 @@ test("tryout staff cannot assign above own authority or below Stage 3 Low Weak",
 test("rank labels are canonical and invalid ranks fail", () => {
   assert.equal(rankToRoleName({ stage: 0, level: "High", strength: "Strong" }), "Stage 0 High Strong");
   assert.throws(() => rankPower({ stage: 5, level: "Low", strength: "Weak" }), /invalid_rank/);
+});
+
+test("all Paradise slash command schemas serialize and names are unique", () => {
+  const commands = paradiseCommands().map(command => command.toJSON());
+  const names = commands.map(command => command.name);
+  assert.equal(new Set(names).size, names.length);
+  assert.ok(names.includes("challenge"));
+  assert.ok(names.includes("activity"));
+  assert.ok(names.includes("whitelist"));
+  assert.ok(names.includes("mainer"));
+  assert.ok(names.includes("report"));
+  assert.ok(names.includes("findfcw"));
+  assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
 });
