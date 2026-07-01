@@ -52,6 +52,20 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
 });
 
+test("Discord command options never put required inputs after optional inputs", () => {
+  const inspect = (options = [], path = "") => {
+    let optionalSeen = false;
+    for (const option of options) {
+      if (option.required === false || option.required === undefined && !option.options) optionalSeen = true;
+      if (option.required === true) {
+        assert.equal(optionalSeen, false, `${path}/${option.name} is required after an optional input`);
+      }
+      if (option.options) inspect(option.options, `${path}/${option.name}`);
+    }
+  };
+  for (const command of paradiseCommands().map(item => item.toJSON())) inspect(command.options, command.name);
+});
+
 test("Paradise brand color accepts safe HEX and rejects malformed values", () => {
   assert.equal(normalizeParadiseBrandColor("#12abEF"), "#12ABEF");
   assert.equal(normalizeParadiseBrandColor("001122"), "#001122");
