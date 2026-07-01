@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canAssignRank, compareRanks, paradiseCommands, rankPower, rankToRoleName } from "../src/paradise3a59.js";
+import {
+  canAssignRank, compareRanks, normalizeParadiseBrandColor, paradiseBrandColorInteger,
+  paradiseCommands, rankPower, rankToRoleName
+} from "../src/paradise3a59.js";
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
   assert.equal(compareRanks(
@@ -40,5 +43,13 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("mainer"));
   assert.ok(names.includes("report"));
   assert.ok(names.includes("findfcw"));
+  assert.ok(names.includes("branding"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
+});
+
+test("Paradise brand color accepts safe HEX and rejects malformed values", () => {
+  assert.equal(normalizeParadiseBrandColor("#12abEF"), "#12ABEF");
+  assert.equal(normalizeParadiseBrandColor("001122"), "#001122");
+  assert.equal(normalizeParadiseBrandColor("javascript:red"), "#9B5CFF");
+  assert.equal(paradiseBrandColorInteger("#12ABEF"), 0x12abef);
 });

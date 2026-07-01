@@ -622,7 +622,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   const origin = String(req.get("origin") || "");
   if (origin && new URL(origin).host !== new URL(apiBaseUrl()).host) return res.status(403).json({ error: "origin_mismatch" });
   const kind = String(req.body?.kind || "");
-  if (!["mainer", "quotas", "channels", "automation"].includes(kind)) return res.status(400).json({ error: "invalid_config_kind" });
+  if (!["mainer", "quotas", "channels", "automation", "branding"].includes(kind)) return res.status(400).json({ error: "invalid_config_kind" });
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
   state.config = state.config && typeof state.config === "object" ? state.config : {};
@@ -636,6 +636,10 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   } else if (kind === "channels") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_channels" });
     state.config.commandChannels = req.body.value;
+  } else if (kind === "branding") {
+    const brandColor = String(req.body?.value || "").trim().toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(brandColor)) return res.status(400).json({ error: "invalid_brand_color" });
+    state.config.brandColor = brandColor;
   } else {
     state.config.autoActivityChecks = req.body?.value?.autoActivityChecks === true;
     state.config.autoActivityRoleRemoval = req.body?.value?.autoActivityRoleRemoval === true;
