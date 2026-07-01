@@ -230,6 +230,9 @@ export async function initializeParadise(client) {
   if (!guild) return;
   const me = guild.members.me || await guild.members.fetchMe();
   if (me.nickname !== "Paradise") await me.setNickname("Paradise", "3A59 Paradise test identity").catch(() => {});
+  await runParadiseMaintenance(guild).catch(() => {});
+  const timer = setInterval(() => runParadiseMaintenance(guild).catch(() => {}), 15 * 60_000);
+  timer.unref?.();
 }
 
 function isOwner(interaction) {
@@ -343,6 +346,12 @@ async function applyClanSetup(interaction) {
     .filter(r => !r.managed && r.id !== interaction.guild.id && !PARADISE_ROLES.includes(r.name));
   for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
   const autoMod = await ensureParadiseAutoMod(interaction.guild).catch(error => ({ status: "failed", error: error.message }));
+  await saveState(state => {
+    state.config.autoActivityChecks = true;
+    state.config.autoActivityRoleRemoval = true;
+    state.config.weeklyQuotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
+    return state;
+  });
   await writeArtifact("3a59-discord-clan-setup-live.json", {
     status: "LIVE VERIFIED", completedAt: new Date().toISOString(),
     guildId: interaction.guildId, categories: PARADISE_CLAN_SCHEMA.length,
@@ -847,9 +856,97 @@ const WEEKLY_QUOTAS = Object.freeze({
   "Game Night Manager": { key: "gamenight", minimum: 1 }
 });
 
+const ACTIVITY_GROUP_ROLES = Object.freeze({
+  Referee: ["Referee", "Trial Referee", "Experienced Referee"],
+  Tryout: ["Tryout Hoster", "Experienced Tryout Hoster", "Tryout Manager", "Tryout Staff", "Trial Tryout Staff"],
+  Training: ["Training Hoster", "Trial Training Hoster", "Experienced Training Hoster", "Training Manager", "Trial Training Manager"],
+  Event: ["Event Manager"], Tournament: ["Tournament Manager"],
+  Giveaway: ["Giveaway Manager"], "Game Night": ["Game Night Manager"]
+});
+
 function weekActivityCount(activity, key, now = Date.now()) {
   const since = now - 7 * 86_400_000;
   return (activity?.[key] || []).filter(value => Date.parse(value) >= since).length;
+}
+
+async function postAutomaticActivityCheck(guild, group, state) {
+  const targetName = group === "Referee" ? "referee-activity-check" : "hoster-activity-check";
+  const channel = guild.channels.cache.find(item => item.name.includes(targetName));
+  if (!channel) return null;
+  const id = crypto.randomUUID();
+  const expiresAt = Date.now() + 86_400_000;
+  const check = { group, startedBy: guild.members.me.id, automatic: true, startedAt: new Date().toISOString(), expiresAt, responses: [] };
+  state.activityChecks[id] = check;
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_activity_present:${id}`).setLabel("I am active / Aktifim").setStyle(ButtonStyle.Success)
+  );
+  await channel.send({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle(`${group} Activity Check`)
+    .setDescription(`Respond within 24 hours. Missing the deadline removes the related staff role unless an active whitelist applies.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
+    .setFooter({ text: "Automatic 48-hour check • Made by Paradise bot" })], components: [row] });
+  return id;
+}
+
+async function runParadiseMaintenance(guild) {
+  await guild.members.fetch().catch(() => {});
+  await saveState(async state => {
+    const now = Date.now();
+    for (const [userId, item] of Object.entries(state.whitelists)) {
+      if (item.expiresAt && Date.parse(item.expiresAt) <= now) {
+        delete state.whitelists[userId];
+        const member = guild.members.cache.get(userId);
+        const role = guild.roles.cache.find(entry => entry.name === "Activity Whitelist");
+        if (member && role) await member.roles.remove(role, "Paradise activity whitelist expired").catch(() => {});
+      }
+    }
+    for (const [id, check] of Object.entries(state.activityChecks)) {
+      if (check.processedAt || Number(check.expiresAt) > now) continue;
+      const roles = ACTIVITY_GROUP_ROLES[check.group] || [];
+      const exempt = new Set(Object.entries(state.whitelists)
+        .filter(([, item]) => !item.expiresAt || Date.parse(item.expiresAt) > now).map(([userId]) => userId));
+      const responded = new Set(check.responses || []);
+      const removed = [];
+      if (state.config.autoActivityRoleRemoval === true) {
+        for (const member of guild.members.cache.values()) {
+          if (member.user.bot || responded.has(member.id) || exempt.has(member.id)) continue;
+          const removable = member.roles.cache.filter(role => roles.includes(role.name));
+          if (removable.size) {
+            await member.roles.remove(removable, `Missed ${check.group} activity check`).catch(() => {});
+            removed.push(member.id);
+          }
+        }
+      }
+      state.activityChecks[id] = { ...check, processedAt: new Date().toISOString(), removed };
+      const log = guild.channels.cache.find(channel => channel.name.includes("activity-review"));
+      if (log) await log.send(`Activity check **${check.group}** closed. Responses: ${responded.size}. Role removals: ${removed.length}. Whitelists were respected.`).catch(() => {});
+    }
+    if (state.config.autoActivityChecks === true) {
+      const last = Number(state.config.lastAutoActivityCheckAt || 0);
+      if (now - last >= 48 * 60 * 60_000) {
+        for (const group of ["Referee", "Tryout", "Training"]) await postAutomaticActivityCheck(guild, group, state);
+        state.config.lastAutoActivityCheckAt = now;
+      }
+    }
+    const sundayKey = new Date(now).toISOString().slice(0, 10);
+    if (new Date(now).getUTCDay() === 0 && state.config.lastWeeklyReview !== sundayKey) {
+      const log = guild.channels.cache.find(channel => channel.name.includes("activity-review"));
+      if (log) {
+        const lines = [];
+        for (const member of guild.members.cache.values()) {
+          const quota = Object.entries(WEEKLY_QUOTAS).find(([role]) => member.roles.cache.some(item => item.name === role));
+          if (!quota) continue;
+          const [role, rule] = quota;
+          const count = weekActivityCount(state.staffActivity[member.id], rule.key, now);
+          const recommendation = count < rule.minimum ? "demotion review" : count >= rule.minimum * 3 ? "promotion review" : "meets quota";
+          lines.push(`${member} — ${role}: ${count}/${rule.minimum} — ${recommendation}`);
+        }
+        await log.send({ embeds: [new EmbedBuilder().setColor(0x9b5cff).setTitle("Sunday Staff Review")
+          .setDescription(lines.join("\n").slice(0, 4000) || "No quota roles found.")
+          .setFooter({ text: "Recommendations only unless autoStaffChanges is explicitly enabled • Made by Paradise bot" })] }).catch(() => {});
+      }
+      state.config.lastWeeklyReview = sundayKey;
+    }
+    return state;
+  });
 }
 
 async function handleWhitelist(interaction) {
