@@ -25,6 +25,7 @@ export function paradiseDashboardHtml({ clientId }) {
     <article class="card"><h2>Mainer configuration</h2><label for="mainer">Official code</label><input id="mainer" maxlength="32"><button data-save="mainer">Save code</button></article>
     <article class="card"><h2>Weekly quotas</h2><p class="muted">JSON object: role → activity key/minimum.</p><textarea id="quotas"></textarea><button data-save="quotas">Save quotas</button></article>
     <article class="card"><h2>Command channels</h2><p class="muted">JSON object: command → channel ID array.</p><textarea id="channels"></textarea><button data-save="channels">Save restrictions</button></article>
+    <article class="card"><h2>Activity automation</h2><label><input id="autoChecks" type="checkbox" style="width:auto"> 48-hour automatic checks</label><label><input id="autoRemoval" type="checkbox" style="width:auto"> Remove related roles after missed 24-hour deadline</label><button data-save="automation">Save automation</button></article>
     <article class="card"><h2>Runtime state</h2><pre id="status">Loading…</pre><button id="refresh">Refresh</button></article>
   </section>
 </main>
@@ -36,11 +37,13 @@ async function load(){
   document.getElementById('mainer').value=j.config.mainerCode||'';
   document.getElementById('quotas').value=JSON.stringify(j.config.weeklyQuotas||{},null,2);
   document.getElementById('channels').value=JSON.stringify(j.config.commandChannels||{},null,2);
+  document.getElementById('autoChecks').checked=j.config.autoActivityChecks===true;
+  document.getElementById('autoRemoval').checked=j.config.autoActivityRoleRemoval===true;
   status.className='ok';status.textContent=JSON.stringify(j.summary,null,2);
 }
 async function save(kind){
   let value;
-  try{value=kind==='mainer'?document.getElementById('mainer').value:JSON.parse(document.getElementById(kind==='quotas'?'quotas':'channels').value||'{}')}
+  try{value=kind==='mainer'?document.getElementById('mainer').value:kind==='automation'?{autoActivityChecks:document.getElementById('autoChecks').checked,autoActivityRoleRemoval:document.getElementById('autoRemoval').checked}:JSON.parse(document.getElementById(kind==='quotas'?'quotas':'channels').value||'{}')}
   catch{status.className='error';status.textContent='Invalid JSON';return}
   const r=await fetch('/api/paradise/config',{method:'PATCH',credentials:'same-origin',headers:{'content-type':'application/json','x-paradise-owner-action':'1'},body:JSON.stringify({kind,value})});
   const j=await r.json();status.className=r.ok?'ok':'error';status.textContent=JSON.stringify(j,null,2);if(r.ok)await load();
