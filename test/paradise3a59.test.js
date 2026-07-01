@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   canAssignRank, challengedLines, compareRanks, normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommands, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, timedAvailabilityLines
+  paradiseCommands, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
@@ -49,7 +50,17 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("availability"));
   assert.ok(names.includes("loa"));
   assert.ok(names.includes("setupfieelstsbtr"));
+  assert.ok(names.includes("profile"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
+});
+
+test("Roblox verification codes stay short and avoid ambiguous filtered characters", () => {
+  for (let index = 0; index < 100; index += 1) {
+    const code = shortVerificationCode();
+    assert.equal(code.length, 6);
+    assert.match(code, /^P[A-HJ-NP-Z2-9]{5}$/);
+    assert.doesNotMatch(code, /[IO01-]/);
+  }
 });
 
 test("Discord command options never put required inputs after optional inputs", () => {
@@ -69,7 +80,7 @@ test("Discord command options never put required inputs after optional inputs", 
 test("Paradise brand color accepts safe HEX and rejects malformed values", () => {
   assert.equal(normalizeParadiseBrandColor("#12abEF"), "#12ABEF");
   assert.equal(normalizeParadiseBrandColor("001122"), "#001122");
-  assert.equal(normalizeParadiseBrandColor("javascript:red"), "#9B5CFF");
+  assert.equal(normalizeParadiseBrandColor("javascript:red"), "#000000");
   assert.equal(paradiseBrandColorInteger("#12ABEF"), 0x12abef);
 });
 

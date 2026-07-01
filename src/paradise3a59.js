@@ -3,12 +3,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder,
-  PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder,
+  ModalBuilder, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder,
+  TextInputBuilder, TextInputStyle,
   AutoModerationActionType, AutoModerationRuleEventType, AutoModerationRuleTriggerType
 } from "discord.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
-export const DEFAULT_PARADISE_BRAND_COLOR = "#9B5CFF";
+export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
 const verificationChallenges = new Map();
@@ -21,7 +22,7 @@ const staffTeamRefreshTimers = new Map();
 const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
 const STATE_KEY = "paradise_3a59_state_v1";
 const EMPTY_STATE = Object.freeze({
-  profiles: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
+  profiles: {}, verificationChallenges: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
   tournaments: {}, leaderboard: {}, staffActivity: {}, activityChecks: {},
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
   config: {}, ticketOptOuts: {}
@@ -182,7 +183,11 @@ export function paradiseCommands() {
     new SlashCommandBuilder().setName("previewserversetup").setDescription("Preview the full Clan/Training rebuild."),
     new SlashCommandBuilder().setName("verifyroblox").setDescription("Verify Roblox ownership with a profile About code.")
       .addStringOption(o => o.setName("username").setDescription("Roblox username").setRequired(true)),
-    new SlashCommandBuilder().setName("verifyrobloxcheck").setDescription("Check the VERIFY code in your Roblox About."),
+    new SlashCommandBuilder().setName("verifyrobloxcheck").setDescription("Check the short Paradise code in your Roblox About."),
+    new SlashCommandBuilder().setName("profile").setDescription("Create or view a verified Paradise fighter profile")
+      .addSubcommand(s => s.setName("create").setDescription("Verify Roblox and create your fighter profile"))
+      .addSubcommand(s => s.setName("view").setDescription("View a Paradise fighter profile")
+        .addUserOption(o => o.setName("user").setDescription("Profile owner; defaults to you"))),
     new SlashCommandBuilder().setName("tryout").setNameLocalizations({ tr: "deneme" }).setDescription("Paradise tryout system").setDescriptionLocalizations({ tr: "Paradise deneme ve sonuç sistemi" })
       .addSubcommand(s => s.setName("start").setDescription("Start a tryout")
         .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
@@ -289,7 +294,7 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("list").setDescription("List configured sticky channels")),
     new SlashCommandBuilder().setName("branding").setDescription("Configure Paradise embed appearance")
       .addSubcommand(s => s.setName("color").setDescription("Set the embed side-accent color")
-        .addStringOption(o => o.setName("hex").setDescription("Six-digit HEX color, e.g. #9B5CFF").setRequired(true)))
+        .addStringOption(o => o.setName("hex").setDescription("Six-digit HEX color, e.g. #000000").setRequired(true)))
       .addSubcommand(s => s.setName("preview").setDescription("Preview Paradise typography and symbols")),
     new SlashCommandBuilder().setName("relation").setDescription("Manage the Paradise ally and enemy clan board")
       .addSubcommand(s => s.setName("add").setDescription("Add an ally or enemy clan")
@@ -329,6 +334,14 @@ export function paradiseCommands() {
 }
 
 export async function initializeParadise(client) {
+  await saveState(state => {
+    if (state.config.blackThemeVersion !== 1) {
+      state.config.brandColor = DEFAULT_PARADISE_BRAND_COLOR;
+      state.config.blackThemeVersion = 1;
+      state.config.blackThemeAppliedAt = new Date().toISOString();
+    }
+    return state;
+  });
   const guild = await client.guilds.fetch(PARADISE_TEST_GUILD_ID).catch(() => null);
   if (!guild) return;
   if (client.user?.username !== "Paradise") {
@@ -577,20 +590,67 @@ async function findRobloxUser(username) {
   return data.data?.[0] || null;
 }
 
+export function shortVerificationCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let value = "P";
+  for (let index = 0; index < 5; index += 1) value += alphabet[crypto.randomInt(alphabet.length)];
+  return value;
+}
+
+function verificationButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("paradise_verify_confirm").setLabel("I've added the code — Confirm").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("paradise_verify_retry").setLabel("New short code").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("paradise_verify_cancel").setLabel("Cancel").setStyle(ButtonStyle.Danger)
+  );
+}
+
+function verificationStartButton() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("paradise_verify_open").setLabel("Verify Roblox Account").setStyle(ButtonStyle.Primary)
+  );
+}
+
+async function startVerification(interaction, username) {
+  const user = await findRobloxUser(username);
+  if (!user) return interaction.reply({ content: "Roblox user not found. Check the exact username and try again.", ephemeral: true });
+  const code = shortVerificationCode();
+  const challenge = {
+    robloxId: String(user.id),
+    username: user.name,
+    code,
+    expires: Date.now() + 10 * 60_000
+  };
+  verificationChallenges.set(interaction.user.id, challenge);
+  await saveState(state => {
+    state.verificationChallenges[interaction.user.id] = challenge;
+    return state;
+  });
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ ROBLOX VERIFICATION")
+      .setDescription(`**Found:** ${user.name}\n\n## Step 1 — Copy this short code\n\`\`\`\n${code}\n\`\`\`\n## Step 2 — Add it to Roblox\nOpen your Roblox **About / Bio**, paste only this code and save.\n\n## Step 3 — Confirm\nPress the green button below. The code expires <t:${Math.floor(challenge.expires / 1000)}:R>.\n\n-# Short format is used to reduce Roblox text filtering. If it still becomes ####, request a new code.`)
+      .setFooter(paradiseFooter("No screenshots accepted as automatic proof"))],
+    components: [verificationButtons()],
+    ephemeral: true
+  });
+}
+
 async function verifyStart(interaction) {
-  const user = await findRobloxUser(interaction.options.getString("username"));
-  if (!user) return interaction.reply({ content: "Roblox user not found.", ephemeral: true });
-  const code = `VERIFY-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-  verificationChallenges.set(interaction.user.id, { robloxId: user.id, username: user.name, code, expires: Date.now() + 15 * 60_000 });
-  return interaction.reply({ content: `Put **${code}** in the About section of **${user.name}**, save it, then use \`/verifyrobloxcheck\`.`, ephemeral: true });
+  return startVerification(interaction, interaction.options.getString("username"));
 }
 
 async function verifyCheck(interaction) {
-  const challenge = verificationChallenges.get(interaction.user.id);
+  const challenge = verificationChallenges.get(interaction.user.id)
+    || (await loadState()).verificationChallenges[interaction.user.id];
   if (!challenge || challenge.expires < Date.now()) return interaction.reply({ content: "Start again with `/verifyroblox`.", ephemeral: true });
   const res = await fetch(`https://users.roblox.com/v1/users/${challenge.robloxId}`);
   const profile = await res.json();
-  if (!String(profile.description || "").includes(challenge.code)) return interaction.reply({ content: "Code not found in Roblox About yet.", ephemeral: true });
+  if (!String(profile.description || "").toUpperCase().includes(challenge.code)) {
+    return interaction.reply({
+      content: "Code not found in Roblox About yet. Save the profile, wait a few seconds, or use **New short code** if Roblox filtered it.",
+      ephemeral: true
+    });
+  }
   verifiedProfiles.set(interaction.user.id, { robloxId: challenge.robloxId, username: challenge.username, verifiedAt: new Date().toISOString() });
   await saveVerifiedProfile(interaction.user.id, {
     robloxId: String(challenge.robloxId), robloxUsername: challenge.username, verifiedAt: new Date().toISOString()
@@ -598,7 +658,16 @@ async function verifyCheck(interaction) {
   const role = await ensureRole(interaction.guild, "Verified Fighter");
   await interaction.member.roles.add(role);
   verificationChallenges.delete(interaction.user.id);
-  return interaction.reply({ content: `Verified as **${challenge.username}**.`, ephemeral: true });
+  await saveState(state => { delete state.verificationChallenges[interaction.user.id]; return state; });
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✓ ROBLOX VERIFIED")
+      .setDescription(`Your Discord is now linked to **${challenge.username}**.\nYou can remove the code from your Roblox bio.\n\nPress **Create Fighter Profile** to choose your region.`)
+      .setFooter(paradiseFooter("Identity verified"))],
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("paradise_profile_create").setLabel("Create Fighter Profile").setStyle(ButtonStyle.Success)
+    )],
+    ephemeral: true
+  });
 }
 
 async function verifiedProfile(discordId) {
@@ -607,6 +676,111 @@ async function verifiedProfile(discordId) {
   if (!profile) return null;
   verifiedProfiles.set(discordId, profile);
   return profile;
+}
+
+async function completedProfile(discordId) {
+  const profile = await verifiedProfile(discordId);
+  return profile?.profileId && profile?.region ? profile : null;
+}
+
+function fighterRank(member) {
+  const ranks = [...member.roles.cache.values()].map(role => {
+    const match = /^Stage ([0-4]) (Low|Mid|High) (Weak|Stable|Strong)$/.exec(role.name);
+    return match ? { stage: Number(match[1]), level: match[2], strength: match[3] } : null;
+  }).filter(Boolean).sort((a, b) => rankPower(b) - rankPower(a));
+  return ranks[0] ? rankToRoleName(ranks[0]) : "Unranked";
+}
+
+async function robloxHeadshot(robloxId) {
+  const response = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${robloxId}&size=150x150&format=Png&isCircular=false`).catch(() => null);
+  if (!response?.ok) return null;
+  const payload = await response.json().catch(() => ({}));
+  return payload.data?.[0]?.imageUrl || null;
+}
+
+async function profileEmbed(guild, discordId) {
+  const profile = await completedProfile(discordId);
+  if (!profile) return null;
+  const member = await guild.members.fetch(discordId).catch(() => null);
+  const rank = member ? fighterRank(member) : "Unranked";
+  const thumbnail = await robloxHeadshot(profile.robloxId);
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE FIGHTER PROFILE")
+    .setDescription(`## ${member || `<@${discordId}>`}\n-# Verified Roblox identity`)
+    .addFields(
+      { name: "Profile ID", value: `\`#${profile.profileId}\``, inline: true },
+      { name: "Roblox", value: `**${profile.robloxUsername}**`, inline: true },
+      { name: "Region", value: `**${profile.region}**`, inline: true },
+      { name: "Rank", value: `**${rank}**`, inline: false },
+      { name: "Verification", value: "✓ Profile About code confirmed", inline: false }
+    )
+    .setFooter(paradiseFooter("Rank updates automatically after approved tryout results"));
+  if (thumbnail) embed.setThumbnail(thumbnail);
+  return embed;
+}
+
+function profileRegionMenu() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder().setCustomId("paradise_profile_region").setPlaceholder("Choose your main server region")
+      .addOptions(
+        { label: "Frankfurt, Germany", value: "Frankfurt, Germany" },
+        { label: "Paris, France", value: "Paris, France" },
+        { label: "London, United Kingdom", value: "London, United Kingdom" },
+        { label: "Amsterdam, Netherlands", value: "Amsterdam, Netherlands" }
+      )
+  );
+}
+
+async function beginProfileCreation(interaction) {
+  if (!await verifiedProfile(interaction.user.id)) {
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("ROBLOX VERIFICATION REQUIRED")
+        .setDescription("You must link your Roblox account before creating a Paradise fighter profile.")],
+      components: [verificationStartButton()],
+      ephemeral: true
+    });
+  }
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHOOSE YOUR REGION")
+      .setDescription("Choose the server region you normally use. Your rank is read from your full Stage–Level–Strength role.")],
+    components: [profileRegionMenu()],
+    ephemeral: true
+  });
+}
+
+async function handleProfile(interaction) {
+  const sub = interaction.options.getSubcommand();
+  if (sub === "create") return beginProfileCreation(interaction);
+  const target = interaction.options.getUser("user") || interaction.user;
+  const embed = await profileEmbed(interaction.guild, target.id);
+  if (!embed) return interaction.reply({ content: `${target} has not completed a Paradise fighter profile.`, ephemeral: true });
+  return interaction.reply({ embeds: [embed] });
+}
+
+async function handleProfileRegion(interaction) {
+  const region = interaction.values[0];
+  let saved = null;
+  await saveState(state => {
+    const current = state.profiles[interaction.user.id];
+    if (!current) return state;
+    if (!current.profileId) {
+      state.config.nextProfileId = Number(state.config.nextProfileId || 100) + 1;
+      current.profileId = state.config.nextProfileId;
+    }
+    current.region = region;
+    current.profileUpdatedAt = new Date().toISOString();
+    state.profiles[interaction.user.id] = current;
+    saved = current;
+    return state;
+  });
+  if (!saved) return interaction.reply({ content: "Verify Roblox first.", ephemeral: true });
+  verifiedProfiles.set(interaction.user.id, saved);
+  const embed = await profileEmbed(interaction.guild, interaction.user.id);
+  return interaction.update({ embeds: [embed], components: [] });
+}
+
+async function handleVerifyModal(interaction) {
+  const username = interaction.fields.getTextInputValue("roblox_username").trim();
+  return startVerification(interaction, username);
 }
 
 function roleRank(member) {
@@ -659,7 +833,7 @@ async function handleTryout(interaction) {
       components: [controls] });
   }
   const target = interaction.options.getUser("user");
-  if (!await verifiedProfile(target.id)) return interaction.reply({ content: "Target must complete `/verifyroblox` first.", ephemeral: true });
+  if (!await completedProfile(target.id)) return interaction.reply({ content: "Target must complete `/profile create` first.", ephemeral: true });
   const rank = {
     stage: interaction.options.getInteger("stage"),
     level: interaction.options.getString("level"),
@@ -677,7 +851,7 @@ async function handleTryout(interaction) {
     new ButtonBuilder().setCustomId(`paradise_tryout_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`paradise_tryout_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
   );
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle("Tryout Result — Pending")
+  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Tryout Result — Pending")
     .addFields(
       { name: "User", value: `${target}`, inline: true },
       { name: "Assigned rank", value: rankToRoleName(rank), inline: true },
@@ -697,7 +871,7 @@ async function handleTryoutApproval(interaction) {
   if (action === "deny") {
     pendingTryouts.delete(id);
     await saveState(state => { delete state.pendingTryouts[id]; return state; });
-    return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(0xff4d6d).setTitle("Tryout Result — Denied")], components: [] });
+    return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor()).setTitle("Tryout Result — Denied")], components: [] });
   }
   const member = await interaction.guild.members.fetch(pending.targetId);
   const role = await assignRankRole(interaction.guild, member, pending.rank);
@@ -706,15 +880,15 @@ async function handleTryoutApproval(interaction) {
   });
   pendingTryouts.delete(id);
   await saveState(state => { delete state.pendingTryouts[id]; return state; });
-  return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(0x2ecc71).setTitle("Tryout Result — Approved")], components: [] });
+  return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor()).setTitle("Tryout Result — Approved")], components: [] });
 }
 
 async function handleChallenge(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "create") {
     const opponent = interaction.options.getUser("opponent");
-    if (!await verifiedProfile(interaction.user.id) || !await verifiedProfile(opponent.id)) {
-      return interaction.reply({ content: "Both fighters must complete `/verifyroblox` first.", ephemeral: true });
+    if (!await completedProfile(interaction.user.id) || !await completedProfile(opponent.id)) {
+      return interaction.reply({ content: "Both fighters must complete `/profile create` first.", ephemeral: true });
     }
     const state = await loadState();
     const now = Date.now();
@@ -759,8 +933,8 @@ async function handleChallenge(interaction) {
   const submittedWinner = interaction.options.getUser("winner");
   const submittedLoser = interaction.options.getUser("loser");
   const submittedScore = interaction.options.getString("score").trim().replace(/\s+to\s+to\s+/gi, " to ");
-  if (!await verifiedProfile(submittedWinner.id) || !await verifiedProfile(submittedLoser.id)) {
-    return interaction.reply({ content: "Winner and loser must both have verified Roblox profiles.", ephemeral: true });
+  if (!await completedProfile(submittedWinner.id) || !await completedProfile(submittedLoser.id)) {
+    return interaction.reply({ content: "Winner and loser must both have completed Paradise fighter profiles.", ephemeral: true });
   }
   const submissionId = crypto.randomUUID();
   const submission = {
@@ -778,7 +952,7 @@ async function handleChallenge(interaction) {
     new ButtonBuilder().setCustomId(`paradise_challenge_approve:${submissionId}`).setLabel("Approve").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`paradise_challenge_deny:${submissionId}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
   );
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle("Challenge Score — Pending Approval")
+  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Challenge Score — Pending Approval")
     .setDescription(`**${submittedWinner}${submission.winnerSpot ? ` (#${submission.winnerSpot})` : ""} vs ${submittedLoser}${submission.loserSpot ? ` (#${submission.loserSpot})` : ""}**`)
     .addFields(
       { name: "Score", value: submittedScore, inline: true },
@@ -790,7 +964,7 @@ async function handleChallenge(interaction) {
   const winner = interaction.options.getUser("winner");
   const loser = interaction.options.getUser("loser");
   const score = interaction.options.getString("score").trim().replace(/\s+to\s+to\s+/gi, " to ");
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle("Challenge Result — Pending Approval")
+  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Challenge Result — Pending Approval")
     .setDescription(`${winner} defeated ${loser}`)
     .addFields({ name: "Score", value: score }, { name: "Referee", value: `${interaction.user}` })] });
 }
@@ -811,7 +985,7 @@ async function handleChallengeApproval(interaction) {
       return state;
     });
     pendingChallenges.delete(id);
-    return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(0xff4d6d)
+    return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
       .setTitle("Challenge Score — Denied").setFooter({ text: `Denied by ${interaction.user.username} • Made by Paradise bot` })], components: [] });
   }
   const now = Date.now();
@@ -842,9 +1016,9 @@ async function handleChallengeApproval(interaction) {
   pendingChallenges.delete(id);
   await updateAvailabilityPanel(interaction.guild).catch(() => {});
   const works = interaction.guild.channels.cache.find(channel => channel.name.includes("referee-works"));
-  if (works) await works.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(0x2ecc71)
+  if (works) await works.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
     .setTitle("Approved Referee Work").setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })] });
-  return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(0x2ecc71)
+  return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
     .setTitle("Challenge Score — Approved").setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })], components: [] });
 }
 
@@ -875,7 +1049,7 @@ async function handleTraining(interaction) {
   await finishSession(owned.id, interaction.user.id, {
     score: interaction.options.getString("score"), winner: interaction.options.getString("winner")
   });
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("Training ended.")
+  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Training ended.")
     .setDescription(`Score: ${interaction.options.getString("score")}, ${interaction.options.getString("winner")} won.`)
     .addFields({ name: "Hoster", value: `${interaction.user}` }).setFooter({ text: "Made by Paradise bot" })] });
 }
@@ -959,7 +1133,7 @@ async function handleTournament(interaction) {
   if (sub === "result-simple") {
     const winner = interaction.options.getUser("winner");
     await recordStaffActivity(interaction.user.id, "tournament");
-    return interaction.reply({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("Tournament Winner")
+    return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Tournament Winner")
       .setDescription(`${winner} won the tournament.`)
       .addFields({ name: "Proof", value: interaction.options.getString("proof") }, { name: "Recorded by", value: `${interaction.user}` })
       .setFooter({ text: "Made by Paradise bot" })] });
@@ -1014,7 +1188,7 @@ async function handleGiveaway(interaction) {
     return state;
   });
   const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`paradise_giveaway_enter:${id}`).setLabel("Enter Giveaway").setStyle(ButtonStyle.Success));
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle(`Giveaway: ${interaction.options.getString("prize")}`)
+  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Giveaway: ${interaction.options.getString("prize")}`)
     .setDescription(`Ends <t:${Math.floor(endsAt / 1000)}:R>\nWinners: **${interaction.options.getInteger("winners") || 1}**\nRequirements: ${interaction.options.getString("requirements") || "Follow server rules."}`)
     .setFooter({ text: "Entries are opt-in • Made by Paradise bot" })], components: [row] });
 }
@@ -1093,7 +1267,7 @@ async function postAutomaticActivityCheck(guild, group, state) {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`paradise_activity_present:${id}`).setLabel("I am active / Aktifim").setStyle(ButtonStyle.Success)
   );
-  await channel.send({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle(`${group} Activity Check`)
+  await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
     .setDescription(`Respond within 24 hours. Missing the deadline removes the related staff role unless an active whitelist applies.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
     .setFooter({ text: "Automatic 48-hour check • Made by Paradise bot" })], components: [row] });
   return id;
@@ -1219,7 +1393,7 @@ async function handleActivity(interaction) {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_activity_present:${id}`).setLabel("I am active / Aktifim").setStyle(ButtonStyle.Success)
     );
-    return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xffc857).setTitle(`${group} Activity Check`)
+    return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
       .setDescription(`Respond within 24 hours. Staff who do not respond may lose the related role unless they have an active whitelist.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
       .setFooter({ text: "Made by Paradise bot" })], components: [row] });
   }
@@ -1294,7 +1468,7 @@ async function handleStaffReport(interaction) {
     ],
     reason: "Paradise private staff report"
   });
-  await channel.send({ embeds: [new EmbedBuilder().setColor(0xff4d6d).setTitle("Private Staff Report")
+  await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Private Staff Report")
     .addFields(
       { name: "Reporter", value: `${interaction.user}` },
       { name: "Reported member", value: `${reported}` },
@@ -1316,7 +1490,7 @@ function helpEmbed(scope) {
       .setFooter(paradiseFooter("TSBTR-style help"));
   }
   return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("✦ PARADISE CLAN COMMAND GUIDE")
-    .setDescription("# Clan Operations\n## ◆ Fighters\n- `/verifyroblox username:<name>` then `/verifyrobloxcheck`\n- `/challenge create opponent:<user> region:<region>` in **challenge-ticket**\n- `/availability panel` in **availability**\n\n## ◆ Hoster & staff\n- `/tryout start link:<url>` in **tryout**\n- `/tryout result user:<user> stage level strength`\n- `/paradisetraining start link:<url>` in **training**\n- `/challenge post winner loser score ...` in **referee-post**\n- `/tournament ...`, `/giveaway create`, `/gamenight start`, `/event create`\n\n## ◆ Clan management\n- `/relation add|remove|panel` → **clan-relations**\n- `/mainer set|guide` → **maining-guide**\n- `/findfcw` → **find-a-fcw**\n- `/loa request|end|panel` → **loa**\n- `/activity check|summary` → **activity-check**\n\n-# Restrict command locations with `/commandchannel`.")
+    .setDescription("# Clan Operations\n## ◆ Fighters\n- `/profile create` — verify Roblox, choose region and create your fighter card\n- `/profile view [user]` — show Profile ID, Roblox, region and full rank\n- `/verifyroblox username:<name>` then `/verifyrobloxcheck` — alternate verification path\n- `/challenge create opponent:<user> region:<region>` in **challenge-ticket**\n- `/availability panel` in **availability**\n\n## ◆ Hoster & staff\n- `/tryout start link:<url>` in **tryout**\n- `/tryout result user:<user> stage level strength`\n- `/paradisetraining start link:<url>` in **training**\n- `/challenge post winner loser score ...` in **referee-post**\n- `/tournament ...`, `/giveaway create`, `/gamenight start`, `/event create`\n\n## ◆ Clan management\n- `/relation add|remove|panel` → **clan-relations**\n- `/mainer set|guide` → **maining-guide**\n- `/findfcw` → **find-a-fcw**\n- `/loa request|end|panel` → **loa**\n- `/activity check|summary` → **activity-check**\n\n-# Restrict command locations with `/commandchannel`.")
     .setFooter(paradiseFooter("Clan help"));
 }
 
@@ -1531,7 +1705,7 @@ async function handleLoa(interaction) {
       new ButtonBuilder().setCustomId(`paradise_loa_deny:${interaction.user.id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
     );
     return interaction.reply({
-      embeds: [new EmbedBuilder().setColor(0xffc857).setTitle("LOA Request — Pending")
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("LOA Request — Pending")
         .setDescription(`**Staff:** ${interaction.user}\n**Ends:** <t:${Math.floor(expiresAt / 1000)}:F>\n**Reason:** ${record.reason}`)
         .setFooter(paradiseFooter("Manager approval required"))],
       components: [row]
@@ -1566,7 +1740,7 @@ async function handleLoaDecision(interaction) {
   }
   await updateLoaPanel(interaction.guild).catch(() => {});
   return interaction.update({
-    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(action === "approve" ? 0x2ecc71 : 0xff4d6d)
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
       .setTitle(action === "approve" ? "LOA Request — Approved" : "LOA Request — Denied")],
     components: []
   });
@@ -1646,7 +1820,7 @@ async function handleBranding(interaction) {
   if (sub === "color") {
     const raw = interaction.options.getString("hex").trim();
     if (!/^#?[0-9a-f]{6}$/i.test(raw)) {
-      return interaction.reply({ content: "Invalid color. Use a six-digit HEX value such as `#9B5CFF`.", ephemeral: true });
+      return interaction.reply({ content: "Invalid color. Use a six-digit HEX value such as `#000000`.", ephemeral: true });
     }
     const brandColor = normalizeParadiseBrandColor(raw);
     await saveState(state => { state.config.brandColor = brandColor; return state; });
@@ -1730,7 +1904,38 @@ function localizedHelp(locale) {
 
 export async function handleParadiseInteraction(interaction) {
   if (interaction.guildId && interaction.guildId !== PARADISE_TEST_GUILD_ID) return false;
+  if (interaction.isModalSubmit?.() && interaction.customId === "paradise_verify_modal") {
+    await handleVerifyModal(interaction);
+    return true;
+  }
   if (interaction.isButton?.()) {
+    if (interaction.customId === "paradise_verify_open") {
+      const modal = new ModalBuilder().setCustomId("paradise_verify_modal").setTitle("Roblox Verification");
+      const username = new TextInputBuilder().setCustomId("roblox_username").setLabel("Roblox Username")
+        .setPlaceholder("Enter your exact Roblox username").setStyle(TextInputStyle.Short)
+        .setMinLength(3).setMaxLength(20).setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(username));
+      await interaction.showModal(modal);
+      return true;
+    }
+    if (interaction.customId === "paradise_verify_confirm") { await verifyCheck(interaction); return true; }
+    if (interaction.customId === "paradise_verify_retry") {
+      const challenge = verificationChallenges.get(interaction.user.id)
+        || (await loadState()).verificationChallenges[interaction.user.id];
+      if (!challenge) {
+        await interaction.reply({ content: "Verification expired. Start again with `/verifyroblox`.", ephemeral: true });
+      } else {
+        await startVerification(interaction, challenge.username);
+      }
+      return true;
+    }
+    if (interaction.customId === "paradise_verify_cancel") {
+      verificationChallenges.delete(interaction.user.id);
+      await saveState(state => { delete state.verificationChallenges[interaction.user.id]; return state; });
+      await interaction.update({ content: "Roblox verification cancelled.", embeds: [], components: [] });
+      return true;
+    }
+    if (interaction.customId === "paradise_profile_create") { await beginProfileCreation(interaction); return true; }
     if (interaction.customId === "paradise_setup_confirm_clan") { await applyServerSetup(interaction, "clan"); return true; }
     if (interaction.customId.startsWith("paradise_setup_select:")) {
       await setupPreview(interaction, interaction.customId.split(":")[1], true);
@@ -1763,6 +1968,10 @@ export async function handleParadiseInteraction(interaction) {
       await interaction.reply({ content: removing ? `${chosen} role removed.` : `${chosen} role added.`, ephemeral: true }); return true;
     }
   }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_profile_region") {
+    await handleProfileRegion(interaction);
+    return true;
+  }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_ping_roles") {
     for (const label of ["Training", "Tournament", "Event", "Giveaway", "Game Night"]) {
       const role = await ensureRole(interaction.guild, `${label} Ping`);
@@ -1781,6 +1990,7 @@ export async function handleParadiseInteraction(interaction) {
   if (interaction.commandName === "help") { await handleHelp(interaction); return true; }
   if (interaction.commandName === "verifyroblox") { await verifyStart(interaction); return true; }
   if (interaction.commandName === "verifyrobloxcheck") { await verifyCheck(interaction); return true; }
+  if (interaction.commandName === "profile") { await handleProfile(interaction); return true; }
   if (interaction.commandName === "paradisehelp") { await interaction.reply({ content: localizedHelp(interaction.locale), ephemeral: true }); return true; }
   if (interaction.commandName === "sendlanguagequestion") {
     const row = new ActionRowBuilder().addComponents(
