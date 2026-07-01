@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  canAssignRank, challengedLines, compareRanks, normalizeParadiseBrandColor, paradiseBrandColorInteger,
+  canAssignRank, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommands, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
@@ -105,4 +106,30 @@ test("availability board separates timed entries and active tickets", () => {
   };
   assert.match(timedAvailabilityLines(state, "cooldownUntil", 0), /<@1>.*Rank #25.*<t:4102444800:R>/);
   assert.match(challengedLines(state), /<@2> \(#7\).*<@3> \(#8\).*Ticket ID: 110/s);
+});
+
+test("challenge ranges follow leaderboard distance rules", () => {
+  assert.deepEqual(challengeTargetSpots(null), [29, 30]);
+  assert.deepEqual(challengeTargetSpots(30), [27, 28, 29]);
+  assert.deepEqual(challengeTargetSpots(20), [18, 19]);
+  assert.deepEqual(challengeTargetSpots(10), [9]);
+  assert.deepEqual(challengeTargetSpots(1), []);
+});
+
+test("challenge creation explains cooldown, immunity and active ticket blocks", () => {
+  const now = 1_800_000_000_000;
+  const base = {
+    leaderboard: {
+      challenger: { availability: { cooldownUntil: now + 60_000 } },
+      opponent: { availability: { immunityUntil: now + 120_000 } }
+    },
+    pendingChallenges: {}
+  };
+  assert.match(challengeBlockReason(base, "challenger", "opponent", now), /cooldown.*<t:1800000060:R>/);
+  base.leaderboard.challenger.availability.cooldownUntil = 0;
+  assert.match(challengeBlockReason(base, "challenger", "opponent", now), /currently immune.*<t:1800000120:R>/);
+  base.pendingChallenges.ticket = {
+    status: "open", ticketId: "123456789012345678", challengerId: "other", opponentId: "opponent"
+  };
+  assert.match(challengeBlockReason(base, "challenger", "opponent", now), /already in a challenge.*<#123456789012345678>/);
 });

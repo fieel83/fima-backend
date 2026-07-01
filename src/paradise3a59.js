@@ -16,6 +16,7 @@ const verificationChallenges = new Map();
 const verifiedProfiles = new Map();
 const pendingTryouts = new Map();
 const pendingChallenges = new Map();
+const challengeDrafts = new Map();
 const activeTrainings = new Map();
 const activeTournaments = new Map();
 const staffTeamRefreshTimers = new Map();
@@ -165,6 +166,14 @@ export function rankToRoleName(rank) {
   return `Stage ${rank.stage} ${rank.level} ${rank.strength}`;
 }
 
+export function challengeTargetSpots(currentSpot) {
+  const spot = Number(currentSpot);
+  if (!Number.isInteger(spot) || spot < 1 || spot > 30) return [29, 30];
+  const distance = spot <= 10 ? 1 : spot <= 20 ? 2 : 3;
+  return Array.from({ length: distance }, (_, index) => spot - distance + index)
+    .filter(target => target >= 1 && target < spot);
+}
+
 export function paradiseCommands() {
   const rankOptions = (builder) => builder
     .addIntegerOption(o => o.setName("stage").setDescription("0 is best; Stage 5 is unused").setRequired(true)
@@ -197,7 +206,7 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("note").setDescription("Optional note").setRequired(false))),
     new SlashCommandBuilder().setName("challenge").setNameLocalizations({ tr: "meydan-okuma" }).setDescription("Verified Paradise challenge system").setDescriptionLocalizations({ tr: "Doğrulanmış Paradise meydan okuma sistemi" })
       .addSubcommand(s => s.setName("create").setDescription("Create a verified challenge ticket")
-        .addUserOption(o => o.setName("opponent").setDescription("Verified opponent").setRequired(true))
+        .addUserOption(o => o.setName("opponent").setDescription("Verified opponent; omit to choose from eligible ranks"))
         .addStringOption(o => o.setName("region").setDescription("Match region").setRequired(false)
           .addChoices(...["Paris", "London", "Amsterdam", "Frankfurt"].map(value => ({ name: value, value })))))
       .addSubcommand(s => s.setName("result").setDescription("Submit a challenge result for approval")
@@ -731,7 +740,8 @@ function profileRegionMenu() {
 }
 
 async function beginProfileCreation(interaction) {
-  if (!await verifiedProfile(interaction.user.id)) {
+  const existing = await verifiedProfile(interaction.user.id);
+  if (!existing) {
     return interaction.reply({
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("ROBLOX VERIFICATION REQUIRED")
         .setDescription("You must link your Roblox account before creating a Paradise fighter profile.")],
@@ -739,9 +749,29 @@ async function beginProfileCreation(interaction) {
       ephemeral: true
     });
   }
+  if (existing.profileId && existing.region) {
+    const embed = await profileEmbed(interaction.guild, interaction.user.id);
+    return interaction.reply({
+      content: `You already have a Paradise fighter profile (ID: **#${existing.profileId}**).`,
+      embeds: embed ? [embed] : [],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("paradise_profile_region_change").setLabel("Change Region").setStyle(ButtonStyle.Secondary)
+      )],
+      ephemeral: true
+    });
+  }
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHOOSE YOUR REGION")
       .setDescription("Choose the server region you normally use. Your rank is read from your full Stage–Level–Strength role.")],
+    components: [profileRegionMenu()],
+    ephemeral: true
+  });
+}
+
+async function beginProfileRegionChange(interaction) {
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHANGE YOUR REGION")
+      .setDescription("Choose your new main server region. Your Profile ID and verified Roblox account will stay unchanged.")],
     components: [profileRegionMenu()],
     ephemeral: true
   });
@@ -883,52 +913,131 @@ async function handleTryoutApproval(interaction) {
   return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor()).setTitle("Tryout Result — Approved")], components: [] });
 }
 
+function openChallengeFor(state, discordId) {
+  return Object.values(state.pendingChallenges || {}).find(item =>
+    item.status === "open" && [item.challengerId, item.opponentId].includes(discordId));
+}
+
+export function challengeBlockReason(state, challengerId, opponentId, now = Date.now()) {
+  if (challengerId === opponentId) return "You cannot challenge yourself.";
+  const challengerTicket = openChallengeFor(state, challengerId);
+  if (challengerTicket) {
+    return `You already have an open challenge in <#${challengerTicket.ticketId}>. Close it before opening another.`;
+  }
+  const opponentTicket = openChallengeFor(state, opponentId);
+  if (opponentTicket) {
+    const otherId = opponentTicket.challengerId === opponentId ? opponentTicket.opponentId : opponentTicket.challengerId;
+    return `That player is already in a challenge with <@${otherId}> in <#${opponentTicket.ticketId}>. You cannot challenge them until that ticket is closed.`;
+  }
+  const challengerCooldown = Number(state.leaderboard?.[challengerId]?.availability?.cooldownUntil || 0);
+  if (challengerCooldown > now) {
+    return `You are currently on challenge cooldown. It expires <t:${Math.floor(challengerCooldown / 1000)}:R>.`;
+  }
+  const opponentImmunity = Number(state.leaderboard?.[opponentId]?.availability?.immunityUntil || 0);
+  if (opponentImmunity > now) {
+    return `That player is currently immune and cannot be challenged. Their immunity expires <t:${Math.floor(opponentImmunity / 1000)}:R>.`;
+  }
+  return null;
+}
+
+function challengeRangeText(currentSpot, spots) {
+  const labels = spots.map(spot => `**#${spot}**`);
+  if (!Number.isInteger(Number(currentSpot))) return `As an unranked player, you may challenge ${labels.join(" or ")}.`;
+  return `As rank **#${currentSpot}**, you may challenge ${labels.join(", ").replace(/, ([^,]*)$/, " or $1")}.`;
+}
+
+async function presentChallengeTargetMenu(interaction, region = null) {
+  if (!await completedProfile(interaction.user.id)) {
+    return interaction.reply({ content: "Complete `/profile create` before opening a challenge.", ephemeral: true });
+  }
+  const state = await loadState();
+  const currentSpot = Number(state.leaderboard[interaction.user.id]?.spot);
+  const spots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null);
+  const entries = Object.entries(state.leaderboard)
+    .filter(([id, row]) => id !== interaction.user.id && spots.includes(Number(row.spot)))
+    .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
+  const candidates = [];
+  for (const [discordId, row] of entries) {
+    if (!await completedProfile(discordId)) continue;
+    const member = await interaction.guild.members.fetch(discordId).catch(() => null);
+    if (!member) continue;
+    const block = challengeBlockReason(state, interaction.user.id, discordId);
+    candidates.push({
+      label: `#${row.spot} ${member.displayName}`.slice(0, 100),
+      value: discordId,
+      description: (block ? "Currently unavailable — select for details" : `Discord: ${discordId}`).slice(0, 100)
+    });
+  }
+  if (!candidates.length) {
+    return interaction.reply({
+      content: `${challengeRangeText(Number.isInteger(currentSpot) ? currentSpot : null, spots)} No eligible profiled player is currently assigned to those positions.`,
+      ephemeral: true
+    });
+  }
+  challengeDrafts.set(interaction.user.id, { region, expires: Date.now() + 10 * 60_000 });
+  const menu = new StringSelectMenuBuilder().setCustomId("paradise_challenge_target")
+    .setPlaceholder("Select who to challenge…").addOptions(candidates.slice(0, 25));
+  return interaction.reply({
+    content: challengeRangeText(Number.isInteger(currentSpot) ? currentSpot : null, spots),
+    components: [new ActionRowBuilder().addComponents(menu)],
+    ephemeral: true
+  });
+}
+
+async function createChallengeTicket(interaction, opponent, region = null) {
+  if (!await completedProfile(interaction.user.id) || !await completedProfile(opponent.id)) {
+    return interaction.reply({ content: "Both fighters must complete `/profile create` first.", ephemeral: true });
+  }
+  const state = await loadState();
+  const currentSpot = Number(state.leaderboard[interaction.user.id]?.spot);
+  const opponentSpot = Number(state.leaderboard[opponent.id]?.spot);
+  const allowedSpots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null);
+  if (!allowedSpots.includes(opponentSpot)) {
+    return interaction.reply({
+      content: `${challengeRangeText(Number.isInteger(currentSpot) ? currentSpot : null, allowedSpots)} <@${opponent.id}> is outside your allowed challenge range.`,
+      ephemeral: true
+    });
+  }
+  const block = challengeBlockReason(state, interaction.user.id, opponent.id);
+  if (block) return interaction.reply({ content: block, ephemeral: true });
+  const me = interaction.guild.members.me;
+  const channel = await interaction.guild.channels.create({
+    name: `challenge-${interaction.user.username}-${opponent.username}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 90),
+    type: ChannelType.GuildText,
+    permissionOverwrites: [
+      { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+      { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+      { id: opponent.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+      { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] }
+    ],
+    reason: "Paradise verified challenge"
+  });
+  await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ VERIFIED CHALLENGE")
+    .setDescription(`# ${interaction.user} **vs** ${opponent}\n\n## ◆ Before the set\n- Confirm availability and cooldowns\n- Record the full match\n- Keep all proof inside this ticket\n\n-# Players lose access after closure; staff retains the transcript.`)
+    .addFields(
+      { name: "◇ Positions", value: `${Number.isInteger(currentSpot) ? `#${currentSpot}` : "Unranked"} vs #${opponentSpot}`, inline: true },
+      { name: "◇ Region", value: `**${region || "Not selected"}**`, inline: true }
+    )
+    .setFooter(paradiseFooter("Verified Paradise profiles"))] });
+  await saveState(current => {
+    current.pendingChallenges[channel.id] = {
+      status: "open", ticketId: channel.id, challengerId: interaction.user.id,
+      opponentId: opponent.id, region: region || null, challengerSpot: Number.isInteger(currentSpot) ? currentSpot : null,
+      opponentSpot, openedAt: new Date().toISOString()
+    };
+    return current;
+  });
+  challengeDrafts.delete(interaction.user.id);
+  await updateAvailabilityPanel(interaction.guild).catch(() => {});
+  return interaction.reply({ content: `Challenge ticket created: ${channel}`, ephemeral: true });
+}
+
 async function handleChallenge(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "create") {
     const opponent = interaction.options.getUser("opponent");
-    if (!await completedProfile(interaction.user.id) || !await completedProfile(opponent.id)) {
-      return interaction.reply({ content: "Both fighters must complete `/profile create` first.", ephemeral: true });
-    }
-    const state = await loadState();
-    const now = Date.now();
-    const conflict = Object.values(state.pendingChallenges).find(item =>
-      item.status === "open"
-      && [item.challengerId, item.opponentId].some(id => [interaction.user.id, opponent.id].includes(id)));
-    if (conflict) return interaction.reply({ content: "Challenge blocked: one fighter already has an open challenge ticket.", ephemeral: true });
-    for (const id of [interaction.user.id, opponent.id]) {
-      const availability = state.leaderboard[id]?.availability || {};
-      const blockedUntil = Math.max(Number(availability.cooldownUntil || 0), Number(availability.immunityUntil || 0));
-      if (blockedUntil > now) {
-        return interaction.reply({ content: `Challenge blocked for <@${id}> until <t:${Math.floor(blockedUntil / 1000)}:R>.`, ephemeral: true });
-      }
-    }
-    const me = interaction.guild.members.me;
-    const channel = await interaction.guild.channels.create({
-      name: `challenge-${interaction.user.username}-${opponent.username}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 90),
-      type: ChannelType.GuildText,
-      permissionOverwrites: [
-        { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-        { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        { id: opponent.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] }
-      ],
-      reason: "Paradise verified challenge"
-    });
-    await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ VERIFIED CHALLENGE")
-      .setDescription(`# ${interaction.user} **vs** ${opponent}\n\n## ◆ Before the set\n- Confirm availability and cooldowns\n- Record the full match\n- Keep all proof inside this ticket\n\n-# Players lose access after closure; staff retains the transcript.`)
-      .addFields({ name: "◇ Region", value: `**${interaction.options.getString("region") || "Not selected"}**` })
-      .setFooter(paradiseFooter("Verified profiles"))] });
-    await saveState(current => {
-      current.pendingChallenges[channel.id] = {
-        status: "open", ticketId: channel.id, challengerId: interaction.user.id,
-        opponentId: opponent.id, region: interaction.options.getString("region") || null,
-        openedAt: new Date().toISOString()
-      };
-      return current;
-    });
-    await updateAvailabilityPanel(interaction.guild).catch(() => {});
-    return interaction.reply({ content: `Challenge ticket created: ${channel}`, ephemeral: true });
+    const region = interaction.options.getString("region");
+    return opponent ? createChallengeTicket(interaction, opponent, region) : presentChallengeTargetMenu(interaction, region);
   }
   const submittedWinner = interaction.options.getUser("winner");
   const submittedLoser = interaction.options.getUser("loser");
@@ -1936,6 +2045,7 @@ export async function handleParadiseInteraction(interaction) {
       return true;
     }
     if (interaction.customId === "paradise_profile_create") { await beginProfileCreation(interaction); return true; }
+    if (interaction.customId === "paradise_profile_region_change") { await beginProfileRegionChange(interaction); return true; }
     if (interaction.customId === "paradise_setup_confirm_clan") { await applyServerSetup(interaction, "clan"); return true; }
     if (interaction.customId.startsWith("paradise_setup_select:")) {
       await setupPreview(interaction, interaction.customId.split(":")[1], true);
@@ -1970,6 +2080,21 @@ export async function handleParadiseInteraction(interaction) {
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_profile_region") {
     await handleProfileRegion(interaction);
+    return true;
+  }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_challenge_target") {
+    const draft = challengeDrafts.get(interaction.user.id);
+    if (!draft || draft.expires < Date.now()) {
+      challengeDrafts.delete(interaction.user.id);
+      await interaction.reply({ content: "Challenge selection expired. Run `/challenge create` again.", ephemeral: true });
+      return true;
+    }
+    const opponent = await interaction.client.users.fetch(interaction.values[0]).catch(() => null);
+    if (!opponent) {
+      await interaction.reply({ content: "That Discord user is no longer available.", ephemeral: true });
+      return true;
+    }
+    await createChallengeTicket(interaction, opponent, draft.region);
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_ping_roles") {
