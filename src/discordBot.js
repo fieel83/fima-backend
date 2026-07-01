@@ -332,7 +332,7 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Discord interaction failed", { message: error.message, command: interaction?.commandName || null });
       if (interaction?.isRepliable?.() && !interaction.replied && !interaction.deferred) {
-        interaction.reply({ content: "Fima bot could not complete that action. Try again later.", ephemeral: true }).catch(() => {});
+        interaction.reply({ content: "Paradise could not complete that action. Try again later.", ephemeral: true }).catch(() => {});
       }
     });
   });
@@ -439,7 +439,7 @@ async function registerDiscordCommands() {
         .addChoices({ name: "preview", value: "preview" }, { name: "apply_missing_only", value: "apply_missing_only" })),
     new SlashCommandBuilder()
       .setName("setupfieelsclan")
-      .setDescription("Preview or safely apply the optional TSB-inspired clan/training system.")
+      .setDescription("Preview the dedicated Paradise clan/training system.")
       .addStringOption((option) => option
         .setName("action")
         .setDescription("Use preview first. Apply only creates missing items; it never deletes.")
@@ -447,12 +447,16 @@ async function registerDiscordCommands() {
         .addChoices({ name: "preview", value: "preview" }, { name: "apply_missing_only", value: "apply_missing_only" })),
     new SlashCommandBuilder()
       .setName("setup")
-      .setDescription("Preview the Fima Discord setup mode.")
+      .setDescription("Preview a Community, Clan or future TSBTR-style setup.")
       .addStringOption((option) => option
         .setName("mode")
         .setDescription("Which setup schema to preview.")
         .setRequired(true)
-        .addChoices({ name: "community", value: "community" }, { name: "clan", value: "clan" }))
+        .addChoices(
+          { name: "community", value: "community" },
+          { name: "clan", value: "clan" },
+          { name: "tsbtr-style", value: "tsbtr" }
+        ))
       .addStringOption((option) => option
         .setName("action")
         .setDescription("Use preview first. Apply only creates missing items; it never deletes.")

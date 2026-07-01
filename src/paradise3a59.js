@@ -23,7 +23,8 @@ const STATE_KEY = "paradise_3a59_state_v1";
 const EMPTY_STATE = Object.freeze({
   profiles: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
   tournaments: {}, leaderboard: {}, staffActivity: {}, activityChecks: {},
-  whitelists: {}, giveaways: {}, rsvps: {}, config: {}, ticketOptOuts: {}
+  whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
+  config: {}, ticketOptOuts: {}
 });
 
 function normalizeState(value) {
@@ -71,7 +72,7 @@ function paradiseFooter(context = "") {
   return { text: `${context ? `${context} • ` : ""}Made by Paradise bot` };
 }
 
-export const PARADISE_ROLES = [
+export const PARADISE_CLAN_ROLES = [
   "Owner", "Admin", "Overseer", "Community Manager", "Training Manager",
   "Trial Training Manager", "Training Supervisor", "Experienced Training Hoster",
   "Training Hoster", "Trial Training Hoster", "Tryout Manager",
@@ -83,23 +84,62 @@ export const PARADISE_ROLES = [
   "Verified Fighter", "Media & Links Approved", "Training Ping",
   "Tryout Ping", "Referee Ping", "Spar Ping", "Tournament Ping", "Event Ping",
   "Giveaway Ping", "Game Night Ping", "Staff Updates", "Server Updates",
-  "Turkish", "English", "Activity Whitelist", "Muted / Quarantined"
+  "Turkish", "English", "Activity Whitelist", "LOA", "Muted / Quarantined"
+];
+
+export const PARADISE_COMMUNITY_ROLES = [
+  "Owner", "Admin", "Manager", "Moderator", "Support Staff", "Trial Support",
+  "Bot Manager", "Developer", "Buyer", "Trial User", "Lifetime Buyer",
+  "Creator", "Partner / Reseller", "Media & Links Approved", "Verified",
+  "Update Ping", "Training Ping", "Tournament Ping", "Giveaway Ping",
+  "Event Ping", "Game Night Ping", "Security Alert Ping", "Robux Payment Ping",
+  "Turkish", "English", "LOA", "Muted / Quarantined"
+];
+
+export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
+
+export const PARADISE_COMMUNITY_SCHEMA = [
+  ["START HERE", ["welcome", "rules", "choose-language", "choose-pings", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
+  ["IMPORTANT", ["announcements", "updates", "status", "faq", "pricing", "trial-info", "giveaways"], false],
+  ["SUPPORT", ["open-ticket", "support-info"], false],
+  ["SUPPORT STAFF", ["ticket-logs", "transcripts", "staff-notes"], true],
+  ["FIMA APP", ["fima-macro", "macro-help", "update-help", "license-help", "hwid-help", "payment-help", "robux-payments", "bug-reports", "suggestions"], false],
+  ["COMMUNITY", ["general", "media", "clips", "outfits", "capes", "macro-discussion", "success-results", "bot-commands"], false],
+  ["TRAINING & EVENTS", ["training-announcements", "training-results", "event-announcements", "event-results", "tournament-announcements", "tournament-results", "game-night"], false],
+  ["STAFF", ["staff-chat", "staff-logs", "moderation-logs", "activity-logs", "application-reviews", "bot-logs"], true]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
+  ["START", ["welcome", "rules", "choose-language", "choose-pings", "command-guide", "role-guide", "maining-guide"], false],
+  ["CLAN", ["announcements", "clan-relations", "ally-requests", "main-line", "eu-rosters", "roster-logs", "mainer-proof", "find-a-fcw"], false],
+  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "hoster-guide", "hoster-works"], false],
+  ["CHALLENGES", ["challenge-ticket", "challenge-rules", "availability", "challenges", "challenge-results", "referee-guide", "referee-post", "referee-works"], false],
+  ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night"], false],
+  ["SUPPORT", ["support-ticket", "application-ticket", "report-staff", "report-guide"], false],
+  ["STAFF", ["staff-annc", "staff-chat", "activity-check", "activity-review", "referee-logs", "bot-logs", "loa"], true],
+  ["VOICE", ["Stage", "Voice 1", "Voice 2", "Voice 3"], false]
+];
+
+export const PARADISE_TSBTR_SCHEMA = [
   ["LOGS", ["challenge-ticket-transcripts", "support-ticket-transcripts", "message-logs", "role-logs", "channel-logs", "nick-logs", "ban-unban-logs", "kick-logs", "mod-logs", "member-logs", "other-logs", "guide"], true],
   ["ADMIN", ["staff-annc", "staff-chat", "staff-works", "staff-rules", "staff-updates", "staff-strikes", "proofs", "referee-logs", "activity-review"], true],
-  ["CENTER", ["welcome", "blacklist", "ban-appeal", "unblacklist", "staff-team", "role-guide", "overview", "report-guide"], false],
+  ["CENTER", ["welcome", "blacklist", "ban-appeal", "unblacklist", "staff-team", "role-guide", "command-guide", "overview", "report-guide"], false],
   ["IMPORTANT", ["rules", "announcements", "sub-announcements", "content-channel", "server-logs", "staff-logs", "applications", "boosts", "giveaways", "polls", "hall-of-shame", "hall-of-fame"], false],
   ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "training-hoster-announcements", "training-hoster-rules", "trainer-annc", "activity-check"], false],
   ["TICKET", ["challenge-ticket", "support-ticket", "payment-ticket", "bug-ticket", "macro-ticket", "application-ticket", "report-staff"], false],
   ["GENERAL", ["tr-chat", "chat", "media", "bot-commands", "teamer-help", "spar-request"], false],
   ["LEADERBOARD", ["top-10", "top-20", "top-30", "challenge-rules", "set-rules", "availability", "challenges", "challenge-results"], false],
-  ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports"], true],
+  ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports", "loa"], true],
   ["REFEREES", ["referee-annc", "referee-chat", "referee-rules", "referee-post", "referee-updates", "referee-works", "referee-guide", "referee-strikes", "referee-activity-check"], true],
   ["CLAN OPERATIONS", ["maining-guide", "mainer-proof", "war-announcements", "war-line-chat", "war-scores", "eu-rosters", "roster-logs", "find-a-fcw"], true],
   ["VOICE", ["Stage", "Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5"], false]
 ];
+
+export const PARADISE_SETUP_SCHEMAS = Object.freeze({
+  community: { label: "Fieel's Community", schema: PARADISE_COMMUNITY_SCHEMA, roles: PARADISE_COMMUNITY_ROLES },
+  clan: { label: "Paradise Clan", schema: PARADISE_CLAN_SCHEMA, roles: PARADISE_CLAN_ROLES },
+  tsbtr: { label: "TSBTR-style Community", schema: PARADISE_TSBTR_SCHEMA, roles: PARADISE_CLAN_ROLES }
+});
 
 export function rankPower({ stage, level, strength }) {
   const s = Number(stage);
@@ -133,7 +173,9 @@ export function paradiseCommands() {
     .addStringOption(o => o.setName("strength").setDescription("Rank strength").setRequired(true)
       .addChoices(...STRENGTHS.map(value => ({ name: value, value }))));
   return [
-    new SlashCommandBuilder().setName("setupfieels").setDescription("Choose and safely preview the Paradise server setup."),
+    new SlashCommandBuilder().setName("setupfieels").setDescription("Choose Community, Clan or TSBTR-style safe setup."),
+    new SlashCommandBuilder().setName("setupfieelstsbtr").setDescription("Safely preview the optional TSBTR-style setup."),
+    new SlashCommandBuilder().setName("help").setDescription("Open the Paradise Community or Clan command guide."),
     new SlashCommandBuilder().setName("sendlanguagequestion").setDescription("Post English/Turkish language buttons."),
     new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post Paradise notification-role selector."),
     new SlashCommandBuilder().setName("backupserverstructure").setDescription("Back up channels, roles and permission overwrites."),
@@ -249,6 +291,39 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("color").setDescription("Set the embed side-accent color")
         .addStringOption(o => o.setName("hex").setDescription("Six-digit HEX color, e.g. #9B5CFF").setRequired(true)))
       .addSubcommand(s => s.setName("preview").setDescription("Preview Paradise typography and symbols")),
+    new SlashCommandBuilder().setName("relation").setDescription("Manage the Paradise ally and enemy clan board")
+      .addSubcommand(s => s.setName("add").setDescription("Add an ally or enemy clan")
+        .addStringOption(o => o.setName("type").setDescription("Relationship type").setRequired(true)
+          .addChoices({ name: "Ally", value: "ally" }, { name: "Enemy", value: "enemy" }))
+        .addStringOption(o => o.setName("clan").setDescription("Clan name").setRequired(true).setMaxLength(80))
+        .addUserOption(o => o.setName("representative").setDescription("Clan representative"))
+        .addStringOption(o => o.setName("invite").setDescription("Optional Discord invite"))
+        .addStringOption(o => o.setName("note").setDescription("Optional note").setMaxLength(250)))
+      .addSubcommand(s => s.setName("remove").setDescription("Remove a clan relationship")
+        .addStringOption(o => o.setName("type").setDescription("Relationship type").setRequired(true)
+          .addChoices({ name: "Ally", value: "ally" }, { name: "Enemy", value: "enemy" }))
+        .addStringOption(o => o.setName("clan").setDescription("Clan name").setRequired(true)))
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh the ally and enemy clan board")),
+    new SlashCommandBuilder().setName("availability").setDescription("Challenge cooldown, immunity and open-ticket board")
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh the challenge availability board"))
+      .addSubcommand(s => s.setName("cooldown").setDescription("Set a player's challenge cooldown")
+        .addUserOption(o => o.setName("user").setDescription("Player").setRequired(true))
+        .addIntegerOption(o => o.setName("rank").setDescription("Leaderboard rank").setMinValue(1).setMaxValue(30))
+        .addIntegerOption(o => o.setName("hours").setDescription("Duration in hours").setRequired(true).setMinValue(1).setMaxValue(720)))
+      .addSubcommand(s => s.setName("immunity").setDescription("Set a player's challenge immunity")
+        .addUserOption(o => o.setName("user").setDescription("Player").setRequired(true))
+        .addIntegerOption(o => o.setName("rank").setDescription("Leaderboard rank").setMinValue(1).setMaxValue(30))
+        .addIntegerOption(o => o.setName("hours").setDescription("Duration in hours").setRequired(true).setMinValue(1).setMaxValue(720)))
+      .addSubcommand(s => s.setName("clear").setDescription("Clear cooldown or immunity")
+        .addUserOption(o => o.setName("user").setDescription("Player").setRequired(true))
+        .addStringOption(o => o.setName("type").setDescription("Entry to clear").setRequired(true)
+          .addChoices({ name: "Cooldown", value: "cooldown" }, { name: "Immunity", value: "immunity" }))),
+    new SlashCommandBuilder().setName("loa").setDescription("Staff leave-of-absence system")
+      .addSubcommand(s => s.setName("request").setDescription("Request a leave of absence")
+        .addIntegerOption(o => o.setName("days").setDescription("LOA duration").setRequired(true).setMinValue(1).setMaxValue(90))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("end").setDescription("End your active LOA early"))
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh the active LOA board")),
     new SlashCommandBuilder().setName("paradisehelp").setDescription("Show private English/Turkish command guidance.")
   ];
 }
@@ -256,6 +331,11 @@ export function paradiseCommands() {
 export async function initializeParadise(client) {
   const guild = await client.guilds.fetch(PARADISE_TEST_GUILD_ID).catch(() => null);
   if (!guild) return;
+  if (client.user?.username !== "Paradise") {
+    await client.user.setUsername("Paradise").catch(error => {
+      console.warn("Paradise bot username update failed", { message: error.message });
+    });
+  }
   const me = guild.members.me || await guild.members.fetchMe();
   if (me.nickname !== "Paradise") await me.setNickname("Paradise", "3A59 Paradise test identity").catch(() => {});
   await runParadiseMaintenance(guild).catch(() => {});
@@ -300,25 +380,96 @@ async function snapshotGuild(guild) {
   };
 }
 
-async function setupPreview(interaction) {
+async function setupChooser(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
-  const snapshot = await snapshotGuild(interaction.guild);
-  await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("paradise_setup_confirm_clan").setLabel("Build Clan / Training").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("paradise_setup_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("paradise_setup_select:community").setLabel("Fieel's Community").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("paradise_setup_select:clan").setLabel("Paradise Clan").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("paradise_setup_select:tsbtr").setLabel("TSBTR-style").setStyle(ButtonStyle.Secondary)
   );
   return interaction.reply({
-    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ Paradise Setup Preview")
-      .setDescription(`## ◆ Backup complete\n- **Channels:** ${snapshot.channels.length}\n- **Roles:** ${snapshot.roles.length}\n\n## ◆ Planned action\nThe confirmed rebuild creates the complete clan/training structure and removes old non-managed resources.\n\n-# Test server only • Nothing changes until the owner confirms.`)
-      .addFields({ name: "🛡️ __Safety boundary__", value: "**Hard-coded test guild only.** Owner confirmation is required; production is never targeted." })
-      .setFooter(paradiseFooter("Safe setup workflow"))],
-    components: [row], ephemeral: true
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHOOSE A SERVER SETUP")
+      .setDescription("## ◆ Fieel's Community\nFima product, support, buyer and community server.\n\n## ◆ Paradise Clan\nFocused clan, training, challenge, relations and event server.\n\n## ◆ TSBTR-style\nLarge community/leaderboard structure kept as an optional future template.\n\n-# Every choice creates a backup and a second confirmation screen before destructive work.")
+      .setFooter(paradiseFooter("Three independent setup templates"))],
+    components: [row],
+    ephemeral: true
   });
 }
 
-async function ensureRole(guild, name) {
-  return guild.roles.cache.find(r => r.name === name) || guild.roles.create({ name, reason: "3A59 Paradise setup" });
+async function setupPreview(interaction, mode = "clan", update = false) {
+  if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
+  const selected = PARADISE_SETUP_SCHEMAS[mode];
+  if (!selected) return interaction.reply({ content: "Unknown setup mode.", ephemeral: true });
+  const snapshot = await snapshotGuild(interaction.guild);
+  await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_setup_confirm:${mode}`).setLabel(`Build ${selected.label}`).setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("paradise_setup_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+  );
+  const payload = {
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`✦ ${selected.label} Setup Preview`)
+      .setDescription(`## ◆ Backup complete\n- **Channels:** ${snapshot.channels.length}\n- **Roles:** ${snapshot.roles.length}\n\n## ◆ Selected template\n**${selected.label}** — ${selected.schema.length} categories, ${selected.schema.reduce((sum, [, channels]) => sum + channels.length, 0)} channels and ${selected.roles.length} roles.\n\n## ◆ Planned action\nThe confirmed rebuild creates this template and removes old non-managed resources not used by it.\n\n-# Test server only • Nothing changes until the owner confirms.`)
+      .addFields({ name: "🛡️ __Safety boundary__", value: "**Hard-coded test guild only.** Owner confirmation is required; production is never targeted." })
+      .setFooter(paradiseFooter("Safe setup workflow"))],
+    components: [row], ephemeral: true
+  };
+  return update ? interaction.update(payload) : interaction.reply(payload);
+}
+
+const ROLE_PERMISSION_NAMES = Object.freeze({
+  Owner: ["Administrator"],
+  Admin: ["Administrator"],
+  Overseer: ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "BanMembers", "ViewAuditLog"],
+  Manager: ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  "Community Manager": ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  Moderator: ["ManageMessages", "ModerateMembers", "KickMembers"],
+  "Support Staff": ["ManageMessages", "ModerateMembers"],
+  "Bot Manager": ["ManageGuild", "ManageChannels", "ManageMessages"],
+  "Training Manager": ["ManageChannels", "ManageMessages", "ModerateMembers"],
+  "Tryout Manager": ["ManageChannels", "ManageMessages", "ModerateMembers"],
+  "Tournament Manager": ["ManageChannels", "ManageMessages"],
+  "Event Manager": ["ManageChannels", "ManageMessages"],
+  "Giveaway Manager": ["ManageChannels", "ManageMessages"],
+  "Game Night Manager": ["ManageChannels", "ManageMessages"],
+  "Referee Manager": ["ManageChannels", "ManageMessages", "ModerateMembers"],
+  "Head Referee": ["ManageMessages"],
+  "Experienced Referee": ["ManageMessages"]
+});
+
+const PRIVATE_ACCESS_ROLES = new Set([
+  "Owner", "Admin", "Overseer", "Manager", "Community Manager", "Moderator",
+  "Support Staff", "Bot Manager", "Training Manager", "Tryout Manager",
+  "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
+  "Referee Manager", "Head Referee", "Experienced Referee"
+]);
+
+function rolePermissions(name) {
+  return (ROLE_PERMISSION_NAMES[name] || [])
+    .map(permission => PermissionsBitField.Flags[permission])
+    .filter(Boolean);
+}
+
+async function ensureRole(guild, name, applyPermissions = false) {
+  let role = guild.roles.cache.find(item => item.name === name);
+  const permissions = rolePermissions(name);
+  if (!role) {
+    role = await guild.roles.create({ name, permissions, reason: "3A59 Paradise setup" });
+  } else if (applyPermissions && role.editable && !role.managed) {
+    await role.setPermissions(permissions, "3A59 Paradise permission template").catch(() => {});
+  }
+  return role;
+}
+
+async function organizeRoleHierarchy(guild, roleNames) {
+  const me = guild.members.me || await guild.members.fetchMe();
+  const highestAllowed = Math.max(1, me.roles.highest.position - 1);
+  const positions = roleNames
+    .map((name, index) => ({
+      role: guild.roles.cache.find(item => item.name === name),
+      position: Math.max(1, highestAllowed - index)
+    }))
+    .filter(item => item.role?.editable && !item.role.managed);
+  if (positions.length) await guild.roles.setPositions(positions).catch(() => {});
 }
 
 async function ensureParadiseAutoMod(guild) {
@@ -344,19 +495,37 @@ async function ensureParadiseAutoMod(guild) {
   return { status: "configured", rules: [...rules.values()].length + 1 };
 }
 
-async function applyClanSetup(interaction) {
+async function applyServerSetup(interaction, mode) {
   if (!isOwner(interaction) || interaction.guildId !== PARADISE_TEST_GUILD_ID) {
     return interaction.reply({ content: "Blocked: wrong guild or non-owner.", ephemeral: true });
   }
+  const selected = PARADISE_SETUP_SCHEMAS[mode];
+  if (!selected) return interaction.reply({ content: "Blocked: unknown setup template.", ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
   const snapshot = await snapshotGuild(interaction.guild);
   await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
-  for (const name of PARADISE_ROLES) await ensureRole(interaction.guild, name);
-  const desiredNames = new Set(PARADISE_CLAN_SCHEMA.flatMap(([category, channels]) => [category, ...channels]));
-  for (const [categoryName, channelNames, privateCategory] of PARADISE_CLAN_SCHEMA) {
+  for (const name of selected.roles) await ensureRole(interaction.guild, name, true);
+  const desiredNames = new Set(selected.schema.flatMap(([category, channels]) => [category, ...channels]));
+  for (const [categoryName, channelNames, privateCategory] of selected.schema) {
     let category = interaction.guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && c.name === categoryName);
     if (!category) category = await interaction.guild.channels.create({ name: categoryName, type: ChannelType.GuildCategory, reason: "3A59 Paradise setup" });
-    if (privateCategory) await category.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
+    if (privateCategory) {
+      await category.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
+      for (const roleName of selected.roles.filter(name => PRIVATE_ACCESS_ROLES.has(name))) {
+        const role = interaction.guild.roles.cache.find(item => item.name === roleName);
+        if (role) await category.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
+      }
+    } else {
+      await category.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: null }).catch(() => {});
+    }
+    const mutedRole = interaction.guild.roles.cache.find(item => item.name === "Muted / Quarantined");
+    if (mutedRole) {
+      await category.permissionOverwrites.edit(mutedRole, {
+        SendMessages: false,
+        AddReactions: false,
+        Speak: false
+      }).catch(() => {});
+    }
     for (const channelName of channelNames) {
       let channel = interaction.guild.channels.cache.find(c => c.name === channelName);
       if (!channel) {
@@ -369,26 +538,34 @@ async function applyClanSetup(interaction) {
     }
   }
   const removableChannels = [...interaction.guild.channels.cache.values()]
-    .filter(c => !desiredNames.has(c.name) && !c.isThread?.());
+    .filter(c => !desiredNames.has(c.name) && !c.isThread?.() && c.id !== interaction.channelId);
   for (const channel of removableChannels) await channel.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
   const removableRoles = [...interaction.guild.roles.cache.values()]
-    .filter(r => !r.managed && r.id !== interaction.guild.id && !PARADISE_ROLES.includes(r.name));
+    .filter(r => !r.managed && r.id !== interaction.guild.id && !selected.roles.includes(r.name));
   for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
+  await organizeRoleHierarchy(interaction.guild, selected.roles);
   const autoMod = await ensureParadiseAutoMod(interaction.guild).catch(error => ({ status: "failed", error: error.message }));
+  await publishSetupGuides(interaction.guild, mode).catch(() => {});
+  if (mode !== "community") {
+    await updateRelationsPanel(interaction.guild).catch(() => {});
+    await updateAvailabilityPanel(interaction.guild).catch(() => {});
+    await updateLoaPanel(interaction.guild).catch(() => {});
+  }
   await updateStaffTeamEmbed(interaction.guild).catch(() => {});
   await saveState(state => {
+    state.config.activeSetupMode = mode;
     state.config.autoActivityChecks = true;
     state.config.autoActivityRoleRemoval = true;
     state.config.weeklyQuotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
     return state;
   });
-  await writeArtifact("3a59-discord-clan-setup-live.json", {
+  await writeArtifact(`3a59-discord-${mode}-setup-live.json`, {
     status: "LIVE VERIFIED", completedAt: new Date().toISOString(),
-    guildId: interaction.guildId, categories: PARADISE_CLAN_SCHEMA.length,
-    channels: PARADISE_CLAN_SCHEMA.reduce((n, [, rows]) => n + rows.length, 0), roles: PARADISE_ROLES.length,
+    guildId: interaction.guildId, template: selected.label, categories: selected.schema.length,
+    channels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0), roles: selected.roles.length,
     autoMod
   });
-  return interaction.editReply("Paradise Clan / Training rebuild completed.");
+  return interaction.editReply(`${selected.label} rebuild completed.`);
 }
 
 async function findRobloxUser(username) {
@@ -576,6 +753,7 @@ async function handleChallenge(interaction) {
       };
       return current;
     });
+    await updateAvailabilityPanel(interaction.guild).catch(() => {});
     return interaction.reply({ content: `Challenge ticket created: ${channel}`, ephemeral: true });
   }
   const submittedWinner = interaction.options.getUser("winner");
@@ -651,6 +829,10 @@ async function handleChallengeApproval(interaction) {
     winner.availability = { ...(winner.availability || {}), immunityUntil: now + (record.winnerSpot && record.winnerSpot <= 10 ? 7 : 3) * 86_400_000 };
     state.leaderboard[record.winnerId] = winner;
     state.leaderboard[record.loserId] = loser;
+    if (state.pendingChallenges[record.ticketId]?.status === "open") {
+      state.pendingChallenges[record.ticketId].status = "closed";
+      state.pendingChallenges[record.ticketId].closedAt = new Date().toISOString();
+    }
     state.pendingChallenges[id] = { ...record, status: "approved", approvedBy: interaction.user.id, decidedAt: new Date().toISOString() };
     const activity = state.staffActivity[record.refereeId] || {};
     activity.referee = [...(activity.referee || []), history.at];
@@ -658,6 +840,7 @@ async function handleChallengeApproval(interaction) {
     return state;
   });
   pendingChallenges.delete(id);
+  await updateAvailabilityPanel(interaction.guild).catch(() => {});
   const works = interaction.guild.channels.cache.find(channel => channel.name.includes("referee-works"));
   if (works) await works.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(0x2ecc71)
     .setTitle("Approved Referee Work").setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })] });
@@ -928,11 +1111,22 @@ async function runParadiseMaintenance(guild) {
         if (member && role) await member.roles.remove(role, "Paradise activity whitelist expired").catch(() => {});
       }
     }
+    for (const [userId, item] of Object.entries(state.loa)) {
+      if (item.status === "approved" && Number(item.expiresAt) <= now) {
+        state.loa[userId] = { ...item, status: "expired", endedAt: new Date().toISOString() };
+        const member = guild.members.cache.get(userId);
+        const role = guild.roles.cache.find(entry => entry.name === "LOA");
+        if (member && role) await member.roles.remove(role, "Paradise LOA expired").catch(() => {});
+      }
+    }
     for (const [id, check] of Object.entries(state.activityChecks)) {
       if (check.processedAt || Number(check.expiresAt) > now) continue;
       const roles = ACTIVITY_GROUP_ROLES[check.group] || [];
       const exempt = new Set(Object.entries(state.whitelists)
         .filter(([, item]) => !item.expiresAt || Date.parse(item.expiresAt) > now).map(([userId]) => userId));
+      for (const [userId, item] of Object.entries(state.loa)) {
+        if (item.status === "approved" && Number(item.expiresAt) > now) exempt.add(userId);
+      }
       const responded = new Set(check.responses || []);
       const removed = [];
       if (state.config.autoActivityRoleRemoval === true) {
@@ -977,6 +1171,8 @@ async function runParadiseMaintenance(guild) {
     }
     return state;
   });
+  await updateLoaPanel(guild).catch(() => {});
+  await updateAvailabilityPanel(guild).catch(() => {});
 }
 
 async function handleWhitelist(interaction) {
@@ -1106,6 +1302,274 @@ async function handleStaffReport(interaction) {
       { name: "Proof", value: interaction.options.getString("proof") || "Not supplied" }
     ).setFooter({ text: "Keep evidence private • Made by Paradise bot" })] });
   return interaction.reply({ content: `Private report opened: ${channel}`, ephemeral: true });
+}
+
+function helpEmbed(scope) {
+  if (scope === "community") {
+    return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("✦ COMMUNITY COMMAND GUIDE")
+      .setDescription("# Fieel's Community\n## ◆ Member commands\n- `/fima_account` — linked account; use in **bot-commands**\n- `/fima_ticket` — private support menu; use in **open-ticket**\n- `/fima_help` — Fima product/account help\n- `/fima_support_ai question:<text>` — approved knowledge-base answer\n- `/language choice:<language>` — support language\n\n## ◆ Staff setup\n- `/fima_ticket_setup channel:#open-ticket`\n- `/fima_trust_setup channel:#security-and-trust`\n- `/fima_faq_setup channel:#faq`\n- `/fima_language_setup channel:#choose-language`\n- `/sendpingroleselector` in **choose-pings**\n\n-# Fima commands are reserved for app, licensing, payment and product support.")
+      .setFooter(paradiseFooter("Community help"));
+  }
+  if (scope === "tsbtr") {
+    return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("✦ TSBTR-STYLE COMMAND GUIDE")
+      .setDescription("# Large Community Operations\n## ◆ Setup\n- `/setupfieelstsbtr` — backup and preview\n\n## ◆ Leaderboard & referee\n- `/challenge create|post`\n- `/availability panel`\n- `/referee guide|works`\n\n## ◆ Staff\n- `/activity check|summary`\n- `/whitelist add|remove|list`\n- `/loa request|end|panel`\n\n-# This optional future template is separate from the normal Paradise Clan setup.")
+      .setFooter(paradiseFooter("TSBTR-style help"));
+  }
+  return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("✦ PARADISE CLAN COMMAND GUIDE")
+    .setDescription("# Clan Operations\n## ◆ Fighters\n- `/verifyroblox username:<name>` then `/verifyrobloxcheck`\n- `/challenge create opponent:<user> region:<region>` in **challenge-ticket**\n- `/availability panel` in **availability**\n\n## ◆ Hoster & staff\n- `/tryout start link:<url>` in **tryout**\n- `/tryout result user:<user> stage level strength`\n- `/paradisetraining start link:<url>` in **training**\n- `/challenge post winner loser score ...` in **referee-post**\n- `/tournament ...`, `/giveaway create`, `/gamenight start`, `/event create`\n\n## ◆ Clan management\n- `/relation add|remove|panel` → **clan-relations**\n- `/mainer set|guide` → **maining-guide**\n- `/findfcw` → **find-a-fcw**\n- `/loa request|end|panel` → **loa**\n- `/activity check|summary` → **activity-check**\n\n-# Restrict command locations with `/commandchannel`.")
+    .setFooter(paradiseFooter("Clan help"));
+}
+
+function helpButtons() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("paradise_help:community").setLabel("Community").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("paradise_help:clan").setLabel("Clan").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("paradise_help:tsbtr").setLabel("TSBTR-style").setStyle(ButtonStyle.Secondary)
+  );
+}
+
+async function handleHelp(interaction) {
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ WHAT DO YOU NEED HELP WITH?")
+      .setDescription("Choose a system below. Its command guide is shown privately, including what each command does and where it belongs.")
+      .setFooter(paradiseFooter("Interactive command directory"))],
+    components: [helpButtons()],
+    ephemeral: true
+  });
+}
+
+async function publishSetupGuides(guild, mode) {
+  const channel = guild.channels.cache.find(item => item.name === "command-guide");
+  if (!channel?.isTextBased?.()) return null;
+  const message = await channel.send({
+    embeds: [helpEmbed(mode).setColor(await paradiseBrandColor())],
+    components: [helpButtons()]
+  });
+  await saveState(state => {
+    state.config.commandGuideMessageIds = state.config.commandGuideMessageIds || {};
+    state.config.commandGuideMessageIds[mode] = message.id;
+    return state;
+  });
+  return message;
+}
+
+function canManageClan(member) {
+  return member.permissions.has(PermissionsBitField.Flags.Administrator)
+    || member.roles.cache.some(role => ["Owner", "Admin", "Overseer", "Community Manager"].includes(role.name));
+}
+
+function relationshipLines(entries) {
+  const rows = Object.values(entries || {}).sort((a, b) => a.clan.localeCompare(b.clan));
+  return rows.length
+    ? rows.map(item => `◆ **${item.clan}**${item.representativeId ? ` — <@${item.representativeId}>` : ""}${item.invite ? `\n  [Server invite](${item.invite})` : ""}${item.note ? `\n  _${item.note}_` : ""}`).join("\n")
+    : "_None configured._";
+}
+
+async function updateRelationsPanel(guild) {
+  const channel = guild.channels.cache.find(item => item.name === "clan-relations");
+  if (!channel?.isTextBased?.()) return null;
+  const state = await loadState();
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🤝 PARADISE CLAN RELATIONS")
+    .setDescription("Relations are managed by authorized clan leadership and update automatically.")
+    .addFields(
+      { name: "◆ __Currently Allies__", value: relationshipLines(state.relations.allies).slice(0, 1024) },
+      { name: "⚔️ __Enemy Clans__", value: relationshipLines(state.relations.enemies).slice(0, 1024) }
+    )
+    .setFooter(paradiseFooter("Use /relation"));
+  let message = state.config.relationsMessageId
+    ? await channel.messages.fetch(state.config.relationsMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => { next.config.relationsMessageId = message.id; return next; });
+  return message;
+}
+
+async function handleRelation(interaction) {
+  if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  if (sub !== "panel") {
+    const type = interaction.options.getString("type");
+    const clan = interaction.options.getString("clan").trim();
+    const invite = interaction.options.getString("invite")?.trim() || null;
+    if (invite && !/^https:\/\/(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite)\/[a-z0-9-]+\/?$/i.test(invite)) {
+      return interaction.reply({ content: "Invite must be an official Discord invite URL.", ephemeral: true });
+    }
+    const key = clan.toLocaleLowerCase("en-US");
+    await saveState(state => {
+      state.relations.allies = state.relations.allies || {};
+      state.relations.enemies = state.relations.enemies || {};
+      const bucket = type === "ally" ? state.relations.allies : state.relations.enemies;
+      const opposite = type === "ally" ? state.relations.enemies : state.relations.allies;
+      if (sub === "remove") delete bucket[key];
+      else {
+        delete opposite[key];
+        bucket[key] = {
+          clan,
+          representativeId: interaction.options.getUser("representative")?.id || null,
+          invite,
+          note: interaction.options.getString("note") || null,
+          updatedBy: interaction.user.id,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return state;
+    });
+  }
+  const panel = await updateRelationsPanel(interaction.guild);
+  return interaction.reply({ content: panel ? `Relations board updated: ${panel.url}` : "Create a `clan-relations` channel first.", ephemeral: true });
+}
+
+function rankLabel(state, userId) {
+  const spot = state.leaderboard[userId]?.spot;
+  return spot ? `#${spot}` : "Unranked";
+}
+
+export function timedAvailabilityLines(state, field, now = Date.now()) {
+  return Object.entries(state.leaderboard || {})
+    .map(([userId, item]) => ({ userId, spot: item.spot, expiresAt: Number(item.availability?.[field] || 0) }))
+    .filter(item => item.expiresAt > now)
+    .sort((a, b) => a.expiresAt - b.expiresAt)
+    .map(item => `• <@${item.userId}> | **${item.spot ? `Rank #${item.spot}` : "Unranked"}** expires <t:${Math.floor(item.expiresAt / 1000)}:R>`)
+    .join("\n") || "_None._";
+}
+
+export function challengedLines(state) {
+  return Object.values(state.pendingChallenges || {})
+    .filter(item => item.status === "open")
+    .map(item => `<@${item.opponentId}> (${rankLabel(state, item.opponentId)}) is being challenged by <@${item.challengerId}> (${rankLabel(state, item.challengerId)})\n-# Ticket ID: ${item.ticketId}`)
+    .join("\n\n") || "_No active challenge tickets._";
+}
+
+async function updateAvailabilityPanel(guild) {
+  const channel = guild.channels.cache.find(item => item.name === "availability");
+  if (!channel?.isTextBased?.()) return null;
+  const state = await loadState();
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHALLENGE AVAILABILITY")
+    .setDescription(("## ◆ Current Cooldowns\n" + timedAvailabilityLines(state, "cooldownUntil")
+      + "\n\n## ◆ Current Immunity\n" + timedAvailabilityLines(state, "immunityUntil")
+      + "\n\n## ◆ Being Challenged\n" + challengedLines(state)
+      + "\n\n-# LOA entries are intentionally kept in the separate LOA panel.").slice(0, 4096))
+    .setFooter(paradiseFooter("Automatically refreshed by challenge results"));
+  let message = state.config.availabilityMessageId
+    ? await channel.messages.fetch(state.config.availabilityMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => { next.config.availabilityMessageId = message.id; return next; });
+  return message;
+}
+
+async function handleAvailability(interaction) {
+  const sub = interaction.options.getSubcommand();
+  if (sub !== "panel" && !canApproveReferee(interaction.member)) {
+    return interaction.reply({ content: "Referee Manager or administrator required.", ephemeral: true });
+  }
+  if (["cooldown", "immunity"].includes(sub)) {
+    const user = interaction.options.getUser("user");
+    const rank = interaction.options.getInteger("rank");
+    const expiresAt = Date.now() + interaction.options.getInteger("hours") * 3_600_000;
+    await saveState(state => {
+      const current = state.leaderboard[user.id] || { wins: 0, losses: 0, history: [] };
+      if (rank) current.spot = rank;
+      current.availability = current.availability || {};
+      current.availability[sub === "cooldown" ? "cooldownUntil" : "immunityUntil"] = expiresAt;
+      state.leaderboard[user.id] = current;
+      return state;
+    });
+  } else if (sub === "clear") {
+    const user = interaction.options.getUser("user");
+    const type = interaction.options.getString("type");
+    await saveState(state => {
+      if (state.leaderboard[user.id]?.availability) {
+        delete state.leaderboard[user.id].availability[type === "cooldown" ? "cooldownUntil" : "immunityUntil"];
+      }
+      return state;
+    });
+  }
+  const panel = await updateAvailabilityPanel(interaction.guild);
+  return interaction.reply({ content: panel ? `Availability board updated: ${panel.url}` : "Create an `availability` channel first.", ephemeral: true });
+}
+
+function activeLoaLines(state) {
+  const now = Date.now();
+  const rows = Object.values(state.loa || {})
+    .filter(item => item.status === "approved" && item.expiresAt > now)
+    .sort((a, b) => a.expiresAt - b.expiresAt);
+  return rows.length
+    ? rows.map(item => `◆ <@${item.userId}>\n- **Ends:** <t:${Math.floor(item.expiresAt / 1000)}:F> (<t:${Math.floor(item.expiresAt / 1000)}:R>)\n- **Reason:** ${item.reason}`).join("\n\n")
+    : "_No active staff LOAs._";
+}
+
+async function updateLoaPanel(guild) {
+  const channel = guild.channels.cache.find(item => item.name === "loa");
+  if (!channel?.isTextBased?.()) return null;
+  const state = await loadState();
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🌙 STAFF LEAVE OF ABSENCE")
+    .setDescription(("## ◆ Active LOAs\n" + activeLoaLines(state) + "\n\n-# LOA is separate from challenge cooldown and immunity.").slice(0, 4096))
+    .setFooter(paradiseFooter("Staff attendance"));
+  let message = state.config.loaMessageId
+    ? await channel.messages.fetch(state.config.loaMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => { next.config.loaMessageId = message.id; return next; });
+  return message;
+}
+
+async function handleLoa(interaction) {
+  const sub = interaction.options.getSubcommand();
+  if (sub === "request") {
+    const expiresAt = Date.now() + interaction.options.getInteger("days") * 86_400_000;
+    const record = {
+      userId: interaction.user.id,
+      reason: interaction.options.getString("reason"),
+      expiresAt,
+      status: "pending",
+      requestedAt: new Date().toISOString()
+    };
+    await saveState(state => { state.loa[interaction.user.id] = record; return state; });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`paradise_loa_approve:${interaction.user.id}`).setLabel("Approve LOA").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`paradise_loa_deny:${interaction.user.id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+    );
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(0xffc857).setTitle("LOA Request — Pending")
+        .setDescription(`**Staff:** ${interaction.user}\n**Ends:** <t:${Math.floor(expiresAt / 1000)}:F>\n**Reason:** ${record.reason}`)
+        .setFooter(paradiseFooter("Manager approval required"))],
+      components: [row]
+    });
+  }
+  if (sub === "end") {
+    await saveState(state => {
+      if (state.loa[interaction.user.id]) state.loa[interaction.user.id].status = "ended";
+      return state;
+    });
+    const role = interaction.guild.roles.cache.find(item => item.name === "LOA");
+    if (role && interaction.member.roles.cache.has(role.id)) await interaction.member.roles.remove(role).catch(() => {});
+  }
+  const panel = await updateLoaPanel(interaction.guild);
+  return interaction.reply({ content: panel ? `LOA board updated: ${panel.url}` : "Create an `loa` channel first.", ephemeral: true });
+}
+
+async function handleLoaDecision(interaction) {
+  if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
+  const [action, userId] = interaction.customId.replace("paradise_loa_", "").split(":");
+  const state = await loadState();
+  const record = state.loa[userId];
+  if (!record || record.status !== "pending") return interaction.reply({ content: "This LOA request is no longer pending.", ephemeral: true });
+  await saveState(next => {
+    next.loa[userId] = { ...record, status: action === "approve" ? "approved" : "denied", decidedBy: interaction.user.id, decidedAt: new Date().toISOString() };
+    return next;
+  });
+  if (action === "approve") {
+    const member = await interaction.guild.members.fetch(userId).catch(() => null);
+    const role = await ensureRole(interaction.guild, "LOA");
+    if (member && role) await member.roles.add(role).catch(() => {});
+  }
+  await updateLoaPanel(interaction.guild).catch(() => {});
+  return interaction.update({
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(action === "approve" ? 0x2ecc71 : 0xff4d6d)
+      .setTitle(action === "approve" ? "LOA Request — Approved" : "LOA Request — Denied")],
+    components: []
+  });
 }
 
 async function handleFindFcw(interaction) {
@@ -1267,8 +1731,22 @@ function localizedHelp(locale) {
 export async function handleParadiseInteraction(interaction) {
   if (interaction.guildId && interaction.guildId !== PARADISE_TEST_GUILD_ID) return false;
   if (interaction.isButton?.()) {
-    if (interaction.customId === "paradise_setup_confirm_clan") { await applyClanSetup(interaction); return true; }
+    if (interaction.customId === "paradise_setup_confirm_clan") { await applyServerSetup(interaction, "clan"); return true; }
+    if (interaction.customId.startsWith("paradise_setup_select:")) {
+      await setupPreview(interaction, interaction.customId.split(":")[1], true);
+      return true;
+    }
+    if (interaction.customId.startsWith("paradise_setup_confirm:")) {
+      await applyServerSetup(interaction, interaction.customId.split(":")[1]);
+      return true;
+    }
     if (interaction.customId === "paradise_setup_cancel") { await interaction.update({ content: "Setup cancelled.", embeds: [], components: [] }); return true; }
+    if (interaction.customId.startsWith("paradise_help:")) {
+      const scope = interaction.customId.split(":")[1];
+      await interaction.update({ embeds: [helpEmbed(scope).setColor(await paradiseBrandColor())], components: [helpButtons()] });
+      return true;
+    }
+    if (interaction.customId.startsWith("paradise_loa_")) { await handleLoaDecision(interaction); return true; }
     if (interaction.customId.startsWith("paradise_tryout_")) { await handleTryoutApproval(interaction); return true; }
     if (interaction.customId.startsWith("paradise_challenge_")) { await handleChallengeApproval(interaction); return true; }
     if (interaction.customId.startsWith("paradise_session_")) { await handleSessionButton(interaction); return true; }
@@ -1294,7 +1772,13 @@ export async function handleParadiseInteraction(interaction) {
   }
   if (!interaction.isChatInputCommand?.()) return false;
   if (!await enforceCommandChannel(interaction)) return true;
-  if (["setupfieels", "previewserversetup", "backupserverstructure"].includes(interaction.commandName)) { await setupPreview(interaction); return true; }
+  if (interaction.commandName === "setupfieels" || interaction.commandName === "previewserversetup") { await setupChooser(interaction); return true; }
+  if (interaction.commandName === "backupserverstructure") { await setupPreview(interaction, "clan"); return true; }
+  if (interaction.commandName === "setupfieelscommunity") { await setupPreview(interaction, "community"); return true; }
+  if (interaction.commandName === "setupfieelsclan") { await setupPreview(interaction, "clan"); return true; }
+  if (interaction.commandName === "setupfieelstsbtr") { await setupPreview(interaction, "tsbtr"); return true; }
+  if (interaction.commandName === "setup") { await setupPreview(interaction, interaction.options.getString("mode") || "community"); return true; }
+  if (interaction.commandName === "help") { await handleHelp(interaction); return true; }
   if (interaction.commandName === "verifyroblox") { await verifyStart(interaction); return true; }
   if (interaction.commandName === "verifyrobloxcheck") { await verifyCheck(interaction); return true; }
   if (interaction.commandName === "paradisehelp") { await interaction.reply({ content: localizedHelp(interaction.locale), ephemeral: true }); return true; }
@@ -1326,5 +1810,8 @@ export async function handleParadiseInteraction(interaction) {
   if (interaction.commandName === "commandchannel") { await handleCommandChannel(interaction); return true; }
   if (interaction.commandName === "sticky") { await handleSticky(interaction); return true; }
   if (interaction.commandName === "branding") { await handleBranding(interaction); return true; }
+  if (interaction.commandName === "relation") { await handleRelation(interaction); return true; }
+  if (interaction.commandName === "availability") { await handleAvailability(interaction); return true; }
+  if (interaction.commandName === "loa") { await handleLoa(interaction); return true; }
   return false;
 }

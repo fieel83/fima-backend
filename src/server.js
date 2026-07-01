@@ -612,7 +612,11 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, 
       pendingTryouts: Object.values(state.pendingTryouts || {}).filter(item => item.status !== "approved").length,
       pendingChallenges: Object.values(state.pendingChallenges || {}).filter(item => ["open", "pending"].includes(item.status)).length,
       activeSessions: Object.values(state.trainings || {}).filter(item => item.status !== "ended").length,
-      whitelists: Object.keys(state.whitelists || {}).length
+      whitelists: Object.keys(state.whitelists || {}).length,
+      activeSetupMode: state.config?.activeSetupMode || null,
+      allies: Object.keys(state.relations?.allies || {}).length,
+      enemies: Object.keys(state.relations?.enemies || {}).length,
+      activeLoa: Object.values(state.loa || {}).filter(item => item.status === "approved" && Number(item.expiresAt) > Date.now()).length
     }
   });
 });

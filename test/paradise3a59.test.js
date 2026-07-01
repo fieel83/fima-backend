@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  canAssignRank, compareRanks, normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommands, rankPower, rankToRoleName
+  canAssignRank, challengedLines, compareRanks, normalizeParadiseBrandColor, paradiseBrandColorInteger,
+  paradiseCommands, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
@@ -44,6 +44,11 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("report"));
   assert.ok(names.includes("findfcw"));
   assert.ok(names.includes("branding"));
+  assert.ok(names.includes("help"));
+  assert.ok(names.includes("relation"));
+  assert.ok(names.includes("availability"));
+  assert.ok(names.includes("loa"));
+  assert.ok(names.includes("setupfieelstsbtr"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
 });
 
@@ -52,4 +57,27 @@ test("Paradise brand color accepts safe HEX and rejects malformed values", () =>
   assert.equal(normalizeParadiseBrandColor("001122"), "#001122");
   assert.equal(normalizeParadiseBrandColor("javascript:red"), "#9B5CFF");
   assert.equal(paradiseBrandColorInteger("#12ABEF"), 0x12abef);
+});
+
+test("Community, Clan and TSBTR setup templates remain separate", () => {
+  assert.deepEqual(Object.keys(PARADISE_SETUP_SCHEMAS), ["community", "clan", "tsbtr"]);
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("fima-macro")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("clan-relations")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.some(([, channels]) => channels.includes("top-30")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("loa")));
+});
+
+test("availability board separates timed entries and active tickets", () => {
+  const state = {
+    leaderboard: {
+      "1": { spot: 25, availability: { cooldownUntil: 4_102_444_800_000 } },
+      "2": { spot: 7, availability: {} },
+      "3": { spot: 8, availability: {} }
+    },
+    pendingChallenges: {
+      ticket: { status: "open", ticketId: "110", challengerId: "3", opponentId: "2" }
+    }
+  };
+  assert.match(timedAvailabilityLines(state, "cooldownUntil", 0), /<@1>.*Rank #25.*<t:4102444800:R>/);
+  assert.match(challengedLines(state), /<@2> \(#7\).*<@3> \(#8\).*Ticket ID: 110/s);
 });
