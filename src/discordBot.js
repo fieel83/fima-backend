@@ -4,7 +4,7 @@ import path from "node:path";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
-import { handleParadiseInteraction, initializeParadise, paradiseCommands } from "./paradise3a59.js";
+import { handleParadiseGuildMemberUpdate, handleParadiseInteraction, handleParadiseMessage, initializeParadise, paradiseCommands } from "./paradise3a59.js";
 
 const ROLE_TYPES = {
   buyer: {
@@ -301,7 +301,8 @@ export function startDiscordBot() {
   client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages
     ]
   });
 
@@ -333,6 +334,20 @@ export function startDiscordBot() {
       if (interaction?.isRepliable?.() && !interaction.replied && !interaction.deferred) {
         interaction.reply({ content: "Fima bot could not complete that action. Try again later.", ephemeral: true }).catch(() => {});
       }
+    });
+  });
+
+  client.on("messageCreate", (message) => {
+    handleParadiseMessage(message).catch((error) => {
+      lastError = error.message;
+      console.warn("Paradise sticky message handler failed", { message: error.message, channelId: message?.channelId || null });
+    });
+  });
+
+  client.on("guildMemberUpdate", (oldMember, newMember) => {
+    handleParadiseGuildMemberUpdate(oldMember, newMember).catch((error) => {
+      lastError = error.message;
+      console.warn("Paradise staff-team refresh failed", { message: error.message, guildId: newMember?.guild?.id || null });
     });
   });
 

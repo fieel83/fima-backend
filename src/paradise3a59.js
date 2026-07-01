@@ -16,6 +16,7 @@ const pendingTryouts = new Map();
 const pendingChallenges = new Map();
 const activeTrainings = new Map();
 const activeTournaments = new Map();
+const staffTeamRefreshTimers = new Map();
 const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
 const STATE_KEY = "paradise_3a59_state_v1";
 const EMPTY_STATE = Object.freeze({
@@ -221,6 +222,11 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("remove").setDescription("Remove this channel from a command")
         .addStringOption(o => o.setName("command").setDescription("Command name without /").setRequired(true)))
       .addSubcommand(s => s.setName("list").setDescription("List command-channel restrictions")),
+    new SlashCommandBuilder().setName("sticky").setDescription("Manage a repeating channel guide message")
+      .addSubcommand(s => s.setName("set").setDescription("Set the sticky message for this channel")
+        .addStringOption(o => o.setName("text").setDescription("Sticky text").setRequired(true).setMaxLength(1800)))
+      .addSubcommand(s => s.setName("remove").setDescription("Remove this channel's sticky message"))
+      .addSubcommand(s => s.setName("list").setDescription("List configured sticky channels")),
     new SlashCommandBuilder().setName("paradisehelp").setDescription("Show private English/Turkish command guidance.")
   ];
 }
@@ -346,6 +352,7 @@ async function applyClanSetup(interaction) {
     .filter(r => !r.managed && r.id !== interaction.guild.id && !PARADISE_ROLES.includes(r.name));
   for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
   const autoMod = await ensureParadiseAutoMod(interaction.guild).catch(error => ({ status: "failed", error: error.message }));
+  await updateStaffTeamEmbed(interaction.guild).catch(() => {});
   await saveState(state => {
     state.config.autoActivityChecks = true;
     state.config.autoActivityRoleRemoval = true;
@@ -1117,6 +1124,93 @@ async function enforceCommandChannel(interaction) {
   return false;
 }
 
+async function handleSticky(interaction) {
+  if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages) && !isOwner(interaction)) {
+    return interaction.reply({ content: "Manage Messages permission required.", ephemeral: true });
+  }
+  const sub = interaction.options.getSubcommand();
+  const state = await loadState();
+  const stickies = state.config.stickies || {};
+  if (sub === "list") {
+    const lines = Object.entries(stickies).map(([channelId, item]) => `<#${channelId}> — ${String(item.text).slice(0, 80)}`);
+    return interaction.reply({ content: lines.join("\n") || "No sticky messages configured.", ephemeral: true });
+  }
+  if (sub === "remove") {
+    await saveState(next => { if (next.config.stickies) delete next.config.stickies[interaction.channelId]; return next; });
+    return interaction.reply({ content: "Sticky removed for this channel.", ephemeral: true });
+  }
+  const text = interaction.options.getString("text").trim();
+  await saveState(next => {
+    next.config.stickies = next.config.stickies || {};
+    next.config.stickies[interaction.channelId] = { text, updatedBy: interaction.user.id, updatedAt: new Date().toISOString(), lastSentAt: 0, messageId: null };
+    return next;
+  });
+  const sent = await interaction.channel.send({ embeds: [new EmbedBuilder().setColor(0x9b5cff).setDescription(text).setFooter({ text: "Sticky guide • Made by Paradise bot" })] });
+  await saveState(next => {
+    next.config.stickies[interaction.channelId] = { ...next.config.stickies[interaction.channelId], messageId: sent.id, lastSentAt: Date.now() };
+    return next;
+  });
+  return interaction.reply({ content: "Sticky configured.", ephemeral: true });
+}
+
+export async function handleParadiseMessage(message) {
+  if (!message.guild || message.guild.id !== PARADISE_TEST_GUILD_ID || message.author.bot) return false;
+  const state = await loadState();
+  const sticky = state.config.stickies?.[message.channelId];
+  if (!sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return false;
+  if (sticky.messageId) await message.channel.messages.delete(sticky.messageId).catch(() => {});
+  const sent = await message.channel.send({ embeds: [new EmbedBuilder().setColor(0x9b5cff).setDescription(sticky.text).setFooter({ text: "Sticky guide • Made by Paradise bot" })] });
+  await saveState(next => {
+    next.config.stickies = next.config.stickies || {};
+    next.config.stickies[message.channelId] = { ...sticky, messageId: sent.id, lastSentAt: Date.now() };
+    return next;
+  });
+  return true;
+}
+
+async function updateStaffTeamEmbed(guild) {
+  const channel = guild.channels.cache.find(item => item.name === "staff-team");
+  if (!channel) return null;
+  await guild.members.fetch().catch(() => {});
+  const roleNames = [
+    "Owner", "Admin", "Overseer", "Community Manager", "Training Manager", "Training Supervisor",
+    "Tryout Manager", "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
+    "Referee Manager", "Experienced Referee", "Referee", "Trial Referee",
+    "Experienced Training Hoster", "Training Hoster", "Experienced Tryout Hoster", "Tryout Hoster", "War Hoster"
+  ];
+  const lines = [];
+  for (const name of roleNames) {
+    const role = guild.roles.cache.find(item => item.name === name);
+    if (!role) continue;
+    const members = [...role.members.values()].filter(member => !member.user.bot);
+    lines.push(`**${name}**\n${members.length ? members.map(member => `${member}`).join(", ") : "Vacant"}`);
+  }
+  const embed = new EmbedBuilder().setColor(0x9b5cff).setTitle("Paradise Staff Team")
+    .setDescription(lines.join("\n\n").slice(0, 4000) || "Staff roles are not configured yet.")
+    .setFooter({ text: "Automatically updated from Discord roles • Made by Paradise bot" })
+    .setTimestamp();
+  const state = await loadState();
+  let message = state.config.staffTeamMessageId
+    ? await channel.messages.fetch(state.config.staffTeamMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => { next.config.staffTeamMessageId = message.id; return next; });
+  return message;
+}
+
+export async function handleParadiseGuildMemberUpdate(oldMember, newMember) {
+  if (newMember.guild.id !== PARADISE_TEST_GUILD_ID || oldMember.roles.cache.size === newMember.roles.cache.size
+    && [...oldMember.roles.cache.keys()].every(id => newMember.roles.cache.has(id))) return false;
+  clearTimeout(staffTeamRefreshTimers.get(newMember.guild.id));
+  const timer = setTimeout(() => {
+    staffTeamRefreshTimers.delete(newMember.guild.id);
+    updateStaffTeamEmbed(newMember.guild).catch(() => {});
+  }, 1500);
+  timer.unref?.();
+  staffTeamRefreshTimers.set(newMember.guild.id, timer);
+  return true;
+}
+
 function localizedHelp(locale) {
   return String(locale).toLowerCase().startsWith("tr")
     ? "Komutlar: `/verifyroblox`, `/tryout start`, `/tryout result`, `/paradisetraining start`, `/challenge create`. Sonuçlar doğrulama ve yetki sınırlarından geçer."
@@ -1183,5 +1277,6 @@ export async function handleParadiseInteraction(interaction) {
   if (interaction.commandName === "report") { await handleStaffReport(interaction); return true; }
   if (interaction.commandName === "findfcw") { await handleFindFcw(interaction); return true; }
   if (interaction.commandName === "commandchannel") { await handleCommandChannel(interaction); return true; }
+  if (interaction.commandName === "sticky") { await handleSticky(interaction); return true; }
   return false;
 }
