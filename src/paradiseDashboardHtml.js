@@ -11,7 +11,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
   <title>Paradise Owner Console</title>
   <style>
     :root{--brand:#8b5cf6;--brand-rgb:139,92,246;--brand-soft:rgba(var(--brand-rgb),.18);--bg:#0d0914;--panel:#171121;--panel2:#20182d;--line:#392b4e;--text:#faf8ff;--muted:#b8aec8;--good:#68e6aa;--warn:#ffd171;--bad:#ff7894}
-    *{box-sizing:border-box}[hidden]{display:none!important}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% -10%,var(--brand-soft),transparent 32%),radial-gradient(circle at 90% 12%,#3b1d5b33,transparent 30%),linear-gradient(145deg,var(--bg),#09070e 62%,#110a18);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif}
+    *{box-sizing:border-box}[hidden]{display:none!important}html{scroll-behavior:smooth;scrollbar-color:var(--brand) #100b18;scrollbar-width:thin}::-webkit-scrollbar{width:11px;height:11px}::-webkit-scrollbar-track{background:#100b18}::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--brand),#4d2d78);border:2px solid #100b18;border-radius:999px}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% -10%,var(--brand-soft),transparent 32%),radial-gradient(circle at 90% 12%,#3b1d5b33,transparent 30%),linear-gradient(145deg,var(--bg),#09070e 62%,#110a18);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif;overflow-x:hidden}body:before{content:"";position:fixed;z-index:-1;width:44vw;height:44vw;left:-16vw;top:42vh;border-radius:50%;background:radial-gradient(circle,var(--brand-soft),transparent 66%);filter:blur(10px);animation:ambientDrift 16s ease-in-out infinite alternate}@keyframes ambientDrift{to{transform:translate(24vw,-20vh) scale(1.18);opacity:.68}}
     main{width:min(1460px,calc(100% - 28px));margin:22px auto 60px}.hero,.panel{border:1px solid var(--line);background:linear-gradient(145deg,rgba(31,23,44,.94),rgba(18,13,27,.97));border-radius:18px;box-shadow:0 22px 70px #0007,0 1px 0 #ffffff0b inset;backdrop-filter:blur(14px)}
     .hero{padding:26px;border-left:5px solid var(--brand);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;inset:-80% -10% auto 55%;height:240px;background:radial-gradient(circle,var(--brand-soft),transparent 68%);pointer-events:none}.badge{color:#ddd5ea;font-weight:900;text-transform:uppercase;letter-spacing:.11em;font-size:12px}
     h1{font-size:clamp(30px,5vw,44px);margin:7px 0 4px}h2{margin:0 0 4px;font-size:21px}h3{margin:18px 0 8px;font-size:15px;color:#ddd9e3}.muted,.help{color:var(--muted)}.help{margin:4px 0 14px;font-size:13px;line-height:1.45}
@@ -19,14 +19,14 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
     .console-shell{display:grid;grid-template-columns:235px minmax(0,1fr);gap:16px;margin-top:16px}.page-nav{position:sticky;top:14px;align-self:start;padding:12px}.page-nav button{margin:3px 0;text-align:left;background:transparent;border-color:transparent;color:var(--muted);font-weight:750;transition:.18s ease}.page-nav button:hover,.page-nav button.active{color:#fff;background:linear-gradient(90deg,var(--brand-soft),transparent);border-color:#ffffff12;transform:translateX(3px)}.page-nav small{display:block;padding:8px 10px;color:#7f748e;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
     .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.stack{display:grid;gap:14px}.panel{padding:22px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}.panel:hover{border-color:color-mix(in srgb,var(--brand) 44%,var(--line));box-shadow:0 26px 80px #0008,0 0 0 1px var(--brand-soft)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
     label{display:block;margin:10px 0 6px;font-weight:800;font-size:13px}input,select,textarea,button,a.button{width:100%;border-radius:11px;border:1px solid var(--line);background:#0d0914;color:#fff;padding:11px;font:inherit;transition:border-color .18s,box-shadow .18s,transform .18s}
-    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}textarea{min-height:120px;resize:vertical}button,a.button{display:block;text-align:center;text-decoration:none;margin-top:11px;background:linear-gradient(135deg,var(--brand),#4d2d78);border-color:#ffffff25;font-weight:900;cursor:pointer}button:hover,a.button:hover{transform:translateY(-1px);filter:brightness(1.08)}button:disabled{opacity:.55;cursor:wait;transform:none}
-    button.secondary{background:#1b1426}.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border:1px solid #6e607f;border-radius:50%;font-size:11px;color:#e5dcf0;cursor:help;position:relative}.tip:hover:after{content:attr(title);position:absolute;z-index:20;left:24px;top:-8px;width:240px;padding:9px 11px;border-radius:9px;background:#09070e;border:1px solid var(--line);color:#eee7f7;box-shadow:0 10px 30px #000a;font-weight:500;line-height:1.35}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}textarea{min-height:120px;resize:vertical}button,a.button{display:block;position:relative;overflow:hidden;text-align:center;text-decoration:none;margin-top:11px;background:linear-gradient(135deg,var(--brand),#4d2d78);border-color:#ffffff25;font-weight:900;cursor:pointer}button:after,a.button:after{content:"";position:absolute;inset:-80% auto -80% -35%;width:24%;transform:rotate(18deg);background:#ffffff22;transition:left .45s ease}button:hover:after,a.button:hover:after{left:120%}button:hover,a.button:hover{transform:translateY(-2px);filter:brightness(1.12);box-shadow:0 10px 28px var(--brand-soft)}button:active,a.button:active{transform:translateY(0) scale(.99)}button:disabled{opacity:.55;cursor:wait;transform:none}
+    button.secondary{background:linear-gradient(145deg,#251b34,#15101e)}button.audit-action{background:linear-gradient(135deg,#2563eb,#4f46e5)}button.backup-action{background:linear-gradient(135deg,#0f766e,#115e59)}button.preview-action{background:linear-gradient(135deg,#a16207,#7c2d12)}.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border:1px solid #6e607f;border-radius:50%;font-size:11px;color:#e5dcf0;cursor:help;position:relative}.tip:hover:after{content:attr(title);position:absolute;z-index:20;left:24px;top:-8px;width:240px;padding:9px 11px;border-radius:9px;background:#09070e;border:1px solid var(--line);color:#eee7f7;box-shadow:0 10px 30px #000a;font-weight:500;line-height:1.35}
     .switch{display:flex;gap:9px;align-items:center;font-weight:700;margin:9px 0}.switch input{width:auto}.color-row{display:grid;grid-template-columns:72px 1fr;gap:10px}.color-row input[type=color]{height:45px;padding:3px}
     .mapping{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(180px,1.2fr);gap:8px;align-items:center;margin:7px 0}.mapping label{margin:0}.danger{border-color:#6a2937;background:linear-gradient(180deg,#241016,#110b0e)}.danger h2{color:#ff9aaa}.notice{padding:12px;border:1px solid #55451f;background:#1c170c;border-radius:10px;color:#ffe0a0;line-height:1.5}
     .status{white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;background:#0b0711;border:1px solid var(--line);border-radius:11px;padding:12px;color:#d7d3dc;font:12px ui-monospace,Consolas,monospace}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric{padding:15px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,#21182f,#120e1a)}.metric b{display:block;font-size:25px;margin-bottom:4px}.metric span{color:var(--muted);font-size:12px}
     .toast{position:fixed;z-index:100;right:18px;bottom:18px;max-width:420px;padding:14px 17px;border-radius:12px;background:#1e162a;border:1px solid var(--line);box-shadow:0 15px 45px #0009;display:none;animation:toastIn .2s ease}.toast.ok{display:block;color:var(--good)}.toast.error{display:block;color:var(--bad)}@keyframes toastIn{from{opacity:0;transform:translateY(8px)}}
     .access{max-width:720px;margin:10vh auto 0;text-align:center;padding:34px}.access-icon{width:54px;height:54px;margin:0 auto 16px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;background:#09090c;font-size:25px}.access-actions{display:flex;gap:10px;justify-content:center;margin-top:20px}.access-actions .button{width:auto;min-width:190px}.template-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.template-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:#0b0a0e;text-align:left}.template-card strong,.template-card span{display:block}.template-card span{color:var(--muted);font-size:12px;margin-top:5px;line-height:1.4}.template-card.is-active{border-color:var(--good);box-shadow:0 0 0 1px #23583d}.preview-card{margin-top:10px;padding:15px;border-left:5px solid var(--brand);background:#09090c;border-radius:10px}.permission-list{display:grid;gap:8px}.permission-item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#0a090d}.permission-item strong{display:block;margin-bottom:4px}.guide-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    .hero-actions{display:grid;grid-template-columns:minmax(220px,420px) auto;gap:10px;align-items:end;margin-top:17px;position:relative;z-index:1}.hero-actions label{margin:0}.dirty{color:var(--warn);font-size:12px;font-weight:800}.loading{position:fixed;z-index:90;inset:0;background:#09070ed6;display:grid;place-items:center}.spinner{width:48px;height:48px;border:4px solid #ffffff1f;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.theme-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.theme-pills button{background:#191222}.theme-pills button.is-active{box-shadow:0 0 0 2px var(--brand) inset}
+    .hero-actions{display:grid;grid-template-columns:minmax(220px,420px) minmax(150px,220px) auto;gap:10px;align-items:end;margin-top:17px;position:relative;z-index:1}.hero-actions label{margin:0}.dirty{color:var(--warn);font-size:12px;font-weight:800}.loading{position:fixed;z-index:90;inset:0;background:#09070ed6;display:grid;place-items:center}.spinner{width:48px;height:48px;border:4px solid #ffffff1f;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.theme-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.theme-pills button{background:#191222}.theme-pills button.is-active{box-shadow:0 0 0 2px var(--brand) inset}.operation-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.audit-summary{margin-top:12px;max-height:360px}
     @media(max-width:980px){.console-shell{grid-template-columns:1fr}.page-nav{position:sticky;top:0;z-index:30;display:flex;overflow:auto;gap:5px;padding:8px;background:#100b19ee}.page-nav small{display:none}.page-nav button{min-width:max-content;margin:0}.metric-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){main{width:min(100% - 18px,1460px)}.grid,.grid.three,.template-cards,.guide-actions,.metric-grid,.hero-actions{grid-template-columns:1fr}.mapping{grid-template-columns:1fr}.mapping label{margin-top:8px}.access-actions{flex-direction:column}.access-actions .button{width:100%}.hero,.panel{border-radius:14px}.panel{padding:17px}}
   </style>
 </head>
@@ -45,7 +45,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
     <h1>Paradise Operations Console</h1>
     <p class="muted">Multi-server operations, templates, transcripts, staff workflows and safe setup metadata. No bot credential is exposed here.</p>
     <div class="chips"><span class="chip" id="guildChip">Guild: loading</span><span class="chip" id="botChip">Bot: loading</span><span class="chip" id="syncChip">Commands: loading</span><span class="chip" id="templateChip">Template: loading</span></div>
-    <div class="hero-actions"><label for="serverSelect">Managed server <span class="tip" title="Only guilds where the official Paradise bot is currently connected appear here.">?</span><select id="serverSelect"><option>Loading managed servers…</option></select></label><span class="dirty" id="saveState">All settings loaded</span></div>
+    <div class="hero-actions"><label for="serverSelect">Managed server <span class="tip" title="Only guilds where the official Paradise bot is currently connected appear here.">?</span><select id="serverSelect"><option>Loading managed servers…</option></select></label><label for="uiLanguage">Panel language<select id="uiLanguage"><option value="tr">Türkçe</option><option value="en">English</option></select></label><span class="dirty" id="saveState">All settings loaded</span></div>
   </section>
 
   <div class="console-shell">
@@ -71,6 +71,16 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         <h2>Operations overview</h2>
         <p class="help">A clean operational summary for the selected server. Detailed runtime data remains sanitized.</p>
         <div class="metric-grid" id="metricGrid"><div class="metric"><b>—</b><span>Loading</span></div></div>
+      </section>
+      <section class="panel" data-page="overview">
+        <h2>Real server discovery</h2>
+        <p class="help">Uses the official Paradise bot API. Audit samples only important visible channels and returns classifications without dumping private message text.</p>
+        <div class="operation-actions">
+          <button class="audit-action" id="runRealAudit">Run deep audit</button>
+          <button class="backup-action" id="runStructureBackup">Create structure backup</button>
+          <button class="preview-action" id="runSetupPreview">Generate template preview</button>
+        </div>
+        <pre class="status audit-summary" id="realAuditStatus">No 3A61 audit has been run in this browser session.</pre>
       </section>
       <section class="panel">
         <h2>Identity & installation <span class="tip" title="Administrator is allowed only for the isolated test setup. Production should use least privilege.">?</span></h2>
@@ -305,6 +315,32 @@ const ROLE_KEYS=[
 let currentPayload=null,selectedGuildId='',csrfPromise=null,currentTheme='paradise';
 const byId=id=>document.getElementById(id);
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const UI_TR={
+  'Paradise Operations Console':'Paradise Operasyon Paneli','Operations':'Operasyonlar','Overview':'Genel Bakış','Setup & templates':'Kurulum ve şablonlar',
+  'Channels & transcripts':'Kanallar ve transcriptler','Roles & permissions':'Roller ve yetkiler','Challenge':'Meydan Okuma','Availability & LOA':'Uygunluk ve LOA',
+  'Roster & lineup':'Roster ve kadrolar','Relations':'İlişkiler','Blacklist & appeals':'Kara liste ve itirazlar','Guides':'Rehberler','Branding':'Görünüm',
+  'Security':'Güvenlik','Advanced':'Gelişmiş','Operations overview':'Operasyon özeti','Real server discovery':'Gerçek sunucu incelemesi',
+  'Run deep audit':'Derin audit çalıştır','Create structure backup':'Yapı yedeği oluştur','Generate template preview':'Şablon önizlemesi oluştur',
+  'Identity & installation':'Kimlik ve kurulum','Template & appearance':'Şablon ve görünüm','Challenge system':'Meydan okuma sistemi',
+  'Discord channel mappings':'Discord kanal eşlemeleri','Discord role mappings':'Discord rol eşlemeleri','Profiles, LOA & activity':'Profiller, LOA ve aktivite',
+  'Referee & hoster permissions':'Hakem ve hoster yetkileri','Relations board settings':'İlişki paneli ayarları','Guide & handbook repost':'Rehberleri yenile',
+  'Ticket & transcript operations':'Ticket ve transcript işlemleri','Roster, lineup & mainer boards':'Roster, kadro ve mainer panelleri',
+  'Blacklist, appeals & bail policy':'Kara liste, itiraz ve bail politikası','Advanced operations':'Gelişmiş işlemler','Danger Zone':'Tehlikeli Bölge',
+  'Live runtime':'Canlı çalışma durumu','Current counters':'Güncel sayaçlar','Restore notes':'Geri yükleme notları','Refresh live state':'Canlı durumu yenile',
+  'Save template':'Şablonu kaydet','Preview appearance':'Görünümü önizle','Save theme':'Temayı kaydet','Save challenge rules':'Meydan okuma ayarlarını kaydet',
+  'Save channel mappings':'Kanal eşlemelerini kaydet','Save role mappings':'Rol eşlemelerini kaydet','Export safe configuration':'Güvenli yapılandırmayı dışa aktar',
+  'Fima login required':'Fima girişi gerekli','Discord account required':'Discord hesabı gerekli','Paradise access is restricted':'Paradise erişimi kısıtlı',
+  'Session check unavailable':'Oturum kontrolü kullanılamıyor','Sign in to Fima':'Fima hesabına giriş yap','Link Discord account':'Discord hesabını bağla',
+  'Account settings':'Hesap ayarları','Review linked accounts':'Bağlı hesapları kontrol et','Try again':'Tekrar dene'
+};
+function applyUiLanguage(language){
+  const lang=language==='en'?'en':'tr';document.documentElement.lang=lang;try{localStorage.setItem('paradiseUiLanguage',lang)}catch{}
+  document.querySelectorAll('h1,h2,h3,button,nav small').forEach(element=>{
+    if(element.childElementCount)return;
+    if(!element.dataset.enText)element.dataset.enText=element.textContent.trim();
+    element.textContent=lang==='tr'?(UI_TR[element.dataset.enText]||element.dataset.enText):element.dataset.enText;
+  });
+}
 function show(message,ok=true){const el=byId('toast');el.className='toast '+(ok?'ok':'error');el.textContent=message;setTimeout(()=>el.className='toast',4500)}
 function hexToRgb(value){const match=/^#([0-9a-f]{6})$/i.exec(value);if(!match)return'139,92,246';const n=parseInt(match[1],16);return[(n>>16)&255,(n>>8)&255,n&255].join(',')}
 function applyBrand(value){document.documentElement.style.setProperty('--brand',value);document.documentElement.style.setProperty('--brand-rgb',hexToRgb(value));document.documentElement.style.setProperty('--brand-soft','rgba('+hexToRgb(value)+',.18)')}
@@ -381,6 +417,7 @@ function renderAccess(status){
     byId('accessMessage').textContent='The secure account check could not be completed. Refresh or try again shortly.';
     actions.innerHTML='<button onclick="start()">Try again</button>';
   }
+  applyUiLanguage(byId('uiLanguage')?.value||'tr');
   return false;
 }
 async function sessionStatus(){
@@ -448,6 +485,23 @@ function valueFor(kind){
 }
 async function save(kind){let value;try{value=valueFor(kind)}catch{show('Invalid JSON',false);return}if(!selectedGuildId)return show('Select a managed Paradise server first.',false);try{const{response,result}=await mutate('/api/paradise/config',{kind,value,guildId:selectedGuildId},'PATCH');if(!response.ok){show(result.error==='csrf_required'?'Security session could not be refreshed. Reload the panel.':result.error||'Save failed',false);return}show('Saved '+kind+' for the selected server');await load()}catch(error){show(error.message==='csrf_unavailable'?'Secure session token is unavailable. Sign in again.':'Save failed safely.',false)}}
 async function repostGuides(mode){if(!confirm('Repost or update the '+mode+' guide messages in the selected Discord server?'))return;try{const{response,result}=await mutate('/api/paradise/actions/repost-guides',{mode,guildId:selectedGuildId});if(!response.ok){show(result.error||'Guide repost failed',false);return}show('Updated '+result.posted+' guide messages');await load()}catch{show('Guide repost failed safely.',false)}}
+async function runManagedOperation(kind){
+  if(!selectedGuildId)return show('Select a managed Paradise server first.',false);
+  const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):byId('runSetupPreview');
+  button.disabled=true;setLoading(true);
+  try{
+    const body={guildId:selectedGuildId};if(kind==='preview')body.mode=byId('template').value;
+    const{response,result}=await mutate('/api/paradise/actions/'+kind,body);
+    if(!response.ok){show(result.error||kind+' failed',false);return}
+    const value=result.audit||result.backup||result.preview||{};
+    const safe=kind==='audit'
+      ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6),botRolePosition:value.guild.botRolePosition,capabilities:value.guild.capabilities}:null,counts:value.counts,readableChannels:(value.sampledChannels||[]).filter(channel=>channel.readable).map(channel=>channel.name),blockedChannels:(value.sampledChannels||[]).filter(channel=>!channel.readable).map(channel=>({name:channel.name,reason:channel.missingPermission}))}
+      :kind==='backup'
+        ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6)}:null,categories:(value.categories||[]).length,channels:(value.channels||[]).length,roles:(value.roles||[]).length}
+        :{status:value.status,generatedAt:value.generatedAt,template:value.templateLabel,createResources:(value.createResources||[]).length,keepResources:(value.keepResources||[]).length,extraResources:(value.extraResources||[]).length,createRoles:(value.createRoles||[]).length,warning:value.warning};
+    byId('realAuditStatus').textContent=JSON.stringify(safe,null,2);show(kind+' completed for the selected server');
+  }catch{show(kind+' failed safely.',false)}finally{button.disabled=false;setLoading(false)}
+}
 byId('brandPicker').oninput=e=>{const v=e.target.value.toUpperCase();byId('brandHex').value=v;applyBrand(v);markDirty()};byId('brandHex').oninput=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value)){byId('brandPicker').value=e.target.value;applyBrand(e.target.value);markDirty()}};
 byId('previewBrand').onclick=()=>{const value=byId('brandHex').value;if(!/^#[0-9a-f]{6}$/i.test(value))return show('Use a valid HEX color such as #000000',false);applyBrand(value);byId('brandPreview').scrollIntoView({behavior:'smooth',block:'center'})};
 document.querySelectorAll('[data-template]').forEach(card=>card.onclick=()=>{byId('template').value=card.dataset.template;document.querySelectorAll('[data-template]').forEach(item=>item.classList.toggle('is-active',item===card))});
@@ -455,9 +509,11 @@ document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset
 document.querySelectorAll('[data-theme]').forEach(button=>button.onclick=()=>{currentTheme=button.dataset.theme;const accent=byId('brandHex').value||THEMES[currentTheme].accent;applyTheme(currentTheme,accent);markDirty()});
 document.querySelectorAll('[data-page-button]').forEach(button=>button.onclick=()=>showPage(button.dataset.pageButton));
 byId('serverSelect').onchange=async event=>{selectedGuildId=event.target.value;await load()};
+byId('uiLanguage').onchange=event=>applyUiLanguage(event.target.value);
+byId('runRealAudit').onclick=()=>runManagedOperation('audit');byId('runStructureBackup').onclick=()=>runManagedOperation('backup');byId('runSetupPreview').onclick=()=>runManagedOperation('preview');
 document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};
-async function start(){try{initializePages();const status=await sessionStatus();if(renderAccess(status)){await csrfToken();await load()}else setLoading(false)}catch{setLoading(false);renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
+async function start(){try{const uiLanguage=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||'tr'}catch{return'tr'}})();byId('uiLanguage').value=uiLanguage;applyUiLanguage(uiLanguage);initializePages();const status=await sessionStatus();if(renderAccess(status)){await csrfToken();await load();applyUiLanguage(byId('uiLanguage').value)}else setLoading(false)}catch{setLoading(false);renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
 start();
 </script>
 </body></html>`;

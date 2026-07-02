@@ -1,9 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { paradiseDashboardHtml } from "../src/paradiseDashboardHtml.js";
 
 const serverSource = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
 const htmlSource = fs.readFileSync(new URL("../src/paradiseDashboardHtml.js", import.meta.url), "utf8");
+
+test("Paradise dashboard client script parses", () => {
+  const html = paradiseDashboardHtml({ clientId: "123", apiBaseUrl: "https://api.example.test", frontendUrl: "https://example.test" });
+  const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1] || "";
+  assert.ok(script.length > 1000);
+  assert.doesNotThrow(() => new Function(script));
+});
 
 test("Paradise dashboard requires the exact linked Discord owner ID", () => {
   assert.match(serverSource, /PARADISE_OWNER_DISCORD_ID\s*=\s*"762858334440521739"/);
@@ -82,6 +90,19 @@ test("Paradise dashboard exposes explained operations fields and live Discord st
   assert.match(htmlSource, /Support transcripts \(private\)/);
   assert.match(htmlSource, /Roster, lineup & mainer boards/);
   assert.match(htmlSource, /Blacklist, appeals & bail policy/);
+});
+
+test("3A61 dashboard exposes Turkish UI, animated premium controls and real audit actions", () => {
+  assert.match(htmlSource, /id="uiLanguage"/);
+  assert.match(htmlSource, /Türkçe/);
+  assert.match(htmlSource, /ambientDrift/);
+  assert.match(htmlSource, /::-webkit-scrollbar-thumb/);
+  assert.match(htmlSource, /runRealAudit/);
+  assert.match(htmlSource, /runStructureBackup/);
+  assert.match(htmlSource, /runSetupPreview/);
+  assert.match(serverSource, /\/api\/paradise\/actions\/audit/);
+  assert.match(serverSource, /\/api\/paradise\/actions\/backup/);
+  assert.match(serverSource, /\/api\/paradise\/actions\/preview/);
 });
 
 test("destructive Paradise setup requires a typed final confirmation", () => {

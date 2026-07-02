@@ -1,0 +1,13 @@
+{
+  "status": "SOURCE ONLY",
+  "implemented": ["challenge create panel", "challenge rules/results mappings", "availability board", "sticky ticket header", "in-ticket autowin context", "pending approvals", "transcript export"],
+  "permissionBoundary": {
+    "Trial Referee": "blocked from approval",
+    "Referee": "blocked from approval by default",
+    "Experienced Referee": "allowed",
+    "Referee Manager": "allowed",
+    "OwnerOrAdministrator": "allowed"
+  },
+  "localTest": "PASS",
+  "livePanelVerification": "WAITING FOR TEST-SERVER AUDIT/PREVIEW EXECUTION"
+}

@@ -46,8 +46,12 @@ import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicen
 import {
   discordBotHealth,
   giveDiscordRole,
+  paradiseDiscordAuditJobStatus,
+  paradiseDiscordDeepAudit,
   paradiseDiscordGuildsSnapshot,
   paradiseDiscordRuntimeSnapshot,
+  paradiseDiscordSetupPreview,
+  paradiseDiscordStructureBackup,
   repostParadiseGuides,
   removeDiscordRole,
   sendPasswordResetDm,
@@ -248,6 +252,7 @@ app.get("/health", (_req, res) => {
     buildTime,
     mode: env("NODE_ENV", "development"),
     apiBaseUrl: apiBaseUrl(),
+    paradiseAudit: paradiseDiscordAuditJobStatus(),
     stripe: stripeStatus()
   });
 });
@@ -685,6 +690,92 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
       activeLoa: Object.values(state.loa || {}).filter(item => belongsToSelectedGuild(item) && item.status === "approved" && Number(item.expiresAt) > Date.now()).length
     }
   });
+});
+
+app.get("/api/paradise/real-audit", requireUser, requireParadiseOwner, async (req, res) => {
+  const guildId = String(req.query?.guildId || "");
+  if (!guildId) return res.status(400).json({ error: "guild_id_required" });
+  const row = await prisma.setting.findUnique({ where: { key: `paradise_3a61_audit_${guildId}` } });
+  return res.json({ success: true, guildId, audit: row?.value || null });
+});
+
+app.post("/api/paradise/actions/audit", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  try {
+    const audit = await paradiseDiscordDeepAudit(guildId);
+    await prisma.setting.upsert({
+      where: { key: `paradise_3a61_audit_${guildId}` },
+      update: { value: audit },
+      create: { key: `paradise_3a61_audit_${guildId}`, value: audit }
+    });
+    await createAuditLog("paradise_real_server_audit", "discord_guild", guildId, {
+      actorUserId: req.user.id,
+      counts: audit.counts
+    });
+    return res.json({ success: true, guildId, audit });
+  } catch (error) {
+    console.error("Paradise real audit failed", publicError(error));
+    return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "real_audit_failed" });
+  }
+});
+
+app.post("/api/paradise/actions/backup", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  try {
+    const backup = await paradiseDiscordStructureBackup(guildId);
+    await prisma.setting.upsert({
+      where: { key: `paradise_3a61_backup_${guildId}` },
+      update: { value: backup },
+      create: { key: `paradise_3a61_backup_${guildId}`, value: backup }
+    });
+    await createAuditLog("paradise_server_structure_backed_up", "discord_guild", guildId, {
+      actorUserId: req.user.id,
+      capturedAt: backup.capturedAt
+    });
+    return res.json({ success: true, guildId, backup });
+  } catch (error) {
+    console.error("Paradise structure backup failed", publicError(error));
+    return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "backup_failed" });
+  }
+});
+
+app.post("/api/paradise/actions/preview", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  const mode = String(req.body?.mode || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  if (!["community", "clan", "tsbtr"].includes(mode)) return res.status(400).json({ error: "invalid_template" });
+  try {
+    const preview = await paradiseDiscordSetupPreview(guildId, mode);
+    await prisma.setting.upsert({
+      where: { key: `paradise_3a61_preview_${guildId}` },
+      update: { value: preview },
+      create: { key: `paradise_3a61_preview_${guildId}`, value: preview }
+    });
+    await createAuditLog("paradise_setup_preview_generated", "discord_guild", guildId, {
+      actorUserId: req.user.id,
+      mode,
+      createResources: preview.createResources.length,
+      extraResources: preview.extraResources.length
+    });
+    return res.json({ success: true, guildId, preview });
+  } catch (error) {
+    console.error("Paradise setup preview failed", publicError(error));
+    return res.status(500).json({ error: error.code || "preview_failed" });
+  }
 });
 
 app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {

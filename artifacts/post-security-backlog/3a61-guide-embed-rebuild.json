@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "requiredFamilies": ["welcome", "rules", "role/profile/help", "challenge/availability/LOA", "training/tryout/referee/hoster/activity", "roster/mainer/relations", "blacklist/appeal/bail", "staff report", "support/application", "FAQ/trust", "Fima community commands"],
+  "messageIdPersistence": true,
+  "updateInPlace": true,
+  "branding": "Paradise except true Fima product/support content",
+  "liveRepost": "WAITING FOR DEEP AUDIT AND OWNER-AUTHENTICATED TARGET SELECTION"
+}

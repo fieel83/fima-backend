@@ -1,0 +1,27 @@
+{
+  "status": "SOURCE ONLY",
+  "generatedAt": "2026-07-02",
+  "note": "3A61 deep-audit endpoint is implemented. After deployment the official bot automatically audits, backs up and previews all three managed targets; owner-authenticated dashboard actions can safely rerun them.",
+  "servers": [
+    {
+      "name": "Paradise | Türkiye",
+      "guildId": "…430661",
+      "previousLiveCounts": {"members": 120, "categories": 10, "channels": 71, "roles": 119, "autoModRules": 3, "webhooks": 7, "botRolePosition": 118},
+      "deepMessageAudit": "PENDING AUTOMATIC POST-DEPLOY EXECUTION"
+    },
+    {
+      "name": "Fieel's Community",
+      "guildId": "…657306",
+      "previousLiveCounts": {"members": 8103, "categories": 7, "channels": 35, "roles": 83, "autoModRules": 6, "webhooks": 8, "botRolePosition": 82},
+      "deepMessageAudit": "PENDING AUTOMATIC POST-DEPLOY EXECUTION"
+    },
+    {
+      "name": "TSBTR Yedek",
+      "guildId": "…881332",
+      "previousLiveCounts": {"members": 10, "categories": 14, "channels": 68, "roles": 102, "autoModRules": 0, "webhooks": 0, "botRolePosition": 1},
+      "warning": "Bot role position is too low for reliable role management.",
+      "deepMessageAudit": "PENDING AUTOMATIC POST-DEPLOY EXECUTION"
+    }
+  ],
+  "implementedInventory": ["permissions", "role position", "categories", "text/forum/voice/stage counts", "roles and order", "permission overwrites", "AutoMod", "webhooks", "pins", "sampled bot messages", "guide/panel classification"]
+}

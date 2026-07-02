@@ -1,0 +1,6 @@
+{
+  "status": "SOURCE ONLY",
+  "commands": ["/lineup panel", "/lineup repost", "/lineup add", "/lineup remove", "/lineup edit", "/lineup clear", "/lineup move", "/roster panel", "/roster repost", "/roster add", "/roster remove", "/roster update"],
+  "features": ["per-guild persistence", "message-ID update in place", "main/war board separation", "roles and notes", "roster region/rank/main", "private roster/war audit logs"],
+  "liveBoardPost": "WAITING FOR TEST-SERVER CHANNEL MAPPING AND OWNER-AUTHENTICATED EXECUTION"
+}

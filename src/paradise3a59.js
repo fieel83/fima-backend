@@ -29,7 +29,8 @@ const EMPTY_STATE = Object.freeze({
   tournaments: {}, leaderboard: {}, leaderboards: {}, staffActivity: {}, activityChecks: {},
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
-  rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {}
+  rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
+  serverBackups: {}, realAudits: {}, setupPreviews: {}
 });
 
 function normalizeState(value) {
@@ -182,38 +183,43 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
 export const PARADISE_COMMUNITY_SCHEMA = [
   ["START HERE", ["welcome", "rules", "choose-language", "choose-pings", "role-selection", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
   ["IMPORTANT", ["announcements", "updates", "status", "faq", "pricing", "trial-info", "giveaways"], false],
-  ["SUPPORT", ["open-ticket", "support-info"], false],
-  ["SUPPORT STAFF", ["ticket-logs", "transcripts", "staff-notes"], true],
+  ["SUPPORT", ["open-ticket", "support-info", "application-ticket", "application-guide"], false],
+  ["SUPPORT STAFF", ["ticket-logs", "transcripts", "staff-notes", "application-reviews"], true],
   ["FIMA APP", ["fima-macro", "macro-help", "update-help", "license-help", "hwid-help", "payment-help", "robux-payments", "bug-reports", "suggestions"], false],
   ["COMMUNITY", ["general", "media", "uploads", "clips", "outfits", "capes", "macro-discussion", "success-results", "creator-resources", "partnerships", "media-approval", "bot-commands"], false],
-  ["TRAINING & EVENTS", ["training-announcements", "training-results", "event-announcements", "event-results", "tournament-announcements", "tournament-results", "game-night"], false],
-  ["STAFF", ["staff-chat", "staff-logs", "moderation-logs", "activity-logs", "application-reviews", "bot-logs"], true]
+  ["TRAINING & EVENTS", ["training-announcements", "training-results", "event-announcements", "event-results", "tournament-announcements", "tournament-results", "game-night", "giveaway-results"], false],
+  ["STAFF", ["staff-chat", "staff-command-guide", "moderation-policy", "moderation-requests", "staff-logs", "moderation-logs", "activity-logs", "security-alerts", "quarantine-review", "bot-logs"], true],
+  ["MEMBER LOGS", ["welcome-logs", "leave-logs", "level-logs"], true],
+  ["VOICE", ["Join to Create", "Community Voice 1", "Community Voice 2", "AFK"], false]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
   ["START", ["welcome", "rules", "verify", "profile-guide", "choose-language", "choose-pings", "command-guide", "role-guide", "maining-guide"], false],
-  ["CLAN", ["announcements", "clan-relations", "ally-requests", "advertisement", "outfits", "capes", "main-line", "eu-rosters", "region-rosters", "branch-support", "roster-logs", "mainer-proof", "find-a-fcw"], false],
+  ["CLAN", ["announcements", "clan-relations", "ally-requests", "advertisement", "outfits", "capes", "main-line", "roster-lineup", "war-lineup", "eu-rosters", "region-rosters", "branch-support", "roster-logs", "war-logs", "mainer-proof", "find-a-fcw"], false],
   ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "tryout-hoster-rules", "training-hoster-rules", "hoster-guide", "hoster-works"], false],
   ["CHALLENGES", ["challenge-ticket", "challenge-rules", "availability", "challenges", "challenge-results", "challenge-ticket-transcripts", "referee-guide", "referee-post", "referee-works"], false],
-  ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night"], false],
-  ["SUPPORT", ["support-ticket", "application-ticket", "report-staff", "report-guide"], false],
-  ["STAFF", ["staff-annc", "staff-chat", "activity-check", "activity-review", "referee-logs", "bot-logs", "loa"], true],
-  ["VOICE", ["war-vc-text", "Stage", "War VC", "Voice 1", "Voice 2", "Voice 3"], false]
+  ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night", "question-of-the-day", "level-leaderboard"], false],
+  ["SUPPORT", ["support-ticket", "application-ticket", "application-guide", "report-staff", "report-guide"], false],
+  ["BLACKLIST & APPEALS", ["blacklist", "blacklist-appeal", "bail-review"], false],
+  ["STAFF", ["staff-annc", "staff-chat", "staff-command-guide", "moderation-policy", "moderation-requests", "activity-check", "activity-review", "referee-logs", "hoster-reports", "quarantine-review", "bot-logs", "loa"], true],
+  ["LOGS", ["welcome-logs", "leave-logs", "message-logs", "role-logs", "channel-logs", "member-logs", "mod-logs", "level-logs"], true],
+  ["VOICE", ["war-vc-text", "Stage", "Join to Create", "War VC", "Voice 1", "Voice 2", "Voice 3", "AFK"], false]
 ];
 
 export const PARADISE_TSBTR_SCHEMA = [
   ["LOGS", ["challenge-ticket-transcripts", "support-ticket-transcripts", "message-logs", "role-logs", "channel-logs", "nick-logs", "ban-unban-logs", "kick-logs", "mod-logs", "member-logs", "other-logs", "guide"], true],
   ["ADMIN", ["staff-annc", "staff-chat", "staff-works", "staff-rules", "staff-updates", "staff-strikes", "proofs", "referee-logs", "activity-review"], true],
-  ["CENTER", ["welcome", "blacklist", "ban-appeal", "unblacklist", "staff-team", "role-guide", "command-guide", "overview", "report-guide"], false],
+  ["CENTER", ["welcome", "blacklist", "ban-appeal", "unblacklist", "bail-review", "staff-team", "role-guide", "command-guide", "overview", "report-guide"], false],
   ["IMPORTANT", ["rules", "announcements", "sub-announcements", "content-channel", "server-logs", "staff-logs", "applications", "boosts", "giveaways", "polls", "hall-of-shame", "hall-of-fame"], false],
   ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "training-hoster-announcements", "training-hoster-rules", "trainer-annc", "activity-check"], false],
-  ["TICKET", ["challenge-ticket", "support-ticket", "payment-ticket", "bug-ticket", "macro-ticket", "application-ticket", "report-staff"], false],
+  ["TICKET", ["challenge-ticket", "support-ticket", "payment-ticket", "bug-ticket", "macro-ticket", "application-ticket", "application-guide", "report-staff"], false],
   ["GENERAL", ["tr-chat", "chat", "media", "bot-commands", "teamer-help", "spar-request"], false],
   ["LEADERBOARD", ["top-10", "top-20", "top-30", "challenge-rules", "set-rules", "availability", "challenges", "challenge-results"], false],
   ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports", "loa"], true],
   ["REFEREES", ["referee-annc", "referee-chat", "referee-rules", "referee-post", "referee-updates", "referee-works", "referee-guide", "referee-strikes", "referee-activity-check"], true],
+  ["STAFF OPERATIONS", ["staff-command-guide", "moderation-policy", "moderation-requests", "quarantine-review", "application-reviews"], true],
   ["CLAN OPERATIONS", ["maining-guide", "mainer-proof", "war-announcements", "war-line-chat", "war-scores", "eu-rosters", "roster-logs", "find-a-fcw"], true],
-  ["VOICE", ["Stage", "Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5"], false]
+  ["VOICE", ["Stage", "Join to Create", "Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5", "AFK"], false]
 ];
 
 export const PARADISE_SETUP_SCHEMAS = Object.freeze({
@@ -221,6 +227,19 @@ export const PARADISE_SETUP_SCHEMAS = Object.freeze({
   clan: { label: "Paradise Clan", schema: PARADISE_CLAN_SCHEMA, roles: PARADISE_CLAN_ROLES },
   tsbtr: { label: "TSBTR-style Community", schema: PARADISE_TSBTR_SCHEMA, roles: PARADISE_CLAN_ROLES }
 });
+
+const COMMUNITY_HIDDEN_COMMANDS = new Set([
+  "challenge", "referee", "lineup", "roster", "mainer", "findfcw", "relation",
+  "blacklist", "appeal", "bail", "availability", "tryout", "paradisetraining",
+  "whitelist", "handbook"
+]);
+
+export function paradiseCommandAllowedForMode(commandName, mode) {
+  const name = String(commandName || "");
+  if (mode === "community") return !COMMUNITY_HIDDEN_COMMANDS.has(name);
+  if (mode === "clan" || mode === "tsbtr") return !name.startsWith("fima_");
+  return true;
+}
 
 export function rankPower({ stage, level, strength }) {
   const s = Number(stage);

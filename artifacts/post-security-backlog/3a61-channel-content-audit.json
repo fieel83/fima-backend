@@ -1,0 +1,15 @@
+{
+  "status": "PARTIAL LIVE VERIFIED",
+  "browserReadOnlyDiscovery": {
+    "visibleServers": ["The Strongest Battlegrounds | Türkiye", "TSBER | TSB Europe Rankings", "TSB Clanning Community", "TSB Germany", "War Managment (TSBCC)", "TSBTR Yedek", "Fieel's Community", "Paradise | Türkiye"],
+    "verifiedVisiblePatterns": ["server/staff logs", "applications", "giveaways", "polls", "hall of fame/shame", "tryout/training", "challenge/support tickets"],
+    "privateMessageContentStored": false
+  },
+  "officialBotContentScanner": {
+    "status": "SOURCE ONLY",
+    "sampleLimitPerImportantChannel": 25,
+    "returnsOnly": ["message ID", "bot/human author kind", "rough type", "keep/rewrite/archive decision", "old-branding flag", "embed/component/pin flags"],
+    "neverReturns": ["raw message text", "tokens", "cookies", "private attachments"]
+  },
+  "blocker": "Current Chrome profile is not signed into the Fima owner dashboard, so the owner-only live audit action cannot yet be executed."
+}

@@ -1,0 +1,18 @@
+{
+  "status": "LOCAL VERIFIED",
+  "templates": {
+    "community": {
+      "rankingOrChallengeSystem": false,
+      "includes": ["Fima support", "applications", "training/events", "giveaways", "game nights", "language/role selection", "security", "staff command guide", "moderation policy/requests", "quarantine review", "welcome/leave logs", "Join to Create"]
+    },
+    "clan": {
+      "includes": ["main/roster/war lineups", "mainer proof", "challenge/availability/LOA", "applications", "blacklist/appeal/bail", "staff command guide", "moderation requests", "question of the day", "level leaderboard", "Join to Create"]
+    },
+    "tsbtr": {
+      "includes": ["leaderboard", "challenge", "availability", "profiles", "LOA", "hoster/referee/activity", "applications", "blacklist/appeal/bail", "staff command guide", "moderation requests", "Join to Create"]
+    }
+  },
+  "commandVisibility": "Guild command registration is filtered by selected/inferred template; Fima product commands are hidden from Clan/TSBTR and challenge/roster commands are hidden from Community.",
+  "safeModes": ["preview", "repair/create missing", "repost guides"],
+  "destructiveMode": "Typed per-server confirmation remains mandatory."
+}

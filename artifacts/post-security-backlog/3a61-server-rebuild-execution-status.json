@@ -1,0 +1,10 @@
+{
+  "status": "WAITING CONFIRMATION",
+  "safeWork": {"automaticAudit": "PENDING DEPLOYMENT", "automaticBackup": "PENDING DEPLOYMENT", "automaticPreview": "PENDING DEPLOYMENT", "dashboardActions": "SOURCE ONLY", "templateCorrection": "LOCAL VERIFIED"},
+  "destructiveRebuilds": {
+    "Paradise | Türkiye": {"executed": false, "requiredConfirmation": "REBUILD PARADISE TURKIYE"},
+    "Fieel's Community": {"executed": false, "requiredConfirmation": "REBUILD FIEELS COMMUNITY"},
+    "TSBTR Yedek": {"executed": false, "requiredConfirmation": "REBUILD TSBTR YEDEK"}
+  },
+  "note": "No channel, role or message was deleted, moved or destructively overwritten."
+}

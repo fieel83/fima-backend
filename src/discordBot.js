@@ -9,6 +9,8 @@ import {
   handleParadiseInteraction,
   handleParadiseMessage,
   initializeParadise,
+  PARADISE_SETUP_SCHEMAS,
+  paradiseCommandAllowedForMode,
   paradiseCommands,
   publishParadiseGuidesFromDashboard
 } from "./paradise3a59.js";
@@ -283,6 +285,13 @@ let lastError = null;
 let lastCommandSyncAt = null;
 let lastCommandSyncError = null;
 let lastCommandSyncCount = 0;
+const lastCommandSyncCountsByGuild = new Map();
+let lastDeepAuditStartedAt = null;
+let lastDeepAuditCompletedAt = null;
+let lastDeepAuditGuildCount = 0;
+let lastStructureBackupGuildCount = 0;
+let lastSetupPreviewGuildCount = 0;
+let lastDeepAuditError = null;
 
 export function startDiscordBot() {
   if (started) {
@@ -335,6 +344,13 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Paradise initialization failed", { message: error.message });
     });
+    const auditTimer = setTimeout(() => {
+      runAutomaticManagedServerAudits().catch(error => {
+        lastDeepAuditError = error.message;
+        console.warn("Paradise automatic managed-server audit failed", { message: error.message });
+      });
+    }, 5_000);
+    auditTimer.unref?.();
   });
 
   client.on("interactionCreate", (interaction) => {
@@ -385,7 +401,7 @@ export function startDiscordBot() {
 
 async function registerDiscordCommands() {
   if (!client?.application) return;
-  const commands = [
+  const allCommands = [
     ...paradiseCommands(),
     new SlashCommandBuilder().setName("fima_account").setDescription("Show your linked Fima account."),
     new SlashCommandBuilder().setName("fima_recovery").setDescription("Send a password reset code to your Discord DM."),
@@ -584,9 +600,25 @@ async function registerDiscordCommands() {
   ].map((command) => command.toJSON());
   try {
     const guildIds = [...new Set([env("DISCORD_GUILD_ID"), ...client.guilds.cache.keys()].filter(Boolean))];
+    const stateRow = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } }).catch(() => null);
+    const state = stateRow?.value && typeof stateRow.value === "object" ? stateRow.value : {};
+    const inferMode = guild => {
+      const configured = state.guildConfigs?.[guild.id]?.activeSetupMode;
+      if (["community", "clan", "tsbtr"].includes(configured)) return configured;
+      if (/fieel'?s community/i.test(guild.name)) return "community";
+      if (/tsbtr|yedek/i.test(guild.name)) return "tsbtr";
+      return "clan";
+    };
     const registeredSets = guildIds.length
-      ? await Promise.all(guildIds.map(guildId => client.application.commands.set(commands, guildId)))
-      : [await client.application.commands.set(commands)];
+      ? await Promise.all(guildIds.map(async guildId => {
+        const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId);
+        const mode = inferMode(guild);
+        const scopedCommands = allCommands.filter(command => paradiseCommandAllowedForMode(command.name, mode));
+        const registered = await client.application.commands.set(scopedCommands, guildId);
+        lastCommandSyncCountsByGuild.set(guildId, registered.size);
+        return registered;
+      }))
+      : [await client.application.commands.set(allCommands)];
     lastCommandSyncAt = new Date();
     lastCommandSyncError = null;
     lastCommandSyncCount = Math.max(0, ...registeredSets.map(registered => registered.size));
@@ -1846,7 +1878,8 @@ export async function paradiseDiscordRuntimeSnapshot(guildId = null) {
     commandSync: {
       lastSyncAt: lastCommandSyncAt?.toISOString() || null,
       lastError: lastCommandSyncError,
-      count: lastCommandSyncCount
+      count: commands.size,
+      configuredCount: lastCommandSyncCountsByGuild.get(guild.id) ?? lastCommandSyncCount
     },
     categories: [...guild.channels.cache.values()]
       .filter(channel => channel.type === ChannelType.GuildCategory)
@@ -1900,6 +1933,283 @@ export async function paradiseDiscordGuildsSnapshot() {
     });
   }
   return guilds.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const IMPORTANT_AUDIT_CHANNEL = /(welcome|rule|guide|verify|faq|trust|challenge|availability|loa|training|tryout|referee|hoster|activity|report|support|application|blacklist|appeal|bail|lineup|line-up|roster|mainer|relation|ally|enemy|announcement|update|mod-|message-|channel-|member-|ticket|log)/i;
+
+function auditMessageType(channelName, message) {
+  const haystack = `${channelName} ${message.embeds?.map(embed => `${embed.title || ""} ${embed.description || ""}`).join(" ") || ""}`;
+  if (/challenge/.test(channelName)) return /result/.test(channelName) ? "challenge-result" : "challenge-guide-or-panel";
+  if (/availability|loa/.test(channelName)) return "availability-or-loa-panel";
+  if (/lineup|line-up|roster|mainer/.test(channelName)) return "roster-or-lineup-board";
+  if (/blacklist|appeal|bail/.test(channelName)) return "blacklist-or-appeal-panel";
+  if (/ticket/.test(channelName)) return "ticket-panel-or-ticket-message";
+  if (/log/.test(channelName)) return "audit-log";
+  if (/rule|guide|faq|trust|welcome|verify/.test(channelName)) return "guide-or-handbook";
+  if (/training|tryout|referee|hoster|activity/.test(channelName)) return "staff-or-activity-system";
+  if (/announcement|update/.test(channelName)) return "announcement";
+  if (message.components?.length) return "interactive-panel";
+  if (message.embeds?.length) return "embed";
+  return haystack.trim() ? "message" : "unknown";
+}
+
+function auditMessageDecision(channelName, message, oldBranding) {
+  const botAuthored = Boolean(message.author?.bot);
+  if (/log/.test(channelName)) return { decision: "KEEP", reason: "Operational history should be preserved." };
+  if (/ticket/.test(channelName) && !/panel|support-ticket|application-ticket/.test(channelName)) {
+    return { decision: "ARCHIVE", reason: "Ticket history should be retained privately, not rewritten in place." };
+  }
+  if (oldBranding) return { decision: "REPOST BETTER", reason: "Old or mixed bot branding was detected." };
+  if (botAuthored && (message.embeds?.length || message.components?.length)) {
+    return { decision: "KEEP BUT EDIT", reason: "Existing bot panel can be updated in place after mapping its message ID." };
+  }
+  if (/rule|guide|faq|trust|welcome|verify|challenge|availability|loa|lineup|roster|blacklist|appeal|relation/.test(channelName)) {
+    return { decision: "REPOST BETTER", reason: "Important static content should use the selected Paradise template and current bilingual style." };
+  }
+  return { decision: "KEEP", reason: "No destructive decision is justified by the sampled metadata." };
+}
+
+export async function paradiseDiscordDeepAudit(guildId = null) {
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.isReady?.()) {
+    const error = new Error("paradise_bot_not_ready");
+    error.code = "paradise_bot_not_ready";
+    throw error;
+  }
+  await Promise.all([guild.channels.fetch(), guild.roles.fetch()]);
+  const me = guild.members.me || await guild.members.fetchMe();
+  const [commands, autoModRules, webhooks] = await Promise.all([
+    guild.commands.fetch().catch(() => new Map()),
+    guild.autoModerationRules.fetch().catch(() => new Map()),
+    guild.fetchWebhooks().catch(() => new Map())
+  ]);
+  const importantChannels = [...guild.channels.cache.values()]
+    .filter(channel => channel.type !== ChannelType.GuildCategory && !channel.isThread?.() && IMPORTANT_AUDIT_CHANNEL.test(channel.name))
+    .sort((a, b) => a.rawPosition - b.rawPosition);
+  const sampledChannels = [];
+  let pinnedMessages = 0;
+  let botAuthoredMessages = 0;
+  let guideMessages = 0;
+  let panels = 0;
+  for (const channel of importantChannels) {
+    const permissions = channel.permissionsFor(me);
+    const readable = Boolean(
+      permissions?.has(PermissionsBitField.Flags.ViewChannel)
+      && permissions?.has(PermissionsBitField.Flags.ReadMessageHistory)
+      && channel.isTextBased?.()
+      && channel.messages?.fetch
+    );
+    const messages = readable ? await channel.messages.fetch({ limit: 25 }).catch(() => new Map()) : new Map();
+    const pins = readable && channel.messages?.fetchPinned
+      ? await channel.messages.fetchPinned().catch(() => new Map())
+      : new Map();
+    pinnedMessages += pins.size || 0;
+    const classified = [...messages.values()].map(message => {
+      const embedText = message.embeds?.map(embed => `${embed.title || ""} ${embed.footer?.text || ""}`).join(" ") || "";
+      const oldBranding = /Fima App|T[üu]rkiye Bot|TSBTR Bot/i.test(`${message.author?.username || ""} ${embedText}`);
+      const roughType = auditMessageType(channel.name.toLowerCase(), message);
+      const { decision, reason } = auditMessageDecision(channel.name.toLowerCase(), message, oldBranding);
+      if (message.author?.bot) botAuthoredMessages += 1;
+      if (/guide|handbook/.test(roughType)) guideMessages += 1;
+      if (message.components?.length || /panel|board/.test(roughType)) panels += 1;
+      return {
+        messageId: message.id,
+        authorKind: message.author?.bot ? "bot" : "human",
+        roughType,
+        decision,
+        reason,
+        shouldRepostByParadise: decision === "REPOST BETTER",
+        oldBranding,
+        hasEmbed: Boolean(message.embeds?.length),
+        hasComponents: Boolean(message.components?.length),
+        pinned: Boolean(message.pinned)
+      };
+    });
+    sampledChannels.push({
+      id: channel.id,
+      name: channel.name,
+      type: ChannelType[channel.type] || String(channel.type),
+      parentId: channel.parentId,
+      readable,
+      missingPermission: readable ? null : "ViewChannel or ReadMessageHistory",
+      pinnedMessageCount: pins.size || 0,
+      sampledMessageCount: classified.length,
+      importantMessages: classified.filter(item =>
+        item.hasEmbed || item.hasComponents || item.pinned || item.decision !== "KEEP"
+      )
+    });
+  }
+  const channels = [...guild.channels.cache.values()].filter(channel => !channel.isThread?.());
+  return {
+    status: "LIVE DISCORD VERIFIED",
+    capturedAt: new Date().toISOString(),
+    guild: {
+      id: guild.id,
+      name: guild.name,
+      memberCount: guild.memberCount,
+      botRolePosition: me.roles.highest.position,
+      botPermissions: me.permissions.toArray(),
+      capabilities: {
+        manageChannels: me.permissions.has(PermissionsBitField.Flags.ManageChannels),
+        manageRoles: me.permissions.has(PermissionsBitField.Flags.ManageRoles),
+        manageMessages: me.permissions.has(PermissionsBitField.Flags.ManageMessages),
+        viewAuditLog: me.permissions.has(PermissionsBitField.Flags.ViewAuditLog)
+      }
+    },
+    counts: {
+      categories: channels.filter(channel => channel.type === ChannelType.GuildCategory).length,
+      textChannels: channels.filter(channel => channel.type === ChannelType.GuildText).length,
+      forumChannels: channels.filter(channel => channel.type === ChannelType.GuildForum).length,
+      voiceChannels: channels.filter(channel => channel.type === ChannelType.GuildVoice).length,
+      stageChannels: channels.filter(channel => channel.type === ChannelType.GuildStageVoice).length,
+      roles: guild.roles.cache.size,
+      permissionOverwrites: channels.reduce((sum, channel) => sum + (channel.permissionOverwrites?.cache?.size || 0), 0),
+      autoModRules: autoModRules.size,
+      webhooks: webhooks.size,
+      pinnedMessages,
+      sampledImportantChannels: sampledChannels.length,
+      sampledMessages: sampledChannels.reduce((sum, channel) => sum + channel.sampledMessageCount, 0),
+      botAuthoredMessages,
+      guideMessages,
+      panels,
+      registeredCommands: commands.size
+    },
+    categories: channels.filter(channel => channel.type === ChannelType.GuildCategory)
+      .map(channel => ({ id: channel.id, name: channel.name, position: channel.rawPosition })),
+    channels: channels.filter(channel => channel.type !== ChannelType.GuildCategory)
+      .map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        type: ChannelType[channel.type] || String(channel.type),
+        parentId: channel.parentId,
+        position: channel.rawPosition,
+        permissionOverwrites: [...(channel.permissionOverwrites?.cache?.values?.() || [])].map(overwrite => ({
+          id: overwrite.id,
+          type: overwrite.type,
+          allow: overwrite.allow.toArray(),
+          deny: overwrite.deny.toArray()
+        }))
+      })),
+    roles: [...guild.roles.cache.values()].sort((a, b) => b.position - a.position).map(role => ({
+      id: role.id,
+      name: role.name,
+      position: role.position,
+      managed: role.managed,
+      permissions: role.permissions.toArray()
+    })),
+    autoModRules: [...autoModRules.values()].map(rule => ({
+      id: rule.id,
+      name: rule.name,
+      enabled: rule.enabled,
+      triggerType: rule.triggerType,
+      actionTypes: rule.actions.map(action => action.type)
+    })),
+    webhooksCount: webhooks.size,
+    sampledChannels
+  };
+}
+
+async function runAutomaticManagedServerAudits() {
+  if (!client?.isReady?.()) return;
+  lastDeepAuditStartedAt = new Date();
+  lastDeepAuditCompletedAt = null;
+  lastDeepAuditGuildCount = 0;
+  lastStructureBackupGuildCount = 0;
+  lastSetupPreviewGuildCount = 0;
+  lastDeepAuditError = null;
+  const targets = [...client.guilds.cache.values()].filter(guild =>
+    ["Paradise | Türkiye", "Fieel's Community", "TSBTR Yedek"].includes(guild.name)
+  );
+  for (const guild of targets) {
+    try {
+      const audit = await paradiseDiscordDeepAudit(guild.id);
+      await prisma.setting.upsert({
+        where: { key: `paradise_3a61_audit_${guild.id}` },
+        update: { value: audit },
+        create: { key: `paradise_3a61_audit_${guild.id}`, value: audit }
+      });
+      lastDeepAuditGuildCount += 1;
+      const backup = await paradiseDiscordStructureBackup(guild.id);
+      await prisma.setting.upsert({
+        where: { key: `paradise_3a61_backup_${guild.id}` },
+        update: { value: backup },
+        create: { key: `paradise_3a61_backup_${guild.id}`, value: backup }
+      });
+      lastStructureBackupGuildCount += 1;
+      const mode = guild.name === "Fieel's Community" ? "community" : guild.name === "TSBTR Yedek" ? "tsbtr" : "clan";
+      const preview = await paradiseDiscordSetupPreview(guild.id, mode);
+      await prisma.setting.upsert({
+        where: { key: `paradise_3a61_preview_${guild.id}` },
+        update: { value: preview },
+        create: { key: `paradise_3a61_preview_${guild.id}`, value: preview }
+      });
+      lastSetupPreviewGuildCount += 1;
+    } catch (error) {
+      lastDeepAuditError = `${guild.name}: ${error.message}`;
+    }
+  }
+  lastDeepAuditCompletedAt = new Date();
+}
+
+export function paradiseDiscordAuditJobStatus() {
+  return {
+    startedAt: lastDeepAuditStartedAt?.toISOString() || null,
+    completedAt: lastDeepAuditCompletedAt?.toISOString() || null,
+    auditedGuildCount: lastDeepAuditGuildCount,
+    backedUpGuildCount: lastStructureBackupGuildCount,
+    previewedGuildCount: lastSetupPreviewGuildCount,
+    targetGuildCount: 3,
+    lastError: lastDeepAuditError
+  };
+}
+
+export async function paradiseDiscordStructureBackup(guildId = null) {
+  const snapshot = await paradiseDiscordRuntimeSnapshot(guildId);
+  if (snapshot.status !== "ready") {
+    const error = new Error("paradise_guild_unavailable");
+    error.code = "paradise_guild_unavailable";
+    throw error;
+  }
+  return {
+    status: "LIVE DISCORD VERIFIED",
+    backupVersion: 1,
+    capturedAt: new Date().toISOString(),
+    guild: snapshot.guild,
+    categories: snapshot.categories,
+    channels: snapshot.channels,
+    roles: snapshot.roles,
+    autoModRules: snapshot.autoModRules,
+    webhooks: snapshot.webhooks
+  };
+}
+
+export async function paradiseDiscordSetupPreview(guildId, mode) {
+  const guild = await getGuild(guildId);
+  const selected = PARADISE_SETUP_SCHEMAS[mode];
+  if (!guild || !selected) {
+    const error = new Error(!guild ? "paradise_guild_unavailable" : "invalid_template");
+    error.code = error.message;
+    throw error;
+  }
+  await Promise.all([guild.channels.fetch(), guild.roles.fetch()]);
+  const desiredResources = new Set(selected.schema.flatMap(([category, channelNames]) => [category, ...channelNames]));
+  const currentResources = [...guild.channels.cache.values()].filter(channel => !channel.isThread?.());
+  const currentNames = new Set(currentResources.map(channel => channel.name));
+  const desiredRoles = new Set(selected.roles);
+  return {
+    status: "LIVE DISCORD VERIFIED",
+    generatedAt: new Date().toISOString(),
+    guildId: guild.id,
+    guildName: guild.name,
+    mode,
+    templateLabel: selected.label,
+    createResources: [...desiredResources].filter(name => !currentNames.has(name)),
+    keepResources: currentResources.filter(channel => desiredResources.has(channel.name)).map(channel => ({ id: channel.id, name: channel.name })),
+    extraResources: currentResources.filter(channel => !desiredResources.has(channel.name)).map(channel => ({ id: channel.id, name: channel.name })),
+    createRoles: [...desiredRoles].filter(name => !guild.roles.cache.some(role => role.name === name)),
+    keepRoles: [...desiredRoles].filter(name => guild.roles.cache.some(role => role.name === name)),
+    warning: "Extra resources are preview-only. No archive or deletion occurs without the exact per-server typed confirmation."
+  };
 }
 
 export async function repostParadiseGuides(mode = "clan", guildId = null) {

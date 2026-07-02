@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
@@ -13,6 +13,15 @@ test("score approval excludes Trial Referee and Referee by default", () => {
   assert.equal(canRoleNamesApproveScore(["Experienced Referee"]), true);
   assert.equal(canRoleNamesApproveScore(["Referee Manager"]), true);
   assert.equal(canRoleNamesApproveScore([], true), true);
+});
+
+test("server templates hide irrelevant command families", () => {
+  assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
+  assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);
+  assert.equal(paradiseCommandAllowedForMode("fima_ticket", "community"), true);
+  assert.equal(paradiseCommandAllowedForMode("challenge", "clan"), true);
+  assert.equal(paradiseCommandAllowedForMode("fima_ticket", "clan"), false);
+  assert.equal(paradiseCommandAllowedForMode("fima_update", "tsbtr"), false);
 });
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
@@ -120,6 +129,10 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Stage 2 High Strong"));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Top 30"));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Frankfurt, Germany"));
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("challenge-results"), false);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("application-ticket"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("Join to Create"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("moderation-requests"), true);
 });
 
 test("availability board separates timed entries and active tickets", () => {
