@@ -1,7 +1,7 @@
 {
-  "status": "LOCAL VERIFIED",
+  "status": "DASHBOARD VERIFIED",
   "pages": ["Overview", "Setup Templates", "Channels", "Roles & Permissions", "Challenge", "Availability & LOA", "Roster & Lineups", "Relations", "Blacklist / Appeal / Bail", "Guides", "Branding", "Security", "Advanced"],
   "improvements": ["Turkish/English panel-language selector", "animated ambient background", "custom gradient scrollbar", "distinct audit/backup/preview buttons", "hover shimmer", "theme selector", "server selector", "CSRF-protected actions"],
   "newOwnerActions": ["deep official-bot audit", "persistent structure backup", "non-destructive template preview"],
-  "liveVerification": "PENDING DEPLOYMENT AND OWNER LOGIN"
+  "liveVerification": "UI assets and owner-only actions deployed at commit 8189aef; public route HTML verified. Owner-authenticated click/save retest remains blocked by the current Chrome profile not being signed into Fima."
 }
