@@ -1,0 +1,22 @@
+{
+  "status": "SOURCE ONLY",
+  "features": {
+    "verifiedProfileGate": true,
+    "rangeRecheck": true,
+    "cooldownImmunityOpenTicketGate": true,
+    "stickyHeader": true,
+    "autowinPendingApproval": true,
+    "scorePendingApproval": true,
+    "noDuplicateToTo": true,
+    "transcriptOnManualClose": true,
+    "transcriptOnApprovedResult": true
+  },
+  "approvalBoundary": {
+    "Trial Referee": false,
+    "Referee": false,
+    "Experienced Referee": true,
+    "Referee Manager": true,
+    "Owner or Administrator": true
+  },
+  "transcript": "Last 100 messages exported to a private mapped text channel as UTF-8 .txt."
+}

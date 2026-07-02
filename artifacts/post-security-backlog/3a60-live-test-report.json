@@ -1,0 +1,27 @@
+{
+  "status": "LOCAL VERIFIED",
+  "tests": {
+    "backendAndCommandSuite": "53/53 PASS",
+    "dashboardSourceTests": "PASS",
+    "discordCommandSerialization": "PASS",
+    "requiredOptionOrdering": "PASS",
+    "csrfTokenFetchAndHeader": "PASS",
+    "csrfRetry": "PASS",
+    "multiServerConfigScope": "PASS",
+    "desktopLayout": "PASS",
+    "responsiveLayout": "PASS",
+    "themeSwitch": "PASS",
+    "localCSRFProtectedSave": "PASS",
+    "transcriptSource": "PASS",
+    "destructiveConfirmationSource": "PASS"
+  },
+  "live": {
+    "productionDeploy": "NOT RUN",
+    "DiscordCommands": "NOT RUN",
+    "threeServerAudit": "BLOCKED until deployed runtime exposes managed guilds",
+    "destructiveSetup": "NOT RUN by design"
+  },
+  "secretsExposed": false,
+  "releasePublished": false,
+  "latestJsonChanged": false
+}

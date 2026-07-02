@@ -1,0 +1,19 @@
+{
+  "priority": "3A60",
+  "status": "LOCAL VERIFIED",
+  "date": "2026-07-02",
+  "rootCause": "Paradise dashboard mutations used credentialed cross-subdomain fetches but did not request or send the CSRF token required by the existing middleware.",
+  "fix": {
+    "tokenEndpoint": "/api/csrf-token",
+    "header": "x-fima-csrf",
+    "credentials": "include",
+    "retry": "One safe token refresh on csrf_required; no CSRF bypass.",
+    "diagnostic": ["authenticated", "discordLinked", "ownerAuthorized", "csrfReady", "dashboardUrl", "reasonCode"],
+    "errorUi": "Clean owner-facing toast; raw csrf_required is not shown as the primary message."
+  },
+  "verification": {
+    "sourceTests": "PASS",
+    "localBrowserSave": "PASS — branding saved through the CSRF-protected mutation helper",
+    "liveProductionSave": "NOT RUN — deployment required"
+  }
+}

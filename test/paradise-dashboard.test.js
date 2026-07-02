@@ -39,6 +39,21 @@ test("cross-subdomain dashboard requests use secure credentialed API fetches", (
   assert.match(serverSource, /credentials:\s*true/);
 });
 
+test("dashboard mutations use CSRF protection and retry one expired token safely", () => {
+  assert.match(htmlSource, /API_BASE\+'\/api\/csrf-token'/);
+  assert.match(htmlSource, /'x-fima-csrf':token/);
+  assert.match(htmlSource, /result\.error==='csrf_required'&&retry/);
+  assert.match(serverSource, /csrfReady/);
+});
+
+test("multi-server owner console scopes reads and writes to a managed guild", () => {
+  assert.match(htmlSource, /id="serverSelect"/);
+  assert.match(htmlSource, /guildId:selectedGuildId/);
+  assert.match(serverSource, /paradiseDiscordGuildsSnapshot/);
+  assert.match(serverSource, /invalid_or_unmanaged_guild/);
+  assert.match(serverSource, /state\.guildConfigs/);
+});
+
 test("Paradise dashboard is noindex and never renders a bot token", () => {
   assert.match(htmlSource, /noindex,nofollow,noarchive/);
   assert.doesNotMatch(htmlSource, /DISCORD_BOT_TOKEN|botToken|token\s*:/i);
@@ -48,6 +63,9 @@ test("Paradise dashboard exposes a live HEX embed color control", () => {
   assert.match(htmlSource, /brandPicker/);
   assert.match(htmlSource, /data-save="branding"/);
   assert.match(htmlSource, /--brand/);
+  assert.match(htmlSource, /Paradise Purple/);
+  assert.match(htmlSource, /Charcoal/);
+  assert.match(htmlSource, /Midnight/);
 });
 
 test("Paradise dashboard exposes explained operations fields and live Discord state", () => {
@@ -60,6 +78,10 @@ test("Paradise dashboard exposes explained operations fields and live Discord st
   assert.match(serverSource, /invalid_channel_mappings/);
   assert.match(serverSource, /invalid_role_mappings/);
   assert.match(serverSource, /repostParadiseGuides/);
+  assert.match(htmlSource, /Challenge transcripts \(private\)/);
+  assert.match(htmlSource, /Support transcripts \(private\)/);
+  assert.match(htmlSource, /Roster, lineup & mainer boards/);
+  assert.match(htmlSource, /Blacklist, appeals & bail policy/);
 });
 
 test("destructive Paradise setup requires a typed final confirmation", () => {

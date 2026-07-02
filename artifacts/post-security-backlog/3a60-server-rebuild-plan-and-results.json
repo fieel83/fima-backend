@@ -1,0 +1,11 @@
+{
+  "status": "BLOCKED",
+  "plan": ["audit", "backup", "keep-delete-edit preview", "typed per-server confirmation", "safe additions", "role order", "overwrites", "guides", "panels", "verification"],
+  "results": {
+    "Paradise Türkiye": "NOT STARTED — live audit and explicit destructive confirmation required",
+    "Fieel's Community": "NOT STARTED — live audit and explicit destructive confirmation required",
+    "TSBTR yedek": "NOT STARTED — live audit and explicit destructive confirmation required"
+  },
+  "sourceGuard": "No web page can silently run destructive setup. Discord setup remains backup + preview + typed second confirmation.",
+  "oldMessages": "PRESERVED"
+}

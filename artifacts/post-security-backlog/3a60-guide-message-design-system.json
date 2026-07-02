@@ -1,0 +1,12 @@
+{
+  "status": "SOURCE ONLY",
+  "design": {
+    "defaultEmbedColor": "#000000",
+    "dashboardAccent": "configurable",
+    "typography": ["# heading", "## section", "### detail", "bold", "underline", "subtext", "quotes"],
+    "footer": "Made by Paradise bot",
+    "languages": ["English", "Türkçe"]
+  },
+  "guideFamilies": ["Community", "Clan", "TSBTR-style"],
+  "repostSafety": "Owner-only, audited and guild-scoped"
+}

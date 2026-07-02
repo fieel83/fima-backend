@@ -10,22 +10,24 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Paradise Owner Console</title>
   <style>
-    :root{--brand:#000;--brand-soft:#ffffff12;--panel:#111016;--panel2:#18161f;--line:#302d39;--text:#f7f5fa;--muted:#aaa5b4;--good:#64dca0;--warn:#ffca67;--bad:#ff758b}
-    *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;background:radial-gradient(circle at 16% -8%,var(--brand-soft),transparent 30%),#08080a;color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif}
-    main{width:min(1240px,calc(100% - 28px));margin:24px auto 60px}.hero,.panel{border:1px solid var(--line);background:linear-gradient(180deg,#15131b,#0e0d12);border-radius:16px;box-shadow:0 20px 60px #0008}
-    .hero{padding:26px;border-left:5px solid var(--brand)}.badge{color:#d7d3dc;font-weight:900;text-transform:uppercase;letter-spacing:.11em;font-size:12px}
+    :root{--brand:#8b5cf6;--brand-rgb:139,92,246;--brand-soft:rgba(var(--brand-rgb),.18);--bg:#0d0914;--panel:#171121;--panel2:#20182d;--line:#392b4e;--text:#faf8ff;--muted:#b8aec8;--good:#68e6aa;--warn:#ffd171;--bad:#ff7894}
+    *{box-sizing:border-box}[hidden]{display:none!important}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% -10%,var(--brand-soft),transparent 32%),radial-gradient(circle at 90% 12%,#3b1d5b33,transparent 30%),linear-gradient(145deg,var(--bg),#09070e 62%,#110a18);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif}
+    main{width:min(1460px,calc(100% - 28px));margin:22px auto 60px}.hero,.panel{border:1px solid var(--line);background:linear-gradient(145deg,rgba(31,23,44,.94),rgba(18,13,27,.97));border-radius:18px;box-shadow:0 22px 70px #0007,0 1px 0 #ffffff0b inset;backdrop-filter:blur(14px)}
+    .hero{padding:26px;border-left:5px solid var(--brand);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;inset:-80% -10% auto 55%;height:240px;background:radial-gradient(circle,var(--brand-soft),transparent 68%);pointer-events:none}.badge{color:#ddd5ea;font-weight:900;text-transform:uppercase;letter-spacing:.11em;font-size:12px}
     h1{font-size:clamp(30px,5vw,44px);margin:7px 0 4px}h2{margin:0 0 4px;font-size:21px}h3{margin:18px 0 8px;font-size:15px;color:#ddd9e3}.muted,.help{color:var(--muted)}.help{margin:4px 0 14px;font-size:13px;line-height:1.45}
     .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.chip{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#0c0b10;color:#d8d4dd;font-size:12px}.chip.good{border-color:#23583d;color:var(--good)}.chip.bad{border-color:#6a2937;color:var(--bad)}
-    .layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.72fr);gap:14px;margin-top:14px}.stack{display:grid;gap:14px}.panel{padding:20px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
-    label{display:block;margin:10px 0 6px;font-weight:800;font-size:13px}input,select,textarea,button,a.button{width:100%;border-radius:10px;border:1px solid var(--line);background:#09090c;color:#fff;padding:11px;font:inherit}
-    textarea{min-height:120px;resize:vertical}button,a.button{display:block;text-align:center;text-decoration:none;margin-top:11px;background:linear-gradient(135deg,var(--brand),#29262f);border-color:#514c59;font-weight:900;cursor:pointer}
-    button.secondary{background:#17151d}.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border:1px solid #5a5562;border-radius:50%;font-size:11px;color:#d8d4dd;cursor:help}
+    .console-shell{display:grid;grid-template-columns:235px minmax(0,1fr);gap:16px;margin-top:16px}.page-nav{position:sticky;top:14px;align-self:start;padding:12px}.page-nav button{margin:3px 0;text-align:left;background:transparent;border-color:transparent;color:var(--muted);font-weight:750;transition:.18s ease}.page-nav button:hover,.page-nav button.active{color:#fff;background:linear-gradient(90deg,var(--brand-soft),transparent);border-color:#ffffff12;transform:translateX(3px)}.page-nav small{display:block;padding:8px 10px;color:#7f748e;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.stack{display:grid;gap:14px}.panel{padding:22px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}.panel:hover{border-color:color-mix(in srgb,var(--brand) 44%,var(--line));box-shadow:0 26px 80px #0008,0 0 0 1px var(--brand-soft)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    label{display:block;margin:10px 0 6px;font-weight:800;font-size:13px}input,select,textarea,button,a.button{width:100%;border-radius:11px;border:1px solid var(--line);background:#0d0914;color:#fff;padding:11px;font:inherit;transition:border-color .18s,box-shadow .18s,transform .18s}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}textarea{min-height:120px;resize:vertical}button,a.button{display:block;text-align:center;text-decoration:none;margin-top:11px;background:linear-gradient(135deg,var(--brand),#4d2d78);border-color:#ffffff25;font-weight:900;cursor:pointer}button:hover,a.button:hover{transform:translateY(-1px);filter:brightness(1.08)}button:disabled{opacity:.55;cursor:wait;transform:none}
+    button.secondary{background:#1b1426}.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border:1px solid #6e607f;border-radius:50%;font-size:11px;color:#e5dcf0;cursor:help;position:relative}.tip:hover:after{content:attr(title);position:absolute;z-index:20;left:24px;top:-8px;width:240px;padding:9px 11px;border-radius:9px;background:#09070e;border:1px solid var(--line);color:#eee7f7;box-shadow:0 10px 30px #000a;font-weight:500;line-height:1.35}
     .switch{display:flex;gap:9px;align-items:center;font-weight:700;margin:9px 0}.switch input{width:auto}.color-row{display:grid;grid-template-columns:72px 1fr;gap:10px}.color-row input[type=color]{height:45px;padding:3px}
     .mapping{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(180px,1.2fr);gap:8px;align-items:center;margin:7px 0}.mapping label{margin:0}.danger{border-color:#6a2937;background:linear-gradient(180deg,#241016,#110b0e)}.danger h2{color:#ff9aaa}.notice{padding:12px;border:1px solid #55451f;background:#1c170c;border-radius:10px;color:#ffe0a0;line-height:1.5}
-    .status{white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;background:#09090c;border:1px solid var(--line);border-radius:10px;padding:12px;color:#d7d3dc;font:12px ui-monospace,Consolas,monospace}
-    .toast{position:fixed;right:18px;bottom:18px;max-width:420px;padding:13px 16px;border-radius:11px;background:#17151d;border:1px solid var(--line);box-shadow:0 15px 45px #0009;display:none}.toast.ok{display:block;color:var(--good)}.toast.error{display:block;color:var(--bad)}
+    .status{white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;background:#0b0711;border:1px solid var(--line);border-radius:11px;padding:12px;color:#d7d3dc;font:12px ui-monospace,Consolas,monospace}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric{padding:15px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,#21182f,#120e1a)}.metric b{display:block;font-size:25px;margin-bottom:4px}.metric span{color:var(--muted);font-size:12px}
+    .toast{position:fixed;z-index:100;right:18px;bottom:18px;max-width:420px;padding:14px 17px;border-radius:12px;background:#1e162a;border:1px solid var(--line);box-shadow:0 15px 45px #0009;display:none;animation:toastIn .2s ease}.toast.ok{display:block;color:var(--good)}.toast.error{display:block;color:var(--bad)}@keyframes toastIn{from{opacity:0;transform:translateY(8px)}}
     .access{max-width:720px;margin:10vh auto 0;text-align:center;padding:34px}.access-icon{width:54px;height:54px;margin:0 auto 16px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;background:#09090c;font-size:25px}.access-actions{display:flex;gap:10px;justify-content:center;margin-top:20px}.access-actions .button{width:auto;min-width:190px}.template-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.template-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:#0b0a0e;text-align:left}.template-card strong,.template-card span{display:block}.template-card span{color:var(--muted);font-size:12px;margin-top:5px;line-height:1.4}.template-card.is-active{border-color:var(--good);box-shadow:0 0 0 1px #23583d}.preview-card{margin-top:10px;padding:15px;border-left:5px solid var(--brand);background:#09090c;border-radius:10px}.permission-list{display:grid;gap:8px}.permission-item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#0a090d}.permission-item strong{display:block;margin-bottom:4px}.guide-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    @media(max-width:900px){.layout{grid-template-columns:1fr}.grid,.grid.three,.template-cards,.guide-actions{grid-template-columns:1fr}.mapping{grid-template-columns:1fr}.mapping label{margin-top:8px}.access-actions{flex-direction:column}.access-actions .button{width:100%}}
+    .hero-actions{display:grid;grid-template-columns:minmax(220px,420px) auto;gap:10px;align-items:end;margin-top:17px;position:relative;z-index:1}.hero-actions label{margin:0}.dirty{color:var(--warn);font-size:12px;font-weight:800}.loading{position:fixed;z-index:90;inset:0;background:#09070ed6;display:grid;place-items:center}.spinner{width:48px;height:48px;border:4px solid #ffffff1f;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.theme-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.theme-pills button{background:#191222}.theme-pills button.is-active{box-shadow:0 0 0 2px var(--brand) inset}
+    @media(max-width:980px){.console-shell{grid-template-columns:1fr}.page-nav{position:sticky;top:0;z-index:30;display:flex;overflow:auto;gap:5px;padding:8px;background:#100b19ee}.page-nav small{display:none}.page-nav button{min-width:max-content;margin:0}.metric-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){main{width:min(100% - 18px,1460px)}.grid,.grid.three,.template-cards,.guide-actions,.metric-grid,.hero-actions{grid-template-columns:1fr}.mapping{grid-template-columns:1fr}.mapping label{margin-top:8px}.access-actions{flex-direction:column}.access-actions .button{width:100%}.hero,.panel{border-radius:14px}.panel{padding:17px}}
   </style>
 </head>
 <body>
@@ -41,12 +43,35 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
   <section class="hero">
     <div class="badge">Owner-only · Fima account + Discord identity protected</div>
     <h1>Paradise Operations Console</h1>
-    <p class="muted">Configure the test guild, challenge rules, channel routing, profiles, staff automation and safe setup metadata. No bot credential is exposed here.</p>
+    <p class="muted">Multi-server operations, templates, transcripts, staff workflows and safe setup metadata. No bot credential is exposed here.</p>
     <div class="chips"><span class="chip" id="guildChip">Guild: loading</span><span class="chip" id="botChip">Bot: loading</span><span class="chip" id="syncChip">Commands: loading</span><span class="chip" id="templateChip">Template: loading</span></div>
+    <div class="hero-actions"><label for="serverSelect">Managed server <span class="tip" title="Only guilds where the official Paradise bot is currently connected appear here.">?</span><select id="serverSelect"><option>Loading managed servers…</option></select></label><span class="dirty" id="saveState">All settings loaded</span></div>
   </section>
 
+  <div class="console-shell">
+  <nav class="panel page-nav" aria-label="Paradise sections">
+    <small>Operations</small>
+    <button data-page-button="overview" class="active">✦ Overview</button>
+    <button data-page-button="setup">◈ Setup & templates</button>
+    <button data-page-button="channels"># Channels & transcripts</button>
+    <button data-page-button="roles">♜ Roles & permissions</button>
+    <button data-page-button="challenge">⚔ Challenge</button>
+    <button data-page-button="availability">◷ Availability & LOA</button>
+    <button data-page-button="roster">♟ Roster & lineup</button>
+    <button data-page-button="relations">◇ Relations</button>
+    <button data-page-button="blacklist">⊘ Blacklist & appeals</button>
+    <button data-page-button="guides">▤ Guides</button>
+    <button data-page-button="branding">✧ Branding</button>
+    <button data-page-button="security">⌁ Security</button>
+    <button data-page-button="advanced">⚙ Advanced</button>
+  </nav>
   <div class="layout">
     <div class="stack">
+      <section class="panel" data-page="overview">
+        <h2>Operations overview</h2>
+        <p class="help">A clean operational summary for the selected server. Detailed runtime data remains sanitized.</p>
+        <div class="metric-grid" id="metricGrid"><div class="metric"><b>—</b><span>Loading</span></div></div>
+      </section>
       <section class="panel">
         <h2>Identity & installation <span class="tip" title="Administrator is allowed only for the isolated test setup. Production should use least privilege.">?</span></h2>
         <p class="help">Application ID and connected guild state are read live from the Paradise bot runtime.</p>
@@ -63,9 +88,17 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         </div>
         <div class="grid">
           <div><label for="template">Active template <span class="tip" title="Community, Clan and TSBTR remain separate schemas.">?</span></label><select id="template"><option value="community">Fieel's Community</option><option value="clan">Paradise Clan</option><option value="tsbtr">TSBTR-style</option></select><button data-save="template">Save template</button></div>
-          <div><label>Embed accent <span class="tip" title="Black is the default. This controls the Discord embed side strip and Paradise accent.">?</span></label><div class="color-row"><input id="brandPicker" type="color" value="#000000" aria-label="Brand color"><input id="brandHex" maxlength="7" value="#000000" spellcheck="false"></div><button class="secondary" id="previewBrand">Preview appearance</button><button data-save="branding">Save color</button></div>
+          <div><label>Accent color <span class="tip" title="Controls both the dashboard accent and the Discord embed side strip.">?</span></label><div class="color-row"><input id="brandPicker" type="color" value="#8B5CF6" aria-label="Brand color"><input id="brandHex" maxlength="7" value="#8B5CF6" spellcheck="false"></div><button class="secondary" id="previewBrand">Preview appearance</button><button data-save="branding">Save theme</button></div>
         </div>
-        <div class="preview-card" id="brandPreview"><b>✦ Paradise premium black embed</b><p class="help">Headings, compact sections and a configurable accent strip.</p></div>
+        <h3>Dashboard theme</h3>
+        <div class="theme-pills"><button type="button" data-theme="paradise">Paradise Purple</button><button type="button" data-theme="charcoal">Charcoal</button><button type="button" data-theme="midnight">Midnight</button></div>
+        <div class="grid">
+          <label>Message density<select id="messageDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+          <label>Separator style<select id="separatorStyle"><option value="diamond">Diamond</option><option value="line">Line</option><option value="minimal">Minimal</option></select></label>
+          <label>Footer style<select id="footerStyle"><option value="branded">Made by Paradise</option><option value="compact">Compact</option></select></label>
+          <label>Default language<select id="defaultLanguage"><option value="en">English</option><option value="tr">Türkçe</option></select></label>
+        </div>
+        <div class="preview-card" id="brandPreview"><b>✦ Paradise premium embed</b><p class="help">Structured headings, readable spacing, a configurable accent and “Made by Paradise” footer.</p></div>
       </section>
 
       <section class="panel">
@@ -144,6 +177,17 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         </div>
       </section>
 
+      <section class="panel" data-page="security">
+        <h2>Security boundaries</h2>
+        <p class="help">Owner access requires both a valid Fima session and the linked owner Discord identity. Mutations use a short-lived CSRF token, credentialed official-origin requests and audited owner-action headers.</p>
+        <div class="permission-list">
+          <div class="permission-item"><strong>Owner-only dashboard</strong><span class="muted">Wrong linked Discord identities receive no configuration data.</span></div>
+          <div class="permission-item"><strong>Guild isolation</strong><span class="muted">Every saved setting includes a managed guild ID; unknown guilds are rejected.</span></div>
+          <div class="permission-item"><strong>No hidden destructive web action</strong><span class="muted">Setup still requires Discord backup, preview and typed second confirmation.</span></div>
+          <div class="permission-item"><strong>Private transcripts</strong><span class="muted">Transcript destinations must be permission-restricted staff channels.</span></div>
+        </div>
+      </section>
+
       <section class="panel">
         <h2>Relations board settings</h2>
         <p class="help">The live board keeps Current Allies and Enemy Clans separate. Add, edit and remove entries with the audited <b>/relation</b> commands.</p>
@@ -164,6 +208,52 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
           <button data-guide-mode="clan">Repost Clan guides</button>
           <button data-guide-mode="tsbtr">Repost TSBTR guides</button>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2>Ticket & transcript operations</h2>
+        <p class="help">Challenge and support transcripts are retained in their mapped private channels. Closing a ticket never silently discards its history.</p>
+        <div class="grid">
+          <label class="switch"><input id="stickyChallengeHeader" type="checkbox"> Sticky challenge ticket header <span class="tip" title="Keeps challenger, challenged, ticket ID, ranks, referee and current state visible.">?</span></label>
+          <label class="switch"><input id="refereeRequired" type="checkbox"> Require assigned referee</label>
+          <label class="switch"><input id="showCooldownSnapshot" type="checkbox"> Include cooldown/immunity snapshot</label>
+          <label class="switch"><input id="showLoaOnAvailability" type="checkbox"> Include LOA on availability board</label>
+          <label class="switch"><input id="challengeTranscripts" type="checkbox"> Save challenge transcripts</label>
+          <label class="switch"><input id="supportTranscripts" type="checkbox"> Save support transcripts</label>
+          <label>Transcript retention days<input id="transcriptRetentionDays" type="number" min="30" max="3650"></label>
+          <label>Availability refresh minutes<input id="availabilityRefreshMinutes" type="number" min="5" max="1440"></label>
+        </div>
+        <label for="autowinReasons">Approved autowin reasons <span class="tip" title="One reason per line. The slash command still logs the exact selected reason and actor.">?</span></label>
+        <textarea id="autowinReasons" placeholder="No-show&#10;Forfeit&#10;Rule violation"></textarea>
+        <button data-save="operations">Save ticket operations</button>
+      </section>
+
+      <section class="panel">
+        <h2>Roster, lineup & mainer boards</h2>
+        <p class="help">Controls display and approval policy for main lineup, war lineup, EU roster and mainer proof workflows. Discord commands remain authoritative and audited.</p>
+        <div class="grid">
+          <label class="switch"><input id="rosterApprovalRequired" type="checkbox"> Require manager approval</label>
+          <label class="switch"><input id="rosterShowRoblox" type="checkbox"> Show Roblox username</label>
+          <label class="switch"><input id="rosterShowStage" type="checkbox"> Show Stage / Level / Strength</label>
+          <label class="switch"><input id="rosterShowRegion" type="checkbox"> Show region</label>
+          <label>Lineup member limit<input id="lineupLimit" type="number" min="5" max="50"></label>
+          <label>Board density<select id="rosterDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+        </div>
+        <button data-save="roster">Save roster policy</button>
+      </section>
+
+      <section class="panel">
+        <h2>Blacklist, appeals & bail policy</h2>
+        <p class="help">Blacklist records require evidence and audit history. Bail is disabled by default and can never bypass owner approval.</p>
+        <div class="grid">
+          <label class="switch"><input id="appealsEnabled" type="checkbox"> Allow blacklist appeals</label>
+          <label class="switch"><input id="blacklistEvidenceRequired" type="checkbox"> Require evidence</label>
+          <label class="switch"><input id="bailEnabled" type="checkbox"> Enable owner-approved bail workflow</label>
+          <label>Appeal cooldown days<input id="appealCooldownDays" type="number" min="1" max="365"></label>
+          <label>Public reason detail<select id="publicReasonMode"><option value="summary">Safe summary</option><option value="full">Full reason</option></select></label>
+        </div>
+        <div class="notice">Bail never auto-unblacklists a user. Payment status and final resolution are separate audited actions.</div>
+        <button data-save="blacklist">Save blacklist policy</button>
       </section>
 
       <section class="panel">
@@ -190,8 +280,10 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
     </aside>
   </div>
   </div>
+  </div>
 </main>
 <div class="toast" id="toast"></div>
+<div class="loading" id="loadingState"><div><div class="spinner"></div><p class="muted">Loading Paradise safely…</p></div></div>
 <script>
 const API_BASE=${JSON.stringify(apiBase)};
 const SITE_BASE=${JSON.stringify(siteBase)};
@@ -199,18 +291,39 @@ const CHANNEL_KEYS=[
   ['challenge_channel','Challenge create panel'],['challenge_rules_channel','Challenge rules'],['challenge_results_channel','Challenge results'],['availability_channel','Availability'],
   ['loa_channel','LOA'],['tryout_channel','Tryout'],['tryout_results_channel','Tryout results'],['training_channel','Training'],['training_results_channel','Training results'],
   ['referee_works_channel','Referee works'],['activity_logs_channel','Activity logs'],['activity_check_channel','Activity check'],['relation_panel_channel','Relations board'],
-  ['role_guide_channel','Role guide'],['faq_channel','FAQ / trust'],['staff_report_channel','Staff reports'],['support_ticket_channel','Support tickets'],['application_ticket_channel','Applications']
+  ['role_guide_channel','Role guide'],['faq_channel','FAQ / trust'],['staff_report_channel','Staff reports'],['support_ticket_channel','Support tickets'],['application_ticket_channel','Applications'],
+  ['challenge_transcripts_channel','Challenge transcripts (private)'],['support_transcripts_channel','Support transcripts (private)'],['roster_channel','EU roster board'],
+  ['main_lineup_channel','Main lineup'],['war_lineup_channel','War lineup'],['mainer_proof_channel','Mainer proof'],['blacklist_channel','Blacklist board'],
+  ['blacklist_appeal_channel','Blacklist appeals'],['bail_appeal_channel','Bail review'],['war_management_channel','War management'],
+  ['roster_logs_channel','Roster logs'],['server_logs_channel','Server logs'],['mod_logs_channel','Moderation logs']
 ];
 const ROLE_KEYS=[
   ['owner_role','Owner'],['overseer_role','Overseer'],['community_manager_role','Community Manager'],['training_manager_role','Training Manager'],
   ['referee_manager_role','Referee Manager'],['experienced_referee_role','Experienced Referee'],['referee_role','Referee'],['trial_referee_role','Trial Referee'],
   ['training_supervisor_role','Training Supervisor'],['training_hoster_role','Training Hoster'],['tryout_supervisor_role','Tryout Supervisor'],['tryout_hoster_role','Tryout Hoster']
 ];
-let currentPayload=null;
+let currentPayload=null,selectedGuildId='',csrfPromise=null,currentTheme='paradise';
 const byId=id=>document.getElementById(id);
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 function show(message,ok=true){const el=byId('toast');el.className='toast '+(ok?'ok':'error');el.textContent=message;setTimeout(()=>el.className='toast',4500)}
-function applyBrand(value){document.documentElement.style.setProperty('--brand',value);document.documentElement.style.setProperty('--brand-soft',value+'33')}
+function hexToRgb(value){const match=/^#([0-9a-f]{6})$/i.exec(value);if(!match)return'139,92,246';const n=parseInt(match[1],16);return[(n>>16)&255,(n>>8)&255,n&255].join(',')}
+function applyBrand(value){document.documentElement.style.setProperty('--brand',value);document.documentElement.style.setProperty('--brand-rgb',hexToRgb(value));document.documentElement.style.setProperty('--brand-soft','rgba('+hexToRgb(value)+',.18)')}
+const THEMES={paradise:{bg:'#0d0914',panel:'#171121',line:'#392b4e',accent:'#8B5CF6'},charcoal:{bg:'#101114',panel:'#1a1c21',line:'#383c45',accent:'#8B8FA3'},midnight:{bg:'#070d1b',panel:'#101a2d',line:'#273b5c',accent:'#4F8CFF'}};
+function applyTheme(name,accent){const theme=THEMES[name]||THEMES.paradise;currentTheme=name;for(const [key,value] of Object.entries(theme)){if(key!=='accent')document.documentElement.style.setProperty('--'+key,value)}applyBrand(accent||theme.accent);document.querySelectorAll('[data-theme]').forEach(button=>button.classList.toggle('is-active',button.dataset.theme===name))}
+function setLoading(active){byId('loadingState').hidden=!active}
+function markDirty(){byId('saveState').textContent='Unsaved changes';byId('saveState').className='dirty'}
+async function csrfToken(force=false){
+  if(force)csrfPromise=null;
+  if(!csrfPromise)csrfPromise=fetch(API_BASE+'/api/csrf-token',{credentials:'include',headers:{accept:'application/json'},cache:'no-store'}).then(async response=>{const body=await response.json().catch(()=>({}));if(!response.ok||!body.csrfToken)throw new Error('csrf_unavailable');return body.csrfToken});
+  return csrfPromise;
+}
+async function mutate(path,body,method='POST',retry=true){
+  const token=await csrfToken();
+  const response=await fetch(API_BASE+path,{method,credentials:'include',headers:{accept:'application/json','content-type':'application/json','x-paradise-owner-action':'1','x-fima-csrf':token},body:JSON.stringify(body)});
+  const result=await response.json().catch(()=>({error:'invalid_response'}));
+  if(response.status===403&&result.error==='csrf_required'&&retry){await csrfToken(true);return mutate(path,body,method,false)}
+  return{response,result};
+}
 function number(id,fallback){return Number(byId(id).value)||fallback}
 function buildMappings(runtime,mappings){
   const channels=(runtime&&runtime.channels||[]).filter(c=>c.type===0||c.type===5);
@@ -225,6 +338,24 @@ function buildRoleMappings(runtime,mappings){
     const options=['<option value="">Safe name fallback</option>'].concat(roles.map(role=>'<option value="'+role.id+'" '+(mappings[key]===role.id?'selected':'')+'>'+escapeHtml(role.name)+'</option>'));
     return '<div class="mapping"><label for="role_'+key+'">'+label+' <span class="tip" title="Stored as '+key+'">?</span></label><select id="role_'+key+'">'+options.join('')+'</select></div>';
   }).join('');
+}
+function initializePages(){
+  const routes=[
+    ['Identity & installation','overview'],['Template & appearance','branding'],['Challenge system','challenge'],['Discord channel mappings','channels'],
+    ['Discord role mappings','roles'],['Profiles, LOA & activity','availability'],['Referee & hoster permissions','roles'],['Relations board settings','relations'],
+    ['Guide & handbook repost','guides'],['Ticket & transcript operations','channels'],['Roster, lineup & mainer boards','roster'],
+    ['Blacklist, appeals & bail policy','blacklist'],['Advanced operations','advanced'],['Danger zone','setup'],['Live runtime','overview'],
+    ['Current counters','overview'],['Restore notes','setup']
+  ];
+  document.querySelectorAll('#console section.panel').forEach(section=>{if(section.dataset.page)return;const title=section.querySelector('h2')?.textContent||'';const match=routes.find(([prefix])=>title.startsWith(prefix));section.dataset.page=match?match[1]:'overview'});
+  document.querySelectorAll('#console aside .panel').forEach(panel=>{panel.parentElement?.classList.add('runtime-panels')});
+  showPage(location.hash.replace('#','')||'overview');
+}
+function showPage(page){
+  const known=[...document.querySelectorAll('[data-page-button]')].some(button=>button.dataset.pageButton===page);if(!known)page='overview';
+  document.querySelectorAll('[data-page]').forEach(section=>section.hidden=section.dataset.page!==page);
+  document.querySelectorAll('[data-page-button]').forEach(button=>button.classList.toggle('active',button.dataset.pageButton===page));
+  history.replaceState(null,'','#'+page);
 }
 function renderAccess(status){
   const gate=byId('accessGate'),actions=byId('accessActions');
@@ -258,9 +389,12 @@ async function sessionStatus(){
   return response.json();
 }
 async function load(){
-  const r=await fetch(API_BASE+'/api/paradise/config',{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});const j=await r.json();
-  if(!r.ok){show(j.error||'Failed to load',false);return}
-  currentPayload=j;const c=j.config||{},rt=j.runtime||{},ch=c.challenge||{},loa=c.loa||{},ver=c.verification||{},act=c.activity||{},am=c.automod||{},rel=c.relationSettings||{};
+  setLoading(true);
+  const query=selectedGuildId?'?guildId='+encodeURIComponent(selectedGuildId):'';
+  const r=await fetch(API_BASE+'/api/paradise/config'+query,{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});const j=await r.json().catch(()=>({error:'invalid_response'}));
+  if(!r.ok){setLoading(false);show(j.error||'Failed to load',false);return}
+  currentPayload=j;selectedGuildId=j.selectedGuildId||'';const c=j.config||{},rt=j.runtime||{},ch=c.challenge||{},loa=c.loa||{},ver=c.verification||{},act=c.activity||{},am=c.automod||{},rel=c.relationSettings||{},ops=c.operations||{},roster=c.roster||{},blacklist=c.blacklist||{};
+  byId('serverSelect').innerHTML=(j.servers||[]).map(server=>'<option value="'+server.id+'" '+(server.id===selectedGuildId?'selected':'')+'>'+escapeHtml(server.name)+' · …'+String(server.id).slice(-6)+'</option>').join('')||'<option value="">No managed server online</option>';
   const guildLabel=rt.guild?rt.guild.name+' · …'+String(rt.guild.id||'').slice(-6):'unavailable';
   byId('guildChip').textContent='Guild: '+guildLabel;byId('guildChip').className='chip '+(rt.status==='ready'?'good':'bad');
   const identity=rt.botIdentity||{};byId('botChip').textContent='Bot: '+(rt.status==='ready'?(identity.nicknameMatches?'Paradise online':'name check needed'):'unavailable');byId('botChip').className='chip '+(rt.status==='ready'&&identity.nicknameMatches?'good':'bad');
@@ -269,13 +403,17 @@ async function load(){
   byId('template').value=c.activeSetupMode||'clan';byId('mainer').value=c.mainerCode||'';byId('quotas').value=JSON.stringify(c.weeklyQuotas||{},null,2);byId('channels').value=JSON.stringify(c.commandChannels||{},null,2);
   document.querySelectorAll('[data-template]').forEach(card=>card.classList.toggle('is-active',card.dataset.template===byId('template').value));
   byId('autoChecks').checked=c.autoActivityChecks===true;byId('autoRemoval').checked=c.autoActivityRoleRemoval===true;
-  const brand=/^#[0-9a-f]{6}$/i.test(c.brandColor||'')?c.brandColor.toUpperCase():'#000000';byId('brandPicker').value=brand.toLowerCase();byId('brandHex').value=brand;applyBrand(brand);
+  const theme=["paradise","charcoal","midnight"].includes(c.dashboardTheme)?c.dashboardTheme:'paradise';const brand=/^#[0-9a-f]{6}$/i.test(c.brandColor||'')?c.brandColor.toUpperCase():THEMES[theme].accent;byId('brandPicker').value=brand.toLowerCase();byId('brandHex').value=brand;applyTheme(theme,brand);
+  byId('messageDensity').value=c.messageDensity==='compact'?'compact':'comfortable';byId('separatorStyle').value=['line','minimal'].includes(c.separatorStyle)?c.separatorStyle:'diamond';byId('footerStyle').value=c.footerStyle==='compact'?'compact':'branded';byId('defaultLanguage').value=c.language==='tr'?'tr':'en';
   byId('topSize').value=ch.topSize||30;byId('top10Range').value=ch.top10Range||1;byId('top20Range').value=ch.top20Range||2;byId('top30Range').value=ch.top30Range||3;byId('cooldownDays').value=ch.cooldownDays||3;byId('top10CooldownDays').value=ch.top10CooldownDays||7;byId('immunityDays').value=ch.immunityDays||3;byId('proofRequired').checked=ch.proofRequired===true;
   byId('codeExpiryMinutes').value=ver.codeExpiryMinutes||10;byId('requireProfileForTrainingResult').checked=ver.requireProfileForTrainingResult!==false;
   byId('loaMaxDays').value=loa.maxDays||90;byId('loaEvidence').checked=loa.requireEvidence===true;byId('loaAutoExpire').checked=loa.autoExpire!==false;
   byId('checkEveryHours').value=act.checkEveryHours||48;byId('responseDeadlineHours').value=act.responseDeadlineHours||24;byId('promotionMultiplier').value=act.promotionMultiplier||3;byId('autoRoleChanges').checked=act.autoRoleChanges===true;
   byId('automodEnabled').checked=am.enabled!==false;byId('blockInvites').checked=am.blockInvites!==false;byId('blockScamKeywords').checked=am.blockScamKeywords!==false;byId('mentionSpamLimit').value=am.mentionSpamLimit||8;
   byId('displayRelationInvites').checked=rel.displayInvites!==false;byId('showRelationRepresentatives').checked=rel.showRepresentatives!==false;byId('relationSortMode').value=rel.sortMode==='updated'?'updated':'alphabetical';
+  byId('stickyChallengeHeader').checked=ops.stickyChallengeHeader!==false;byId('refereeRequired').checked=ops.refereeRequired!==false;byId('showCooldownSnapshot').checked=ops.showCooldownSnapshot!==false;byId('showLoaOnAvailability').checked=ops.showLoaOnAvailability===true;byId('challengeTranscripts').checked=ops.challengeTranscripts!==false;byId('supportTranscripts').checked=ops.supportTranscripts!==false;byId('transcriptRetentionDays').value=ops.transcriptRetentionDays||365;byId('availabilityRefreshMinutes').value=ops.availabilityRefreshMinutes||30;byId('autowinReasons').value=(ops.autowinReasons||['No-show','Forfeit','Rule violation']).join('\\n');
+  byId('rosterApprovalRequired').checked=roster.approvalRequired!==false;byId('rosterShowRoblox').checked=roster.showRobloxName!==false;byId('rosterShowStage').checked=roster.showStage!==false;byId('rosterShowRegion').checked=roster.showRegion!==false;byId('lineupLimit').value=roster.lineupLimit||15;byId('rosterDensity').value=roster.boardDensity==='compact'?'compact':'comfortable';
+  byId('appealsEnabled').checked=blacklist.appealsEnabled!==false;byId('blacklistEvidenceRequired').checked=blacklist.evidenceRequired!==false;byId('bailEnabled').checked=blacklist.bailEnabled===true;byId('appealCooldownDays').value=blacklist.appealCooldownDays||30;byId('publicReasonMode').value=blacklist.publicReasonMode==='full'?'full':'summary';
   buildMappings(rt,c.channelMappings||{});buildRoleMappings(rt,c.roleMappings||{});
   const runtimeView={
     status:rt.status,
@@ -287,9 +425,13 @@ async function load(){
   };
   byId('runtimeStatus').textContent=JSON.stringify(runtimeView,null,2);byId('summaryStatus').textContent=JSON.stringify(j.summary,null,2);
   byId('relationSummary').textContent='Current Allies: '+Number(j.summary&&j.summary.allies||0)+'\\nEnemy Clans: '+Number(j.summary&&j.summary.enemies||0)+'\\nManage entries in Discord with /relation add, /relation edit and /relation remove.';
+  const metrics=[['Managed servers',(j.servers||[]).length],['Commands',(rt.commandSync&&rt.commandSync.count)||0],['Channels',(rt.channels||[]).length],['Roles',(rt.roles||[]).length],['Profiles',j.summary?.verifiedProfiles||0],['Open challenges',j.summary?.pendingChallenges||0],['Active sessions',j.summary?.activeSessions||0],['Active LOA',j.summary?.activeLoa||0]];
+  byId('metricGrid').innerHTML=metrics.map(([label,value])=>'<div class="metric"><b>'+escapeHtml(value)+'</b><span>'+escapeHtml(label)+'</span></div>').join('');
+  byId('saveState').textContent='All settings loaded';byId('saveState').className='dirty';byId('saveState').style.color='var(--good)';
+  setLoading(false);
 }
 function valueFor(kind){
-  if(kind==='mainer')return byId('mainer').value;if(kind==='branding')return byId('brandHex').value;if(kind==='template')return byId('template').value;
+  if(kind==='mainer')return byId('mainer').value;if(kind==='branding')return{brandColor:byId('brandHex').value,dashboardTheme:currentTheme,messageDensity:byId('messageDensity').value,separatorStyle:byId('separatorStyle').value,footerStyle:byId('footerStyle').value,language:byId('defaultLanguage').value};if(kind==='template')return byId('template').value;
   if(kind==='quotas'||kind==='channels')return JSON.parse(byId(kind).value||'{}');
   if(kind==='automation')return{autoActivityChecks:byId('autoChecks').checked,autoActivityRoleRemoval:byId('autoRemoval').checked};
   if(kind==='challenge')return{topSize:number('topSize',30),top10Range:number('top10Range',1),top20Range:number('top20Range',2),top30Range:number('top30Range',3),cooldownDays:number('cooldownDays',3),top10CooldownDays:number('top10CooldownDays',7),immunityDays:number('immunityDays',3),proofRequired:byId('proofRequired').checked};
@@ -300,15 +442,22 @@ function valueFor(kind){
   if(kind==='channelMappings'){const out={};CHANNEL_KEYS.forEach(([key])=>{const v=byId('map_'+key).value;if(v)out[key]=v});return out}
   if(kind==='roleMappings'){const out={};ROLE_KEYS.forEach(([key])=>{const v=byId('role_'+key).value;if(v)out[key]=v});return out}
   if(kind==='relations')return{displayInvites:byId('displayRelationInvites').checked,showRepresentatives:byId('showRelationRepresentatives').checked,sortMode:byId('relationSortMode').value};
+  if(kind==='operations')return{stickyChallengeHeader:byId('stickyChallengeHeader').checked,refereeRequired:byId('refereeRequired').checked,showCooldownSnapshot:byId('showCooldownSnapshot').checked,showLoaOnAvailability:byId('showLoaOnAvailability').checked,challengeTranscripts:byId('challengeTranscripts').checked,supportTranscripts:byId('supportTranscripts').checked,transcriptRetentionDays:number('transcriptRetentionDays',365),availabilityRefreshMinutes:number('availabilityRefreshMinutes',30),autowinReasons:byId('autowinReasons').value.split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean)};
+  if(kind==='roster')return{approvalRequired:byId('rosterApprovalRequired').checked,showRobloxName:byId('rosterShowRoblox').checked,showStage:byId('rosterShowStage').checked,showRegion:byId('rosterShowRegion').checked,lineupLimit:number('lineupLimit',15),boardDensity:byId('rosterDensity').value};
+  if(kind==='blacklist')return{appealsEnabled:byId('appealsEnabled').checked,evidenceRequired:byId('blacklistEvidenceRequired').checked,bailEnabled:byId('bailEnabled').checked,appealCooldownDays:number('appealCooldownDays',30),publicReasonMode:byId('publicReasonMode').value};
 }
-async function save(kind){let value;try{value=valueFor(kind)}catch{show('Invalid JSON',false);return}const r=await fetch(API_BASE+'/api/paradise/config',{method:'PATCH',credentials:'include',headers:{accept:'application/json','content-type':'application/json','x-paradise-owner-action':'1'},body:JSON.stringify({kind,value})});const j=await r.json();if(!r.ok){show(j.error||'Save failed',false);return}show('Saved: '+kind);await load()}
-async function repostGuides(mode){if(!confirm('Repost or update the '+mode+' guide messages in Discord?'))return;const r=await fetch(API_BASE+'/api/paradise/actions/repost-guides',{method:'POST',credentials:'include',headers:{accept:'application/json','content-type':'application/json','x-paradise-owner-action':'1'},body:JSON.stringify({mode})});const j=await r.json();if(!r.ok){show(j.error||'Guide repost failed',false);return}show('Updated '+j.posted+' guide messages');await load()}
-byId('brandPicker').oninput=e=>{const v=e.target.value.toUpperCase();byId('brandHex').value=v;applyBrand(v)};byId('brandHex').oninput=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value)){byId('brandPicker').value=e.target.value;applyBrand(e.target.value)}};
+async function save(kind){let value;try{value=valueFor(kind)}catch{show('Invalid JSON',false);return}if(!selectedGuildId)return show('Select a managed Paradise server first.',false);try{const{response,result}=await mutate('/api/paradise/config',{kind,value,guildId:selectedGuildId},'PATCH');if(!response.ok){show(result.error==='csrf_required'?'Security session could not be refreshed. Reload the panel.':result.error||'Save failed',false);return}show('Saved '+kind+' for the selected server');await load()}catch(error){show(error.message==='csrf_unavailable'?'Secure session token is unavailable. Sign in again.':'Save failed safely.',false)}}
+async function repostGuides(mode){if(!confirm('Repost or update the '+mode+' guide messages in the selected Discord server?'))return;try{const{response,result}=await mutate('/api/paradise/actions/repost-guides',{mode,guildId:selectedGuildId});if(!response.ok){show(result.error||'Guide repost failed',false);return}show('Updated '+result.posted+' guide messages');await load()}catch{show('Guide repost failed safely.',false)}}
+byId('brandPicker').oninput=e=>{const v=e.target.value.toUpperCase();byId('brandHex').value=v;applyBrand(v);markDirty()};byId('brandHex').oninput=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value)){byId('brandPicker').value=e.target.value;applyBrand(e.target.value);markDirty()}};
 byId('previewBrand').onclick=()=>{const value=byId('brandHex').value;if(!/^#[0-9a-f]{6}$/i.test(value))return show('Use a valid HEX color such as #000000',false);applyBrand(value);byId('brandPreview').scrollIntoView({behavior:'smooth',block:'center'})};
 document.querySelectorAll('[data-template]').forEach(card=>card.onclick=()=>{byId('template').value=card.dataset.template;document.querySelectorAll('[data-template]').forEach(item=>item.classList.toggle('is-active',item===card))});
 document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset.save));document.querySelectorAll('[data-guide-mode]').forEach(b=>b.onclick=()=>repostGuides(b.dataset.guideMode));byId('refresh').onclick=load;
+document.querySelectorAll('[data-theme]').forEach(button=>button.onclick=()=>{currentTheme=button.dataset.theme;const accent=byId('brandHex').value||THEMES[currentTheme].accent;applyTheme(currentTheme,accent);markDirty()});
+document.querySelectorAll('[data-page-button]').forEach(button=>button.onclick=()=>showPage(button.dataset.pageButton));
+byId('serverSelect').onchange=async event=>{selectedGuildId=event.target.value;await load()};
+document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};
-async function start(){try{const status=await sessionStatus();if(renderAccess(status))await load()}catch{renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
+async function start(){try{initializePages();const status=await sessionStatus();if(renderAccess(status)){await csrfToken();await load()}else setLoading(false)}catch{setLoading(false);renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
 start();
 </script>
 </body></html>`;

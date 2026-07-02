@@ -1,0 +1,13 @@
+{
+  "status": "SOURCE ONLY",
+  "commands": ["/blacklist add", "/blacklist remove", "/blacklist panel", "/blacklist appeal-panel"],
+  "persistence": ["blacklists", "appeals", "bails"],
+  "rules": {
+    "evidenceRequiredConfig": true,
+    "appealCooldownConfig": true,
+    "bailDefault": "disabled",
+    "bailAutoUnblacklist": false,
+    "bailOwnerApproval": true
+  },
+  "warning": "Bail is never guaranteed and payment status is separate from resolution."
+}

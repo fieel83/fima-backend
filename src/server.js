@@ -46,6 +46,7 @@ import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicen
 import {
   discordBotHealth,
   giveDiscordRole,
+  paradiseDiscordGuildsSnapshot,
   paradiseDiscordRuntimeSnapshot,
   repostParadiseGuides,
   removeDiscordRole,
@@ -619,6 +620,7 @@ app.get("/api/paradise/session-status", async (req, res) => {
         authenticated: false,
         discordLinked: false,
         ownerAuthorized: false,
+        csrfReady: false,
         reasonCode: "login_required",
         dashboardUrl: `${frontendUrl()}/paradise`
       });
@@ -634,6 +636,7 @@ app.get("/api/paradise/session-status", async (req, res) => {
       authenticated: true,
       discordLinked: access.discordLinked,
       ownerAuthorized: access.ownerAuthorized,
+      csrfReady: Boolean(req.cookies?.[USER_SESSION_COOKIE]),
       reasonCode: access.reasonCode,
       dashboardUrl: `${frontendUrl()}/paradise`
     });
@@ -643,19 +646,30 @@ app.get("/api/paradise/session-status", async (req, res) => {
       authenticated: false,
       discordLinked: false,
       ownerAuthorized: false,
+      csrfReady: false,
       reasonCode: "session_check_failed",
       dashboardUrl: `${frontendUrl()}/paradise`
     });
   }
 });
 
-app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, res) => {
+app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? row.value : {};
-  const runtime = await paradiseDiscordRuntimeSnapshot().catch(error => ({ status: "error", error: error.message }));
+  const servers = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  const requestedGuildId = String(req.query?.guildId || "");
+  const selectedGuild = servers.find(guild => guild.id === requestedGuildId)
+    || servers.find(guild => guild.id === env("DISCORD_GUILD_ID"))
+    || servers[0]
+    || null;
+  const selectedGuildId = selectedGuild?.id || env("DISCORD_GUILD_ID", "");
+  const runtime = await paradiseDiscordRuntimeSnapshot(selectedGuildId).catch(error => ({ status: "error", error: error.message }));
+  const config = state.guildConfigs?.[selectedGuildId] || state.config || {};
   return res.json({
     success: true,
-    config: state.config || {},
+    selectedGuildId,
+    servers,
+    config,
     runtime,
     summary: {
       verifiedProfiles: Object.keys(state.profiles || {}).length,
@@ -663,7 +677,7 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, 
       pendingChallenges: Object.values(state.pendingChallenges || {}).filter(item => ["open", "pending"].includes(item.status)).length,
       activeSessions: Object.values(state.trainings || {}).filter(item => item.status !== "ended").length,
       whitelists: Object.keys(state.whitelists || {}).length,
-      activeSetupMode: state.config?.activeSetupMode || null,
+      activeSetupMode: config.activeSetupMode || null,
       allies: Object.keys(state.relations?.allies || {}).length,
       enemies: Object.keys(state.relations?.enemies || {}).length,
       activeLoa: Object.values(state.loa || {}).filter(item => item.status === "approved" && Number(item.expiresAt) > Date.now()).length
@@ -676,22 +690,29 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
   const kind = String(req.body?.kind || "");
-  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations"].includes(kind)) {
+  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations", "operations", "blacklist", "roster"].includes(kind)) {
     return res.status(400).json({ error: "invalid_config_kind" });
   }
+  const guildId = String(req.body?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
-  state.config = state.config && typeof state.config === "object" ? state.config : {};
+  state.guildConfigs = state.guildConfigs && typeof state.guildConfigs === "object" ? state.guildConfigs : {};
+  state.guildConfigs[guildId] = state.guildConfigs[guildId] && typeof state.guildConfigs[guildId] === "object"
+    ? state.guildConfigs[guildId]
+    : guildId === env("DISCORD_GUILD_ID") && state.config && typeof state.config === "object" ? structuredClone(state.config) : {};
+  const config = state.guildConfigs[guildId];
   if (kind === "mainer") {
     const code = String(req.body?.value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
     if (!code) return res.status(400).json({ error: "invalid_mainer_code" });
-    state.config.mainerCode = code;
+    config.mainerCode = code;
   } else if (kind === "quotas") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_quotas" });
-    state.config.weeklyQuotas = req.body.value;
+    config.weeklyQuotas = req.body.value;
   } else if (kind === "channels") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_channels" });
-    state.config.commandChannels = req.body.value;
+    config.commandChannels = req.body.value;
   } else if (kind === "channelMappings") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_channel_mappings" });
     const mappings = {};
@@ -700,7 +721,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       const channelId = String(value || "");
       if (/^\d{16,22}$/.test(channelId)) mappings[key] = channelId;
     }
-    state.config.channelMappings = mappings;
+    config.channelMappings = mappings;
   } else if (kind === "roleMappings") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_role_mappings" });
     const mappings = {};
@@ -709,18 +730,24 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       const roleId = String(value || "");
       if (/^\d{16,22}$/.test(roleId)) mappings[key] = roleId;
     }
-    state.config.roleMappings = mappings;
+    config.roleMappings = mappings;
   } else if (kind === "branding") {
-    const brandColor = String(req.body?.value || "").trim().toUpperCase();
+    const value = typeof req.body?.value === "string" ? { brandColor: req.body.value } : req.body?.value || {};
+    const brandColor = String(value.brandColor || "").trim().toUpperCase();
     if (!/^#[0-9A-F]{6}$/.test(brandColor)) return res.status(400).json({ error: "invalid_brand_color" });
-    state.config.brandColor = brandColor;
+    config.brandColor = brandColor;
+    config.dashboardTheme = ["paradise", "charcoal", "midnight"].includes(value.dashboardTheme) ? value.dashboardTheme : "paradise";
+    config.messageDensity = value.messageDensity === "compact" ? "compact" : "comfortable";
+    config.separatorStyle = ["line", "diamond", "minimal"].includes(value.separatorStyle) ? value.separatorStyle : "diamond";
+    config.footerStyle = value.footerStyle === "compact" ? "compact" : "branded";
+    config.language = value.language === "tr" ? "tr" : "en";
   } else if (kind === "template") {
     const template = String(req.body?.value || "");
     if (!["community", "clan", "tsbtr"].includes(template)) return res.status(400).json({ error: "invalid_template" });
-    state.config.activeSetupMode = template;
+    config.activeSetupMode = template;
   } else if (kind === "challenge") {
     const value = req.body?.value || {};
-    state.config.challenge = {
+    config.challenge = {
       topSize: Math.min(100, Math.max(2, Number(value.topSize) || 30)),
       top10Range: Math.min(10, Math.max(1, Number(value.top10Range) || 1)),
       top20Range: Math.min(10, Math.max(1, Number(value.top20Range) || 2)),
@@ -732,20 +759,20 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     };
   } else if (kind === "loa") {
     const value = req.body?.value || {};
-    state.config.loa = {
+    config.loa = {
       maxDays: Math.min(365, Math.max(1, Number(value.maxDays) || 90)),
       requireEvidence: value.requireEvidence === true,
       autoExpire: value.autoExpire !== false
     };
   } else if (kind === "verification") {
     const value = req.body?.value || {};
-    state.config.verification = {
+    config.verification = {
       codeExpiryMinutes: Math.min(30, Math.max(3, Number(value.codeExpiryMinutes) || 10)),
       requireProfileForTrainingResult: value.requireProfileForTrainingResult !== false
     };
   } else if (kind === "activity") {
     const value = req.body?.value || {};
-    state.config.activity = {
+    config.activity = {
       checkEveryHours: Math.min(168, Math.max(24, Number(value.checkEveryHours) || 48)),
       responseDeadlineHours: Math.min(72, Math.max(1, Number(value.responseDeadlineHours) || 24)),
       promotionMultiplier: Math.min(10, Math.max(2, Number(value.promotionMultiplier) || 3)),
@@ -753,7 +780,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     };
   } else if (kind === "automod") {
     const value = req.body?.value || {};
-    state.config.automod = {
+    config.automod = {
       enabled: value.enabled !== false,
       blockInvites: value.blockInvites !== false,
       blockScamKeywords: value.blockScamKeywords !== false,
@@ -761,25 +788,61 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     };
   } else if (kind === "relations") {
     const value = req.body?.value || {};
-    state.config.relationSettings = {
+    config.relationSettings = {
       displayInvites: value.displayInvites !== false,
       showRepresentatives: value.showRepresentatives !== false,
       sortMode: value.sortMode === "updated" ? "updated" : "alphabetical"
     };
   } else if (kind === "commandVisibility") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_visibility" });
-    state.config.commandVisibility = req.body.value;
+    config.commandVisibility = req.body.value;
+  } else if (kind === "operations") {
+    const value = req.body?.value || {};
+    config.operations = {
+      stickyChallengeHeader: value.stickyChallengeHeader !== false,
+      refereeRequired: value.refereeRequired !== false,
+      showCooldownSnapshot: value.showCooldownSnapshot !== false,
+      showLoaOnAvailability: value.showLoaOnAvailability === true,
+      challengeTranscripts: value.challengeTranscripts !== false,
+      supportTranscripts: value.supportTranscripts !== false,
+      transcriptRetentionDays: Math.min(3650, Math.max(30, Number(value.transcriptRetentionDays) || 365)),
+      availabilityRefreshMinutes: Math.min(1440, Math.max(5, Number(value.availabilityRefreshMinutes) || 30)),
+      autowinReasons: Array.isArray(value.autowinReasons)
+        ? value.autowinReasons.map(item => String(item).trim().slice(0, 80)).filter(Boolean).slice(0, 20)
+        : []
+    };
+  } else if (kind === "blacklist") {
+    const value = req.body?.value || {};
+    config.blacklist = {
+      appealsEnabled: value.appealsEnabled !== false,
+      appealCooldownDays: Math.min(365, Math.max(1, Number(value.appealCooldownDays) || 30)),
+      evidenceRequired: value.evidenceRequired !== false,
+      bailEnabled: value.bailEnabled === true,
+      bailNeedsOwnerApproval: true,
+      publicReasonMode: value.publicReasonMode === "full" ? "full" : "summary"
+    };
+  } else if (kind === "roster") {
+    const value = req.body?.value || {};
+    config.roster = {
+      approvalRequired: value.approvalRequired !== false,
+      showRobloxName: value.showRobloxName !== false,
+      showStage: value.showStage !== false,
+      showRegion: value.showRegion !== false,
+      lineupLimit: Math.min(50, Math.max(5, Number(value.lineupLimit) || 15)),
+      boardDensity: value.boardDensity === "compact" ? "compact" : "comfortable"
+    };
   } else {
-    state.config.autoActivityChecks = req.body?.value?.autoActivityChecks === true;
-    state.config.autoActivityRoleRemoval = req.body?.value?.autoActivityRoleRemoval === true;
+    config.autoActivityChecks = req.body?.value?.autoActivityChecks === true;
+    config.autoActivityRoleRemoval = req.body?.value?.autoActivityRoleRemoval === true;
   }
+  if (guildId === env("DISCORD_GUILD_ID")) state.config = structuredClone(config);
   await prisma.setting.upsert({
     where: { key: "paradise_3a59_state_v1" },
     update: { value: state },
     create: { key: "paradise_3a59_state_v1", value: state }
   });
-  await createAuditLog("paradise_owner_config_updated", "discord_user", "762858334440521739", { kind, userId: req.user.id });
-  return res.json({ success: true, kind });
+  await createAuditLog("paradise_owner_config_updated", "discord_user", "762858334440521739", { kind, guildId, userId: req.user.id });
+  return res.json({ success: true, kind, guildId });
 });
 
 app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwner, async (req, res) => {
@@ -788,9 +851,12 @@ app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwne
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
   const mode = String(req.body?.mode || "clan");
   if (!["community", "clan", "tsbtr"].includes(mode)) return res.status(400).json({ error: "invalid_template" });
+  const guildId = String(req.body?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
   try {
-    const result = await repostParadiseGuides(mode);
-    await createAuditLog("paradise_guides_reposted", "discord_guild", env("DISCORD_GUILD_ID", null), {
+    const result = await repostParadiseGuides(mode, guildId);
+    await createAuditLog("paradise_guides_reposted", "discord_guild", guildId, {
       mode,
       posted: result.posted,
       actorUserId: req.user.id

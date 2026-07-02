@@ -1,0 +1,16 @@
+{
+  "status": "BLOCKED",
+  "scope": ["Paradise | Türkiye", "Fieel's Community", "TSBTR yedek"],
+  "safeSourceCapability": {
+    "multiGuildDiscovery": "SOURCE ONLY",
+    "perGuildRuntimeSnapshot": "SOURCE ONLY",
+    "perGuildConfiguration": "SOURCE ONLY",
+    "allGuildCommandRegistration": "SOURCE ONLY"
+  },
+  "blocker": "The updated runtime has not yet been deployed, so the live bot guild cache cannot be queried for an authoritative three-server inventory.",
+  "requiredAfterDeploy": [
+    "Capture guild ID, member count, bot permissions and bot role position",
+    "Capture categories, channels, roles, permission overwrites and AutoMod",
+    "Record warnings without deleting or moving anything"
+  ]
+}

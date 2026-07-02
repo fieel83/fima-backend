@@ -1,0 +1,13 @@
+{
+  "status": "SOURCE ONLY",
+  "matrix": {
+    "setupRebuild": ["Guild owner", "isolated test guild", "typed confirmation"],
+    "challengeSubmit": ["Trial Referee", "Referee", "Experienced Referee", "Referee Manager"],
+    "challengeApprove": ["Experienced Referee", "Head Referee", "Referee Manager", "Owner", "Administrator"],
+    "lineupRosterEdit": ["Competitive manager", "Manage Server", "Administrator"],
+    "blacklistEdit": ["Blacklist or server manager", "Manage Server", "Administrator"],
+    "dashboard": ["Fima login", "linked Discord owner ID 762858334440521739"],
+    "guideRepost": ["Owner dashboard or Administrator handbook command"]
+  },
+  "leastPrivilege": "Hosters do not receive broad Manage Roles solely to assign stages."
+}

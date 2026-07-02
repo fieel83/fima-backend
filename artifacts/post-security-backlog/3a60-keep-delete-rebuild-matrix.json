@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "keep": ["member data", "approved roles", "existing evidence", "transcripts", "audit history", "working bot integrations"],
+  "repair": ["Paradise naming", "guide embeds", "channel mappings", "role mappings", "permission overwrites", "staff panels"],
+  "rebuildAfterConfirmation": ["obsolete channel layout", "duplicate placeholder roles", "broken setup-generated panels"],
+  "neverSilentDelete": ["channels", "roles", "messages", "transcripts", "evidence"],
+  "requiredSequence": ["audit", "backup", "preview", "typed per-server confirmation", "apply", "verify"]
+}

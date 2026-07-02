@@ -1,0 +1,13 @@
+{
+  "status": "SOURCE ONLY",
+  "evidence": "Owner-provided screenshots and text excerpts only",
+  "servers": {
+    "real TSBTR": ["challenge/referee workflow", "activity checks", "availability board", "guide embeds", "role ladders"],
+    "TSB Clanning Community": ["multi-region clan leaderboard", "rules layout", "staff directory", "mainer command flow"],
+    "TSBER / Europe competitive": ["visible reference only; hidden content not inspected"],
+    "TSB Germany": ["visible reference only; hidden content not inspected"],
+    "war management servers": ["visible reference only; no user-token automation used"]
+  },
+  "reusePolicy": "Patterns are inspiration only. Names, permissions, copy and automation are Paradise-owned and not copied blindly.",
+  "limitations": "No selfbot, private scraping, mass DM or hidden-channel access."
+}

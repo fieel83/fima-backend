@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "sections": ["Current Allies", "Enemy Clans"],
+  "commands": ["/relation add", "/relation edit", "/relation remove", "/relation panel"],
+  "fields": ["clan", "representative", "approved invite", "note", "status"],
+  "dashboard": ["show invites", "show representatives", "alphabetical or recently updated sorting"],
+  "updateMode": "Edit stored board message in place where available"
+}

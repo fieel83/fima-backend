@@ -1,0 +1,27 @@
+{
+  "status": "LOCAL VERIFIED",
+  "route": "https://fimamacro.com/paradise",
+  "design": {
+    "defaultTheme": "Paradise Purple on dark purple/charcoal surfaces",
+    "themes": ["Paradise Purple", "Charcoal", "Midnight"],
+    "customAccent": true,
+    "serverSelector": true,
+    "hoverAnimations": true,
+    "tooltips": true,
+    "saveToasts": true,
+    "loadingState": true,
+    "responsive": true
+  },
+  "pages": [
+    "Overview", "Setup & templates", "Channels & transcripts", "Roles & permissions",
+    "Challenge", "Availability & LOA", "Roster & lineup", "Relations",
+    "Blacklist & appeals", "Guides", "Branding", "Security", "Advanced"
+  ],
+  "browserProof": {
+    "desktopGrid": "235px navigation + flexible content",
+    "serverOptionsInFixture": 3,
+    "themeSwitch": "PASS",
+    "unsavedIndicator": "PASS",
+    "saveToast": "PASS"
+  }
+}

@@ -582,14 +582,14 @@ async function registerDiscordCommands() {
       .setDescription("Send staff/referee/hoster/reseller application guidance.")
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false))
   ].map((command) => command.toJSON());
-  const guildId = env("DISCORD_GUILD_ID");
   try {
-    const registered = guildId
-      ? await client.application.commands.set(commands, guildId)
-      : await client.application.commands.set(commands);
+    const guildIds = [...new Set([env("DISCORD_GUILD_ID"), ...client.guilds.cache.keys()].filter(Boolean))];
+    const registeredSets = guildIds.length
+      ? await Promise.all(guildIds.map(guildId => client.application.commands.set(commands, guildId)))
+      : [await client.application.commands.set(commands)];
     lastCommandSyncAt = new Date();
     lastCommandSyncError = null;
-    lastCommandSyncCount = registered.size;
+    lastCommandSyncCount = Math.max(0, ...registeredSets.map(registered => registered.size));
   } catch (error) {
     lastCommandSyncError = error.message;
     throw error;
@@ -1799,8 +1799,8 @@ export async function discordBotHealth() {
   };
 }
 
-export async function paradiseDiscordRuntimeSnapshot() {
-  const guild = await getGuild();
+export async function paradiseDiscordRuntimeSnapshot(guildId = null) {
+  const guild = await getGuild(guildId);
   if (!guild || !client?.isReady?.()) {
     return {
       status: "unavailable",
@@ -1836,7 +1836,7 @@ export async function paradiseDiscordRuntimeSnapshot() {
       usernameMatches: client.user?.username === "Paradise",
       nicknameMatches: (me?.nickname || client.user?.username) === "Paradise"
     },
-    commandScope: env("DISCORD_GUILD_ID") ? "guild" : "global",
+    commandScope: "guild",
     commands: [...commands.values()].map(command => ({
       id: command.id,
       name: command.name,
@@ -1884,8 +1884,26 @@ export async function paradiseDiscordRuntimeSnapshot() {
   };
 }
 
-export async function repostParadiseGuides(mode = "clan") {
-  const guild = await getGuild();
+export async function paradiseDiscordGuildsSnapshot() {
+  if (!client?.isReady?.()) return [];
+  const guilds = [];
+  for (const cached of client.guilds.cache.values()) {
+    const guild = await client.guilds.fetch(cached.id).catch(() => cached);
+    const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    guilds.push({
+      id: guild.id,
+      name: guild.name,
+      memberCount: guild.memberCount,
+      botRolePosition: me?.roles?.highest?.position ?? null,
+      botPermissions: me?.permissions?.toArray?.() || [],
+      available: guild.available !== false
+    });
+  }
+  return guilds.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function repostParadiseGuides(mode = "clan", guildId = null) {
+  const guild = await getGuild(guildId);
   if (!guild || !client?.isReady?.()) {
     const error = new Error("paradise_bot_not_ready");
     error.code = "paradise_bot_not_ready";
@@ -2120,21 +2138,26 @@ async function auditDiscordBotAction(action, targetType = null, targetId = null,
   }
 }
 
-async function getGuild() {
+async function getGuild(requestedGuildId = null) {
   if (!client?.isReady?.()) {
     const error = new Error(lastError || "discord_bot_not_ready");
     error.code = "discord_bot_not_ready";
     throw error;
   }
 
-  const guildId = env("DISCORD_GUILD_ID");
+  const guildId = requestedGuildId || env("DISCORD_GUILD_ID");
   if (!guildId) {
     const error = new Error("DISCORD_GUILD_ID is not configured");
     error.code = "missing_discord_guild";
     throw error;
   }
 
-  const guild = await client.guilds.fetch(guildId);
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) {
+    const error = new Error("discord_guild_not_managed");
+    error.code = "discord_guild_not_managed";
+    throw error;
+  }
   if (!guild.members.me) await guild.members.fetchMe().catch(() => null);
   return guild;
 }

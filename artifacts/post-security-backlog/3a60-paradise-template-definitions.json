@@ -1,0 +1,15 @@
+{
+  "status": "SOURCE ONLY",
+  "templates": {
+    "community": "Fima product, support, security and community server; isolated from clan ranking logic.",
+    "clan": "Paradise training, tryout, challenge, roster, relations and war operations.",
+    "tsbtr": "Large competition template with logs, referee hierarchy, leaderboard and staff systems."
+  },
+  "safety": {
+    "backupFirst": true,
+    "previewRequired": true,
+    "typedSecondConfirmation": true,
+    "testGuildDestructiveGuard": true
+  },
+  "mixingPrevention": "Templates remain separate schemas and separate setup commands."
+}

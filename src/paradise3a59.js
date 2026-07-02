@@ -26,7 +26,8 @@ const EMPTY_STATE = Object.freeze({
   profiles: {}, verificationChallenges: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
   tournaments: {}, leaderboard: {}, staffActivity: {}, activityChecks: {},
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
-  config: {}, ticketOptOuts: {}
+  config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
+  rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {}
 });
 
 function normalizeState(value) {
@@ -34,6 +35,10 @@ function normalizeState(value) {
   return Object.fromEntries(Object.keys(EMPTY_STATE).map(key => [
     key, input[key] && typeof input[key] === "object" ? input[key] : {}
   ]));
+}
+
+function configForGuild(state, guildId) {
+  return state.guildConfigs?.[String(guildId || "")] || state.config || {};
 }
 
 async function loadState() {
@@ -130,7 +135,14 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
   ["faq_channel", "FAQ and trust"],
   ["staff_report_channel", "Staff reports"],
   ["support_ticket_channel", "Support ticket panel"],
-  ["application_ticket_channel", "Application ticket panel"]
+  ["application_ticket_channel", "Application ticket panel"],
+  ["challenge_transcripts_channel", "Private challenge transcripts"],
+  ["support_transcripts_channel", "Private support transcripts"],
+  ["roster_channel", "EU roster board"],
+  ["main_lineup_channel", "Main lineup board"],
+  ["war_lineup_channel", "War lineup board"],
+  ["mainer_proof_channel", "Mainer proof review"],
+  ["blacklist_channel", "Blacklist board"]
 ]);
 
 export const PARADISE_COMMUNITY_SCHEMA = [
@@ -441,6 +453,38 @@ export function paradiseCommands() {
         .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Removal reason")))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the active LOA board")),
+    new SlashCommandBuilder().setName("lineup").setDescription("Manage Paradise main and war lineup boards")
+      .addSubcommand(s => s.setName("add").setDescription("Add a member to a lineup")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addIntegerOption(o => o.setName("position").setDescription("Optional display position").setMinValue(1).setMaxValue(50)))
+      .addSubcommand(s => s.setName("remove").setDescription("Remove a member from a lineup")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true)))
+      .addSubcommand(s => s.setName("move").setDescription("Move a lineup member")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addIntegerOption(o => o.setName("position").setDescription("New display position").setRequired(true).setMinValue(1).setMaxValue(50)))
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh a lineup board")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))),
+    new SlashCommandBuilder().setName("roster").setDescription("Manage the Paradise competitive roster")
+      .addSubcommand(s => s.setName("add").setDescription("Add or update a roster member")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("region").setDescription("Region").setRequired(true).addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))
+        .addStringOption(o => o.setName("note").setDescription("Optional roster note").setMaxLength(160)))
+      .addSubcommand(s => s.setName("remove").setDescription("Remove a roster member")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true)))
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh the roster board")),
+    new SlashCommandBuilder().setName("blacklist").setDescription("Manage blacklist, appeal and owner-approved bail workflows")
+      .addSubcommand(s => s.setName("add").setDescription("Add an audited blacklist record")
+        .addUserOption(o => o.setName("user").setDescription("User").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500))
+        .addStringOption(o => o.setName("evidence").setDescription("Evidence URL")))
+      .addSubcommand(s => s.setName("remove").setDescription("Resolve and remove a blacklist record")
+        .addUserOption(o => o.setName("user").setDescription("User").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Resolution reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("appeal-panel").setDescription("Post or refresh the appeal information panel"))
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh the public blacklist board")),
     (() => {
       const command = new SlashCommandBuilder().setName("set").setDescription("Map Paradise systems to Discord channels")
         .setDescriptionLocalizations({ tr: "Paradise sistemlerini Discord kanallarına eşle" });
@@ -474,18 +518,18 @@ export async function initializeParadise(client) {
     }
     return state;
   });
-  const guild = await client.guilds.fetch(PARADISE_TEST_GUILD_ID).catch(() => null);
-  if (!guild) return;
   if (client.user?.username !== "Paradise") {
     await client.user.setUsername("Paradise").catch(error => {
       console.warn("Paradise bot username update failed", { message: error.message });
     });
   }
-  const me = guild.members.me || await guild.members.fetchMe();
-  if (me.nickname !== "Paradise") await me.setNickname("Paradise", "3A59 Paradise test identity").catch(() => {});
-  await runParadiseMaintenance(guild).catch(() => {});
-  const timer = setInterval(() => runParadiseMaintenance(guild).catch(() => {}), 15 * 60_000);
-  timer.unref?.();
+  for (const guild of client.guilds.cache.values()) {
+    const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    if (me && me.nickname !== "Paradise") await me.setNickname("Paradise", "Paradise managed server identity").catch(() => {});
+    await runParadiseMaintenance(guild).catch(() => {});
+    const timer = setInterval(() => runParadiseMaintenance(guild).catch(() => {}), 15 * 60_000);
+    timer.unref?.();
+  }
 }
 
 function isOwner(interaction) {
@@ -1353,6 +1397,7 @@ async function handleChallenge(interaction) {
     await interaction.channel.permissionOverwrites.edit(ticket.challengerId, { ViewChannel: false }).catch(() => {});
     await interaction.channel.permissionOverwrites.edit(ticket.opponentId, { ViewChannel: false }).catch(() => {});
     await refreshChallengeHeader(interaction.guild, closed).catch(() => {});
+    await saveChallengeTranscript(interaction.guild, interaction.channel, closed, "manual_close").catch(() => {});
     await updateAvailabilityPanel(interaction.guild).catch(() => {});
     return interaction.reply({ content: `Challenge closed. Player access removed. Reason: **${reason}**`, ephemeral: true });
   }
@@ -1523,6 +1568,7 @@ async function handleChallengeApproval(interaction) {
     await ticketChannel.permissionOverwrites.edit(closedTicket.challengerId, { ViewChannel: false }).catch(() => {});
     await ticketChannel.permissionOverwrites.edit(closedTicket.opponentId, { ViewChannel: false }).catch(() => {});
     await refreshChallengeHeader(interaction.guild, closedTicket).catch(() => {});
+    await saveChallengeTranscript(interaction.guild, ticketChannel, closedTicket, "approved_result").catch(() => {});
   }
   const results = await configuredChannel(interaction.guild, "challenge_results_channel", "challenge-results");
   if (results) {
@@ -2122,12 +2168,58 @@ async function publishSetupGuides(guild, mode) {
 
 async function configuredChannel(guild, mappingKey, fallbackName) {
   const state = await loadState();
-  const configuredId = state.config.channelMappings?.[mappingKey];
+  const configuredId = configForGuild(state, guild.id).channelMappings?.[mappingKey];
   if (configuredId) {
     const configured = guild.channels.cache.get(configuredId) || await guild.channels.fetch(configuredId).catch(() => null);
     if (configured?.isTextBased?.()) return configured;
   }
   return guild.channels.cache.find(item => item.name === fallbackName && item.isTextBased?.()) || null;
+}
+
+async function saveChallengeTranscript(guild, channel, ticket, trigger) {
+  if (!channel?.isTextBased?.()) return null;
+  const state = await loadState();
+  const guildConfig = configForGuild(state, guild.id);
+  if (guildConfig.operations?.challengeTranscripts === false) return null;
+  const destination = await configuredChannel(guild, "challenge_transcripts_channel", "challenge-ticket-transcripts");
+  if (!destination) return null;
+  const fetched = await channel.messages.fetch({ limit: 100 });
+  const messages = [...fetched.values()].reverse();
+  const lines = [
+    `Paradise challenge transcript`,
+    `Ticket: ${ticket.ticketId || channel.id}`,
+    `Challenger: ${ticket.challengerId || "unknown"}`,
+    `Challenged: ${ticket.opponentId || "unknown"}`,
+    `Status: ${ticket.status || "unknown"}`,
+    `Trigger: ${trigger}`,
+    `Created: ${ticket.openedAt || "unknown"}`,
+    `Closed: ${ticket.closedAt || new Date().toISOString()}`,
+    "",
+    ...messages.map(message => {
+      const timestamp = message.createdAt?.toISOString?.() || "unknown";
+      const author = message.author ? `${message.author.username} (${message.author.id})` : "unknown";
+      const content = String(message.cleanContent || message.content || "[embed / attachment]").replace(/\r?\n/g, " ");
+      const attachments = [...message.attachments.values()].map(item => item.url).join(" ");
+      return `[${timestamp}] ${author}: ${content}${attachments ? ` | ${attachments}` : ""}`;
+    })
+  ];
+  const transcriptMessage = await destination.send({
+    content: `Challenge transcript · Ticket **${ticket.ticketId || channel.id}** · ${trigger}`,
+    files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `paradise-challenge-${ticket.ticketId || channel.id}.txt` }]
+  });
+  await saveState(next => {
+    next.transcripts[ticket.ticketId || channel.id] = {
+      type: "challenge",
+      guildId: guild.id,
+      sourceChannelId: channel.id,
+      destinationChannelId: destination.id,
+      messageId: transcriptMessage.id,
+      trigger,
+      savedAt: new Date().toISOString()
+    };
+    return next;
+  });
+  return transcriptMessage;
 }
 
 const GUIDE_POSTS = Object.freeze([
@@ -2585,6 +2677,162 @@ async function postChallengeCreatePanel(guild, channel) {
   return message;
 }
 
+function canManageCompetitiveBoards(member) {
+  return member.permissions.has(PermissionsBitField.Flags.Administrator)
+    || member.permissions.has(PermissionsBitField.Flags.ManageGuild)
+    || member.roles.cache.some(role => [
+      "Owner", "Overseer", "Community Manager", "Training Manager", "War Manager",
+      "Roster Manager", "Leaderboard Updater", "Referee Manager"
+    ].includes(role.name));
+}
+
+async function updateLineupPanel(guild, board) {
+  const state = await loadState();
+  const entries = state.lineups?.[guild.id]?.[board] || [];
+  const mappingKey = board === "war" ? "war_lineup_channel" : "main_lineup_channel";
+  const channel = await configuredChannel(guild, mappingKey, board === "war" ? "war-lineup" : "main-line");
+  if (!channel) return null;
+  const guildConfig = configForGuild(state, guild.id);
+  const messageKey = `${board}LineupMessageId`;
+  let message = guildConfig[messageKey] ? await channel.messages.fetch(guildConfig[messageKey]).catch(() => null) : null;
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(board === "war" ? "⚔ PARADISE WAR LINEUP" : "♟ PARADISE MAIN LINEUP")
+    .setDescription(entries.length ? entries.map((userId, index) => `**${index + 1}.** <@${userId}>`).join("\n") : "_No members assigned yet._")
+    .setFooter(paradiseFooter("Managed with /lineup"))
+    .setTimestamp();
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id][messageKey] = message.id;
+    return next;
+  });
+  return message;
+}
+
+async function handleLineup(interaction) {
+  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Roster or server manager authority required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  const board = interaction.options.getString("board") || "main";
+  if (sub === "panel") {
+    const panel = await updateLineupPanel(interaction.guild, board);
+    return interaction.reply({ content: panel ? `${board} lineup refreshed.` : "Map the lineup channel first.", ephemeral: true });
+  }
+  const user = interaction.options.getUser("user");
+  const requestedPosition = interaction.options.getInteger("position");
+  await saveState(state => {
+    state.lineups[interaction.guildId] = state.lineups[interaction.guildId] || { main: [], war: [] };
+    const entries = [...(state.lineups[interaction.guildId][board] || [])].filter(id => id !== user.id);
+    if (sub !== "remove") {
+      const index = requestedPosition ? Math.min(entries.length, requestedPosition - 1) : entries.length;
+      entries.splice(index, 0, user.id);
+    }
+    state.lineups[interaction.guildId][board] = entries;
+    return state;
+  });
+  await updateLineupPanel(interaction.guild, board).catch(() => {});
+  return interaction.reply({ content: `${user} ${sub === "remove" ? "removed from" : "saved to"} the **${board} lineup**.`, ephemeral: true });
+}
+
+async function updateRosterPanel(guild) {
+  const state = await loadState();
+  const entries = Object.values(state.rosters?.[guild.id] || {}).sort((a, b) => String(a.region).localeCompare(String(b.region)) || a.addedAt.localeCompare(b.addedAt));
+  const channel = await configuredChannel(guild, "roster_channel", "eu-rosters");
+  if (!channel) return null;
+  const guildConfig = configForGuild(state, guild.id);
+  let message = guildConfig.rosterMessageId ? await channel.messages.fetch(guildConfig.rosterMessageId).catch(() => null) : null;
+  const description = entries.length
+    ? entries.map(item => `**${item.region}** · <@${item.userId}>${item.note ? ` — ${item.note}` : ""}`).join("\n").slice(0, 3900)
+    : "_Roster is currently empty._";
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("♟ PARADISE COMPETITIVE ROSTER").setDescription(description).setFooter(paradiseFooter("Managed with /roster")).setTimestamp();
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].rosterMessageId = message.id;
+    return next;
+  });
+  return message;
+}
+
+async function handleRoster(interaction) {
+  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Roster manager authority required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  if (sub === "panel") {
+    const panel = await updateRosterPanel(interaction.guild);
+    return interaction.reply({ content: panel ? "Roster board refreshed." : "Map the roster channel first.", ephemeral: true });
+  }
+  const user = interaction.options.getUser("user");
+  await saveState(state => {
+    state.rosters[interaction.guildId] = state.rosters[interaction.guildId] || {};
+    if (sub === "remove") delete state.rosters[interaction.guildId][user.id];
+    else state.rosters[interaction.guildId][user.id] = {
+      userId: user.id,
+      region: interaction.options.getString("region"),
+      note: interaction.options.getString("note") || null,
+      addedBy: interaction.user.id,
+      addedAt: new Date().toISOString()
+    };
+    return state;
+  });
+  await updateRosterPanel(interaction.guild).catch(() => {});
+  return interaction.reply({ content: `${user} ${sub === "remove" ? "removed from" : "saved to"} the roster.`, ephemeral: true });
+}
+
+async function updateBlacklistPanel(guild) {
+  const state = await loadState();
+  const records = Object.values(state.blacklists?.[guild.id] || {}).filter(item => item.status === "active");
+  const channel = await configuredChannel(guild, "blacklist_channel", "blacklist");
+  if (!channel) return null;
+  const guildConfig = configForGuild(state, guild.id);
+  let message = guildConfig.blacklistMessageId ? await channel.messages.fetch(guildConfig.blacklistMessageId).catch(() => null) : null;
+  const description = records.length
+    ? records.map(item => `<@${item.userId}> — ${item.reason}\n-# Added <t:${Math.floor(Date.parse(item.createdAt) / 1000)}:R>`).join("\n\n").slice(0, 3900)
+    : "_No active Paradise blacklist records._";
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⊘ PARADISE BLACKLIST").setDescription(description).setFooter(paradiseFooter("Evidence-backed records only")).setTimestamp();
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].blacklistMessageId = message.id;
+    return next;
+  });
+  return message;
+}
+
+async function handleBlacklist(interaction) {
+  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Blacklist manager authority required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  if (sub === "panel") {
+    const panel = await updateBlacklistPanel(interaction.guild);
+    return interaction.reply({ content: panel ? "Blacklist board refreshed." : "Map the blacklist channel first.", ephemeral: true });
+  }
+  if (sub === "appeal-panel") {
+    const channel = await configuredChannel(interaction.guild, "blacklist_appeal_channel", "blacklist-appeal");
+    if (!channel) return interaction.reply({ content: "Map or create the blacklist-appeal channel first.", ephemeral: true });
+    await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◇ BLACKLIST APPEALS")
+      .setDescription("# Appeal safely\nOpen a private support ticket and include the blacklist date, reason you are appealing and any relevant evidence.\n\n> Bail is never guaranteed and never auto-removes a blacklist. Final resolution requires owner approval.\n\n-# Türkçe destek aynı ticket içinde seçilebilir.")
+      .setFooter(paradiseFooter("Private review only"))] });
+    return interaction.reply({ content: "Appeal information panel posted.", ephemeral: true });
+  }
+  const user = interaction.options.getUser("user");
+  const reason = interaction.options.getString("reason");
+  await saveState(state => {
+    state.blacklists[interaction.guildId] = state.blacklists[interaction.guildId] || {};
+    if (sub === "remove") {
+      state.blacklists[interaction.guildId][user.id] = {
+        ...(state.blacklists[interaction.guildId][user.id] || { userId: user.id }),
+        status: "resolved", resolution: reason, resolvedBy: interaction.user.id, resolvedAt: new Date().toISOString()
+      };
+    } else {
+      state.blacklists[interaction.guildId][user.id] = {
+        userId: user.id, status: "active", reason,
+        evidence: interaction.options.getString("evidence") || null,
+        createdBy: interaction.user.id, createdAt: new Date().toISOString()
+      };
+    }
+    return state;
+  });
+  await updateBlacklistPanel(interaction.guild).catch(() => {});
+  return interaction.reply({ content: `${user} blacklist record ${sub === "remove" ? "resolved" : "created"}.`, ephemeral: true });
+}
+
 async function handleSetChannel(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
   const key = interaction.options.getSubcommand();
@@ -2593,9 +2841,11 @@ async function handleSetChannel(interaction) {
   }
   const channel = interaction.options.getChannel("channel");
   await saveState(state => {
-    state.config.channelMappings = state.config.channelMappings || {};
-    state.config.channelMappings[key] = channel.id;
-    state.config.channelMappingsUpdatedAt = new Date().toISOString();
+    state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
+    state.guildConfigs[interaction.guildId].channelMappings = state.guildConfigs[interaction.guildId].channelMappings || {};
+    state.guildConfigs[interaction.guildId].channelMappings[key] = channel.id;
+    state.guildConfigs[interaction.guildId].channelMappingsUpdatedAt = new Date().toISOString();
+    if (interaction.guildId === PARADISE_TEST_GUILD_ID) state.config = structuredClone(state.guildConfigs[interaction.guildId]);
     return state;
   });
   if (key === "challenge_channel") await postChallengeCreatePanel(interaction.guild, channel);
@@ -2675,15 +2925,17 @@ async function handleBranding(interaction) {
 }
 
 export async function handleParadiseMessage(message) {
-  if (!message.guild || message.guild.id !== PARADISE_TEST_GUILD_ID || message.author.bot) return false;
+  if (!message.guild || message.author.bot) return false;
   const state = await loadState();
-  const sticky = state.config.stickies?.[message.channelId];
+  const guildConfig = configForGuild(state, message.guild.id);
+  const sticky = guildConfig.stickies?.[message.channelId];
   if (!sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return false;
   if (sticky.messageId) await message.channel.messages.delete(sticky.messageId).catch(() => {});
   const sent = await message.channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setDescription(sticky.text).setFooter(paradiseFooter("Sticky guide"))] });
   await saveState(next => {
-    next.config.stickies = next.config.stickies || {};
-    next.config.stickies[message.channelId] = { ...sticky, messageId: sent.id, lastSentAt: Date.now() };
+    next.guildConfigs[message.guild.id] = next.guildConfigs[message.guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[message.guild.id].stickies = next.guildConfigs[message.guild.id].stickies || {};
+    next.guildConfigs[message.guild.id].stickies[message.channelId] = { ...sticky, messageId: sent.id, lastSentAt: Date.now() };
     return next;
   });
   return true;
@@ -2711,16 +2963,21 @@ async function updateStaffTeamEmbed(guild) {
     .setFooter(paradiseFooter("Live role directory"))
     .setTimestamp();
   const state = await loadState();
-  let message = state.config.staffTeamMessageId
-    ? await channel.messages.fetch(state.config.staffTeamMessageId).catch(() => null)
+  const guildConfig = configForGuild(state, guild.id);
+  let message = guildConfig.staffTeamMessageId
+    ? await channel.messages.fetch(guildConfig.staffTeamMessageId).catch(() => null)
     : null;
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
-  await saveState(next => { next.config.staffTeamMessageId = message.id; return next; });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].staffTeamMessageId = message.id;
+    return next;
+  });
   return message;
 }
 
 export async function handleParadiseGuildMemberUpdate(oldMember, newMember) {
-  if (newMember.guild.id !== PARADISE_TEST_GUILD_ID || oldMember.roles.cache.size === newMember.roles.cache.size
+  if (oldMember.roles.cache.size === newMember.roles.cache.size
     && [...oldMember.roles.cache.keys()].every(id => newMember.roles.cache.has(id))) return false;
   clearTimeout(staffTeamRefreshTimers.get(newMember.guild.id));
   const timer = setTimeout(() => {
@@ -2739,7 +2996,6 @@ function localizedHelp(locale) {
 }
 
 export async function handleParadiseInteraction(interaction) {
-  if (interaction.guildId && interaction.guildId !== PARADISE_TEST_GUILD_ID) return false;
   if (interaction.isModalSubmit?.() && interaction.customId === "paradise_verify_modal") {
     await handleVerifyModal(interaction);
     return true;
@@ -2890,6 +3146,9 @@ export async function handleParadiseInteraction(interaction) {
   if (interaction.commandName === "relation") { await handleRelation(interaction); return true; }
   if (interaction.commandName === "availability") { await handleAvailability(interaction); return true; }
   if (interaction.commandName === "loa") { await handleLoa(interaction); return true; }
+  if (interaction.commandName === "lineup") { await handleLineup(interaction); return true; }
+  if (interaction.commandName === "roster") { await handleRoster(interaction); return true; }
+  if (interaction.commandName === "blacklist") { await handleBlacklist(interaction); return true; }
   if (interaction.commandName === "set") { await handleSetChannel(interaction); return true; }
   if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;

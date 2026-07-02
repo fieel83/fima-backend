@@ -1,0 +1,7 @@
+{
+  "status": "SOURCE ONLY",
+  "availability": ["Current Cooldowns", "Current Immunity", "Being Challenged", "Discord relative timestamps"],
+  "loa": ["separate panel", "request", "manager add", "approve", "deny", "remove", "early end", "auto-expire"],
+  "dashboard": ["refresh interval", "LOA maximum", "evidence requirement", "show LOA on availability"],
+  "liveDiscordTest": "NOT RUN — deployment required"
+}
