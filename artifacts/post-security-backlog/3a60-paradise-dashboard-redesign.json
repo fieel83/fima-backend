@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL VERIFIED",
+  "status": "LIVE VERIFIED",
   "route": "https://fimamacro.com/paradise",
   "design": {
     "defaultTheme": "Paradise Purple on dark purple/charcoal surfaces",
@@ -22,6 +22,9 @@
     "serverOptionsInFixture": 3,
     "themeSwitch": "PASS",
     "unsavedIndicator": "PASS",
-    "saveToast": "PASS"
+    "saveToast": "PASS",
+    "liveOwnerAccess": "PASS",
+    "liveManagedServers": 4,
+    "liveConsoleErrors": 0
   }
 }

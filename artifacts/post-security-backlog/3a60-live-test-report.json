@@ -1,13 +1,14 @@
 {
-  "status": "LOCAL VERIFIED",
+  "status": "LIVE VERIFIED",
   "tests": {
-    "backendAndCommandSuite": "53/53 PASS",
+    "backendAndCommandSuite": "54/54 PASS",
     "dashboardSourceTests": "PASS",
     "discordCommandSerialization": "PASS",
     "requiredOptionOrdering": "PASS",
     "csrfTokenFetchAndHeader": "PASS",
     "csrfRetry": "PASS",
     "multiServerConfigScope": "PASS",
+    "multiServerOperationalIsolation": "PASS — config, leaderboard, challenges, LOA, whitelists, relations, roster and lineup are guild-scoped",
     "desktopLayout": "PASS",
     "responsiveLayout": "PASS",
     "themeSwitch": "PASS",
@@ -16,9 +17,14 @@
     "destructiveConfirmationSource": "PASS"
   },
   "live": {
-    "productionDeploy": "NOT RUN",
-    "DiscordCommands": "NOT RUN",
-    "threeServerAudit": "BLOCKED until deployed runtime exposes managed guilds",
+    "productionDeploy": "PASS — commit 81bea7f",
+    "dashboardOwnerAccess": "PASS",
+    "dashboardSaveSections": ["template", "branding", "challenge", "channelMappings", "operations", "roleMappings", "loa", "activity", "relations", "automation", "roster", "blacklist"],
+    "dashboardRawCsrfError": false,
+    "dashboardConsoleErrors": 0,
+    "serverSelector": ["Fieel's Community", "Paradise | Türkiye", "Paradise deneme", "TSBTR Yedek"],
+    "DiscordCommandSync": "73 commands synced in all four managed guilds",
+    "threeServerAudit": "PASS — sanitized inventory and role position captured",
     "destructiveSetup": "NOT RUN by design"
   },
   "secretsExposed": false,

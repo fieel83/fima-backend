@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder,
   ModalBuilder, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder,
@@ -20,11 +21,12 @@ const challengeDrafts = new Map();
 const activeTrainings = new Map();
 const activeTournaments = new Map();
 const staffTeamRefreshTimers = new Map();
+const paradiseGuildContext = new AsyncLocalStorage();
 const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
 const STATE_KEY = "paradise_3a59_state_v1";
 const EMPTY_STATE = Object.freeze({
   profiles: {}, verificationChallenges: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
-  tournaments: {}, leaderboard: {}, staffActivity: {}, activityChecks: {},
+  tournaments: {}, leaderboard: {}, leaderboards: {}, staffActivity: {}, activityChecks: {},
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {}
@@ -39,6 +41,32 @@ function normalizeState(value) {
 
 function configForGuild(state, guildId) {
   return state.guildConfigs?.[String(guildId || "")] || state.config || {};
+}
+
+function belongsToGuild(record, guildId) {
+  return record?.guildId ? record.guildId === guildId : guildId === PARADISE_TEST_GUILD_ID;
+}
+
+function guildUserKey(guildId, userId) {
+  return `${guildId}:${userId}`;
+}
+
+function guildUserRecord(bucket, guildId, userId) {
+  return bucket?.[guildUserKey(guildId, userId)]
+    || (guildId === PARADISE_TEST_GUILD_ID ? bucket?.[userId] : null)
+    || null;
+}
+
+function leaderboardForGuild(state, guildId) {
+  return state.leaderboards?.[String(guildId || "")]
+    || (guildId === PARADISE_TEST_GUILD_ID ? state.leaderboard : {})
+    || {};
+}
+
+function ensureLeaderboardForGuild(state, guildId) {
+  state.leaderboards[guildId] = state.leaderboards[guildId]
+    || (guildId === PARADISE_TEST_GUILD_ID ? structuredClone(state.leaderboard || {}) : {});
+  return state.leaderboards[guildId];
 }
 
 async function loadState() {
@@ -72,7 +100,8 @@ export function paradiseBrandColorInteger(value) {
 }
 
 async function paradiseBrandColor() {
-  return paradiseBrandColorInteger((await loadState()).config.brandColor);
+  const state = await loadState();
+  return paradiseBrandColorInteger(configForGuild(state, paradiseGuildContext.getStore()).brandColor);
 }
 
 function paradiseFooter(context = "") {
@@ -524,10 +553,14 @@ export async function initializeParadise(client) {
     });
   }
   for (const guild of client.guilds.cache.values()) {
+    await saveState(state => {
+      state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
+      return state;
+    });
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
     if (me && me.nickname !== "Paradise") await me.setNickname("Paradise", "Paradise managed server identity").catch(() => {});
-    await runParadiseMaintenance(guild).catch(() => {});
-    const timer = setInterval(() => runParadiseMaintenance(guild).catch(() => {}), 15 * 60_000);
+    await paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild)).catch(() => {});
+    const timer = setInterval(() => paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild)).catch(() => {}), 15 * 60_000);
     timer.unref?.();
   }
 }
@@ -730,7 +763,7 @@ async function ensureParadiseAutoMod(guild) {
   const rules = await guild.autoModerationRules.fetch().catch(() => null);
   if (!rules) return { status: "unavailable" };
   const state = await loadState();
-  const config = state.config.automod || {};
+  const config = configForGuild(state, guild.id).automod || {};
   if (config.enabled === false) {
     for (const rule of rules.values()) {
       if (rule.name.startsWith("Paradise ")) await rule.edit({ enabled: false, reason: "Paradise dashboard AutoMod disabled" }).catch(() => {});
@@ -832,8 +865,10 @@ async function applyServerSetup(interaction, mode, destructive = true) {
   }
   await updateStaffTeamEmbed(interaction.guild).catch(() => {});
   await saveState(state => {
-    state.config.activeSetupMode = mode;
-    state.config.lastSetupRun = {
+    state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
+    const config = state.guildConfigs[interaction.guildId];
+    config.activeSetupMode = mode;
+    config.lastSetupRun = {
       mode,
       operation: destructive ? "rebuild" : "repair",
       completedAt: new Date().toISOString(),
@@ -841,9 +876,10 @@ async function applyServerSetup(interaction, mode, destructive = true) {
       preservedExtraChannels: destructive ? 0 : removableChannels.length,
       preservedExtraRoles: destructive ? 0 : removableRoles.length
     };
-    state.config.autoActivityChecks = true;
-    state.config.autoActivityRoleRemoval = true;
-    state.config.weeklyQuotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
+    config.autoActivityChecks = true;
+    config.autoActivityRoleRemoval = true;
+    config.weeklyQuotas = config.weeklyQuotas || WEEKLY_QUOTAS;
+    if (interaction.guildId === PARADISE_TEST_GUILD_ID) state.config = structuredClone(config);
     return state;
   });
   await writeArtifact(`3a59-discord-${mode}-setup-live.json`, {
@@ -892,7 +928,7 @@ async function startVerification(interaction, username) {
   if (!user) return interaction.reply({ content: "Roblox user not found. Check the exact username and try again.", ephemeral: true });
   const code = shortVerificationCode();
   const state = await loadState();
-  const expiryMinutes = Number(state.config.verification?.codeExpiryMinutes || 10);
+  const expiryMinutes = Number(configForGuild(state, interaction.guildId).verification?.codeExpiryMinutes || 10);
   const challenge = {
     robloxId: String(user.id),
     username: user.name,
@@ -983,7 +1019,7 @@ async function profileEmbed(guild, discordId) {
   const rank = member ? fighterRank(member) : "Unranked";
   const thumbnail = await robloxHeadshot(profile.robloxId);
   const state = await loadState();
-  const topSpot = state.leaderboard[discordId]?.spot || null;
+  const topSpot = leaderboardForGuild(state, guild.id)[discordId]?.spot || null;
   const createdAt = Math.floor(new Date(profile.createdAt || profile.verifiedAt || Date.now()).getTime() / 1000);
   const updatedAt = Math.floor(new Date(profile.updatedAt || profile.profileUpdatedAt || profile.verifiedAt || Date.now()).getTime() / 1000);
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE FIGHTER PROFILE")
@@ -1140,7 +1176,7 @@ async function handleTryout(interaction) {
     if (!roleRank(interaction.member)) return interaction.reply({ content: "Tryout Staff role required.", ephemeral: true });
     const link = interaction.options.getString("link");
     const sessionId = crypto.randomUUID();
-    const session = { id: sessionId, type: "tryout", hosterId: interaction.user.id, link, status: "open", startedAt: new Date().toISOString() };
+    const session = { id: sessionId, guildId: interaction.guildId, type: "tryout", hosterId: interaction.user.id, link, status: "open", startedAt: new Date().toISOString() };
     activeTrainings.set(sessionId, session);
     await saveState(state => { state.trainings[sessionId] = session; return state; });
     const controls = new ActionRowBuilder().addComponents(
@@ -1168,7 +1204,7 @@ async function handleTryout(interaction) {
     return interaction.reply({ content: "You cannot assign this rank. Staff cannot exceed their own authority or assign below Stage 3 Low Weak.", ephemeral: true });
   }
   const id = crypto.randomUUID();
-  const pendingRecord = { targetId: target.id, rank, hosterId: interaction.user.id, createdAt: new Date().toISOString() };
+  const pendingRecord = { guildId: interaction.guildId, targetId: target.id, rank, hosterId: interaction.user.id, createdAt: new Date().toISOString() };
   pendingTryouts.set(id, pendingRecord);
   await saveState(state => { state.pendingTryouts[id] = pendingRecord; return state; });
   const rows = new ActionRowBuilder().addComponents(
@@ -1192,6 +1228,7 @@ async function handleTryoutApproval(interaction) {
   }
   const pending = pendingTryouts.get(id) || (await loadState()).pendingTryouts[id];
   if (!pending) return interaction.reply({ content: "This pending result expired.", ephemeral: true });
+  if (!belongsToGuild(pending, interaction.guildId)) return interaction.reply({ content: "This tryout result belongs to another server.", ephemeral: true });
   if (action === "deny") {
     pendingTryouts.delete(id);
     await saveState(state => { delete state.pendingTryouts[id]; return state; });
@@ -1207,35 +1244,36 @@ async function handleTryoutApproval(interaction) {
   return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor()).setTitle("Tryout Result — Approved")], components: [] });
 }
 
-function openChallengeFor(state, discordId) {
+function openChallengeFor(state, discordId, guildId = PARADISE_TEST_GUILD_ID) {
   return Object.values(state.pendingChallenges || {}).find(item =>
-    item.status === "open" && [item.challengerId, item.opponentId].includes(discordId));
+    belongsToGuild(item, guildId) && item.status === "open" && [item.challengerId, item.opponentId].includes(discordId));
 }
 
-export function challengeBlockReason(state, challengerId, opponentId, now = Date.now()) {
+export function challengeBlockReason(state, challengerId, opponentId, now = Date.now(), guildId = PARADISE_TEST_GUILD_ID) {
   if (challengerId === opponentId) return "You cannot challenge yourself.";
-  const challengerTicket = openChallengeFor(state, challengerId);
+  const challengerTicket = openChallengeFor(state, challengerId, guildId);
   if (challengerTicket) {
     return `You already have an open challenge in <#${challengerTicket.ticketId}>. Close it before opening another.`;
   }
-  const opponentTicket = openChallengeFor(state, opponentId);
+  const opponentTicket = openChallengeFor(state, opponentId, guildId);
   if (opponentTicket) {
     const otherId = opponentTicket.challengerId === opponentId ? opponentTicket.opponentId : opponentTicket.challengerId;
     return `That player is already in a challenge with <@${otherId}> in <#${opponentTicket.ticketId}>. You cannot challenge them until that ticket is closed.`;
   }
-  const challengerCooldown = Number(state.leaderboard?.[challengerId]?.availability?.cooldownUntil || 0);
+  const leaderboard = leaderboardForGuild(state, guildId);
+  const challengerCooldown = Number(leaderboard?.[challengerId]?.availability?.cooldownUntil || 0);
   if (challengerCooldown > now) {
     return `You are currently on challenge cooldown. It expires <t:${Math.floor(challengerCooldown / 1000)}:R>.`;
   }
-  const opponentImmunity = Number(state.leaderboard?.[opponentId]?.availability?.immunityUntil || 0);
+  const opponentImmunity = Number(leaderboard?.[opponentId]?.availability?.immunityUntil || 0);
   if (opponentImmunity > now) {
     return `That player is currently immune and cannot be challenged. Their immunity expires <t:${Math.floor(opponentImmunity / 1000)}:R>.`;
   }
-  const challengerLoa = state.loa?.[challengerId];
+  const challengerLoa = guildUserRecord(state.loa, guildId, challengerId);
   if (challengerLoa?.status === "approved" && Number(challengerLoa.expiresAt) > now) {
     return `Your active LOA blocks ranked challenges until <t:${Math.floor(challengerLoa.expiresAt / 1000)}:R>.`;
   }
-  const opponentLoa = state.loa?.[opponentId];
+  const opponentLoa = guildUserRecord(state.loa, guildId, opponentId);
   if (opponentLoa?.status === "approved" && Number(opponentLoa.expiresAt) > now) {
     return `That player is currently unavailable due to LOA until <t:${Math.floor(opponentLoa.expiresAt / 1000)}:R>.`;
   }
@@ -1253,9 +1291,10 @@ async function presentChallengeTargetMenu(interaction, region = null) {
     return interaction.reply({ content: "Complete `/profile create` before opening a challenge.", ephemeral: true });
   }
   const state = await loadState();
-  const currentSpot = Number(state.leaderboard[interaction.user.id]?.spot);
-  const spots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null, state.config.challenge);
-  const entries = Object.entries(state.leaderboard)
+  const leaderboard = leaderboardForGuild(state, interaction.guildId);
+  const currentSpot = Number(leaderboard[interaction.user.id]?.spot);
+  const spots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null, configForGuild(state, interaction.guildId).challenge);
+  const entries = Object.entries(leaderboard)
     .filter(([id, row]) => id !== interaction.user.id && spots.includes(Number(row.spot)))
     .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
   const candidates = [];
@@ -1263,7 +1302,7 @@ async function presentChallengeTargetMenu(interaction, region = null) {
     if (!await completedProfile(discordId)) continue;
     const member = await interaction.guild.members.fetch(discordId).catch(() => null);
     if (!member) continue;
-    const block = challengeBlockReason(state, interaction.user.id, discordId);
+    const block = challengeBlockReason(state, interaction.user.id, discordId, Date.now(), interaction.guildId);
     candidates.push({
       label: `#${row.spot} ${member.displayName}`.slice(0, 100),
       value: discordId,
@@ -1320,16 +1359,18 @@ async function createChallengeTicket(interaction, opponent, region = null) {
     return interaction.reply({ content: "Both fighters must complete `/profile create` first.", ephemeral: true });
   }
   const state = await loadState();
-  const currentSpot = Number(state.leaderboard[interaction.user.id]?.spot);
-  const opponentSpot = Number(state.leaderboard[opponent.id]?.spot);
-  const allowedSpots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null, state.config.challenge);
+  const leaderboard = leaderboardForGuild(state, interaction.guildId);
+  const currentSpot = Number(leaderboard[interaction.user.id]?.spot);
+  const opponentSpot = Number(leaderboard[opponent.id]?.spot);
+  const guildConfig = configForGuild(state, interaction.guildId);
+  const allowedSpots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null, guildConfig.challenge);
   if (!allowedSpots.includes(opponentSpot)) {
     return interaction.reply({
       content: `${challengeRangeText(Number.isInteger(currentSpot) ? currentSpot : null, allowedSpots)} <@${opponent.id}> is outside your allowed challenge range.`,
       ephemeral: true
     });
   }
-  const block = challengeBlockReason(state, interaction.user.id, opponent.id);
+  const block = challengeBlockReason(state, interaction.user.id, opponent.id, Date.now(), interaction.guildId);
   if (block) return interaction.reply({ content: block, ephemeral: true });
   const me = interaction.guild.members.me;
   const staffOverwrites = ["Owner", "Admin", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee"]
@@ -1352,9 +1393,9 @@ async function createChallengeTicket(interaction, opponent, region = null) {
     reason: "Paradise verified challenge"
   });
   const record = {
-    status: "open", ticketId: channel.id, challengerId: interaction.user.id,
+    status: "open", guildId: interaction.guildId, ticketId: channel.id, challengerId: interaction.user.id,
     opponentId: opponent.id, region: region || null, challengerSpot: Number.isInteger(currentSpot) ? currentSpot : null,
-    opponentSpot, challengeType: "Ranked", proofRequired: state.config.challenge?.proofRequired === true,
+    opponentSpot, challengeType: "Ranked", proofRequired: guildConfig.challenge?.proofRequired === true,
     openedAt: new Date().toISOString()
   };
   const header = await refreshChallengeHeader(interaction.guild, record);
@@ -1418,6 +1459,7 @@ async function handleChallenge(interaction) {
     const reason = interaction.options.getString("reason");
     const submission = {
       status: "pending",
+      guildId: interaction.guildId,
       resultType: "autowin",
       winnerId: winner.id,
       loserId,
@@ -1455,7 +1497,7 @@ async function handleChallenge(interaction) {
   }
   const submissionId = crypto.randomUUID();
   const submission = {
-    status: "pending", winnerId: submittedWinner.id, loserId: submittedLoser.id, score: submittedScore,
+    status: "pending", guildId: interaction.guildId, winnerId: submittedWinner.id, loserId: submittedLoser.id, score: submittedScore,
     refereeId: interaction.user.id,
     winnerSpot: sub === "post" ? interaction.options.getInteger("winner_spot") : null,
     loserSpot: sub === "post" ? interaction.options.getInteger("loser_spot") : null,
@@ -1489,11 +1531,12 @@ async function handleChallenge(interaction) {
 async function canApproveReferee(member) {
   if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
   const state = await loadState();
+  const guildConfig = configForGuild(state, member.guild.id);
   const mapped = new Set([
-    state.config.roleMappings?.owner_role,
-    state.config.roleMappings?.overseer_role,
-    state.config.roleMappings?.referee_manager_role,
-    state.config.roleMappings?.experienced_referee_role
+    guildConfig.roleMappings?.owner_role,
+    guildConfig.roleMappings?.overseer_role,
+    guildConfig.roleMappings?.referee_manager_role,
+    guildConfig.roleMappings?.experienced_referee_role
   ].filter(Boolean));
   return member.roles.cache.some(role =>
     mapped.has(role.id)
@@ -1517,12 +1560,13 @@ async function handleChallengeApproval(interaction) {
   }
   const now = Date.now();
   await saveState(state => {
-    const challengeConfig = state.config.challenge || {};
+    const challengeConfig = configForGuild(state, interaction.guildId).challenge || {};
+    const leaderboard = ensureLeaderboardForGuild(state, interaction.guildId);
     const normalCooldownDays = Number(challengeConfig.cooldownDays || 3);
     const top10CooldownDays = Number(challengeConfig.top10CooldownDays || 7);
     const immunityDays = Number(challengeConfig.immunityDays || normalCooldownDays);
-    const winner = state.leaderboard[record.winnerId] || { wins: 0, losses: 0, history: [] };
-    const loser = state.leaderboard[record.loserId] || { wins: 0, losses: 0, history: [] };
+    const winner = leaderboard[record.winnerId] || { wins: 0, losses: 0, history: [] };
+    const loser = leaderboard[record.loserId] || { wins: 0, losses: 0, history: [] };
     winner.wins = Number(winner.wins || 0) + 1;
     loser.losses = Number(loser.losses || 0) + 1;
     winner.spot = record.winnerSpot || winner.spot || null;
@@ -1538,8 +1582,8 @@ async function handleChallengeApproval(interaction) {
       ...(winner.availability || {}),
       immunityUntil: now + (record.winnerSpot && record.winnerSpot <= 10 ? top10CooldownDays : immunityDays) * 86_400_000
     };
-    state.leaderboard[record.winnerId] = winner;
-    state.leaderboard[record.loserId] = loser;
+    leaderboard[record.winnerId] = winner;
+    leaderboard[record.loserId] = loser;
     if (state.pendingChallenges[record.ticketId]?.status === "open") {
       state.pendingChallenges[record.ticketId] = {
         ...state.pendingChallenges[record.ticketId],
@@ -1600,7 +1644,7 @@ async function handleTraining(interaction) {
     const cohost = interaction.options.getUser("cohost");
     const sessionId = crypto.randomUUID();
     const session = {
-      id: sessionId, type: "training", hosterId: selectedHost.id, createdBy: interaction.user.id,
+      id: sessionId, guildId: interaction.guildId, type: "training", hosterId: selectedHost.id, createdBy: interaction.user.id,
       cohostId: cohost?.id || null, link, rules, status: "open", startedAt: new Date().toISOString()
     };
     const controls = new ActionRowBuilder().addComponents(
@@ -1624,11 +1668,11 @@ async function handleTraining(interaction) {
     await saveState(state => { state.trainings[sessionId] = session; return state; });
     return interaction.editReply(`Training started: ${announcement.url}`);
   }
-  const owned = [...activeTrainings.values()].find(item => item.hosterId === interaction.user.id && item.status !== "ended")
-    || Object.values((await loadState()).trainings).find(item => item.hosterId === interaction.user.id && item.status !== "ended");
+  const owned = [...activeTrainings.values()].find(item => belongsToGuild(item, interaction.guildId) && item.hosterId === interaction.user.id && item.status !== "ended")
+    || Object.values((await loadState()).trainings).find(item => belongsToGuild(item, interaction.guildId) && item.hosterId === interaction.user.id && item.status !== "ended");
   if (!owned) return interaction.reply({ content: "You have no active training session.", ephemeral: true });
   const state = await loadState();
-  if (state.config.verification?.requireProfileForTrainingResult !== false && !await completedProfile(interaction.user.id)) {
+  if (configForGuild(state, interaction.guildId).verification?.requireProfileForTrainingResult !== false && !await completedProfile(interaction.user.id)) {
     return interaction.reply({ content: "Complete `/profile create` before submitting a training result.", ephemeral: true });
   }
   const result = {
@@ -1683,6 +1727,7 @@ async function handleSessionButton(interaction) {
   const [action, sessionId] = interaction.customId.replace("paradise_session_", "").split(":");
   const session = activeTrainings.get(sessionId) || (await loadState()).trainings[sessionId];
   if (!session) return interaction.reply({ content: "Session not found.", ephemeral: true });
+  if (!belongsToGuild(session, interaction.guildId)) return interaction.reply({ content: "This session belongs to another server.", ephemeral: true });
   if (session.hosterId !== interaction.user.id && !isOwner(interaction)) {
     return interaction.reply({ content: "Only the recorded hoster can use this button.", ephemeral: true });
   }
@@ -1872,9 +1917,9 @@ async function postAutomaticActivityCheck(guild, group, state) {
     || guild.channels.cache.find(item => item.name.includes(targetName));
   if (!channel) return null;
   const id = crypto.randomUUID();
-  const deadlineHours = Number(state.config.activity?.responseDeadlineHours || 24);
+  const deadlineHours = Number(configForGuild(state, guild.id).activity?.responseDeadlineHours || 24);
   const expiresAt = Date.now() + deadlineHours * 3_600_000;
-  const check = { group, startedBy: guild.members.me.id, automatic: true, startedAt: new Date().toISOString(), expiresAt, responses: [] };
+  const check = { guildId: guild.id, group, startedBy: guild.members.me.id, automatic: true, startedAt: new Date().toISOString(), expiresAt, responses: [] };
   state.activityChecks[id] = check;
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`paradise_activity_present:${id}`).setLabel("I am active / Aktifim").setStyle(ButtonStyle.Success)
@@ -1889,33 +1934,38 @@ async function runParadiseMaintenance(guild) {
   await guild.members.fetch().catch(() => {});
   await saveState(async state => {
     const now = Date.now();
+    const config = configForGuild(state, guild.id);
     for (const [userId, item] of Object.entries(state.whitelists)) {
+      if (!belongsToGuild(item, guild.id)) continue;
       if (item.expiresAt && Date.parse(item.expiresAt) <= now) {
         delete state.whitelists[userId];
-        const member = guild.members.cache.get(userId);
+        const member = guild.members.cache.get(item.userId || userId);
         const role = guild.roles.cache.find(entry => entry.name === "Activity Whitelist");
         if (member && role) await member.roles.remove(role, "Paradise activity whitelist expired").catch(() => {});
       }
     }
     for (const [userId, item] of Object.entries(state.loa)) {
+      if (!belongsToGuild(item, guild.id)) continue;
       if (item.status === "approved" && Number(item.expiresAt) <= now) {
         state.loa[userId] = { ...item, status: "expired", endedAt: new Date().toISOString() };
-        const member = guild.members.cache.get(userId);
+        const member = guild.members.cache.get(item.userId || userId);
         const role = guild.roles.cache.find(entry => entry.name === "LOA");
         if (member && role) await member.roles.remove(role, "Paradise LOA expired").catch(() => {});
       }
     }
     for (const [id, check] of Object.entries(state.activityChecks)) {
+      if (!belongsToGuild(check, guild.id)) continue;
       if (check.processedAt || Number(check.expiresAt) > now) continue;
       const roles = ACTIVITY_GROUP_ROLES[check.group] || [];
       const exempt = new Set(Object.entries(state.whitelists)
-        .filter(([, item]) => !item.expiresAt || Date.parse(item.expiresAt) > now).map(([userId]) => userId));
+        .filter(([, item]) => belongsToGuild(item, guild.id) && (!item.expiresAt || Date.parse(item.expiresAt) > now))
+        .map(([userId, item]) => item.userId || userId));
       for (const [userId, item] of Object.entries(state.loa)) {
-        if (item.status === "approved" && Number(item.expiresAt) > now) exempt.add(userId);
+        if (belongsToGuild(item, guild.id) && item.status === "approved" && Number(item.expiresAt) > now) exempt.add(item.userId || userId);
       }
       const responded = new Set(check.responses || []);
       const removed = [];
-      if (state.config.autoActivityRoleRemoval === true && state.config.activity?.autoRoleChanges === true) {
+      if (config.autoActivityRoleRemoval === true && config.activity?.autoRoleChanges === true) {
         for (const member of guild.members.cache.values()) {
           if (member.user.bot || responded.has(member.id) || exempt.has(member.id)) continue;
           const removable = member.roles.cache.filter(role => roles.includes(role.name));
@@ -1930,22 +1980,22 @@ async function runParadiseMaintenance(guild) {
         || guild.channels.cache.find(channel => channel.name.includes("activity-review"));
       if (log) await log.send(`Activity check **${check.group}** closed. Responses: ${responded.size}. Role removals: ${removed.length}. Whitelists were respected.`).catch(() => {});
     }
-    if (state.config.autoActivityChecks === true) {
-      const last = Number(state.config.lastAutoActivityCheckAt || 0);
-      const intervalHours = Number(state.config.activity?.checkEveryHours || 48);
+    if (config.autoActivityChecks === true) {
+      const last = Number(config.lastAutoActivityCheckAt || 0);
+      const intervalHours = Number(config.activity?.checkEveryHours || 48);
       if (now - last >= intervalHours * 60 * 60_000) {
         for (const group of ["Referee", "Tryout", "Training"]) await postAutomaticActivityCheck(guild, group, state);
-        state.config.lastAutoActivityCheckAt = now;
+        config.lastAutoActivityCheckAt = now;
       }
     }
     const sundayKey = new Date(now).toISOString().slice(0, 10);
-    if (new Date(now).getUTCDay() === 0 && state.config.lastWeeklyReview !== sundayKey) {
+    if (new Date(now).getUTCDay() === 0 && config.lastWeeklyReview !== sundayKey) {
       const log = await configuredChannel(guild, "activity_logs_channel", "activity-review")
         || guild.channels.cache.find(channel => channel.name.includes("activity-review"));
       if (log) {
         const lines = [];
-        const quotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
-        const promotionMultiplier = Number(state.config.activity?.promotionMultiplier || 3);
+        const quotas = config.weeklyQuotas || WEEKLY_QUOTAS;
+        const promotionMultiplier = Number(config.activity?.promotionMultiplier || 3);
         for (const member of guild.members.cache.values()) {
           const quota = Object.entries(quotas).find(([role]) => member.roles.cache.some(item => item.name === role));
           if (!quota) continue;
@@ -1958,7 +2008,7 @@ async function runParadiseMaintenance(guild) {
           .setDescription(lines.join("\n").slice(0, 4000) || "No quota roles found.")
           .setFooter({ text: "Recommendations only unless autoStaffChanges is explicitly enabled • Made by Paradise bot" })] }).catch(() => {});
       }
-      state.config.lastWeeklyReview = sundayKey;
+      config.lastWeeklyReview = sundayKey;
     }
     return state;
   });
@@ -1973,21 +2023,25 @@ async function handleWhitelist(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "list") {
     const entries = Object.entries((await loadState()).whitelists)
-      .filter(([, item]) => !item.expiresAt || Date.parse(item.expiresAt) > Date.now())
-      .map(([id, item]) => `<@${id}> — ${item.group} — ${item.expiresAt ? `<t:${Math.floor(Date.parse(item.expiresAt) / 1000)}:R>` : "unlimited"}`);
+      .filter(([, item]) => belongsToGuild(item, interaction.guildId) && (!item.expiresAt || Date.parse(item.expiresAt) > Date.now()))
+      .map(([id, item]) => `<@${item.userId || id}> — ${item.group} — ${item.expiresAt ? `<t:${Math.floor(Date.parse(item.expiresAt) / 1000)}:R>` : "unlimited"}`);
     return interaction.reply({ content: entries.join("\n") || "No active activity whitelists.", ephemeral: true });
   }
   const user = interaction.options.getUser("user");
   if (sub === "remove") {
-    await saveState(state => { delete state.whitelists[user.id]; return state; });
+    await saveState(state => {
+      delete state.whitelists[guildUserKey(interaction.guildId, user.id)];
+      if (interaction.guildId === PARADISE_TEST_GUILD_ID) delete state.whitelists[user.id];
+      return state;
+    });
     return interaction.reply({ content: `${user} removed from the activity whitelist.`, ephemeral: true });
   }
   const days = interaction.options.getInteger("days");
   const item = {
-    group: interaction.options.getString("group"), grantedBy: interaction.user.id,
+    guildId: interaction.guildId, userId: user.id, group: interaction.options.getString("group"), grantedBy: interaction.user.id,
     grantedAt: new Date().toISOString(), expiresAt: days ? new Date(Date.now() + days * 86_400_000).toISOString() : null
   };
-  await saveState(state => { state.whitelists[user.id] = item; return state; });
+  await saveState(state => { state.whitelists[guildUserKey(interaction.guildId, user.id)] = item; return state; });
   const role = await ensureRole(interaction.guild, "Activity Whitelist");
   const member = await interaction.guild.members.fetch(user.id);
   await member.roles.add(role, "Paradise activity whitelist");
@@ -2002,11 +2056,11 @@ async function handleActivity(interaction) {
     }
     const group = interaction.options.getString("group");
     const id = crypto.randomUUID();
-    const policy = (await loadState()).config.activity || {};
+    const policy = configForGuild(await loadState(), interaction.guildId).activity || {};
     const deadlineHours = Number(policy.responseDeadlineHours || 24);
     const expiresAt = Date.now() + deadlineHours * 3_600_000;
     await saveState(state => {
-      state.activityChecks[id] = { group, startedBy: interaction.user.id, startedAt: new Date().toISOString(), expiresAt, responses: [] };
+      state.activityChecks[id] = { guildId: interaction.guildId, group, startedBy: interaction.user.id, startedAt: new Date().toISOString(), expiresAt, responses: [] };
       return state;
     });
     const row = new ActionRowBuilder().addComponents(
@@ -2019,14 +2073,16 @@ async function handleActivity(interaction) {
   const state = await loadState();
   const now = Date.now();
   const rows = [];
-  const quotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
-  const promotionMultiplier = Number(state.config.activity?.promotionMultiplier || 3);
+  const guildConfig = configForGuild(state, interaction.guildId);
+  const quotas = guildConfig.weeklyQuotas || WEEKLY_QUOTAS;
+  const promotionMultiplier = Number(guildConfig.activity?.promotionMultiplier || 3);
   for (const member of interaction.guild.members.cache.values()) {
     const quota = Object.entries(quotas).find(([role]) => member.roles.cache.some(item => item.name === role));
     if (!quota) continue;
     const [role, rule] = quota;
     const count = weekActivityCount(state.staffActivity[member.id], rule.key, now);
-    const exempt = state.whitelists[member.id] && (!state.whitelists[member.id].expiresAt || Date.parse(state.whitelists[member.id].expiresAt) > now);
+    const whitelist = guildUserRecord(state.whitelists, interaction.guildId, member.id);
+    const exempt = whitelist && (!whitelist.expiresAt || Date.parse(whitelist.expiresAt) > now);
     const recommendation = exempt ? "WHITELIST" : count < rule.minimum ? "DEMOTION REVIEW" : count >= rule.minimum * promotionMultiplier ? "PROMOTION REVIEW" : "OK";
     rows.push(`${member} — ${role}: ${count}/${rule.minimum} — **${recommendation}**`);
   }
@@ -2054,9 +2110,13 @@ async function handleMainer(interaction) {
     if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
     const code = interaction.options.getString("code").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
     if (!code) return interaction.reply({ content: "Invalid mainer code.", ephemeral: true });
-    await saveState(state => { state.config.mainerCode = code; return state; });
+    await saveState(state => {
+      state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
+      state.guildConfigs[interaction.guildId].mainerCode = code;
+      return state;
+    });
   }
-  const code = (await loadState()).config.mainerCode || "Not configured";
+  const code = configForGuild(await loadState(), interaction.guildId).mainerCode || "Not configured";
   return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE MAINING GUIDE")
     .setDescription(`# Official code\n\`${code}\`\n\n## ◆ How to main Paradise\n1. Open the **official TSBCC maining channel**.\n2. Run \`/mainclan code:${code} region:EU\`.\n3. Choose only your **approved staff role**.\n4. Keep proof in **mainer-proof** for review.\n\n> **Security:** Paradise never asks for cookies, passwords or tokens.\n\n-# Use only official Discord and Roblox links.`)
     .setFooter(paradiseFooter("Clan operations"))] });
@@ -2159,8 +2219,9 @@ async function publishSetupGuides(guild, mode) {
     components: [helpButtons(mode)]
   });
   await saveState(state => {
-    state.config.commandGuideMessageIds = state.config.commandGuideMessageIds || {};
-    state.config.commandGuideMessageIds[mode] = message.id;
+    state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
+    state.guildConfigs[guild.id].commandGuideMessageIds = state.guildConfigs[guild.id].commandGuideMessageIds || {};
+    state.guildConfigs[guild.id].commandGuideMessageIds[mode] = message.id;
     return state;
   });
   return message;
@@ -2289,7 +2350,7 @@ async function publishGuidePost(guild, definition) {
   const channel = guild.channels.cache.find(item => item.name === definition.channel && item.isTextBased?.());
   if (!channel) return false;
   const state = await loadState();
-  const oldId = state.config.guideMessageIds?.[definition.key];
+  const oldId = configForGuild(state, guild.id).guideMessageIds?.[definition.key];
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
   const payload = {
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(definition.title)
@@ -2297,8 +2358,9 @@ async function publishGuidePost(guild, definition) {
   };
   if (message) await message.edit(payload); else message = await channel.send(payload);
   await saveState(next => {
-    next.config.guideMessageIds = next.config.guideMessageIds || {};
-    next.config.guideMessageIds[definition.key] = message.id;
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].guideMessageIds = next.guildConfigs[guild.id].guideMessageIds || {};
+    next.guildConfigs[guild.id].guideMessageIds[definition.key] = message.id;
     return next;
   });
   return true;
@@ -2324,7 +2386,7 @@ export async function publishParadiseGuidesFromDashboard(guild, mode = "clan") {
     error.code = "invalid_paradise_setup_mode";
     throw error;
   }
-  return publishAllGuides(guild, mode);
+  return paradiseGuildContext.run(guild.id, () => publishAllGuides(guild, mode));
 }
 
 function canManageClan(member) {
@@ -2347,19 +2409,25 @@ async function updateRelationsPanel(guild) {
   const channel = await configuredChannel(guild, "relation_panel_channel", "clan-relations");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
-  const relationSettings = state.config.relationSettings || {};
+  const guildConfig = configForGuild(state, guild.id);
+  const relationSettings = guildConfig.relationSettings || {};
+  const relationState = state.relations?.[guild.id] || (state.relations?.allies || state.relations?.enemies ? state.relations : {});
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🤝 PARADISE CLAN RELATIONS")
     .setDescription("Relations are managed by authorized clan leadership and update automatically.")
     .addFields(
-      { name: "◆ __Currently Allies__", value: relationshipLines(state.relations.allies, relationSettings).slice(0, 1024) },
-      { name: "⚔️ __Enemy Clans__", value: relationshipLines(state.relations.enemies, relationSettings).slice(0, 1024) }
+      { name: "◆ __Currently Allies__", value: relationshipLines(relationState.allies, relationSettings).slice(0, 1024) },
+      { name: "⚔️ __Enemy Clans__", value: relationshipLines(relationState.enemies, relationSettings).slice(0, 1024) }
     )
     .setFooter(paradiseFooter("Use /relation"));
-  let message = state.config.relationsMessageId
-    ? await channel.messages.fetch(state.config.relationsMessageId).catch(() => null)
+  let message = guildConfig.relationsMessageId
+    ? await channel.messages.fetch(guildConfig.relationsMessageId).catch(() => null)
     : null;
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
-  await saveState(next => { next.config.relationsMessageId = message.id; return next; });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].relationsMessageId = message.id;
+    return next;
+  });
   return message;
 }
 
@@ -2375,10 +2443,20 @@ async function handleRelation(interaction) {
     }
     const key = clan.toLocaleLowerCase("en-US");
     await saveState(state => {
-      state.relations.allies = state.relations.allies || {};
-      state.relations.enemies = state.relations.enemies || {};
-      const bucket = type === "ally" ? state.relations.allies : state.relations.enemies;
-      const opposite = type === "ally" ? state.relations.enemies : state.relations.allies;
+      if (state.relations.allies || state.relations.enemies) {
+        state.relations[interaction.guildId] = {
+          allies: structuredClone(state.relations.allies || {}),
+          enemies: structuredClone(state.relations.enemies || {})
+        };
+        delete state.relations.allies;
+        delete state.relations.enemies;
+      }
+      state.relations[interaction.guildId] = state.relations[interaction.guildId] || { allies: {}, enemies: {} };
+      const relationState = state.relations[interaction.guildId];
+      relationState.allies = relationState.allies || {};
+      relationState.enemies = relationState.enemies || {};
+      const bucket = type === "ally" ? relationState.allies : relationState.enemies;
+      const opposite = type === "ally" ? relationState.enemies : relationState.allies;
       if (sub === "remove") delete bucket[key];
       else {
         delete opposite[key];
@@ -2401,13 +2479,13 @@ async function handleRelation(interaction) {
   return interaction.reply({ content: panel ? `Relations board updated: ${panel.url}` : "Create a `clan-relations` channel first.", ephemeral: true });
 }
 
-function rankLabel(state, userId) {
-  const spot = state.leaderboard[userId]?.spot;
+function rankLabel(state, userId, guildId = PARADISE_TEST_GUILD_ID) {
+  const spot = leaderboardForGuild(state, guildId)[userId]?.spot;
   return spot ? `#${spot}` : "Unranked";
 }
 
-export function timedAvailabilityLines(state, field, now = Date.now()) {
-  return Object.entries(state.leaderboard || {})
+export function timedAvailabilityLines(state, field, now = Date.now(), guildId = PARADISE_TEST_GUILD_ID) {
+  return Object.entries(leaderboardForGuild(state, guildId))
     .map(([userId, item]) => ({ userId, spot: item.spot, expiresAt: Number(item.availability?.[field] || 0) }))
     .filter(item => item.expiresAt > now)
     .sort((a, b) => a.expiresAt - b.expiresAt)
@@ -2415,19 +2493,20 @@ export function timedAvailabilityLines(state, field, now = Date.now()) {
     .join("\n") || "_None._";
 }
 
-export function challengedLines(state) {
+export function challengedLines(state, guildId = PARADISE_TEST_GUILD_ID) {
   return Object.values(state.pendingChallenges || {})
-    .filter(item => item.status === "open")
-    .map(item => `<@${item.opponentId}> (${rankLabel(state, item.opponentId)}) is being challenged by <@${item.challengerId}> (${rankLabel(state, item.challengerId)})\n-# Ticket ID: ${item.ticketId}`)
+    .filter(item => belongsToGuild(item, guildId) && item.status === "open")
+    .map(item => `<@${item.opponentId}> (${rankLabel(state, item.opponentId, guildId)}) is being challenged by <@${item.challengerId}> (${rankLabel(state, item.challengerId, guildId)})\n-# Ticket ID: ${item.ticketId}`)
     .join("\n\n") || "_No active challenge tickets._";
 }
 
-function rankedLoaLines(state, now = Date.now()) {
+function rankedLoaLines(state, guildId = PARADISE_TEST_GUILD_ID, now = Date.now()) {
+  const leaderboard = leaderboardForGuild(state, guildId);
   const rows = Object.values(state.loa || {})
-    .filter(item => item.status === "approved" && Number(item.expiresAt) > now && state.leaderboard[item.userId]?.spot)
+    .filter(item => belongsToGuild(item, guildId) && item.status === "approved" && Number(item.expiresAt) > now && leaderboard[item.userId]?.spot)
     .sort((a, b) => Number(a.expiresAt) - Number(b.expiresAt));
   return rows.length
-    ? rows.map(item => `• <@${item.userId}> | **Rank #${state.leaderboard[item.userId].spot}** unavailable until <t:${Math.floor(item.expiresAt / 1000)}:R>`).join("\n")
+    ? rows.map(item => `• <@${item.userId}> | **Rank #${leaderboard[item.userId].spot}** unavailable until <t:${Math.floor(item.expiresAt / 1000)}:R>`).join("\n")
     : "_None._";
 }
 
@@ -2435,21 +2514,26 @@ async function updateAvailabilityPanel(guild) {
   const channel = await configuredChannel(guild, "availability_channel", "availability");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
+  const guildConfig = configForGuild(state, guild.id);
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHALLENGE AVAILABILITY")
-    .setDescription(("## ◆ Current Cooldowns\n" + timedAvailabilityLines(state, "cooldownUntil")
-      + "\n\n## ◆ Current Immunity\n" + timedAvailabilityLines(state, "immunityUntil")
-      + "\n\n## ◆ Being Challenged\n" + challengedLines(state)
-      + "\n\n## ◆ Ranked LOA Impact\n" + rankedLoaLines(state)
+    .setDescription(("## ◆ Current Cooldowns\n" + timedAvailabilityLines(state, "cooldownUntil", Date.now(), guild.id)
+      + "\n\n## ◆ Current Immunity\n" + timedAvailabilityLines(state, "immunityUntil", Date.now(), guild.id)
+      + "\n\n## ◆ Being Challenged\n" + challengedLines(state, guild.id)
+      + "\n\n## ◆ Ranked LOA Impact\n" + rankedLoaLines(state, guild.id)
       + "\n\n-# Full LOA records remain in the separate LOA panel.").slice(0, 4096))
     .setFooter(paradiseFooter("Automatically refreshed by challenge results"));
-  let message = state.config.availabilityMessageId
-    ? await channel.messages.fetch(state.config.availabilityMessageId).catch(() => null)
+  let message = guildConfig.availabilityMessageId
+    ? await channel.messages.fetch(guildConfig.availabilityMessageId).catch(() => null)
     : null;
   const components = [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("paradise_availability_refresh").setLabel("Refresh availability").setStyle(ButtonStyle.Secondary)
   )];
   if (message) await message.edit({ embeds: [embed], components }); else message = await channel.send({ embeds: [embed], components });
-  await saveState(next => { next.config.availabilityMessageId = message.id; return next; });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].availabilityMessageId = message.id;
+    return next;
+  });
   return message;
 }
 
@@ -2463,19 +2547,21 @@ async function handleAvailability(interaction) {
     const rank = interaction.options.getInteger("rank");
     const expiresAt = Date.now() + interaction.options.getInteger("hours") * 3_600_000;
     await saveState(state => {
-      const current = state.leaderboard[user.id] || { wins: 0, losses: 0, history: [] };
+      const leaderboard = ensureLeaderboardForGuild(state, interaction.guildId);
+      const current = leaderboard[user.id] || { wins: 0, losses: 0, history: [] };
       if (rank) current.spot = rank;
       current.availability = current.availability || {};
       current.availability[sub === "cooldown" ? "cooldownUntil" : "immunityUntil"] = expiresAt;
-      state.leaderboard[user.id] = current;
+      leaderboard[user.id] = current;
       return state;
     });
   } else if (sub === "clear") {
     const user = interaction.options.getUser("user");
     const type = interaction.options.getString("type");
     await saveState(state => {
-      if (state.leaderboard[user.id]?.availability) {
-        delete state.leaderboard[user.id].availability[type === "cooldown" ? "cooldownUntil" : "immunityUntil"];
+      const leaderboard = ensureLeaderboardForGuild(state, interaction.guildId);
+      if (leaderboard[user.id]?.availability) {
+        delete leaderboard[user.id].availability[type === "cooldown" ? "cooldownUntil" : "immunityUntil"];
       }
       return state;
     });
@@ -2484,10 +2570,10 @@ async function handleAvailability(interaction) {
   return interaction.reply({ content: panel ? `Availability board updated: ${panel.url}` : "Create an `availability` channel first.", ephemeral: true });
 }
 
-function activeLoaLines(state) {
+function activeLoaLines(state, guildId = PARADISE_TEST_GUILD_ID) {
   const now = Date.now();
   const rows = Object.values(state.loa || {})
-    .filter(item => item.status === "approved" && item.expiresAt > now)
+    .filter(item => belongsToGuild(item, guildId) && item.status === "approved" && item.expiresAt > now)
     .sort((a, b) => a.expiresAt - b.expiresAt);
   return rows.length
     ? rows.map(item => `◆ <@${item.userId}>${item.robloxUsername ? ` · **${item.robloxUsername}**` : ""}${item.region ? ` · ${item.region}` : ""}\n- **Ends:** <t:${Math.floor(item.expiresAt / 1000)}:F> (<t:${Math.floor(item.expiresAt / 1000)}:R>)\n- **Note:** ${item.reason || item.note || "No note"}${item.decidedBy ? `\n- **Approved by:** <@${item.decidedBy}>` : ""}`).join("\n\n")
@@ -2498,14 +2584,19 @@ async function updateLoaPanel(guild) {
   const channel = await configuredChannel(guild, "loa_channel", "loa");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
+  const guildConfig = configForGuild(state, guild.id);
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🌙 STAFF LEAVE OF ABSENCE")
-    .setDescription(("## ◆ Active LOAs\n" + activeLoaLines(state) + "\n\n-# LOA is separate from challenge cooldown and immunity.").slice(0, 4096))
+    .setDescription(("## ◆ Active LOAs\n" + activeLoaLines(state, guild.id) + "\n\n-# LOA is separate from challenge cooldown and immunity.").slice(0, 4096))
     .setFooter(paradiseFooter("Staff attendance"));
-  let message = state.config.loaMessageId
-    ? await channel.messages.fetch(state.config.loaMessageId).catch(() => null)
+  let message = guildConfig.loaMessageId
+    ? await channel.messages.fetch(guildConfig.loaMessageId).catch(() => null)
     : null;
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
-  await saveState(next => { next.config.loaMessageId = message.id; return next; });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].loaMessageId = message.id;
+    return next;
+  });
   return message;
 }
 
@@ -2514,15 +2605,17 @@ async function handleLoa(interaction) {
   if (sub === "request") {
     const state = await loadState();
     const days = interaction.options.getInteger("days");
-    const maxDays = Number(state.config.loa?.maxDays || 90);
+    const guildConfig = configForGuild(state, interaction.guildId);
+    const maxDays = Number(guildConfig.loa?.maxDays || 90);
     if (days > maxDays) return interaction.reply({ content: `Maximum configured LOA is **${maxDays} days**.`, ephemeral: true });
     const evidence = interaction.options.getString("evidence") || null;
-    if (state.config.loa?.requireEvidence && !evidence) {
+    if (guildConfig.loa?.requireEvidence && !evidence) {
       return interaction.reply({ content: "Evidence is required by the current LOA policy.", ephemeral: true });
     }
     const profile = await verifiedProfile(interaction.user.id);
     const expiresAt = Date.now() + days * 86_400_000;
     const record = {
+      guildId: interaction.guildId,
       userId: interaction.user.id,
       reason: interaction.options.getString("reason"),
       evidence,
@@ -2533,7 +2626,7 @@ async function handleLoa(interaction) {
       status: "pending",
       requestedAt: new Date().toISOString()
     };
-    await saveState(state => { state.loa[interaction.user.id] = record; return state; });
+    await saveState(state => { state.loa[guildUserKey(interaction.guildId, interaction.user.id)] = record; return state; });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_loa_approve:${interaction.user.id}`).setLabel("Approve LOA").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_loa_deny:${interaction.user.id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
@@ -2549,11 +2642,12 @@ async function handleLoa(interaction) {
     if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
     const user = interaction.options.getUser("user");
     const currentState = await loadState();
-    const current = currentState.loa[user.id];
+    const current = guildUserRecord(currentState.loa, interaction.guildId, user.id);
     if (sub === "add") {
       const days = interaction.options.getInteger("days");
       const profile = await verifiedProfile(user.id);
       const record = {
+        guildId: interaction.guildId,
         userId: user.id,
         note: interaction.options.getString("note"),
         reason: interaction.options.getString("note"),
@@ -2567,7 +2661,7 @@ async function handleLoa(interaction) {
         decidedAt: new Date().toISOString(),
         requestedAt: new Date().toISOString()
       };
-      await saveState(state => { state.loa[user.id] = record; return state; });
+      await saveState(state => { state.loa[guildUserKey(interaction.guildId, user.id)] = record; return state; });
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
       const role = await ensureRole(interaction.guild, "LOA");
       if (member) await member.roles.add(role).catch(() => {});
@@ -2575,8 +2669,10 @@ async function handleLoa(interaction) {
       if (!current) return interaction.reply({ content: "No LOA record exists for that user.", ephemeral: true });
       const status = sub === "approve" ? "approved" : sub === "deny" ? "denied" : "removed";
       await saveState(state => {
-        state.loa[user.id] = {
-          ...state.loa[user.id],
+        const key = guildUserKey(interaction.guildId, user.id);
+        state.loa[key] = {
+          ...guildUserRecord(state.loa, interaction.guildId, user.id),
+          guildId: interaction.guildId,
           status,
           decisionReason: interaction.options.getString("reason") || null,
           decidedBy: interaction.user.id,
@@ -2596,7 +2692,9 @@ async function handleLoa(interaction) {
   }
   if (sub === "end") {
     await saveState(state => {
-      if (state.loa[interaction.user.id]) state.loa[interaction.user.id].status = "ended";
+      const key = guildUserKey(interaction.guildId, interaction.user.id);
+      const record = guildUserRecord(state.loa, interaction.guildId, interaction.user.id);
+      if (record) state.loa[key] = { ...record, guildId: interaction.guildId, status: "ended" };
       return state;
     });
     const role = interaction.guild.roles.cache.find(item => item.name === "LOA");
@@ -2610,10 +2708,10 @@ async function handleLoaDecision(interaction) {
   if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
   const [action, userId] = interaction.customId.replace("paradise_loa_", "").split(":");
   const state = await loadState();
-  const record = state.loa[userId];
+  const record = guildUserRecord(state.loa, interaction.guildId, userId);
   if (!record || record.status !== "pending") return interaction.reply({ content: "This LOA request is no longer pending.", ephemeral: true });
   await saveState(next => {
-    next.loa[userId] = { ...record, status: action === "approve" ? "approved" : "denied", decidedBy: interaction.user.id, decidedAt: new Date().toISOString() };
+    next.loa[guildUserKey(interaction.guildId, userId)] = { ...record, guildId: interaction.guildId, status: action === "approve" ? "approved" : "denied", decidedBy: interaction.user.id, decidedAt: new Date().toISOString() };
     return next;
   });
   if (action === "approve") {
@@ -2643,18 +2741,19 @@ async function handleCommandChannel(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
   const sub = interaction.options.getSubcommand();
   const state = await loadState();
-  const current = state.config.commandChannels || {};
+  const current = configForGuild(state, interaction.guildId).commandChannels || {};
   if (sub === "list") {
     const lines = Object.entries(current).map(([command, ids]) => `/${command}: ${ids.map(id => `<#${id}>`).join(", ")}`);
     return interaction.reply({ content: lines.join("\n") || "No command-channel restrictions configured.", ephemeral: true });
   }
   const command = interaction.options.getString("command").trim().replace(/^\//, "").toLowerCase();
   await saveState(next => {
-    const mapping = next.config.commandChannels || {};
+    next.guildConfigs[interaction.guildId] = next.guildConfigs[interaction.guildId] || structuredClone(next.config || {});
+    const mapping = next.guildConfigs[interaction.guildId].commandChannels || {};
     const ids = new Set(mapping[command] || []);
     if (sub === "add") ids.add(interaction.channelId); else ids.delete(interaction.channelId);
     if (ids.size) mapping[command] = [...ids]; else delete mapping[command];
-    next.config.commandChannels = mapping;
+    next.guildConfigs[interaction.guildId].commandChannels = mapping;
     return next;
   });
   return interaction.reply({ content: sub === "add" ? `/${command} is now allowed in this channel.` : `This channel was removed from /${command}.`, ephemeral: true });
@@ -2662,7 +2761,7 @@ async function handleCommandChannel(interaction) {
 
 async function postChallengeCreatePanel(guild, channel) {
   const state = await loadState();
-  const oldId = state.config.challengeCreatePanelMessageId;
+  const oldId = configForGuild(state, guild.id).challengeCreatePanelMessageId;
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
   const payload = {
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ CREATE A RANKED CHALLENGE")
@@ -2673,7 +2772,11 @@ async function postChallengeCreatePanel(guild, channel) {
     )]
   };
   if (message) await message.edit(payload); else message = await channel.send(payload);
-  await saveState(next => { next.config.challengeCreatePanelMessageId = message.id; return next; });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].challengeCreatePanelMessageId = message.id;
+    return next;
+  });
   return message;
 }
 
@@ -2865,7 +2968,7 @@ async function handleHandbook(interaction) {
 
 async function enforceCommandChannel(interaction) {
   if (isOwner(interaction)) return true;
-  const allowed = (await loadState()).config.commandChannels?.[interaction.commandName];
+  const allowed = configForGuild(await loadState(), interaction.guildId).commandChannels?.[interaction.commandName];
   if (!allowed?.length || allowed.includes(interaction.channelId)) return true;
   await interaction.reply({ content: `Use this command in: ${allowed.map(id => `<#${id}>`).join(", ")}`, ephemeral: true });
   return false;
@@ -2877,24 +2980,29 @@ async function handleSticky(interaction) {
   }
   const sub = interaction.options.getSubcommand();
   const state = await loadState();
-  const stickies = state.config.stickies || {};
+  const stickies = configForGuild(state, interaction.guildId).stickies || {};
   if (sub === "list") {
     const lines = Object.entries(stickies).map(([channelId, item]) => `<#${channelId}> — ${String(item.text).slice(0, 80)}`);
     return interaction.reply({ content: lines.join("\n") || "No sticky messages configured.", ephemeral: true });
   }
   if (sub === "remove") {
-    await saveState(next => { if (next.config.stickies) delete next.config.stickies[interaction.channelId]; return next; });
+    await saveState(next => {
+      next.guildConfigs[interaction.guildId] = next.guildConfigs[interaction.guildId] || structuredClone(next.config || {});
+      if (next.guildConfigs[interaction.guildId].stickies) delete next.guildConfigs[interaction.guildId].stickies[interaction.channelId];
+      return next;
+    });
     return interaction.reply({ content: "Sticky removed for this channel.", ephemeral: true });
   }
   const text = interaction.options.getString("text").trim();
   await saveState(next => {
-    next.config.stickies = next.config.stickies || {};
-    next.config.stickies[interaction.channelId] = { text, updatedBy: interaction.user.id, updatedAt: new Date().toISOString(), lastSentAt: 0, messageId: null };
+    next.guildConfigs[interaction.guildId] = next.guildConfigs[interaction.guildId] || structuredClone(next.config || {});
+    next.guildConfigs[interaction.guildId].stickies = next.guildConfigs[interaction.guildId].stickies || {};
+    next.guildConfigs[interaction.guildId].stickies[interaction.channelId] = { text, updatedBy: interaction.user.id, updatedAt: new Date().toISOString(), lastSentAt: 0, messageId: null };
     return next;
   });
   const sent = await interaction.channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setDescription(text).setFooter(paradiseFooter("Sticky guide"))] });
   await saveState(next => {
-    next.config.stickies[interaction.channelId] = { ...next.config.stickies[interaction.channelId], messageId: sent.id, lastSentAt: Date.now() };
+    next.guildConfigs[interaction.guildId].stickies[interaction.channelId] = { ...next.guildConfigs[interaction.guildId].stickies[interaction.channelId], messageId: sent.id, lastSentAt: Date.now() };
     return next;
   });
   return interaction.reply({ content: "Sticky configured.", ephemeral: true });
@@ -2909,9 +3017,13 @@ async function handleBranding(interaction) {
       return interaction.reply({ content: "Invalid color. Use a six-digit HEX value such as `#000000`.", ephemeral: true });
     }
     const brandColor = normalizeParadiseBrandColor(raw);
-    await saveState(state => { state.config.brandColor = brandColor; return state; });
+    await saveState(state => {
+      state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
+      state.guildConfigs[interaction.guildId].brandColor = brandColor;
+      return state;
+    });
   }
-  const color = normalizeParadiseBrandColor((await loadState()).config.brandColor);
+  const color = normalizeParadiseBrandColor(configForGuild(await loadState(), interaction.guildId).brandColor);
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(paradiseBrandColorInteger(color)).setTitle("✦ PARADISE STYLE PREVIEW")
       .setDescription("# Primary heading\n## ◆ Clear section\n### ◇ Supporting detail\n\n**Bold priority** • __Underlined label__ • _soft emphasis_\n\n- Clean bullet hierarchy\n- Consistent spacing\n- Short, readable sections\n\n> Important callout text stays visually separate.\n\n-# This smaller line is Discord subtext.")
@@ -2924,7 +3036,7 @@ async function handleBranding(interaction) {
   });
 }
 
-export async function handleParadiseMessage(message) {
+async function handleParadiseMessageInner(message) {
   if (!message.guild || message.author.bot) return false;
   const state = await loadState();
   const guildConfig = configForGuild(state, message.guild.id);
@@ -2939,6 +3051,10 @@ export async function handleParadiseMessage(message) {
     return next;
   });
   return true;
+}
+
+export async function handleParadiseMessage(message) {
+  return paradiseGuildContext.run(message.guild?.id || null, () => handleParadiseMessageInner(message));
 }
 
 async function updateStaffTeamEmbed(guild) {
@@ -2982,7 +3098,7 @@ export async function handleParadiseGuildMemberUpdate(oldMember, newMember) {
   clearTimeout(staffTeamRefreshTimers.get(newMember.guild.id));
   const timer = setTimeout(() => {
     staffTeamRefreshTimers.delete(newMember.guild.id);
-    updateStaffTeamEmbed(newMember.guild).catch(() => {});
+    paradiseGuildContext.run(newMember.guild.id, () => updateStaffTeamEmbed(newMember.guild)).catch(() => {});
   }, 1500);
   timer.unref?.();
   staffTeamRefreshTimers.set(newMember.guild.id, timer);
@@ -2995,7 +3111,7 @@ function localizedHelp(locale) {
     : "Commands: `/verifyroblox`, `/tryout start`, `/tryout result`, `/paradisetraining start`, `/challenge create`. Results pass verification and authority checks.";
 }
 
-export async function handleParadiseInteraction(interaction) {
+async function handleParadiseInteractionInner(interaction) {
   if (interaction.isModalSubmit?.() && interaction.customId === "paradise_verify_modal") {
     await handleVerifyModal(interaction);
     return true;
@@ -3152,4 +3268,8 @@ export async function handleParadiseInteraction(interaction) {
   if (interaction.commandName === "set") { await handleSetChannel(interaction); return true; }
   if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;
+}
+
+export async function handleParadiseInteraction(interaction) {
+  return paradiseGuildContext.run(interaction.guildId || null, () => handleParadiseInteractionInner(interaction));
 }

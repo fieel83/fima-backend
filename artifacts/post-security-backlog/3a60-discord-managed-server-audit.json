@@ -1,16 +1,53 @@
 {
-  "status": "BLOCKED",
-  "scope": ["Paradise | Türkiye", "Fieel's Community", "TSBTR yedek"],
-  "safeSourceCapability": {
-    "multiGuildDiscovery": "SOURCE ONLY",
-    "perGuildRuntimeSnapshot": "SOURCE ONLY",
-    "perGuildConfiguration": "SOURCE ONLY",
-    "allGuildCommandRegistration": "SOURCE ONLY"
+  "status": "LIVE VERIFIED",
+  "scope": ["Paradise | Türkiye", "Fieel's Community", "TSBTR Yedek", "Paradise deneme"],
+  "servers": {
+    "Paradise | Türkiye": {
+      "members": 120,
+      "categories": 10,
+      "channels": 71,
+      "roles": 119,
+      "autoModRules": 3,
+      "webhooks": 7,
+      "botRolePosition": 118,
+      "botName": "Paradise",
+      "commandCount": 73
+    },
+    "Fieel's Community": {
+      "members": 8103,
+      "categories": 7,
+      "channels": 35,
+      "roles": 83,
+      "autoModRules": 6,
+      "webhooks": 8,
+      "botRolePosition": 82,
+      "botName": "Paradise",
+      "commandCount": 73
+    },
+    "TSBTR Yedek": {
+      "members": 10,
+      "categories": 14,
+      "channels": 68,
+      "roles": 102,
+      "autoModRules": 0,
+      "webhooks": 0,
+      "botRolePosition": 1,
+      "botName": "Paradise",
+      "commandCount": 73,
+      "warning": "Bot role position is too low for broad role management; raise it before setup or permission repair."
+    },
+    "Paradise deneme": {
+      "members": 2,
+      "categories": 11,
+      "channels": 89,
+      "roles": 30,
+      "autoModRules": 0,
+      "webhooks": 0,
+      "botRolePosition": 29,
+      "botName": "Paradise",
+      "commandCount": 73
+    }
   },
-  "blocker": "The updated runtime has not yet been deployed, so the live bot guild cache cannot be queried for an authoritative three-server inventory.",
-  "requiredAfterDeploy": [
-    "Capture guild ID, member count, bot permissions and bot role position",
-    "Capture categories, channels, roles, permission overwrites and AutoMod",
-    "Record warnings without deleting or moving anything"
-  ]
+  "mutation": "No channels, roles or messages were deleted or moved.",
+  "limitation": "This runtime audit records sanitized inventory counts. A content-by-content keep/delete preview remains required before any rebuild."
 }

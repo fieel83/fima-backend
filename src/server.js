@@ -665,6 +665,8 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
   const selectedGuildId = selectedGuild?.id || env("DISCORD_GUILD_ID", "");
   const runtime = await paradiseDiscordRuntimeSnapshot(selectedGuildId).catch(error => ({ status: "error", error: error.message }));
   const config = state.guildConfigs?.[selectedGuildId] || state.config || {};
+  const relations = state.relations?.[selectedGuildId] || (state.relations?.allies || state.relations?.enemies ? state.relations : {});
+  const belongsToSelectedGuild = item => item?.guildId ? item.guildId === selectedGuildId : selectedGuildId === env("DISCORD_GUILD_ID");
   return res.json({
     success: true,
     selectedGuildId,
@@ -673,14 +675,14 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
     runtime,
     summary: {
       verifiedProfiles: Object.keys(state.profiles || {}).length,
-      pendingTryouts: Object.values(state.pendingTryouts || {}).filter(item => item.status !== "approved").length,
-      pendingChallenges: Object.values(state.pendingChallenges || {}).filter(item => ["open", "pending"].includes(item.status)).length,
-      activeSessions: Object.values(state.trainings || {}).filter(item => item.status !== "ended").length,
-      whitelists: Object.keys(state.whitelists || {}).length,
+      pendingTryouts: Object.values(state.pendingTryouts || {}).filter(item => belongsToSelectedGuild(item) && item.status !== "approved").length,
+      pendingChallenges: Object.values(state.pendingChallenges || {}).filter(item => belongsToSelectedGuild(item) && ["open", "pending"].includes(item.status)).length,
+      activeSessions: Object.values(state.trainings || {}).filter(item => belongsToSelectedGuild(item) && item.status !== "ended").length,
+      whitelists: Object.values(state.whitelists || {}).filter(belongsToSelectedGuild).length,
       activeSetupMode: config.activeSetupMode || null,
-      allies: Object.keys(state.relations?.allies || {}).length,
-      enemies: Object.keys(state.relations?.enemies || {}).length,
-      activeLoa: Object.values(state.loa || {}).filter(item => item.status === "approved" && Number(item.expiresAt) > Date.now()).length
+      allies: Object.keys(relations.allies || {}).length,
+      enemies: Object.keys(relations.enemies || {}).length,
+      activeLoa: Object.values(state.loa || {}).filter(item => belongsToSelectedGuild(item) && item.status === "approved" && Number(item.expiresAt) > Date.now()).length
     }
   });
 });

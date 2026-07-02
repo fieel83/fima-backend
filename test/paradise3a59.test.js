@@ -55,6 +55,9 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("training"));
   assert.ok(names.includes("set"));
   assert.ok(names.includes("handbook"));
+  assert.ok(names.includes("lineup"));
+  assert.ok(names.includes("roster"));
+  assert.ok(names.includes("blacklist"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
@@ -145,4 +148,23 @@ test("challenge creation explains cooldown, immunity and active ticket blocks", 
     status: "open", ticketId: "123456789012345678", challengerId: "other", opponentId: "opponent"
   };
   assert.match(challengeBlockReason(base, "challenger", "opponent", now), /already in a challenge.*<#123456789012345678>/);
+});
+
+test("challenge tickets and leaderboards stay isolated between managed guilds", () => {
+  const now = 1_800_000_000_000;
+  const state = {
+    leaderboard: {},
+    leaderboards: {
+      guildA: { challenger: { availability: { cooldownUntil: now + 60_000 } }, opponent: { availability: {} } },
+      guildB: { challenger: { availability: {} }, opponent: { availability: {} } }
+    },
+    pendingChallenges: {
+      ticketA: { guildId: "guildA", status: "open", ticketId: "111", challengerId: "other", opponentId: "opponent" }
+    },
+    loa: {}
+  };
+  assert.match(challengeBlockReason(state, "challenger", "opponent", now, "guildA"), /already in a challenge/);
+  assert.equal(challengeBlockReason(state, "challenger", "opponent", now, "guildB"), null);
+  assert.match(timedAvailabilityLines(state, "cooldownUntil", now, "guildA"), /<@challenger>/);
+  assert.equal(timedAvailabilityLines(state, "cooldownUntil", now, "guildB"), "_None._");
 });
