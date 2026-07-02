@@ -1587,8 +1587,15 @@ async function handleChallenge(interaction) {
     .addFields({ name: "Score", value: score }, { name: "Referee", value: `${interaction.user}` })] });
 }
 
+export function canRoleNamesApproveScore(roleNames = [], isAdministrator = false) {
+  return isAdministrator || roleNames.some(name =>
+    ["Owner", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee"].includes(name)
+  );
+}
+
 async function canApproveReferee(member) {
-  if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
+  const administrator = member.permissions.has(PermissionsBitField.Flags.Administrator);
+  if (administrator) return true;
   const state = await loadState();
   const guildConfig = configForGuild(state, member.guild.id);
   const mapped = new Set([
@@ -1597,10 +1604,9 @@ async function canApproveReferee(member) {
     guildConfig.roleMappings?.referee_manager_role,
     guildConfig.roleMappings?.experienced_referee_role
   ].filter(Boolean));
-  return member.roles.cache.some(role =>
-    mapped.has(role.id)
-    || ["Owner", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee"].includes(role.name)
-  );
+  const roles = [...member.roles.cache.values()];
+  return roles.some(role => mapped.has(role.id))
+    || canRoleNamesApproveScore(roles.map(role => role.name), administrator);
 }
 
 async function handleChallengeApproval(interaction) {

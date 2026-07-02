@@ -1,11 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  canAssignRank, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
+
+test("score approval excludes Trial Referee and Referee by default", () => {
+  assert.equal(canRoleNamesApproveScore(["Trial Referee"]), false);
+  assert.equal(canRoleNamesApproveScore(["Referee"]), false);
+  assert.equal(canRoleNamesApproveScore(["Experienced Referee"]), true);
+  assert.equal(canRoleNamesApproveScore(["Referee Manager"]), true);
+  assert.equal(canRoleNamesApproveScore([], true), true);
+});
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
   assert.equal(compareRanks(

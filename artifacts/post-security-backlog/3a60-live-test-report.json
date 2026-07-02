@@ -1,7 +1,7 @@
 {
   "status": "LIVE VERIFIED",
   "tests": {
-    "backendAndCommandSuite": "54/54 PASS",
+    "backendAndCommandSuite": "55/55 PASS",
     "dashboardSourceTests": "PASS",
     "discordCommandSerialization": "PASS",
     "requiredOptionOrdering": "PASS",
@@ -17,14 +17,15 @@
     "destructiveConfirmationSource": "PASS"
   },
   "live": {
-    "productionDeploy": "PASS — commit 81bea7f",
+    "productionDeploy": "PASS — current commit is exposed by the safe /health endpoint",
     "dashboardOwnerAccess": "PASS",
     "dashboardSaveSections": ["template", "branding", "challenge", "channelMappings", "operations", "roleMappings", "loa", "activity", "relations", "automation", "roster", "blacklist"],
     "dashboardRawCsrfError": false,
     "dashboardConsoleErrors": 0,
     "serverSelector": ["Fieel's Community", "Paradise | Türkiye", "Paradise deneme", "TSBTR Yedek"],
-    "DiscordCommandSync": "73 commands synced in all four managed guilds",
+    "DiscordCommandSync": "73 commands previously LIVE VERIFIED; appeal, bail and setlogchannel additions require post-deploy owner-dashboard count confirmation",
     "threeServerAudit": "PASS — sanitized inventory and role position captured",
+    "guideRepost": "BLOCKED — the owner-confirmed request was accepted, but the completion toast could not be recovered after Chrome connection interruption; duplicate repost was intentionally avoided",
     "destructiveSetup": "NOT RUN by design"
   },
   "secretsExposed": false,
