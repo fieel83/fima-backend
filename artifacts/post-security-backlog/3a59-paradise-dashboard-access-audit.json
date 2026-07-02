@@ -1,7 +1,7 @@
 {
   "id": "3a59-paradise-dashboard-access-audit",
   "date": "2026-07-02",
-  "status": "LOCAL VERIFIED",
+  "status": "LIVE VERIFIED WITH OWNER-LOGIN BLOCKER",
   "finding": {
     "rootCause": "The same server-side protected /paradise route was mounted on both fimamacro.com and api.fimamacro.com. The Fima user session cookie is intentionally host-only to api.fimamacro.com, so a normal navigation on the frontend host could not perform server-side API-cookie authentication and returned raw JSON 401.",
     "cookieFailure": false,
@@ -50,7 +50,45 @@
     "secretPatternsInHtml": false
   },
   "liveVerification": {
-    "status": "PENDING DEPLOY"
+    "commit": "267aaedb828044c19a5832e5c79961c9f5b332ae",
+    "mainDashboard": {
+      "status": "LIVE VERIFIED",
+      "httpStatus": 200,
+      "contentType": "text/html",
+      "loggedOutUi": "Fima login required",
+      "rawUnauthorizedJson": false,
+      "browserConsoleErrors": 0
+    },
+    "dashboardAlias": {
+      "status": "LIVE VERIFIED",
+      "httpStatus": 302,
+      "location": "https://fimamacro.com/paradise"
+    },
+    "apiDirectNavigation": {
+      "status": "LIVE VERIFIED",
+      "httpStatus": 302,
+      "location": "https://fimamacro.com/paradise"
+    },
+    "sessionStatusLoggedOut": {
+      "status": "LIVE VERIFIED",
+      "httpStatus": 200,
+      "reasonCode": "login_required",
+      "corsOrigin": "https://fimamacro.com"
+    },
+    "configApiLoggedOut": {
+      "status": "LIVE VERIFIED",
+      "httpStatus": 401,
+      "contentType": "application/json",
+      "corsOrigin": "https://fimamacro.com"
+    },
+    "ownerAuthenticatedConsole": {
+      "status": "BLOCKED",
+      "reason": "The owner's current Chrome profile has no active Fima user session. The live page correctly shows the login-required card."
+    },
+    "wrongAuthenticatedUser": {
+      "status": "LOCAL VERIFIED / LIVE BLOCKED",
+      "reason": "No separate authenticated non-owner Fima account was available; creating a persistent disposable account was intentionally avoided."
+    }
   },
   "releaseSafety": {
     "latestJsonChanged": false,
