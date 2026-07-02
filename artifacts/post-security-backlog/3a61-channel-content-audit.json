@@ -1,15 +1,74 @@
 {
   "status": "PARTIAL LIVE VERIFIED",
-  "browserReadOnlyDiscovery": {
-    "visibleServers": ["The Strongest Battlegrounds | Türkiye", "TSBER | TSB Europe Rankings", "TSB Clanning Community", "TSB Germany", "War Managment (TSBCC)", "TSBTR Yedek", "Fieel's Community", "Paradise | Türkiye"],
-    "verifiedVisiblePatterns": ["server/staff logs", "applications", "giveaways", "polls", "hall of fame/shame", "tryout/training", "challenge/support tickets"],
+  "updatedAt": "2026-07-02",
+  "chromeReadOnlyDiscovery": {
+    "status": "BLOCKED AFTER PARTIAL READ",
+    "openDiscordTab": {
+      "server": "TSB Clanning Community",
+      "channel": "cl-gen",
+      "guildIdMasked": "…71714",
+      "accessConfirmed": true
+    },
+    "visibleServers": [
+      "The Strongest Battlegrounds | Türkiye",
+      "TSBER | TSB Europe Rankings",
+      "TSB Clanning Community",
+      "TSB Germany",
+      "War Managment (TSBCC)",
+      "TSBTR Yedek",
+      "Fieel's Community",
+      "Paradise | Türkiye"
+    ],
+    "previouslyReadChannelPatterns": [
+      "server-logs",
+      "staff-logs",
+      "applications",
+      "boosts",
+      "giveaways",
+      "polls",
+      "hall-of-shame",
+      "hall-of-fame",
+      "tryout",
+      "tryout-results",
+      "training",
+      "training-results",
+      "challenge-ticket",
+      "support-ticket"
+    ],
+    "currentBlocker": "The Chrome extension timed out while projecting the large Discord tree. No message was sent and no Discord state was changed.",
     "privateMessageContentStored": false
   },
-  "officialBotContentScanner": {
-    "status": "SOURCE ONLY",
-    "sampleLimitPerImportantChannel": 25,
-    "returnsOnly": ["message ID", "bot/human author kind", "rough type", "keep/rewrite/archive decision", "old-branding flag", "embed/component/pin flags"],
-    "neverReturns": ["raw message text", "tokens", "cookies", "private attachments"]
+  "fimaChromeState": {
+    "status": "BLOCKED",
+    "page": "https://fimamacro.com/login?next=%2Fparadise",
+    "reason": "The currently open Fima tab is logged out, so the owner dashboard cannot be inspected in this browser session."
   },
-  "blocker": "Current Chrome profile is not signed into the Fima owner dashboard, so the owner-only live audit action cannot yet be executed."
+  "officialBotContentScanner": {
+    "status": "LIVE DISCORD VERIFIED",
+    "sampleLimitPerImportantChannel": 25,
+    "managedGuildsAudited": 3,
+    "managedGuildsBackedUp": 3,
+    "managedGuildsPreviewed": 3,
+    "returnsOnly": [
+      "message ID",
+      "bot/human author kind",
+      "rough type",
+      "keep/rewrite/archive decision",
+      "old-branding flag",
+      "embed/component/pin flags"
+    ],
+    "neverReturns": [
+      "raw private message text",
+      "tokens",
+      "cookies",
+      "private attachments"
+    ]
+  },
+  "safety": {
+    "browserMode": "read-only",
+    "selfbot": false,
+    "userTokenAutomation": false,
+    "messagesSent": 0,
+    "destructiveActions": 0
+  }
 }

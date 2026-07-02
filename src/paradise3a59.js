@@ -21,6 +21,7 @@ const challengeDrafts = new Map();
 const activeTrainings = new Map();
 const activeTournaments = new Map();
 const staffTeamRefreshTimers = new Map();
+const levelMessageCooldowns = new Map();
 const paradiseGuildContext = new AsyncLocalStorage();
 const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
 const STATE_KEY = "paradise_3a59_state_v1";
@@ -30,7 +31,8 @@ const EMPTY_STATE = Object.freeze({
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
-  serverBackups: {}, realAudits: {}, setupPreviews: {}
+  serverBackups: {}, realAudits: {}, setupPreviews: {},
+  temporaryVoices: {}, memberLevels: {}, questionOfDay: {}
 });
 
 function normalizeState(value) {
@@ -231,7 +233,7 @@ export const PARADISE_SETUP_SCHEMAS = Object.freeze({
 const COMMUNITY_HIDDEN_COMMANDS = new Set([
   "challenge", "referee", "lineup", "roster", "mainer", "findfcw", "relation",
   "blacklist", "appeal", "bail", "availability", "tryout", "paradisetraining",
-  "whitelist", "handbook"
+  "whitelist", "handbook", "qotd", "answer"
 ]);
 
 export function paradiseCommandAllowedForMode(commandName, mode) {
@@ -275,6 +277,45 @@ export function challengeTargetSpots(currentSpot, config = {}) {
       : Math.max(1, Number(config.top30Range) || 3);
   return Array.from({ length: distance }, (_, index) => spot - distance + index)
     .filter(target => target >= 1 && target < spot);
+}
+
+const TEMP_VOICE_BLOCKED_WORDS = [
+  "porn", "porno", "sex", "seks", "nude", "nsfw", "hentai", "yarrak", "sik", "amcik", "amcık",
+  "orospu", "faggot", "nigger", "nigga", "hitler", "nazi", "token", "cookie"
+];
+
+export function sanitizeTemporaryVoiceName(value, fallback = "Private Room") {
+  const clean = String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  const lowered = clean.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/g, "");
+  if (!clean || TEMP_VOICE_BLOCKED_WORDS.some(word => lowered.includes(word.replace(/[^a-z0-9çğıöşü]+/g, "")))) {
+    return String(fallback || "Private Room").slice(0, 80);
+  }
+  return clean;
+}
+
+export function normalizedAnswer(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[ıİ]/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ğ/g, "g")
+    .replace(/ç/g, "c")
+    .replace(/ö/g, "o")
+    .replace(/ü/g, "u")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function isQuestionAnswerMatch(value, acceptedAnswers = []) {
+  const candidate = normalizedAnswer(value);
+  return Boolean(candidate) && acceptedAnswers.some(answer => normalizedAnswer(answer) === candidate);
 }
 
 export function paradiseCommands() {
@@ -582,6 +623,13 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("deny").setDescription("Deny or cancel a bail offer")
         .addUserOption(o => o.setName("user").setDescription("Blacklisted user").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Decision reason").setRequired(true).setMaxLength(500))),
+    new SlashCommandBuilder().setName("qotd").setDescription("Manage the clan-only daily question and 25 Robux claim")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+      .addSubcommand(s => s.setName("post").setDescription("Post today's question now for testing"))
+      .addSubcommand(s => s.setName("status").setDescription("Show today's question status privately"))
+      .addSubcommand(s => s.setName("cancel").setDescription("Cancel today's unanswered question")),
+    new SlashCommandBuilder().setName("answer").setDescription("Answer today's Paradise clan question")
+      .addStringOption(o => o.setName("answer").setDescription("Your answer").setRequired(true).setMaxLength(120)),
     (() => {
       const command = new SlashCommandBuilder().setName("set").setDescription("Map Paradise systems to Discord channels")
         .setDescriptionLocalizations({ tr: "Paradise sistemlerini Discord kanallarına eşle" });
@@ -1969,6 +2017,407 @@ async function handleOptInButton(interaction) {
   return interaction.reply({ content: `RSVP saved: ${choice}.`, ephemeral: true });
 }
 
+const DAILY_QUESTIONS = Object.freeze([
+  { category: "TSB", prompt: "Saitama karakterinin normal isimli ilk yeteneği nedir?", answers: ["normal punch"] },
+  { category: "TSB", prompt: "Garou karakterinin oyun içindeki unvanı nedir?", answers: ["hero hunter"] },
+  { category: "TSB", prompt: "Training sonunda kullanılan iki ek etkinlikten birinin kısa adı nedir?", answers: ["ffa", "kotm"] },
+  { category: "TSB", prompt: "FT3 ifadesindeki 3 neyi belirtir?", answers: ["3 galibiyet", "uc galibiyet", "ilk 3", "first to 3"] },
+  { category: "Paradise", prompt: "Bir challenge sonucu onaylanmadan önce hangi iki tarafsız kanıt türünden biri saklanmalıdır?", answers: ["video", "kayit", "recording", "proof"] },
+  { category: "Paradise", prompt: "Stage sisteminde en iyi stage numarası kaçtır?", answers: ["0", "stage 0"] },
+  { category: "Paradise", prompt: "Stage 1 Low Strong'dan sonraki rank nedir?", answers: ["stage 1 mid weak", "1 mid weak"] },
+  { category: "Community", prompt: "Bir tartışmada cevap vermeden önce yapılabilecek en iyi ilk adım nedir?", answers: ["sakinlesmek", "sakin olmak", "dinlemek", "beklemek"] },
+  { category: "Community", prompt: "Güvenmediğin bir Discord bağlantısını açmadan önce ne yapmalısın?", answers: ["yetkiliye sor", "staffa sor", "raporla", "kontrol et"] },
+  { category: "Life", prompt: "Bir hedefi sürdürülebilir hale getiren en önemli şeylerden biri nedir?", answers: ["duzen", "disiplin", "istikrar", "plan"] },
+  { category: "Life", prompt: "Takım çalışmasında anlaşmazlığı azaltan temel davranış nedir?", answers: ["iletisim", "dinlemek", "saygi"] },
+  { category: "Life", prompt: "Hesabını korumak için tek kullanımlık şifreye ek olarak açman gereken güvenlik özelliği nedir?", answers: ["2fa", "iki faktor", "iki adimli dogrulama"] }
+]);
+
+function berlinClock(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(now).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  return { dateKey: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour), minute: Number(parts.minute) };
+}
+
+function questionForDate(dateKey) {
+  const seed = [...String(dateKey)].reduce((total, char) => total + char.charCodeAt(0), 0);
+  return DAILY_QUESTIONS[seed % DAILY_QUESTIONS.length];
+}
+
+function qotdWinnerButtons(dateKey) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_qotd_gamepass:${dateKey}`).setLabel("Gamepass linkini ver").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`paradise_qotd_how:${dateKey}`).setLabel("Nasıl?").setStyle(ButtonStyle.Secondary)
+  );
+}
+
+async function postDailyQuestion(guild, { force = false } = {}) {
+  const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  if (!force && config.activeSetupMode !== "clan") return null;
+  const channel = guild.channels.cache.find(item => item.name === "question-of-the-day");
+  if (!channel?.isTextBased?.()) return null;
+  const clock = berlinClock();
+  const existing = state.questionOfDay?.[guild.id];
+  if (existing?.dateKey === clock.dateKey && existing?.messageId) return existing;
+  const question = questionForDate(clock.dateKey);
+  const message = await channel.send({
+    embeds: [new EmbedBuilder()
+      .setColor(await paradiseBrandColor())
+      .setTitle("◆ GÜNÜN SORUSU · 25 ROBUX")
+      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını Paradise paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün 13:00 Europe/Berlin · Made by Paradise bot`)
+      .setTimestamp()]
+  });
+  const record = {
+    guildId: guild.id, dateKey: clock.dateKey, category: question.category, prompt: question.prompt,
+    acceptedAnswers: question.answers, messageId: message.id, channelId: channel.id,
+    postedAt: new Date().toISOString(), winnerId: null, cancelledAt: null
+  };
+  await saveState(next => { next.questionOfDay[guild.id] = record; return next; });
+  return record;
+}
+
+async function handleQotdCommand(interaction) {
+  if (!isOwner(interaction) && !interaction.member.permissions.has(PermissionsBitField.Flags.ManageGuild)) {
+    return interaction.reply({ content: "Manage Server permission required.", ephemeral: true });
+  }
+  const sub = interaction.options.getSubcommand();
+  const state = await loadState();
+  const current = state.questionOfDay?.[interaction.guildId];
+  if (sub === "status") {
+    return interaction.reply({
+      content: current
+        ? `Date: **${current.dateKey}** · status: **${current.cancelledAt ? "cancelled" : current.winnerId ? "won" : "open"}**${current.winnerId ? ` · winner: <@${current.winnerId}>` : ""}`
+        : "No daily question has been posted for this server.",
+      ephemeral: true
+    });
+  }
+  if (sub === "cancel") {
+    if (!current || current.winnerId) return interaction.reply({ content: "There is no open unanswered question.", ephemeral: true });
+    await saveState(next => {
+      next.questionOfDay[interaction.guildId] = { ...current, cancelledAt: new Date().toISOString() };
+      return next;
+    });
+    return interaction.reply({ content: "Today's question was cancelled. No reward will be issued.", ephemeral: true });
+  }
+  const posted = await postDailyQuestion(interaction.guild, { force: true });
+  return interaction.reply({ content: posted ? `Daily question is ready in <#${posted.channelId}>.` : "Create a question-of-the-day text channel first.", ephemeral: true });
+}
+
+async function handleQotdSlashAnswer(interaction) {
+  const state = await loadState();
+  const current = state.questionOfDay?.[interaction.guildId];
+  if (!current || current.cancelledAt || current.winnerId) {
+    return interaction.reply({ content: "Bugün cevaplanabilecek açık bir soru yok.", ephemeral: true });
+  }
+  if (interaction.channelId !== current.channelId) {
+    return interaction.reply({ content: `Bu komut yalnızca <#${current.channelId}> kanalında kullanılabilir.`, ephemeral: true });
+  }
+  if (!isQuestionAnswerMatch(interaction.options.getString("answer"), current.acceptedAnswers)) {
+    return interaction.reply({ content: "Bu cevap doğru değil; tekrar düşünebilirsin.", ephemeral: true });
+  }
+  let won = false;
+  await saveState(next => {
+    const latest = next.questionOfDay?.[interaction.guildId];
+    if (latest && !latest.winnerId && !latest.cancelledAt && latest.dateKey === current.dateKey) {
+      next.questionOfDay[interaction.guildId] = {
+        ...latest, winnerId: interaction.user.id, winningInteractionId: interaction.id, wonAt: new Date().toISOString()
+      };
+      won = true;
+    }
+    return next;
+  });
+  if (!won) return interaction.reply({ content: "Başka biri senden hemen önce doğru cevap verdi.", ephemeral: true });
+  return interaction.reply({
+    content: `# Doğru bildin, ${interaction.user}!\n25 Robux ödülünü istemek için aşağıdaki butonu kullan.`,
+    components: [qotdWinnerButtons(current.dateKey)]
+  });
+}
+
+async function handleQotdAnswer(message, state) {
+  const current = state.questionOfDay?.[message.guild.id];
+  if (!current || current.cancelledAt || current.winnerId || current.channelId !== message.channelId) return false;
+  if (!isQuestionAnswerMatch(message.content, current.acceptedAnswers)) return false;
+  let won = false;
+  await saveState(next => {
+    const latest = next.questionOfDay?.[message.guild.id];
+    if (latest && !latest.winnerId && !latest.cancelledAt && latest.dateKey === current.dateKey) {
+      next.questionOfDay[message.guild.id] = {
+        ...latest, winnerId: message.author.id, winningMessageId: message.id, wonAt: new Date().toISOString()
+      };
+      won = true;
+    }
+    return next;
+  });
+  if (!won) return false;
+  await message.reply({
+    content: `# Doğru bildin, ${message.author}!\n25 Robux ödülünü istemek için aşağıdaki butonu kullan. Gamepass bağlantısı yalnızca owner'a ve özel ödül loguna iletilir.`,
+    components: [qotdWinnerButtons(current.dateKey)],
+    allowedMentions: { repliedUser: true }
+  });
+  return true;
+}
+
+function validRobloxGamepassUrl(raw) {
+  try {
+    const url = new URL(String(raw || "").trim());
+    const hostname = url.hostname.toLowerCase();
+    return url.protocol === "https:"
+      && (hostname === "roblox.com" || hostname === "www.roblox.com" || hostname === "create.roblox.com")
+      && (/game-pass|gamepass|passes/i.test(url.pathname) || url.searchParams.has("id"))
+      ? url.toString().slice(0, 500)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function handleQotdButton(interaction) {
+  const [action, dateKey] = interaction.customId.replace("paradise_qotd_", "").split(":");
+  const current = (await loadState()).questionOfDay?.[interaction.guildId];
+  if (!current || current.dateKey !== dateKey || current.winnerId !== interaction.user.id) {
+    return interaction.reply({ content: "Bu ödül panelini yalnızca günün sorusunu kazanan kişi kullanabilir.", ephemeral: true });
+  }
+  if (action === "how") {
+    return interaction.reply({
+      content: "**Gamepass oluşturma:** Roblox Creator Dashboard → Creations → Experiences → ilgili oyun → Monetization/Passes → Create Pass. Fiyatı, owner'ın 25 Robux alımı sonrası net tutarı kontrol edebileceği şekilde ayarla ve yalnızca resmi Roblox bağlantısını gönder.",
+      ephemeral: true
+    });
+  }
+  if (current.gamepassSubmittedAt) {
+    return interaction.reply({ content: "Gamepass bağlantın zaten owner'a iletildi.", ephemeral: true });
+  }
+  const modal = new ModalBuilder().setCustomId(`paradise_qotd_gamepass_modal:${dateKey}`).setTitle("25 Robux ödül bağlantısı");
+  modal.addComponents(new ActionRowBuilder().addComponents(
+    new TextInputBuilder().setCustomId("gamepass_url").setLabel("Resmî Roblox gamepass bağlantısı")
+      .setPlaceholder("https://www.roblox.com/game-pass/...").setStyle(TextInputStyle.Short)
+      .setMinLength(20).setMaxLength(500).setRequired(true)
+  ));
+  return interaction.showModal(modal);
+}
+
+async function handleQotdGamepassModal(interaction) {
+  const dateKey = interaction.customId.split(":")[1];
+  const current = (await loadState()).questionOfDay?.[interaction.guildId];
+  if (!current || current.dateKey !== dateKey || current.winnerId !== interaction.user.id) {
+    return interaction.reply({ content: "Ödül talebi artık geçerli değil.", ephemeral: true });
+  }
+  const gamepassUrl = validRobloxGamepassUrl(interaction.fields.getTextInputValue("gamepass_url"));
+  if (!gamepassUrl) return interaction.reply({ content: "Yalnızca resmî bir Roblox/Create Roblox gamepass bağlantısı kabul edilir.", ephemeral: true });
+  const owner = await interaction.guild.fetchOwner().catch(() => null);
+  const rewardLog = interaction.guild.channels.cache.find(channel => ["bot-logs", "staff-logs", "giveaway-results"].includes(channel.name) && channel.isTextBased?.());
+  const payload = `QOTD reward claim · ${interaction.user} (${interaction.user.id}) · ${dateKey}\n${gamepassUrl}\nManual review required; Paradise does not auto-pay.`;
+  const dmSent = owner ? await owner.send(payload).then(() => true).catch(() => false) : false;
+  if (rewardLog) await rewardLog.send(payload).catch(() => {});
+  await saveState(next => {
+    next.questionOfDay[interaction.guildId] = {
+      ...current, gamepassUrl, gamepassSubmittedAt: new Date().toISOString(), ownerDmSent: dmSent
+    };
+    return next;
+  });
+  return interaction.reply({ content: "Gamepass bağlantın güvenli şekilde kaydedildi ve owner incelemesine gönderildi.", ephemeral: true });
+}
+
+function temporaryVoicePanel(channelId) {
+  return {
+    embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("◆ PRIVATE VOICE CONTROL")
+      .setDescription("Bu kanalın sahibi aşağıdaki kontrolleri kullanabilir. Uygunsuz adlar reddedilir ve kanal adı Discord adına döner.\n\n- **Lock:** yeni girişleri kapat/aç\n- **Limit:** 0 → 2 → 4 → 6 → 8 → 10\n- **Rename:** güvenli özel ad\n- **Delete:** kanal boşken kaldır")
+      .setFooter({ text: "Made by Paradise bot" })],
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`paradise_voice_lock:${channelId}`).setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`paradise_voice_limit:${channelId}`).setLabel("User Limit").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`paradise_voice_rename:${channelId}`).setLabel("Rename").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`paradise_voice_delete:${channelId}`).setLabel("Delete").setStyle(ButtonStyle.Danger)
+    )]
+  };
+}
+
+async function handleTemporaryVoiceButton(interaction) {
+  const [action, channelId] = interaction.customId.replace("paradise_voice_", "").split(":");
+  const state = await loadState();
+  const record = state.temporaryVoices?.[channelId];
+  const channel = interaction.guild.channels.cache.get(channelId);
+  if (!record || !channel || record.ownerId !== interaction.user.id) {
+    return interaction.reply({ content: "Bu ses kanalını yalnızca onu oluşturan kişi yönetebilir.", ephemeral: true });
+  }
+  if (action === "rename") {
+    const modal = new ModalBuilder().setCustomId(`paradise_voice_rename_modal:${channelId}`).setTitle("Ses kanalını yeniden adlandır");
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId("voice_name").setLabel("Yeni güvenli kanal adı").setStyle(TextInputStyle.Short)
+        .setMinLength(1).setMaxLength(80).setRequired(true)
+    ));
+    return interaction.showModal(modal);
+  }
+  if (action === "lock") {
+    const everyone = interaction.guild.roles.everyone;
+    const locked = Boolean(record.locked);
+    await channel.permissionOverwrites.edit(everyone, { Connect: locked ? null : false }, { reason: "Paradise private voice owner control" });
+    await saveState(next => { next.temporaryVoices[channelId] = { ...record, locked: !locked }; return next; });
+    return interaction.reply({ content: locked ? "Ses kanalı açıldı." : "Ses kanalı kilitlendi.", ephemeral: true });
+  }
+  if (action === "limit") {
+    const limits = [0, 2, 4, 6, 8, 10];
+    const nextLimit = limits[(limits.indexOf(channel.userLimit) + 1) % limits.length];
+    await channel.setUserLimit(nextLimit, "Paradise private voice owner control");
+    return interaction.reply({ content: `Kullanıcı limiti **${nextLimit || "sınırsız"}** olarak ayarlandı.`, ephemeral: true });
+  }
+  if (channel.members.size > 0) return interaction.reply({ content: "Kanalı silmeden önce herkesin çıkması gerekir.", ephemeral: true });
+  await channel.delete("Paradise private voice owner request");
+  await saveState(next => { delete next.temporaryVoices[channelId]; return next; });
+  return interaction.reply({ content: "Ses kanalı silindi.", ephemeral: true }).catch(() => null);
+}
+
+async function handleTemporaryVoiceRenameModal(interaction) {
+  const channelId = interaction.customId.split(":")[1];
+  const state = await loadState();
+  const record = state.temporaryVoices?.[channelId];
+  const channel = interaction.guild.channels.cache.get(channelId);
+  if (!record || !channel || record.ownerId !== interaction.user.id) {
+    return interaction.reply({ content: "Bu ses kanalını yeniden adlandırma yetkin yok.", ephemeral: true });
+  }
+  const fallback = `${interaction.member.displayName || interaction.user.username}'s room`;
+  const requested = interaction.fields.getTextInputValue("voice_name");
+  const safeName = sanitizeTemporaryVoiceName(requested, fallback);
+  await channel.setName(safeName, "Paradise private voice safe rename");
+  return interaction.reply({
+    content: safeName === requested.trim() ? `Kanal adı **${safeName}** oldu.` : `Uygunsuz ad reddedildi; kanal adı **${safeName}** olarak ayarlandı.`,
+    ephemeral: true
+  });
+}
+
+export async function handleParadiseVoiceStateUpdate(oldState, newState) {
+  const guild = newState.guild || oldState.guild;
+  if (!guild || newState.member?.user?.bot) return false;
+  const activeMode = configForGuild(await loadState(), guild.id).activeSetupMode;
+  if (!activeMode) return false;
+  const joined = newState.channel;
+  if (joined?.name === "Join to Create") {
+    const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
+    const channel = await guild.channels.create({
+      name: sanitizeTemporaryVoiceName(fallbackName, "Private Room"),
+      type: ChannelType.GuildVoice,
+      parent: joined.parentId,
+      permissionOverwrites: [
+        { id: guild.roles.everyone.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect] },
+        { id: newState.member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.MoveMembers] }
+      ],
+      reason: "Paradise Join to Create"
+    });
+    await saveState(state => {
+      state.temporaryVoices[channel.id] = {
+        guildId: guild.id, ownerId: newState.member.id, createdAt: new Date().toISOString(), locked: false
+      };
+      return state;
+    });
+    await newState.setChannel(channel, "Paradise Join to Create");
+    await channel.send(temporaryVoicePanel(channel.id)).catch(() => {});
+    return true;
+  }
+  const oldChannel = oldState.channel;
+  if (oldChannel && oldChannel.id !== newState.channelId) {
+    const record = (await loadState()).temporaryVoices?.[oldChannel.id];
+    if (record && oldChannel.members.size === 0) {
+      await oldChannel.delete("Paradise empty temporary voice cleanup").catch(() => {});
+      await saveState(state => { delete state.temporaryVoices[oldChannel.id]; return state; });
+      return true;
+    }
+  }
+  return false;
+}
+
+function levelFromXp(xp) {
+  return Math.floor(Math.sqrt(Math.max(0, Number(xp) || 0) / 100));
+}
+
+async function addMemberXp(guild, member, amount, source, sourceChannel = null) {
+  if (!guild || !member || member.user?.bot || amount <= 0) return null;
+  let result = null;
+  await saveState(state => {
+    const key = guildUserKey(guild.id, member.id);
+    const previous = state.memberLevels[key] || { guildId: guild.id, userId: member.id, xp: 0, level: 0 };
+    const xp = Math.max(0, Number(previous.xp) || 0) + amount;
+    const level = levelFromXp(xp);
+    result = { ...previous, xp, level, lastSource: source, updatedAt: new Date().toISOString() };
+    state.memberLevels[key] = result;
+    return state;
+  });
+  const priorLevel = levelFromXp(result.xp - amount);
+  if (result.level > priorLevel) {
+    const log = guild.channels.cache.find(channel => channel.name === "level-logs" && channel.isTextBased?.());
+    if (log) await log.send(`${member} reached **Level ${result.level}** through ${source} activity.`).catch(() => {});
+    else if (sourceChannel) await sourceChannel.send(`${member} reached **Level ${result.level}**!`).catch(() => {});
+  }
+  return result;
+}
+
+async function updateLevelLeaderboard(guild) {
+  const channel = guild.channels.cache.find(item => item.name === "level-leaderboard" && item.isTextBased?.());
+  if (!channel) return null;
+  const state = await loadState();
+  const rows = Object.values(state.memberLevels)
+    .filter(item => belongsToGuild(item, guild.id))
+    .sort((a, b) => Number(b.xp) - Number(a.xp))
+    .slice(0, 20);
+  const description = rows.map((item, index) => `**${index + 1}.** <@${item.userId}> · Level **${item.level}** · ${item.xp} XP`).join("\n")
+    || "_No chat or voice activity recorded yet._";
+  const config = configForGuild(state, guild.id);
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ PARADISE ACTIVITY LEADERBOARD")
+    .setDescription(`${description}\n\n-# Chat and non-AFK voice activity are rate-limited. Spam does not grant extra XP.`)
+    .setFooter(paradiseFooter("Chat + voice levels"));
+  let message = config.levelLeaderboardMessageId
+    ? await channel.messages.fetch(config.levelLeaderboardMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].levelLeaderboardMessageId = message.id;
+    next.guildConfigs[guild.id].lastLevelLeaderboardAt = Date.now();
+    return next;
+  });
+  return message;
+}
+
+async function handleMemberLevelMessage(message) {
+  if (!message.guild || message.author.bot || !message.member) return false;
+  if (!message.content?.trim() && !message.attachments?.size) return false;
+  if (!configForGuild(await loadState(), message.guild.id).activeSetupMode) return false;
+  const key = guildUserKey(message.guild.id, message.author.id);
+  const last = levelMessageCooldowns.get(key) || 0;
+  if (Date.now() - last < 60_000) return false;
+  levelMessageCooldowns.set(key, Date.now());
+  await addMemberXp(message.guild, message.member, 10, "chat", message.channel);
+  return true;
+}
+
+async function sendMemberLifecycleMessage(member, kind) {
+  if (!configForGuild(await loadState(), member.guild.id).activeSetupMode) return false;
+  const joined = kind === "join";
+  const publicChannel = joined ? member.guild.channels.cache.find(channel => channel.name === "welcome" && channel.isTextBased?.()) : null;
+  const log = member.guild.channels.cache.find(channel => channel.name === (joined ? "welcome-logs" : "leave-logs") && channel.isTextBased?.());
+  if (publicChannel) {
+    await publicChannel.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor())
+        .setTitle(joined ? "◆ WELCOME TO PARADISE" : "◆ MEMBER UPDATE")
+        .setDescription(`${member} hoş geldin!\n\nKuralları oku, dil/ping rollerini seç ve profil rehberini takip et. Şifre, cookie veya token paylaşma.\n\n-# Member #${member.guild.memberCount} · Made by Paradise bot`)
+        .setThumbnail(member.user.displayAvatarURL())
+        .setTimestamp()]
+    }).catch(() => {});
+  }
+  if (log) await log.send(`${joined ? "Joined" : "Left"}: ${member.user.tag} (${member.id}) · <t:${Math.floor(Date.now() / 1000)}:F>`).catch(() => {});
+  return true;
+}
+
+export async function handleParadiseGuildMemberAdd(member) {
+  await sendMemberLifecycleMessage(member, "join");
+  return true;
+}
+
+export async function handleParadiseGuildMemberRemove(member) {
+  await sendMemberLifecycleMessage(member, "leave");
+  return true;
+}
+
 const WEEKLY_QUOTAS = Object.freeze({
   "Training Manager": { key: "training", minimum: 2 },
   "Training Hoster": { key: "training", minimum: 2 },
@@ -2096,6 +2545,24 @@ async function runParadiseMaintenance(guild) {
     }
     return state;
   });
+  const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  if (config.activeSetupMode) {
+    const afkChannelId = guild.afkChannelId;
+    for (const voiceState of guild.voiceStates.cache.values()) {
+      if (!voiceState.member?.user?.bot && voiceState.channelId && voiceState.channelId !== afkChannelId
+        && !voiceState.selfDeaf && !voiceState.serverDeaf) {
+        await addMemberXp(guild, voiceState.member, 15, "voice").catch(() => {});
+      }
+    }
+  }
+  const clock = berlinClock();
+  if (config.activeSetupMode === "clan" && clock.hour >= 13) {
+    await postDailyQuestion(guild).catch(() => {});
+  }
+  if (config.activeSetupMode && (!config.lastLevelLeaderboardAt || Date.now() - Number(config.lastLevelLeaderboardAt) >= 60 * 60_000)) {
+    await updateLevelLeaderboard(guild).catch(() => {});
+  }
   await updateLoaPanel(guild).catch(() => {});
   await updateAvailabilityPanel(guild).catch(() => {});
 }
@@ -3321,9 +3788,11 @@ async function handleBranding(interaction) {
 async function handleParadiseMessageInner(message) {
   if (!message.guild || message.author.bot) return false;
   const state = await loadState();
+  const qotdWon = await handleQotdAnswer(message, state);
+  await handleMemberLevelMessage(message);
   const guildConfig = configForGuild(state, message.guild.id);
   const sticky = guildConfig.stickies?.[message.channelId];
-  if (!sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return false;
+  if (!sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return qotdWon;
   if (sticky.messageId) await message.channel.messages.delete(sticky.messageId).catch(() => {});
   const sent = await message.channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setDescription(sticky.text).setFooter(paradiseFooter("Sticky guide"))] });
   await saveState(next => {
@@ -3398,6 +3867,14 @@ async function handleParadiseInteractionInner(interaction) {
     await handleVerifyModal(interaction);
     return true;
   }
+  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_voice_rename_modal:")) {
+    await handleTemporaryVoiceRenameModal(interaction);
+    return true;
+  }
+  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_qotd_gamepass_modal:")) {
+    await handleQotdGamepassModal(interaction);
+    return true;
+  }
   if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_setup_final:")) {
     await handleSetupFinalConfirmation(interaction, interaction.customId.split(":")[1]);
     return true;
@@ -3462,6 +3939,8 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_challenge_")) { await handleChallengeApproval(interaction); return true; }
     if (interaction.customId.startsWith("paradise_session_")) { await handleSessionButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_activity_present:")) { await handleActivityResponse(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_voice_")) { await handleTemporaryVoiceButton(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_qotd_")) { await handleQotdButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_giveaway_enter:") || interaction.customId.startsWith("paradise_rsvp_")) { await handleOptInButton(interaction); return true; }
     if (["paradise_lang_en", "paradise_lang_tr"].includes(interaction.customId)) {
       const chosen = interaction.customId.endsWith("_tr") ? "Turkish" : "English";
@@ -3549,6 +4028,8 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "blacklist") { await handleBlacklist(interaction); return true; }
   if (interaction.commandName === "appeal") { await handleAppeal(interaction); return true; }
   if (interaction.commandName === "bail") { await handleBail(interaction); return true; }
+  if (interaction.commandName === "qotd") { await handleQotdCommand(interaction); return true; }
+  if (interaction.commandName === "answer") { await handleQotdSlashAnswer(interaction); return true; }
   if (interaction.commandName === "set" || interaction.commandName === "setlogchannel") { await handleSetChannel(interaction); return true; }
   if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;

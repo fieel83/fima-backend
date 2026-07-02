@@ -1,0 +1,89 @@
+{
+  "status": "SOURCE ONLY",
+  "updatedAt": "2026-07-02",
+  "goal": "Map recurring human and third-party bot work observed in managed/reference servers to official Paradise bot automation without selfbots or user-token automation.",
+  "implementedThisPass": [
+    {
+      "workflow": "Join to Create voice rooms",
+      "trigger": "Member joins the Join to Create voice channel",
+      "automation": "Create a temporary voice room, move the member, grant owner controls, post a control panel, clean up when empty",
+      "controls": ["lock/unlock", "user limit cycle", "safe rename", "delete when empty"],
+      "safety": ["profanity/scam-name filter", "owner-only controls", "fallback to Discord display name"],
+      "proof": "LOCAL VERIFIED"
+    },
+    {
+      "workflow": "Welcome and leave handling",
+      "trigger": "guildMemberAdd / guildMemberRemove",
+      "automation": "Premium welcome embed plus private welcome/leave logs",
+      "proof": "SOURCE ONLY"
+    },
+    {
+      "workflow": "Chat and voice levels",
+      "trigger": "Rate-limited chat activity and non-AFK voice presence",
+      "automation": "Persist XP, calculate levels, log level-ups, refresh one in-place leaderboard",
+      "safety": ["60-second chat XP cooldown", "no bot XP", "no AFK/deaf voice XP"],
+      "proof": "LOCAL VERIFIED"
+    },
+    {
+      "workflow": "Clan daily question",
+      "trigger": "13:00 Europe/Berlin in Paradise Clan template or staff test command",
+      "automation": "Post one question, atomically lock first correct winner, show winner-only reward controls",
+      "reward": "25 Robux manual owner review; Paradise never auto-pays",
+      "claim": "Winner submits only an official Roblox/Create Roblox gamepass URL; owner DM and private log fallback",
+      "fallback": "The /answer command works without privileged Message Content intent",
+      "proof": "LOCAL VERIFIED"
+    }
+  ],
+  "alreadyImplementedOrPresent": [
+    "Roblox short-code verification and fighter profiles",
+    "structured tryout/training announcements, results and approval boundaries",
+    "challenge eligibility, ticket context, transcripts, autowin and score approval",
+    "availability, cooldown, immunity and LOA boards",
+    "referee/hoster activity checks, weekly quotas, whitelist and Sunday review",
+    "lineup, roster, mainer and relations boards updated in place",
+    "blacklist, appeal and owner-reviewed bail flows",
+    "support/application panels and guide repost system",
+    "AutoMod invite/scam/mention guards",
+    "per-template command visibility",
+    "backup, preview, repair, guide-only and typed destructive confirmation"
+  ],
+  "nextAutomationModules": [
+    {
+      "priority": 1,
+      "module": "Moderation request approvals",
+      "workflows": ["warn", "timeout", "kick request", "ban request", "quarantine", "appeal"],
+      "rules": ["low staff request only", "senior approval buttons", "reason/evidence required", "audit log", "configured penalty matrix"]
+    },
+    {
+      "priority": 2,
+      "module": "Unified ticket engine",
+      "workflows": ["support", "application", "staff report", "challenge", "payment", "bug"],
+      "rules": ["claim", "close", "reopen", "transcript", "add participant", "escalate", "SLA and duplicate prevention"]
+    },
+    {
+      "priority": 3,
+      "module": "Application engine",
+      "workflows": ["moderator", "support", "referee", "training hoster", "tryout hoster", "event", "reseller"],
+      "rules": ["template-specific questions", "review queue", "approve/deny reason", "probation role", "audit"]
+    },
+    {
+      "priority": 4,
+      "module": "Security and quarantine",
+      "workflows": ["raid mode", "suspicious-link quarantine", "mention spam", "new-account review", "media approval"],
+      "rules": ["no first-offense auto-ban", "staff bypass", "safe release", "Wick-style logs without copying Wick branding"]
+    },
+    {
+      "priority": 5,
+      "module": "Reference-server idea catalogue",
+      "dependency": "Complete Chrome read-only channel tree and important-panel audit",
+      "rules": ["classify patterns only", "do not copy private text", "do not automate through a user token"]
+    }
+  ],
+  "nonGoals": [
+    "selfbot behavior",
+    "joining external servers as a normal user through automation",
+    "mass DMs",
+    "automatic Robux payment",
+    "destructive rebuild without backup, preview and exact owner confirmation"
+  ]
+}

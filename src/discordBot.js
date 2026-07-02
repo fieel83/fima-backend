@@ -5,9 +5,12 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, Embe
 import { prisma } from "./db.js";
 import { env } from "./env.js";
 import {
+  handleParadiseGuildMemberAdd,
+  handleParadiseGuildMemberRemove,
   handleParadiseGuildMemberUpdate,
   handleParadiseInteraction,
   handleParadiseMessage,
+  handleParadiseVoiceStateUpdate,
   initializeParadise,
   PARADISE_SETUP_SCHEMAS,
   paradiseCommandAllowedForMode,
@@ -304,7 +307,7 @@ export function startDiscordBot() {
   console.info("Starting Discord bot...", {
     discordBotTokenExists: Boolean(token),
     discordGuildIdExists: Boolean(env("DISCORD_GUILD_ID")),
-    intents: ["Guilds", "GuildMembers"]
+    intents: ["Guilds", "GuildMembers", "GuildMessages", "GuildVoiceStates", ...(env("DISCORD_MESSAGE_CONTENT_INTENT", "false") === "true" ? ["MessageContent"] : [])]
   });
   console.info(`DISCORD_BOT_TOKEN exists: ${Boolean(token)}`);
 
@@ -317,13 +320,14 @@ export function startDiscordBot() {
     return;
   }
 
-  client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers,
-      GatewayIntentBits.GuildMessages
-    ]
-  });
+  const intents = [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildVoiceStates
+  ];
+  if (env("DISCORD_MESSAGE_CONTENT_INTENT", "false") === "true") intents.push(GatewayIntentBits.MessageContent);
+  client = new Client({ intents });
 
   client.once("ready", async () => {
     readyAt = new Date();
@@ -374,6 +378,27 @@ export function startDiscordBot() {
     handleParadiseGuildMemberUpdate(oldMember, newMember).catch((error) => {
       lastError = error.message;
       console.warn("Paradise staff-team refresh failed", { message: error.message, guildId: newMember?.guild?.id || null });
+    });
+  });
+
+  client.on("guildMemberAdd", (member) => {
+    handleParadiseGuildMemberAdd(member).catch((error) => {
+      lastError = error.message;
+      console.warn("Paradise welcome automation failed", { message: error.message, guildId: member?.guild?.id || null });
+    });
+  });
+
+  client.on("guildMemberRemove", (member) => {
+    handleParadiseGuildMemberRemove(member).catch((error) => {
+      lastError = error.message;
+      console.warn("Paradise leave automation failed", { message: error.message, guildId: member?.guild?.id || null });
+    });
+  });
+
+  client.on("voiceStateUpdate", (oldState, newState) => {
+    handleParadiseVoiceStateUpdate(oldState, newState).catch((error) => {
+      lastError = error.message;
+      console.warn("Paradise temporary voice automation failed", { message: error.message, guildId: newState?.guild?.id || oldState?.guild?.id || null });
     });
   });
 

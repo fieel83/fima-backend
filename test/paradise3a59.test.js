@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  isQuestionAnswerMatch,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  sanitizeTemporaryVoiceName,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
@@ -78,6 +80,8 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("appeal"));
   assert.ok(names.includes("bail"));
   assert.ok(names.includes("setlogchannel"));
+  assert.ok(names.includes("qotd"));
+  assert.ok(names.includes("answer"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
@@ -88,6 +92,19 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(commands.find(command => command.name === "setlogchannel").options.length <= 25);
   assert.deepEqual(commands.find(command => command.name === "lineup").options.map(option => option.name), ["add", "remove", "move", "edit", "clear", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "roster").options.map(option => option.name), ["add", "update", "remove", "panel", "repost"]);
+});
+
+test("temporary voice names reject explicit and scam-like names", () => {
+  assert.equal(sanitizeTemporaryVoiceName("Fieel's Arena", "Fieel's room"), "Fieel's Arena");
+  assert.equal(sanitizeTemporaryVoiceName("PORNO room", "Fieel's room"), "Fieel's room");
+  assert.equal(sanitizeTemporaryVoiceName("free token cookie", "Safe room"), "Safe room");
+  assert.equal(sanitizeTemporaryVoiceName("   ", "Safe room"), "Safe room");
+});
+
+test("daily question answers are normalized without fuzzy false positives", () => {
+  assert.equal(isQuestionAnswerMatch("İletişim", ["iletisim", "dinlemek"]), true);
+  assert.equal(isQuestionAnswerMatch("  STAGE-0 ", ["stage 0"]), true);
+  assert.equal(isQuestionAnswerMatch("stage 1", ["stage 0"]), false);
 });
 
 test("Roblox verification codes stay short and avoid ambiguous filtered characters", () => {
