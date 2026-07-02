@@ -1,0 +1,18 @@
+{
+  "id": "3a59-paradise-role-matrix",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "families": {
+    "leadership": ["Owner", "Overseer", "Community Manager", "Training Manager"],
+    "moderation": ["Moderation Manager", "Head Moderator", "Senior Moderator", "Moderator", "Junior Moderator"],
+    "referees": ["Referee Manager", "Experienced Referee", "Referee", "Trial Referee", "Referee Ping"],
+    "training": ["Host Overseer", "Training Supervisor", "Experienced Training Hoster", "Training Hoster"],
+    "tryout": ["Tryout Supervisor", "Experienced Tryout Hoster", "Tryout Hoster", "Trial Tryout Staff"],
+    "competitive": ["Leaderboard Updater", "FFlag Checker", "Alt Checker", "Content Creator", "War Streamer"],
+    "leaderboard": ["Top 1 through Top 30", "Top Player 1-10", "Top Player 11-20", "Top Player 21-30", "Top Player", "Retired Top Player"],
+    "rank": ["Stage 0 through Stage 4", "Low/Mid/High", "Weak/Stable/Strong", "45 exact combined rank roles"],
+    "regions": ["Paris, France", "Frankfurt, Germany", "London, United Kingdom", "Amsterdam, Netherlands"],
+    "member": ["Verified Fighter", "Verified", "Unverified", "Media & Links Approved", "Muted / Quarantined"],
+    "pings": ["Training", "Tryout", "Tournament", "Giveaway", "Event", "Game Night", "Security Alert", "Robux Payment"]
+  },
+  "rankOrdering": "Stage 0 is best; within a stage Low Weak -> Low Stable -> Low Strong -> Mid Weak -> Mid Stable -> Mid Strong -> High Weak -> High Stable -> High Strong."
+}

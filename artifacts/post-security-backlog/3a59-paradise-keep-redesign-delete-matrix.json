@@ -1,0 +1,27 @@
+{
+  "id": "3a59-paradise-keep-redesign-delete-matrix",
+  "status": "SOURCE VERIFIED",
+  "keep": [
+    "Persistent Paradise state model",
+    "Approval-button pattern",
+    "Rank comparison utilities",
+    "Ticket transcript and activity concepts",
+    "Existing Fima support commands"
+  ],
+  "redesign": [
+    "Generic result commands into structured command groups",
+    "Unsafe setup into backup/preview/typed-confirmation workflow",
+    "Long Roblox verification codes into short filter-resistant codes",
+    "Static availability messages into generated cooldown/immunity/challenge/LOA board",
+    "Hard-coded channels into dashboard-managed mappings",
+    "Fima-branded bot surfaces into Paradise branding while retaining Fima product commands"
+  ],
+  "deleteOrAvoid": [
+    "Blind copying of the friend's broken Paradise implementation",
+    "Bot tokens or secrets in chat/dashboard",
+    "Personal Discord account automation or self-bot behavior",
+    "Permanent deletion without backup and explicit confirmation",
+    "Trial Tryout Staff role assignment permissions",
+    "Unreviewed automatic demotions"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "3a59-paradise-master-audit",
+  "generatedAt": "2026-07-02T00:00:00+02:00",
+  "source": "Paradise Bot, Fima Site ve Yönetim Paneli İçin Araştırma Tabanlı Uygulama Şartnamesi.docx",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "scope": {
+    "commands": "Slash-command schemas serialize with unique names.",
+    "state": "Paradise state is stored in the Prisma Setting row paradise_3a59_state_v1; owner configuration actions also create AuditLog records.",
+    "dashboard": "Owner-only Operations Console protected by the linked Discord ID 762858334440521739.",
+    "templates": ["community", "clan", "tsbtr"],
+    "liveGuild": "Runtime audit data is exposed only to the authenticated owner; destructive setup was not executed."
+  },
+  "verification": {
+    "nodeTests": "49/49 passed",
+    "desktopDashboard": "visually inspected",
+    "mobileDashboard": "390x844, no horizontal overflow",
+    "secretsPrinted": false,
+    "releaseCreated": false,
+    "latestJsonChanged": false
+  },
+  "unverifiedLiveActions": [
+    "Destructive test-guild rebuild",
+    "Rollback exercise after a destructive rebuild",
+    "End-to-end member interactions with multiple real Discord accounts"
+  ]
+}

@@ -26,3 +26,19 @@ test("Paradise dashboard exposes a live HEX embed color control", () => {
   assert.match(htmlSource, /data-save="branding"/);
   assert.match(htmlSource, /--brand/);
 });
+
+test("Paradise dashboard exposes explained operations fields and live Discord state", () => {
+  for (const expected of [
+    "channelMappings", "topSize", "top10Range", "codeExpiryMinutes", "loaMaxDays",
+    "checkEveryHours", "mentionSpamLimit", "Danger zone", "runtimeStatus"
+  ]) assert.match(htmlSource, new RegExp(expected));
+  assert.match(serverSource, /paradiseDiscordRuntimeSnapshot/);
+  assert.match(serverSource, /invalid_channel_mappings/);
+});
+
+test("destructive Paradise setup requires a typed final confirmation", () => {
+  const paradiseSource = fs.readFileSync(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(paradiseSource, /paradise_setup_final/);
+  assert.match(paradiseSource, /REBUILD \$\{mode\.toUpperCase\(\)\}/);
+  assert.match(paradiseSource, /destructive \? "rebuild" : "repair"/);
+});

@@ -1,0 +1,17 @@
+{
+  "id": "3a59-paradise-challenge-workflow-spec",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "flow": [
+    "Require a verified Paradise profile.",
+    "Calculate legal targets from leaderboard position and configured ranges.",
+    "Block cooldown, immunity, LOA and already-open-ticket conflicts with a human-readable reason.",
+    "Create a private ticket and pin a live header containing players, positions, ticket ID, region, referee and proof state.",
+    "Collect structured result or autowin reason.",
+    "Require manager/experienced-referee approval.",
+    "Update leaderboard, cooldown/immunity and availability board.",
+    "Remove player ticket access after close while retaining staff/referee access and transcript."
+  ],
+  "autowinReasons": ["dodged", "no-show", "invalid", "disqualified", "closed"],
+  "wordingGuard": "Score rendering is centralized so Auto and numeric scores cannot produce duplicate 'to to'.",
+  "timestamps": "Discord relative timestamps are used for expiry display."
+}

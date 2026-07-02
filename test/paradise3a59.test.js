@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   canAssignRank, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommands, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
@@ -52,7 +52,15 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("loa"));
   assert.ok(names.includes("setupfieelstsbtr"));
   assert.ok(names.includes("profile"));
+  assert.ok(names.includes("training"));
+  assert.ok(names.includes("set"));
+  assert.ok(names.includes("handbook"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
+  assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
+  assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
+  assert.deepEqual(commands.find(command => command.name === "profile").options.map(option => option.name), ["create", "view", "edit", "verify-status"]);
+  assert.equal(commands.find(command => command.name === "set").options.length, PARADISE_CHANNEL_MAPPINGS.length);
+  assert.ok(PARADISE_CHANNEL_MAPPINGS.length <= 25);
 });
 
 test("Roblox verification codes stay short and avoid ambiguous filtered characters", () => {
@@ -91,6 +99,9 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("clan-relations")));
   assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.some(([, channels]) => channels.includes("top-30")));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("loa")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Stage 2 High Strong"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Top 30"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Frankfurt, Germany"));
 });
 
 test("availability board separates timed entries and active tickets", () => {
@@ -114,6 +125,8 @@ test("challenge ranges follow leaderboard distance rules", () => {
   assert.deepEqual(challengeTargetSpots(20), [18, 19]);
   assert.deepEqual(challengeTargetSpots(10), [9]);
   assert.deepEqual(challengeTargetSpots(1), []);
+  assert.deepEqual(challengeTargetSpots(null, { topSize: 50 }), [49, 50]);
+  assert.deepEqual(challengeTargetSpots(40, { topSize: 50, top30Range: 5 }), [35, 36, 37, 38, 39]);
 });
 
 test("challenge creation explains cooldown, immunity and active ticket blocks", () => {

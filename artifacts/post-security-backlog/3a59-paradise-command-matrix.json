@@ -1,0 +1,18 @@
+{
+  "id": "3a59-paradise-command-matrix",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "groups": {
+    "setup": ["/setup", "/setupfieelscommunity", "/setupfieelsclan", "/setupfieelstsbtr", "/set", "/handbook post"],
+    "helpAndLanguage": ["/help", "/sendlanguagequestion", "/sendpingroleselector"],
+    "identity": ["/profile create", "/profile view", "/profile edit", "/profile verify-status", "/verifyroblox"],
+    "challenge": ["/challenge create", "/challenge result", "/challenge autowin", "/challenge close"],
+    "availability": ["/availability", "/loa request", "/loa end", "/loa add", "/loa approve", "/loa deny", "/loa remove", "/loa panel"],
+    "training": ["/training setup", "/training start", "/training result"],
+    "tryout": ["/tryout start", "/tryout result"],
+    "staff": ["/activity", "/activitycheck", "/whitelist"],
+    "relations": ["/relation add", "/relation edit", "/relation remove", "/relation list"],
+    "eventsAndSupport": ["/tournament", "/giveaway", "/gamenight", "/event", "/ticket"]
+  },
+  "channelPolicy": "Each operational group supports dashboard-managed allowed channel mappings; owner/admin setup commands remain administrator-visible.",
+  "schemaVerification": "All Paradise slash command JSON schemas serialize and command names are unique."
+}

@@ -1,0 +1,36 @@
+{
+  "id": "3a59-paradise-gap-analysis",
+  "status": "SOURCE VERIFIED",
+  "closedGaps": [
+    "Separate Community, Clan and TSBTR setup templates",
+    "Preview, repair, guide-only and typed destructive confirmation flows",
+    "Owner-only dashboard with live runtime inventory and HEX branding",
+    "Structured profile, short Roblox verification, challenge, availability and LOA flows",
+    "Training sessions with host ownership, end state and activity logging",
+    "Configurable channel mappings, challenge ranges, quotas and AutoMod policy",
+    "Turkish and English handbook/help surfaces",
+    "Relations list with ally/enemy status and update-in-place behavior"
+  ],
+  "remainingGaps": [
+    {
+      "item": "Live destructive setup and rollback",
+      "status": "BLOCKED BY EXPLICIT CONFIRMATION",
+      "reason": "The specification requires backup, preview and the typed phrase REBUILD <MODE>."
+    },
+    {
+      "item": "External TSBCC leaderboard scraping and unsolicited DM automation",
+      "status": "NOT IMPLEMENTED",
+      "reason": "A bot cannot join as a normal user or automate a personal account; cross-server data requires the bot to be authorized and permitted."
+    },
+    {
+      "item": "Spotify/YouTube voice playback",
+      "status": "NOT IMPLEMENTED",
+      "reason": "Requires a separate licensed media/voice architecture and deployment dependencies; it is not mixed into the moderation bot runtime."
+    },
+    {
+      "item": "Fully automated promotions/demotions",
+      "status": "SAFE DEFAULT",
+      "reason": "Recommendations are produced; role mutation remains opt-in through autoRoleChanges."
+    }
+  ]
+}

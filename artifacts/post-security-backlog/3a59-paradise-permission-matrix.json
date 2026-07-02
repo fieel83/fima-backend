@@ -1,0 +1,29 @@
+{
+  "id": "3a59-paradise-permission-matrix",
+  "status": "SOURCE VERIFIED",
+  "principles": [
+    "Owner and configured administrators control setup and dashboard configuration.",
+    "The bot role must remain above every role it manages.",
+    "Tryout staff assign ranks only through the bot and never receive Manage Roles.",
+    "Trial referees cannot approve challenge results.",
+    "Ticket participants see only their active private ticket.",
+    "Transcript, staff log and review channels are staff-only.",
+    "Member-facing selectors grant only self-assignable language and ping roles."
+  ],
+  "roleCapabilities": {
+    "Owner": ["all Paradise commands", "setup confirmation", "dashboard"],
+    "Overseer": ["approve high-risk results", "manage operational workflows"],
+    "Training Manager": ["approve tryout results", "review hoster activity"],
+    "Experienced Referee": ["approve challenge posts", "review referee work"],
+    "Referee": ["create challenge results", "cannot approve own result"],
+    "Trial Referee": ["assisted low-range sets", "no approval"],
+    "Tryout Staff": ["structured rank proposal within authority"],
+    "Member": ["profile", "verification", "challenge request", "tickets", "selectors"]
+  },
+  "dangerousPermissions": {
+    "administrator": "Bot only in the dedicated test server during setup; production should use least privilege.",
+    "manageRoles": "Managers/bot only; never Tryout Staff.",
+    "manageGuild": "Owner/admin only.",
+    "mentionEveryone": "Bot-controlled announcement commands only."
+  }
+}

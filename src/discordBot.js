@@ -273,6 +273,9 @@ let client = null;
 let started = false;
 let readyAt = null;
 let lastError = null;
+let lastCommandSyncAt = null;
+let lastCommandSyncError = null;
+let lastCommandSyncCount = 0;
 
 export function startDiscordBot() {
   if (started) {
@@ -432,22 +435,33 @@ async function registerDiscordCommands() {
     new SlashCommandBuilder()
       .setName("setupfieelscommunity")
       .setDescription("Preview or safely apply the Fieel's Community channel/role system.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addStringOption((option) => option
         .setName("action")
-        .setDescription("Use preview first. Apply only creates missing items; it never deletes.")
+        .setDescription("Preview, repair missing items, or repost handbooks.")
         .setRequired(false)
-        .addChoices({ name: "preview", value: "preview" }, { name: "apply_missing_only", value: "apply_missing_only" })),
+        .addChoices(
+          { name: "preview", value: "preview" },
+          { name: "repair_existing", value: "repair" },
+          { name: "repost_handbooks", value: "guides" }
+        )),
     new SlashCommandBuilder()
       .setName("setupfieelsclan")
       .setDescription("Preview the dedicated Paradise clan/training system.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addStringOption((option) => option
         .setName("action")
-        .setDescription("Use preview first. Apply only creates missing items; it never deletes.")
+        .setDescription("Preview, repair missing items, or repost handbooks.")
         .setRequired(false)
-        .addChoices({ name: "preview", value: "preview" }, { name: "apply_missing_only", value: "apply_missing_only" })),
+        .addChoices(
+          { name: "preview", value: "preview" },
+          { name: "repair_existing", value: "repair" },
+          { name: "repost_handbooks", value: "guides" }
+        )),
     new SlashCommandBuilder()
       .setName("setup")
       .setDescription("Preview a Community, Clan or future TSBTR-style setup.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addStringOption((option) => option
         .setName("mode")
         .setDescription("Which setup schema to preview.")
@@ -459,9 +473,13 @@ async function registerDiscordCommands() {
         ))
       .addStringOption((option) => option
         .setName("action")
-        .setDescription("Use preview first. Apply only creates missing items; it never deletes.")
+        .setDescription("Preview, repair missing items, or repost handbooks.")
         .setRequired(false)
-        .addChoices({ name: "preview", value: "preview" }, { name: "apply_missing_only", value: "apply_missing_only" })),
+        .addChoices(
+          { name: "preview", value: "preview" },
+          { name: "repair_existing", value: "repair" },
+          { name: "repost_handbooks", value: "guides" }
+        )),
     new SlashCommandBuilder()
       .setName("fima_status")
       .setDescription("Show Fima bot and community system status."),
@@ -558,8 +576,17 @@ async function registerDiscordCommands() {
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false))
   ].map((command) => command.toJSON());
   const guildId = env("DISCORD_GUILD_ID");
-  if (guildId) await client.application.commands.set(commands, guildId);
-  else await client.application.commands.set(commands);
+  try {
+    const registered = guildId
+      ? await client.application.commands.set(commands, guildId)
+      : await client.application.commands.set(commands);
+    lastCommandSyncAt = new Date();
+    lastCommandSyncError = null;
+    lastCommandSyncCount = registered.size;
+  } catch (error) {
+    lastCommandSyncError = error.message;
+    throw error;
+  }
 }
 
 async function handleDiscordInteraction(interaction) {
@@ -1762,6 +1789,84 @@ export async function discordBotHealth() {
     canManageRoles: manageRolesPermission,
     roles: roleChecks,
     lastError
+  };
+}
+
+export async function paradiseDiscordRuntimeSnapshot() {
+  const guild = await getGuild();
+  if (!guild || !client?.isReady?.()) {
+    return {
+      status: "unavailable",
+      botReady: Boolean(client?.isReady?.()),
+      guildConfigured: env("DISCORD_GUILD_ID", "") || null,
+      lastCommandSyncAt: lastCommandSyncAt?.toISOString() || null,
+      lastCommandSyncError,
+      lastCommandSyncCount
+    };
+  }
+  await Promise.all([guild.channels.fetch(), guild.roles.fetch()]);
+  const [commands, autoModRules, webhooks] = await Promise.all([
+    guild.commands.fetch().catch(() => new Map()),
+    guild.autoModerationRules.fetch().catch(() => new Map()),
+    guild.fetchWebhooks().catch(() => new Map())
+  ]);
+  const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+  return {
+    status: "ready",
+    capturedAt: new Date().toISOString(),
+    guild: {
+      id: guild.id,
+      name: guild.name,
+      ownerId: guild.ownerId,
+      memberCount: guild.memberCount,
+      botRolePosition: me?.roles?.highest?.position ?? null,
+      botPermissions: me?.permissions?.toArray?.() || []
+    },
+    commandScope: env("DISCORD_GUILD_ID") ? "guild" : "global",
+    commands: [...commands.values()].map(command => ({
+      id: command.id,
+      name: command.name,
+      description: command.description,
+      defaultMemberPermissions: command.defaultMemberPermissions?.toString() || null
+    })).sort((a, b) => a.name.localeCompare(b.name)),
+    commandSync: {
+      lastSyncAt: lastCommandSyncAt?.toISOString() || null,
+      lastError: lastCommandSyncError,
+      count: lastCommandSyncCount
+    },
+    categories: [...guild.channels.cache.values()]
+      .filter(channel => channel.type === ChannelType.GuildCategory)
+      .map(channel => ({ id: channel.id, name: channel.name, position: channel.rawPosition })),
+    channels: [...guild.channels.cache.values()]
+      .filter(channel => channel.type !== ChannelType.GuildCategory && !channel.isThread?.())
+      .map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        parentId: channel.parentId,
+        position: channel.rawPosition,
+        permissionOverwriteCount: channel.permissionOverwrites?.cache?.size || 0
+      })),
+    roles: [...guild.roles.cache.values()].map(role => ({
+      id: role.id,
+      name: role.name,
+      position: role.position,
+      permissions: role.permissions.toArray(),
+      managed: role.managed
+    })),
+    autoModRules: [...autoModRules.values()].map(rule => ({
+      id: rule.id,
+      name: rule.name,
+      enabled: rule.enabled,
+      triggerType: rule.triggerType,
+      actionTypes: rule.actions.map(action => action.type)
+    })),
+    webhooks: [...webhooks.values()].map(webhook => ({
+      id: webhook.id,
+      name: webhook.name,
+      channelId: webhook.channelId,
+      applicationId: webhook.applicationId || null
+    }))
   };
 }
 

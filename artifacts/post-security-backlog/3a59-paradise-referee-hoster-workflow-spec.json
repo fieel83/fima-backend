@@ -1,0 +1,18 @@
+{
+  "id": "3a59-paradise-referee-hoster-workflow-spec",
+  "status": "SOURCE VERIFIED",
+  "referee": {
+    "submission": "Challenge results create a pending work item.",
+    "approval": "Experienced Referee, Referee Manager or configured management role.",
+    "logging": "Approved/denied actions, actor and reason are retained in state and staff logs.",
+    "quota": "Weekly referee work can be configured; whitelist entries exempt a member until their optional expiry."
+  },
+  "hoster": {
+    "submission": "Training and tryout sessions are created by structured commands, not free-form proof posts.",
+    "logging": "Completed sessions write hoster work/activity records automatically.",
+    "activityCheck": "Configurable interval and response deadline; default policy warns before any role action.",
+    "promotion": "Quota multiplier and time-in-role recommendations are reported for Sunday review.",
+    "demotion": "Automatic role removal is disabled unless autoRoleChanges is explicitly enabled."
+  },
+  "guides": ["referee guide", "training hoster rules", "tryout hoster rules", "challenge handbook", "availability guide"]
+}

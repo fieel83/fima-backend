@@ -76,6 +76,8 @@ function paradiseFooter(context = "") {
 
 export const PARADISE_CLAN_ROLES = [
   "Owner", "Admin", "Overseer", "Community Manager", "Training Manager",
+  "Administration Manager", "Head Admin", "Senior Admin", "Moderator Manager",
+  "Head Moderator", "Senior Moderator", "Moderator", "Helper",
   "Trial Training Manager", "Training Supervisor", "Experienced Training Hoster",
   "Training Hoster", "Trial Training Hoster", "Tryout Manager",
   "Experienced Tryout Hoster", "Tryout Hoster",
@@ -86,7 +88,17 @@ export const PARADISE_CLAN_ROLES = [
   "Verified Fighter", "Media & Links Approved", "Training Ping",
   "Tryout Ping", "Referee Ping", "Spar Ping", "Tournament Ping", "Event Ping",
   "Giveaway Ping", "Game Night Ping", "Staff Updates", "Server Updates",
-  "Turkish", "English", "Activity Whitelist", "LOA", "Muted / Quarantined"
+  "Turkish", "English", "Activity Whitelist", "LOA", "Muted / Quarantined",
+  "Frankfurt, Germany", "Paris, France", "London, United Kingdom", "Amsterdam, Netherlands",
+  "The Strongest Hero", "Hero Hunter", "Monster Form", "Destructive Cyborg",
+  "Deadly Ninja", "Brutal Demon", "Blade Master", "Wild Psychic", "Martial Artist", "Tech Prodigy",
+  "Top Player 1-10", "Top Player 11-20", "Top Player 21-30", "Top Player", "Retired Top Player",
+  ...Array.from({ length: 30 }, (_, index) => `Top ${index + 1}`),
+  ...Array.from({ length: 5 }, (_, stage) =>
+    ["Low", "Mid", "High"].flatMap(level =>
+      ["Weak", "Stable", "Strong"].map(strength => `Stage ${stage} ${level} ${strength}`)
+    )
+  ).flat()
 ];
 
 export const PARADISE_COMMUNITY_ROLES = [
@@ -100,26 +112,47 @@ export const PARADISE_COMMUNITY_ROLES = [
 
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
 
+export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
+  ["challenge_channel", "Challenge create panel"],
+  ["challenge_rules_channel", "Challenge rules"],
+  ["challenge_results_channel", "Challenge results"],
+  ["availability_channel", "Availability board"],
+  ["loa_channel", "LOA board"],
+  ["tryout_channel", "Tryout announcements"],
+  ["tryout_results_channel", "Tryout results"],
+  ["training_channel", "Training announcements"],
+  ["training_results_channel", "Training results"],
+  ["referee_works_channel", "Referee works"],
+  ["activity_logs_channel", "Activity logs"],
+  ["activity_check_channel", "Activity checks"],
+  ["relation_panel_channel", "Relations board"],
+  ["role_guide_channel", "Role guide"],
+  ["faq_channel", "FAQ and trust"],
+  ["staff_report_channel", "Staff reports"],
+  ["support_ticket_channel", "Support ticket panel"],
+  ["application_ticket_channel", "Application ticket panel"]
+]);
+
 export const PARADISE_COMMUNITY_SCHEMA = [
-  ["START HERE", ["welcome", "rules", "choose-language", "choose-pings", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
+  ["START HERE", ["welcome", "rules", "choose-language", "choose-pings", "role-selection", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
   ["IMPORTANT", ["announcements", "updates", "status", "faq", "pricing", "trial-info", "giveaways"], false],
   ["SUPPORT", ["open-ticket", "support-info"], false],
   ["SUPPORT STAFF", ["ticket-logs", "transcripts", "staff-notes"], true],
   ["FIMA APP", ["fima-macro", "macro-help", "update-help", "license-help", "hwid-help", "payment-help", "robux-payments", "bug-reports", "suggestions"], false],
-  ["COMMUNITY", ["general", "media", "clips", "outfits", "capes", "macro-discussion", "success-results", "bot-commands"], false],
+  ["COMMUNITY", ["general", "media", "uploads", "clips", "outfits", "capes", "macro-discussion", "success-results", "creator-resources", "partnerships", "media-approval", "bot-commands"], false],
   ["TRAINING & EVENTS", ["training-announcements", "training-results", "event-announcements", "event-results", "tournament-announcements", "tournament-results", "game-night"], false],
   ["STAFF", ["staff-chat", "staff-logs", "moderation-logs", "activity-logs", "application-reviews", "bot-logs"], true]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
-  ["START", ["welcome", "rules", "choose-language", "choose-pings", "command-guide", "role-guide", "maining-guide"], false],
-  ["CLAN", ["announcements", "clan-relations", "ally-requests", "main-line", "eu-rosters", "roster-logs", "mainer-proof", "find-a-fcw"], false],
-  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "hoster-guide", "hoster-works"], false],
-  ["CHALLENGES", ["challenge-ticket", "challenge-rules", "availability", "challenges", "challenge-results", "referee-guide", "referee-post", "referee-works"], false],
+  ["START", ["welcome", "rules", "verify", "profile-guide", "choose-language", "choose-pings", "command-guide", "role-guide", "maining-guide"], false],
+  ["CLAN", ["announcements", "clan-relations", "ally-requests", "advertisement", "outfits", "capes", "main-line", "eu-rosters", "region-rosters", "branch-support", "roster-logs", "mainer-proof", "find-a-fcw"], false],
+  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "tryout-hoster-rules", "training-hoster-rules", "hoster-guide", "hoster-works"], false],
+  ["CHALLENGES", ["challenge-ticket", "challenge-rules", "availability", "challenges", "challenge-results", "challenge-ticket-transcripts", "referee-guide", "referee-post", "referee-works"], false],
   ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night"], false],
   ["SUPPORT", ["support-ticket", "application-ticket", "report-staff", "report-guide"], false],
   ["STAFF", ["staff-annc", "staff-chat", "activity-check", "activity-review", "referee-logs", "bot-logs", "loa"], true],
-  ["VOICE", ["Stage", "Voice 1", "Voice 2", "Voice 3"], false]
+  ["VOICE", ["war-vc-text", "Stage", "War VC", "Voice 1", "Voice 2", "Voice 3"], false]
 ];
 
 export const PARADISE_TSBTR_SCHEMA = [
@@ -166,15 +199,26 @@ export function rankToRoleName(rank) {
   return `Stage ${rank.stage} ${rank.level} ${rank.strength}`;
 }
 
-export function challengeTargetSpots(currentSpot) {
+export function challengeTargetSpots(currentSpot, config = {}) {
   const spot = Number(currentSpot);
-  if (!Number.isInteger(spot) || spot < 1 || spot > 30) return [29, 30];
-  const distance = spot <= 10 ? 1 : spot <= 20 ? 2 : 3;
+  const topSize = Math.min(100, Math.max(2, Number(config.topSize) || 30));
+  if (!Number.isInteger(spot) || spot < 1 || spot > topSize) return [topSize - 1, topSize];
+  const distance = spot <= 10
+    ? Math.max(1, Number(config.top10Range) || 1)
+    : spot <= 20
+      ? Math.max(1, Number(config.top20Range) || 2)
+      : Math.max(1, Number(config.top30Range) || 3);
   return Array.from({ length: distance }, (_, index) => spot - distance + index)
     .filter(target => target >= 1 && target < spot);
 }
 
 export function paradiseCommands() {
+  const setupAction = option => option.setName("action").setDescription("Preview, non-destructive repair, or guide repost")
+    .addChoices(
+      { name: "Preview rebuild", value: "preview" },
+      { name: "Repair existing structure", value: "repair" },
+      { name: "Repost handbooks only", value: "guides" }
+    );
   const rankOptions = (builder) => builder
     .addIntegerOption(o => o.setName("stage").setDescription("0 is best; Stage 5 is unused").setRequired(true)
       .addChoices(...[0, 1, 2, 3, 4].map(value => ({ name: `Stage ${value}`, value }))))
@@ -183,20 +227,28 @@ export function paradiseCommands() {
     .addStringOption(o => o.setName("strength").setDescription("Rank strength").setRequired(true)
       .addChoices(...STRENGTHS.map(value => ({ name: value, value }))));
   return [
-    new SlashCommandBuilder().setName("setupfieels").setDescription("Choose Community, Clan or TSBTR-style safe setup."),
-    new SlashCommandBuilder().setName("setupfieelstsbtr").setDescription("Safely preview the optional TSBTR-style setup."),
+    new SlashCommandBuilder().setName("setupfieels").setDescription("Choose Community, Clan or TSBTR-style safe setup.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+    new SlashCommandBuilder().setName("setupfieelstsbtr").setDescription("Preview, repair or repost the TSBTR-style setup.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
+      .addStringOption(setupAction),
     new SlashCommandBuilder().setName("help").setDescription("Open the Paradise Community or Clan command guide."),
     new SlashCommandBuilder().setName("sendlanguagequestion").setDescription("Post English/Turkish language buttons."),
     new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post Paradise notification-role selector."),
-    new SlashCommandBuilder().setName("backupserverstructure").setDescription("Back up channels, roles and permission overwrites."),
-    new SlashCommandBuilder().setName("previewserversetup").setDescription("Preview the full Clan/Training rebuild."),
+    new SlashCommandBuilder().setName("backupserverstructure").setDescription("Back up channels, roles and permission overwrites.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+    new SlashCommandBuilder().setName("previewserversetup").setDescription("Preview the full Clan/Training rebuild.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     new SlashCommandBuilder().setName("verifyroblox").setDescription("Verify Roblox ownership with a profile About code.")
       .addStringOption(o => o.setName("username").setDescription("Roblox username").setRequired(true)),
     new SlashCommandBuilder().setName("verifyrobloxcheck").setDescription("Check the short Paradise code in your Roblox About."),
     new SlashCommandBuilder().setName("profile").setDescription("Create or view a verified Paradise fighter profile")
+      .setDescriptionLocalizations({ tr: "Doğrulanmış Paradise oyuncu profili oluştur, düzenle veya görüntüle" })
       .addSubcommand(s => s.setName("create").setDescription("Verify Roblox and create your fighter profile"))
       .addSubcommand(s => s.setName("view").setDescription("View a Paradise fighter profile")
-        .addUserOption(o => o.setName("user").setDescription("Profile owner; defaults to you"))),
+        .addUserOption(o => o.setName("user").setDescription("Profile owner; defaults to you")))
+      .addSubcommand(s => s.setName("edit").setDescription("Edit your profile region without changing Profile ID"))
+      .addSubcommand(s => s.setName("verify-status").setDescription("Show your Roblox verification and profile-completion status")),
     new SlashCommandBuilder().setName("tryout").setNameLocalizations({ tr: "deneme" }).setDescription("Paradise tryout system").setDescriptionLocalizations({ tr: "Paradise deneme ve sonuç sistemi" })
       .addSubcommand(s => s.setName("start").setDescription("Start a tryout")
         .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
@@ -220,7 +272,20 @@ export function paradiseCommands() {
         .addIntegerOption(o => o.setName("winner_spot").setDescription("Winner leaderboard spot").setMinValue(1).setMaxValue(30))
         .addIntegerOption(o => o.setName("loser_spot").setDescription("Loser leaderboard spot").setMinValue(1).setMaxValue(30))
         .addStringOption(o => o.setName("note").setDescription("Optional referee note"))
-        .addStringOption(o => o.setName("ticket_id").setDescription("Challenge ticket ID"))),
+        .addStringOption(o => o.setName("ticket_id").setDescription("Challenge ticket ID")))
+      .addSubcommand(s => s.setName("autowin").setDescription("Submit an in-ticket automatic win for approval")
+        .addUserOption(o => o.setName("winner").setDescription("Automatic winner").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Dodged, no-show, invalid, disqualified or other").setRequired(true)
+          .addChoices(
+            { name: "Dodged", value: "dodged" },
+            { name: "No-show", value: "no-show" },
+            { name: "Invalid challenge", value: "invalid" },
+            { name: "Disqualified", value: "disqualified" },
+            { name: "Closed by staff", value: "closed" }
+          ))
+        .addStringOption(o => o.setName("note").setDescription("Optional staff note")))
+      .addSubcommand(s => s.setName("close").setDescription("Close this challenge and remove player access")
+        .addStringOption(o => o.setName("reason").setDescription("Closure reason").setRequired(true))),
     new SlashCommandBuilder().setName("paradisetraining").setNameLocalizations({ tr: "antrenman" }).setDescription("Paradise training lifecycle").setDescriptionLocalizations({ tr: "Paradise antrenman başlatma ve bitirme sistemi" })
       .addSubcommand(s => s.setName("start").setDescription("Start training")
         .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
@@ -228,6 +293,20 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("end").setDescription("End training")
         .addStringOption(o => o.setName("score").setDescription("Score, e.g. 3-1").setRequired(true))
         .addStringOption(o => o.setName("winner").setDescription("Red, Blue or team name").setRequired(true))),
+    new SlashCommandBuilder().setName("training").setDescription("Paradise training setup, start and result")
+      .setDescriptionLocalizations({ tr: "Paradise eğitim kurulum, başlatma ve sonuç sistemi" })
+      .addSubcommand(s => s.setName("setup").setDescription("Post the training help and announcement panel"))
+      .addSubcommand(s => s.setName("start").setDescription("Start a branded training session")
+        .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
+        .addUserOption(o => o.setName("host").setDescription("Host; defaults to you"))
+        .addUserOption(o => o.setName("cohost").setDescription("Optional co-host"))
+        .addStringOption(o => o.setName("rules").setDescription("Optional extra rules")))
+      .addSubcommand(s => s.setName("result").setDescription("End your active training and post its result")
+        .addStringOption(o => o.setName("score").setDescription("Score, e.g. 3-1").setRequired(true))
+        .addStringOption(o => o.setName("winner").setDescription("Red, Blue or team name").setRequired(true))
+        .addStringOption(o => o.setName("mvps").setDescription("Mention MVPs or list names"))
+        .addStringOption(o => o.setName("note").setDescription("Result note"))
+        .addStringOption(o => o.setName("proof").setDescription("Proof image or message URL"))),
     new SlashCommandBuilder().setName("tournament").setNameLocalizations({ tr: "turnuva" }).setDescription("Paradise tournament system").setDescriptionLocalizations({ tr: "Paradise turnuva sistemi" })
       .addSubcommand(s => s.setName("start-simple").setDescription("Start a simple tournament")
         .addStringOption(o => o.setName("title").setDescription("Tournament title").setRequired(true))
@@ -302,6 +381,7 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("remove").setDescription("Remove this channel's sticky message"))
       .addSubcommand(s => s.setName("list").setDescription("List configured sticky channels")),
     new SlashCommandBuilder().setName("branding").setDescription("Configure Paradise embed appearance")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addSubcommand(s => s.setName("color").setDescription("Set the embed side-accent color")
         .addStringOption(o => o.setName("hex").setDescription("Six-digit HEX color, e.g. #000000").setRequired(true)))
       .addSubcommand(s => s.setName("preview").setDescription("Preview Paradise typography and symbols")),
@@ -317,6 +397,14 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("type").setDescription("Relationship type").setRequired(true)
           .addChoices({ name: "Ally", value: "ally" }, { name: "Enemy", value: "enemy" }))
         .addStringOption(o => o.setName("clan").setDescription("Clan name").setRequired(true)))
+      .addSubcommand(s => s.setName("edit").setDescription("Edit an existing ally or enemy record")
+        .addStringOption(o => o.setName("type").setDescription("Relationship type").setRequired(true)
+          .addChoices({ name: "Ally", value: "ally" }, { name: "Enemy", value: "enemy" }))
+        .addStringOption(o => o.setName("clan").setDescription("Existing clan name").setRequired(true))
+        .addUserOption(o => o.setName("representative").setDescription("Updated representative"))
+        .addStringOption(o => o.setName("invite").setDescription("Updated Discord invite"))
+        .addStringOption(o => o.setName("note").setDescription("Updated note").setMaxLength(250))
+        .addStringOption(o => o.setName("status").setDescription("Relationship status").setMaxLength(80)))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the ally and enemy clan board")),
     new SlashCommandBuilder().setName("availability").setDescription("Challenge cooldown, immunity and open-ticket board")
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the challenge availability board"))
@@ -333,11 +421,46 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("type").setDescription("Entry to clear").setRequired(true)
           .addChoices({ name: "Cooldown", value: "cooldown" }, { name: "Immunity", value: "immunity" }))),
     new SlashCommandBuilder().setName("loa").setDescription("Staff leave-of-absence system")
+      .setDescriptionLocalizations({ tr: "Yetkili izin ve LOA yönetim sistemi" })
       .addSubcommand(s => s.setName("request").setDescription("Request a leave of absence")
         .addIntegerOption(o => o.setName("days").setDescription("LOA duration").setRequired(true).setMinValue(1).setMaxValue(90))
-        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500))
+        .addStringOption(o => o.setName("evidence").setDescription("Optional evidence URL")))
       .addSubcommand(s => s.setName("end").setDescription("End your active LOA early"))
+      .addSubcommand(s => s.setName("add").setDescription("Manager: add an approved LOA for a staff member")
+        .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true))
+        .addIntegerOption(o => o.setName("days").setDescription("LOA duration").setRequired(true).setMinValue(1).setMaxValue(365))
+        .addStringOption(o => o.setName("note").setDescription("LOA note").setRequired(true).setMaxLength(500))
+        .addStringOption(o => o.setName("evidence").setDescription("Optional evidence URL")))
+      .addSubcommand(s => s.setName("approve").setDescription("Manager: approve a pending LOA")
+        .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true)))
+      .addSubcommand(s => s.setName("deny").setDescription("Manager: deny a pending LOA")
+        .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Denial reason").setRequired(true)))
+      .addSubcommand(s => s.setName("remove").setDescription("Manager: remove or end a LOA")
+        .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Removal reason")))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the active LOA board")),
+    (() => {
+      const command = new SlashCommandBuilder().setName("set").setDescription("Map Paradise systems to Discord channels")
+        .setDescriptionLocalizations({ tr: "Paradise sistemlerini Discord kanallarına eşle" });
+      command.setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator);
+      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS) {
+        command.addSubcommand(subcommand => subcommand.setName(name).setDescription(description)
+          .addChannelOption(option => option.setName("channel").setDescription(description).addChannelTypes(ChannelType.GuildText).setRequired(true)));
+      }
+      return command;
+    })(),
+    new SlashCommandBuilder().setName("handbook").setDescription("Post or regenerate Paradise guide panels")
+      .setDescriptionLocalizations({ tr: "Paradise rehber panellerini gönder veya yenile" })
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
+      .addSubcommand(s => s.setName("post").setDescription("Post all guides for a setup template")
+        .addStringOption(o => o.setName("template").setDescription("Guide family").setRequired(true)
+          .addChoices(
+            { name: "Fieel's Community", value: "community" },
+            { name: "Paradise Clan", value: "clan" },
+            { name: "TSBTR-style", value: "tsbtr" }
+          ))),
     new SlashCommandBuilder().setName("paradisehelp").setDescription("Show private English/Turkish command guidance.")
   ];
 }
@@ -380,11 +503,21 @@ async function loadProfileStore() {
 }
 
 async function saveVerifiedProfile(discordId, profile) {
+  let saved = null;
   await saveState(state => {
-    state.profiles[discordId] = profile;
+    const existing = state.profiles[discordId] || {};
+    saved = {
+      ...existing,
+      ...profile,
+      discordUserId: discordId,
+      createdAt: existing.createdAt || profile.verifiedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    state.profiles[discordId] = saved;
     return state;
   });
   await writeArtifact("3a59-verified-roblox-profiles.json", (await loadState()).profiles);
+  return saved;
 }
 
 async function snapshotGuild(guild) {
@@ -424,24 +557,75 @@ async function setupPreview(interaction, mode = "clan", update = false) {
   if (!selected) return interaction.reply({ content: "Unknown setup mode.", ephemeral: true });
   const snapshot = await snapshotGuild(interaction.guild);
   await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
+  const desiredNames = new Set(selected.schema.flatMap(([category, channels]) => [category, ...channels]));
+  const existingNames = new Set(snapshot.channels.map(channel => channel.name));
+  const createNames = [...desiredNames].filter(name => !existingNames.has(name));
+  const extraNames = snapshot.channels.map(channel => channel.name).filter(name => !desiredNames.has(name));
+  const missingRoles = selected.roles.filter(name => !snapshot.roles.some(role => role.name === name));
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`paradise_setup_confirm:${mode}`).setLabel(`Build ${selected.label}`).setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`paradise_setup_review:${mode}`).setLabel("Continue to final confirmation").setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId("paradise_setup_cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
   );
   const payload = {
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`✦ ${selected.label} Setup Preview`)
-      .setDescription(`## ◆ Backup complete\n- **Channels:** ${snapshot.channels.length}\n- **Roles:** ${snapshot.roles.length}\n\n## ◆ Selected template\n**${selected.label}** — ${selected.schema.length} categories, ${selected.schema.reduce((sum, [, channels]) => sum + channels.length, 0)} channels and ${selected.roles.length} roles.\n\n## ◆ Planned action\nThe confirmed rebuild creates this template and removes old non-managed resources not used by it.\n\n-# Test server only • Nothing changes until the owner confirms.`)
-      .addFields({ name: "🛡️ __Safety boundary__", value: "**Hard-coded test guild only.** Owner confirmation is required; production is never targeted." })
+      .setDescription(`## ◆ Backup complete\n- **Channels:** ${snapshot.channels.length}\n- **Roles:** ${snapshot.roles.length}\n\n## ◆ Selected template\n**${selected.label}** — ${selected.schema.length} categories, ${selected.schema.reduce((sum, [, channels]) => sum + channels.length, 0)} channels and ${selected.roles.length} roles.\n\n## ◆ Rebuild diff\n- **Create channels/categories:** ${createNames.length}\n- **Create roles:** ${missingRoles.length}\n- **Extra resources affected by rebuild:** ${extraNames.length}\n\n> ⚠️ **DANGER:** final rebuild removes extra non-managed resources. Repair mode preserves them.\n\n-# Test server only • Nothing changes until final typed confirmation.`)
+      .addFields(
+        { name: "Create preview", value: createNames.slice(0, 20).map(name => `\`${name}\``).join(", ") || "Nothing missing." },
+        { name: "Potential removal preview", value: extraNames.slice(0, 20).map(name => `\`${name}\``).join(", ") || "No extra resources." },
+        { name: "🛡️ __Safety boundary__", value: "**Hard-coded test guild only.** Backup + preview + typed confirmation are required; production is never targeted." }
+      )
       .setFooter(paradiseFooter("Safe setup workflow"))],
     components: [row], ephemeral: true
   };
   return update ? interaction.update(payload) : interaction.reply(payload);
 }
 
+async function showSetupFinalConfirmation(interaction, mode) {
+  if (!isOwner(interaction) || !PARADISE_SETUP_SCHEMAS[mode]) {
+    return interaction.reply({ content: "Owner-only setup confirmation.", ephemeral: true });
+  }
+  const modal = new ModalBuilder().setCustomId(`paradise_setup_final:${mode}`).setTitle("Final destructive confirmation");
+  const confirmation = new TextInputBuilder()
+    .setCustomId("confirmation")
+    .setLabel(`Type REBUILD ${mode.toUpperCase()}`)
+    .setPlaceholder(`REBUILD ${mode.toUpperCase()}`)
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+  modal.addComponents(new ActionRowBuilder().addComponents(confirmation));
+  return interaction.showModal(modal);
+}
+
+async function handleSetupFinalConfirmation(interaction, mode) {
+  const expected = `REBUILD ${mode.toUpperCase()}`;
+  const supplied = interaction.fields.getTextInputValue("confirmation").trim().toUpperCase();
+  if (supplied !== expected) {
+    return interaction.reply({ content: `Confirmation did not match \`${expected}\`. Nothing was changed.`, ephemeral: true });
+  }
+  return applyServerSetup(interaction, mode, true);
+}
+
+async function handleSetupAction(interaction, mode) {
+  const action = interaction.options.getString("action") || "preview";
+  if (action === "repair" || action === "apply_missing_only") return applyServerSetup(interaction, mode, false);
+  if (action === "guides") {
+    if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const result = await publishAllGuides(interaction.guild, mode);
+    return interaction.editReply(`Paradise handbooks regenerated: **${result.posted}** posts updated or created.`);
+  }
+  return setupPreview(interaction, mode);
+}
+
 const ROLE_PERMISSION_NAMES = Object.freeze({
   Owner: ["Administrator"],
   Admin: ["Administrator"],
   Overseer: ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "BanMembers", "ViewAuditLog"],
+  "Administration Manager": ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  "Head Admin": ["ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  "Senior Admin": ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  "Moderator Manager": ["ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  "Head Moderator": ["ManageMessages", "ModerateMembers", "KickMembers"],
+  "Senior Moderator": ["ManageMessages", "ModerateMembers"],
   Manager: ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Community Manager": ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   Moderator: ["ManageMessages", "ModerateMembers", "KickMembers"],
@@ -460,9 +644,13 @@ const ROLE_PERMISSION_NAMES = Object.freeze({
 
 const PRIVATE_ACCESS_ROLES = new Set([
   "Owner", "Admin", "Overseer", "Manager", "Community Manager", "Moderator",
+  "Administration Manager", "Head Admin", "Senior Admin", "Moderator Manager", "Head Moderator", "Senior Moderator",
   "Support Staff", "Bot Manager", "Training Manager", "Tryout Manager",
   "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
-  "Referee Manager", "Head Referee", "Experienced Referee"
+  "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee",
+  "Training Supervisor", "Experienced Training Hoster", "Training Hoster", "Trial Training Hoster",
+  "Tryout Manager", "Experienced Tryout Hoster", "Tryout Hoster", "Tryout Staff", "Trial Tryout Staff",
+  "War Hoster"
 ]);
 
 function rolePermissions(name) {
@@ -497,27 +685,50 @@ async function organizeRoleHierarchy(guild, roleNames) {
 async function ensureParadiseAutoMod(guild) {
   const rules = await guild.autoModerationRules.fetch().catch(() => null);
   if (!rules) return { status: "unavailable" };
+  const state = await loadState();
+  const config = state.config.automod || {};
+  if (config.enabled === false) {
+    for (const rule of rules.values()) {
+      if (rule.name.startsWith("Paradise ")) await rule.edit({ enabled: false, reason: "Paradise dashboard AutoMod disabled" }).catch(() => {});
+    }
+    return { status: "disabled" };
+  }
   const exemptRoleIds = ["Owner", "Admin", "Overseer", "Media & Links Approved"]
     .map(name => guild.roles.cache.find(role => role.name === name)?.id).filter(Boolean);
   const logChannel = guild.channels.cache.find(channel => channel.name === "mod-logs");
   const actions = [{ type: AutoModerationActionType.BlockMessage, metadata: { customMessage: "That link is not allowed here. Use an approved media/ticket channel or ask staff." } }];
   if (logChannel) actions.push({ type: AutoModerationActionType.SendAlertMessage, metadata: { channel: logChannel.id } });
-  if (![...rules.values()].some(rule => rule.name === "Paradise Invite & Scam Link Guard")) {
+  const keywords = [];
+  if (config.blockInvites !== false) keywords.push("*discord.gg/*", "*discord.com/invite/*", "*discordapp.com/invite/*");
+  if (config.blockScamKeywords !== false) keywords.push("*free nitro*", "*steam gift*", "*claim reward*", "*verify account here*", "*limited gift*");
+  if (keywords.length && ![...rules.values()].some(rule => rule.name === "Paradise Invite & Scam Link Guard")) {
     await guild.autoModerationRules.create({
       name: "Paradise Invite & Scam Link Guard",
       eventType: AutoModerationRuleEventType.MessageSend,
       triggerType: AutoModerationRuleTriggerType.Keyword,
       triggerMetadata: {
-        keywordFilter: ["*discord.gg/*", "*discord.com/invite/*", "*discordapp.com/invite/*", "*free nitro*", "*steam gift*", "*claim reward*"]
+        keywordFilter: keywords
       },
       actions, enabled: true, exemptRoles: exemptRoleIds,
       reason: "3A59 anti-scam and invite-link protection"
     });
   }
-  return { status: "configured", rules: [...rules.values()].length + 1 };
+  if (![...rules.values()].some(rule => rule.name === "Paradise Mention Spam Guard")) {
+    await guild.autoModerationRules.create({
+      name: "Paradise Mention Spam Guard",
+      eventType: AutoModerationRuleEventType.MessageSend,
+      triggerType: AutoModerationRuleTriggerType.MentionSpam,
+      triggerMetadata: { mentionTotalLimit: Math.min(50, Math.max(3, Number(config.mentionSpamLimit) || 8)), mentionRaidProtectionEnabled: true },
+      actions,
+      enabled: true,
+      exemptRoles: exemptRoleIds,
+      reason: "Paradise mention-spam protection"
+    });
+  }
+  return { status: "configured", rules: [...rules.values()].length + 2 };
 }
 
-async function applyServerSetup(interaction, mode) {
+async function applyServerSetup(interaction, mode, destructive = true) {
   if (!isOwner(interaction) || interaction.guildId !== PARADISE_TEST_GUILD_ID) {
     return interaction.reply({ content: "Blocked: wrong guild or non-owner.", ephemeral: true });
   }
@@ -551,7 +762,7 @@ async function applyServerSetup(interaction, mode) {
     for (const channelName of channelNames) {
       let channel = interaction.guild.channels.cache.find(c => c.name === channelName);
       if (!channel) {
-        const voice = categoryName === "VOICE";
+        const voice = categoryName === "VOICE" && channelName !== "war-vc-text";
         channel = await interaction.guild.channels.create({
           name: channelName, type: voice ? ChannelType.GuildVoice : ChannelType.GuildText,
           parent: category.id, reason: "3A59 Paradise setup"
@@ -561,13 +772,15 @@ async function applyServerSetup(interaction, mode) {
   }
   const removableChannels = [...interaction.guild.channels.cache.values()]
     .filter(c => !desiredNames.has(c.name) && !c.isThread?.() && c.id !== interaction.channelId);
-  for (const channel of removableChannels) await channel.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
   const removableRoles = [...interaction.guild.roles.cache.values()]
     .filter(r => !r.managed && r.id !== interaction.guild.id && !selected.roles.includes(r.name));
-  for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
+  if (destructive) {
+    for (const channel of removableChannels) await channel.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
+    for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
+  }
   await organizeRoleHierarchy(interaction.guild, selected.roles);
   const autoMod = await ensureParadiseAutoMod(interaction.guild).catch(error => ({ status: "failed", error: error.message }));
-  await publishSetupGuides(interaction.guild, mode).catch(() => {});
+  await publishAllGuides(interaction.guild, mode).catch(() => {});
   if (mode !== "community") {
     await updateRelationsPanel(interaction.guild).catch(() => {});
     await updateAvailabilityPanel(interaction.guild).catch(() => {});
@@ -576,18 +789,28 @@ async function applyServerSetup(interaction, mode) {
   await updateStaffTeamEmbed(interaction.guild).catch(() => {});
   await saveState(state => {
     state.config.activeSetupMode = mode;
+    state.config.lastSetupRun = {
+      mode,
+      operation: destructive ? "rebuild" : "repair",
+      completedAt: new Date().toISOString(),
+      createdOrRepairedChannels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0),
+      preservedExtraChannels: destructive ? 0 : removableChannels.length,
+      preservedExtraRoles: destructive ? 0 : removableRoles.length
+    };
     state.config.autoActivityChecks = true;
     state.config.autoActivityRoleRemoval = true;
     state.config.weeklyQuotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
     return state;
   });
   await writeArtifact(`3a59-discord-${mode}-setup-live.json`, {
-    status: "LIVE VERIFIED", completedAt: new Date().toISOString(),
+    status: "LIVE VERIFIED", completedAt: new Date().toISOString(), operation: destructive ? "rebuild" : "repair",
     guildId: interaction.guildId, template: selected.label, categories: selected.schema.length,
     channels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0), roles: selected.roles.length,
     autoMod
   });
-  return interaction.editReply(`${selected.label} rebuild completed.`);
+  return interaction.editReply(destructive
+    ? `${selected.label} rebuild completed. Backup and final typed confirmation were recorded.`
+    : `${selected.label} repair completed. No extra channel or role was deleted.`);
 }
 
 async function findRobloxUser(username) {
@@ -624,11 +847,13 @@ async function startVerification(interaction, username) {
   const user = await findRobloxUser(username);
   if (!user) return interaction.reply({ content: "Roblox user not found. Check the exact username and try again.", ephemeral: true });
   const code = shortVerificationCode();
+  const state = await loadState();
+  const expiryMinutes = Number(state.config.verification?.codeExpiryMinutes || 10);
   const challenge = {
     robloxId: String(user.id),
     username: user.name,
     code,
-    expires: Date.now() + 10 * 60_000
+    expires: Date.now() + Math.min(30, Math.max(3, expiryMinutes)) * 60_000
   };
   verificationChallenges.set(interaction.user.id, challenge);
   await saveState(state => {
@@ -660,10 +885,10 @@ async function verifyCheck(interaction) {
       ephemeral: true
     });
   }
-  verifiedProfiles.set(interaction.user.id, { robloxId: challenge.robloxId, username: challenge.username, verifiedAt: new Date().toISOString() });
-  await saveVerifiedProfile(interaction.user.id, {
+  const savedProfile = await saveVerifiedProfile(interaction.user.id, {
     robloxId: String(challenge.robloxId), robloxUsername: challenge.username, verifiedAt: new Date().toISOString()
   });
+  verifiedProfiles.set(interaction.user.id, savedProfile);
   const role = await ensureRole(interaction.guild, "Verified Fighter");
   await interaction.member.roles.add(role);
   verificationChallenges.delete(interaction.user.id);
@@ -713,6 +938,10 @@ async function profileEmbed(guild, discordId) {
   const member = await guild.members.fetch(discordId).catch(() => null);
   const rank = member ? fighterRank(member) : "Unranked";
   const thumbnail = await robloxHeadshot(profile.robloxId);
+  const state = await loadState();
+  const topSpot = state.leaderboard[discordId]?.spot || null;
+  const createdAt = Math.floor(new Date(profile.createdAt || profile.verifiedAt || Date.now()).getTime() / 1000);
+  const updatedAt = Math.floor(new Date(profile.updatedAt || profile.profileUpdatedAt || profile.verifiedAt || Date.now()).getTime() / 1000);
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE FIGHTER PROFILE")
     .setDescription(`## ${member || `<@${discordId}>`}\n-# Verified Roblox identity`)
     .addFields(
@@ -720,7 +949,9 @@ async function profileEmbed(guild, discordId) {
       { name: "Roblox", value: `**${profile.robloxUsername}**`, inline: true },
       { name: "Region", value: `**${profile.region}**`, inline: true },
       { name: "Rank", value: `**${rank}**`, inline: false },
-      { name: "Verification", value: "✓ Profile About code confirmed", inline: false }
+      { name: "Leaderboard", value: topSpot ? `**Rank #${topSpot}**` : "**Unranked**", inline: true },
+      { name: "Verification", value: "✓ Roblox About code confirmed", inline: true },
+      { name: "Created / Updated", value: `<t:${createdAt}:D> · <t:${updatedAt}:R>`, inline: false }
     )
     .setFooter(paradiseFooter("Rank updates automatically after approved tryout results"));
   if (thumbnail) embed.setThumbnail(thumbnail);
@@ -780,6 +1011,24 @@ async function beginProfileRegionChange(interaction) {
 async function handleProfile(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "create") return beginProfileCreation(interaction);
+  if (sub === "edit") {
+    if (!await completedProfile(interaction.user.id)) return beginProfileCreation(interaction);
+    return beginProfileRegionChange(interaction);
+  }
+  if (sub === "verify-status") {
+    const profile = await verifiedProfile(interaction.user.id);
+    const complete = Boolean(profile?.profileId && profile?.region);
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PROFILE VERIFICATION STATUS")
+        .addFields(
+          { name: "Roblox linked", value: profile?.robloxId ? "✓ Yes" : "✗ No", inline: true },
+          { name: "Profile complete", value: complete ? "✓ Yes" : "✗ No", inline: true },
+          { name: "Profile ID", value: profile?.profileId ? `#${profile.profileId}` : "Not assigned", inline: true },
+          { name: "Region", value: profile?.region || "Not selected", inline: true }
+        ).setFooter(paradiseFooter("Use /profile create or /profile edit"))],
+      ephemeral: true
+    });
+  }
   const target = interaction.options.getUser("user") || interaction.user;
   const embed = await profileEmbed(interaction.guild, target.id);
   if (!embed) return interaction.reply({ content: `${target} has not completed a Paradise fighter profile.`, ephemeral: true });
@@ -798,6 +1047,7 @@ async function handleProfileRegion(interaction) {
     }
     current.region = region;
     current.profileUpdatedAt = new Date().toISOString();
+    current.updatedAt = current.profileUpdatedAt;
     state.profiles[interaction.user.id] = current;
     saved = current;
     return state;
@@ -937,6 +1187,14 @@ export function challengeBlockReason(state, challengerId, opponentId, now = Date
   if (opponentImmunity > now) {
     return `That player is currently immune and cannot be challenged. Their immunity expires <t:${Math.floor(opponentImmunity / 1000)}:R>.`;
   }
+  const challengerLoa = state.loa?.[challengerId];
+  if (challengerLoa?.status === "approved" && Number(challengerLoa.expiresAt) > now) {
+    return `Your active LOA blocks ranked challenges until <t:${Math.floor(challengerLoa.expiresAt / 1000)}:R>.`;
+  }
+  const opponentLoa = state.loa?.[opponentId];
+  if (opponentLoa?.status === "approved" && Number(opponentLoa.expiresAt) > now) {
+    return `That player is currently unavailable due to LOA until <t:${Math.floor(opponentLoa.expiresAt / 1000)}:R>.`;
+  }
   return null;
 }
 
@@ -952,7 +1210,7 @@ async function presentChallengeTargetMenu(interaction, region = null) {
   }
   const state = await loadState();
   const currentSpot = Number(state.leaderboard[interaction.user.id]?.spot);
-  const spots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null);
+  const spots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null, state.config.challenge);
   const entries = Object.entries(state.leaderboard)
     .filter(([id, row]) => id !== interaction.user.id && spots.includes(Number(row.spot)))
     .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
@@ -984,6 +1242,35 @@ async function presentChallengeTargetMenu(interaction, region = null) {
   });
 }
 
+async function challengeHeaderEmbed(record) {
+  const created = Math.floor(new Date(record.openedAt || Date.now()).getTime() / 1000);
+  return new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ LIVE CHALLENGE CONTEXT")
+    .setDescription(`# <@${record.challengerId}> **vs** <@${record.opponentId}>\n-# Referees should never need to scroll to recover ticket context.`)
+    .addFields(
+      { name: "Ticket ID", value: `\`${record.ticketId}\``, inline: true },
+      { name: "Opened", value: `<t:${created}:F>\n<t:${created}:R>`, inline: true },
+      { name: "Status", value: `**${String(record.status || "open").toUpperCase()}**`, inline: true },
+      { name: "Positions", value: `${record.challengerSpot ? `#${record.challengerSpot}` : "Unranked"} vs ${record.opponentSpot ? `#${record.opponentSpot}` : "Unranked"}`, inline: true },
+      { name: "Region / Type", value: `${record.region || "Not selected"} · ${record.challengeType || "Ranked"}`, inline: true },
+      { name: "Referee", value: record.refereeId ? `<@${record.refereeId}>` : "Not assigned", inline: true },
+      { name: "Proof", value: record.proofRequired ? "Required" : "Optional", inline: true },
+      { name: "Notes", value: record.note || "No notes.", inline: false }
+    )
+    .setFooter(paradiseFooter("Pinned and refreshed automatically"));
+}
+
+async function refreshChallengeHeader(guild, record) {
+  const channel = guild.channels.cache.get(record.ticketId) || await guild.channels.fetch(record.ticketId).catch(() => null);
+  if (!channel?.isTextBased?.()) return null;
+  let message = record.headerMessageId ? await channel.messages.fetch(record.headerMessageId).catch(() => null) : null;
+  const payload = { embeds: [await challengeHeaderEmbed(record)] };
+  if (message) await message.edit(payload); else {
+    message = await channel.send(payload);
+    await message.pin("Paradise live challenge context").catch(() => {});
+  }
+  return message;
+}
+
 async function createChallengeTicket(interaction, opponent, region = null) {
   if (!await completedProfile(interaction.user.id) || !await completedProfile(opponent.id)) {
     return interaction.reply({ content: "Both fighters must complete `/profile create` first.", ephemeral: true });
@@ -991,7 +1278,7 @@ async function createChallengeTicket(interaction, opponent, region = null) {
   const state = await loadState();
   const currentSpot = Number(state.leaderboard[interaction.user.id]?.spot);
   const opponentSpot = Number(state.leaderboard[opponent.id]?.spot);
-  const allowedSpots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null);
+  const allowedSpots = challengeTargetSpots(Number.isInteger(currentSpot) ? currentSpot : null, state.config.challenge);
   if (!allowedSpots.includes(opponentSpot)) {
     return interaction.reply({
       content: `${challengeRangeText(Number.isInteger(currentSpot) ? currentSpot : null, allowedSpots)} <@${opponent.id}> is outside your allowed challenge range.`,
@@ -1001,6 +1288,13 @@ async function createChallengeTicket(interaction, opponent, region = null) {
   const block = challengeBlockReason(state, interaction.user.id, opponent.id);
   if (block) return interaction.reply({ content: block, ephemeral: true });
   const me = interaction.guild.members.me;
+  const staffOverwrites = ["Owner", "Admin", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee"]
+    .map(name => interaction.guild.roles.cache.find(role => role.name === name))
+    .filter(Boolean)
+    .map(role => ({
+      id: role.id,
+      allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory]
+    }));
   const channel = await interaction.guild.channels.create({
     name: `challenge-${interaction.user.username}-${opponent.username}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 90),
     type: ChannelType.GuildText,
@@ -1008,23 +1302,24 @@ async function createChallengeTicket(interaction, opponent, region = null) {
       { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
       { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
       { id: opponent.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-      { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] }
+      { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] },
+      ...staffOverwrites
     ],
     reason: "Paradise verified challenge"
   });
-  await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ VERIFIED CHALLENGE")
-    .setDescription(`# ${interaction.user} **vs** ${opponent}\n\n## ◆ Before the set\n- Confirm availability and cooldowns\n- Record the full match\n- Keep all proof inside this ticket\n\n-# Players lose access after closure; staff retains the transcript.`)
-    .addFields(
-      { name: "◇ Positions", value: `${Number.isInteger(currentSpot) ? `#${currentSpot}` : "Unranked"} vs #${opponentSpot}`, inline: true },
-      { name: "◇ Region", value: `**${region || "Not selected"}**`, inline: true }
-    )
-    .setFooter(paradiseFooter("Verified Paradise profiles"))] });
+  const record = {
+    status: "open", ticketId: channel.id, challengerId: interaction.user.id,
+    opponentId: opponent.id, region: region || null, challengerSpot: Number.isInteger(currentSpot) ? currentSpot : null,
+    opponentSpot, challengeType: "Ranked", proofRequired: state.config.challenge?.proofRequired === true,
+    openedAt: new Date().toISOString()
+  };
+  const header = await refreshChallengeHeader(interaction.guild, record);
+  record.headerMessageId = header?.id || null;
+  await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ CHALLENGE READY")
+    .setDescription("Use `/challenge post` after the match, or `/challenge autowin` for an approved automatic-win reason.\n\n> Record the complete set and keep proof in this ticket.")
+    .setFooter(paradiseFooter("Senior approval required"))] });
   await saveState(current => {
-    current.pendingChallenges[channel.id] = {
-      status: "open", ticketId: channel.id, challengerId: interaction.user.id,
-      opponentId: opponent.id, region: region || null, challengerSpot: Number.isInteger(currentSpot) ? currentSpot : null,
-      opponentSpot, openedAt: new Date().toISOString()
-    };
+    current.pendingChallenges[channel.id] = record;
     return current;
   });
   challengeDrafts.delete(interaction.user.id);
@@ -1038,6 +1333,74 @@ async function handleChallenge(interaction) {
     const opponent = interaction.options.getUser("opponent");
     const region = interaction.options.getString("region");
     return opponent ? createChallengeTicket(interaction, opponent, region) : presentChallengeTargetMenu(interaction, region);
+  }
+  if (sub === "close") {
+    if (!canApproveReferee(interaction.member)) {
+      return interaction.reply({ content: "Experienced Referee, Head Referee or Referee Manager required.", ephemeral: true });
+    }
+    const state = await loadState();
+    const ticket = state.pendingChallenges[interaction.channelId];
+    if (!ticket || ticket.status !== "open") return interaction.reply({ content: "Run this inside an open Paradise challenge ticket.", ephemeral: true });
+    const reason = interaction.options.getString("reason");
+    const closed = {
+      ...ticket,
+      status: "closed",
+      closeReason: reason,
+      closedBy: interaction.user.id,
+      closedAt: new Date().toISOString()
+    };
+    await saveState(next => { next.pendingChallenges[interaction.channelId] = closed; return next; });
+    await interaction.channel.permissionOverwrites.edit(ticket.challengerId, { ViewChannel: false }).catch(() => {});
+    await interaction.channel.permissionOverwrites.edit(ticket.opponentId, { ViewChannel: false }).catch(() => {});
+    await refreshChallengeHeader(interaction.guild, closed).catch(() => {});
+    await updateAvailabilityPanel(interaction.guild).catch(() => {});
+    return interaction.reply({ content: `Challenge closed. Player access removed. Reason: **${reason}**`, ephemeral: true });
+  }
+  if (sub === "autowin") {
+    const hasRefereeRole = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)
+      || interaction.member.roles.cache.some(role => ["Trial Referee", "Referee", "Experienced Referee", "Head Referee", "Referee Manager"].includes(role.name));
+    if (!hasRefereeRole) return interaction.reply({ content: "Referee role required.", ephemeral: true });
+    const state = await loadState();
+    const ticket = state.pendingChallenges[interaction.channelId];
+    if (!ticket || ticket.status !== "open") return interaction.reply({ content: "Run `/challenge autowin` inside an open challenge ticket.", ephemeral: true });
+    const winner = interaction.options.getUser("winner");
+    if (![ticket.challengerId, ticket.opponentId].includes(winner.id)) {
+      return interaction.reply({ content: "Winner must be one of the two fighters in this ticket.", ephemeral: true });
+    }
+    const loserId = winner.id === ticket.challengerId ? ticket.opponentId : ticket.challengerId;
+    const loser = await interaction.client.users.fetch(loserId);
+    const submissionId = crypto.randomUUID();
+    const reason = interaction.options.getString("reason");
+    const submission = {
+      status: "pending",
+      resultType: "autowin",
+      winnerId: winner.id,
+      loserId,
+      score: "Auto",
+      refereeId: interaction.user.id,
+      winnerSpot: winner.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot,
+      loserSpot: loserId === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot,
+      note: `${reason}${interaction.options.getString("note") ? ` — ${interaction.options.getString("note")}` : ""}`,
+      ticketId: interaction.channelId,
+      createdAt: new Date().toISOString()
+    };
+    pendingChallenges.set(submissionId, submission);
+    await saveState(next => { next.pendingChallenges[submissionId] = submission; return next; });
+    const approvalRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`paradise_challenge_approve:${submissionId}`).setLabel("Approve Auto Win").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`paradise_challenge_deny:${submissionId}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+    );
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Automatic Win — Pending Approval")
+        .setDescription(`# ${winner} **vs** ${loser}`)
+        .addFields(
+          { name: "Winner", value: `${winner}`, inline: true },
+          { name: "Result", value: `**Auto — ${reason}**`, inline: true },
+          { name: "Referee", value: `${interaction.user}`, inline: true },
+          { name: "Ticket ID", value: interaction.channelId, inline: false }
+        ).setFooter(paradiseFooter("Senior referee approval required"))],
+      components: [approvalRow]
+    });
   }
   const submittedWinner = interaction.options.getUser("winner");
   const submittedLoser = interaction.options.getUser("loser");
@@ -1099,6 +1462,10 @@ async function handleChallengeApproval(interaction) {
   }
   const now = Date.now();
   await saveState(state => {
+    const challengeConfig = state.config.challenge || {};
+    const normalCooldownDays = Number(challengeConfig.cooldownDays || 3);
+    const top10CooldownDays = Number(challengeConfig.top10CooldownDays || 7);
+    const immunityDays = Number(challengeConfig.immunityDays || normalCooldownDays);
     const winner = state.leaderboard[record.winnerId] || { wins: 0, losses: 0, history: [] };
     const loser = state.leaderboard[record.loserId] || { wins: 0, losses: 0, history: [] };
     winner.wins = Number(winner.wins || 0) + 1;
@@ -1108,13 +1475,28 @@ async function handleChallengeApproval(interaction) {
     const history = { resultId: id, winnerId: record.winnerId, loserId: record.loserId, score: record.score, at: new Date().toISOString() };
     winner.history = [...(winner.history || []), history].slice(-50);
     loser.history = [...(loser.history || []), history].slice(-50);
-    loser.availability = { ...(loser.availability || {}), cooldownUntil: now + (record.loserSpot && record.loserSpot <= 10 ? 7 : 3) * 86_400_000 };
-    winner.availability = { ...(winner.availability || {}), immunityUntil: now + (record.winnerSpot && record.winnerSpot <= 10 ? 7 : 3) * 86_400_000 };
+    loser.availability = {
+      ...(loser.availability || {}),
+      cooldownUntil: now + (record.loserSpot && record.loserSpot <= 10 ? top10CooldownDays : normalCooldownDays) * 86_400_000
+    };
+    winner.availability = {
+      ...(winner.availability || {}),
+      immunityUntil: now + (record.winnerSpot && record.winnerSpot <= 10 ? top10CooldownDays : immunityDays) * 86_400_000
+    };
     state.leaderboard[record.winnerId] = winner;
     state.leaderboard[record.loserId] = loser;
     if (state.pendingChallenges[record.ticketId]?.status === "open") {
-      state.pendingChallenges[record.ticketId].status = "closed";
-      state.pendingChallenges[record.ticketId].closedAt = new Date().toISOString();
+      state.pendingChallenges[record.ticketId] = {
+        ...state.pendingChallenges[record.ticketId],
+        status: "closed",
+        resultType: record.resultType || "score",
+        winnerId: record.winnerId,
+        loserId: record.loserId,
+        finalScore: record.score,
+        refereeId: record.refereeId,
+        approvedBy: interaction.user.id,
+        closedAt: new Date().toISOString()
+      };
     }
     state.pendingChallenges[id] = { ...record, status: "approved", approvedBy: interaction.user.id, decidedAt: new Date().toISOString() };
     const activity = state.staffActivity[record.refereeId] || {};
@@ -1124,7 +1506,21 @@ async function handleChallengeApproval(interaction) {
   });
   pendingChallenges.delete(id);
   await updateAvailabilityPanel(interaction.guild).catch(() => {});
-  const works = interaction.guild.channels.cache.find(channel => channel.name.includes("referee-works"));
+  const finalState = await loadState();
+  const closedTicket = finalState.pendingChallenges[record.ticketId];
+  const ticketChannel = interaction.guild.channels.cache.get(record.ticketId);
+  if (ticketChannel && closedTicket) {
+    await ticketChannel.permissionOverwrites.edit(closedTicket.challengerId, { ViewChannel: false }).catch(() => {});
+    await ticketChannel.permissionOverwrites.edit(closedTicket.opponentId, { ViewChannel: false }).catch(() => {});
+    await refreshChallengeHeader(interaction.guild, closedTicket).catch(() => {});
+  }
+  const results = await configuredChannel(interaction.guild, "challenge_results_channel", "challenge-results");
+  if (results) {
+    await results.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
+      .setTitle(record.resultType === "autowin" ? "Approved Automatic Win" : "Approved Challenge Result")
+      .setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })] }).catch(() => {});
+  }
+  const works = await configuredChannel(interaction.guild, "referee_works_channel", "referee-works");
   if (works) await works.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
     .setTitle("Approved Referee Work").setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })] });
   return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
@@ -1133,34 +1529,83 @@ async function handleChallengeApproval(interaction) {
 
 async function handleTraining(interaction) {
   const sub = interaction.options.getSubcommand();
+  if (sub === "setup") {
+    if (!canManageClan(interaction.member)) return interaction.reply({ content: "Training management role required.", ephemeral: true });
+    const posted = await publishGuidePost(interaction.guild, GUIDE_POSTS.find(item => item.key === "training_rules"));
+    return interaction.reply({ content: posted ? "Training handbook updated." : "Create `training-hoster-rules` first.", ephemeral: true });
+  }
   if (sub === "start") {
     const link = interaction.options.getString("link");
     const rules = interaction.options.getString("rules") || "No Lh, no TDS, no overpassive, no 2 Ragdoll cancel, no wall, no hitting in queue, do not leave queue.";
+    const selectedHost = interaction.options.getUser("host") || interaction.user;
+    if (selectedHost.id !== interaction.user.id && !canManageClan(interaction.member)) {
+      return interaction.reply({ content: "Only training management can start a session for another host.", ephemeral: true });
+    }
+    const cohost = interaction.options.getUser("cohost");
     const sessionId = crypto.randomUUID();
-    const session = { id: sessionId, type: "training", hosterId: interaction.user.id, link, rules, status: "open", startedAt: new Date().toISOString() };
-    activeTrainings.set(sessionId, session);
-    await saveState(state => { state.trainings[sessionId] = session; return state; });
+    const session = {
+      id: sessionId, type: "training", hosterId: selectedHost.id, createdBy: interaction.user.id,
+      cohostId: cohost?.id || null, link, rules, status: "open", startedAt: new Date().toISOString()
+    };
     const controls = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRAINING").setStyle(ButtonStyle.Danger)
     );
-    return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ TRAINING OPEN")
+    const payload = { embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ TRAINING OPEN")
       .setDescription(`# Training\n## ◆ Server\n[**Join the private server**](${link})\n\n## ◆ Rules\n${rules}\n\n## ◆ Playable characters\n- **Saitama**\n- **Garou**\n- **Metal Bat**\n\n-# Teams must be balanced. Keep the queue orderly.`)
       .addFields(
-        { name: "◇ Hoster", value: `${interaction.user}`, inline: true },
+        { name: "◇ Hoster", value: `<@${selectedHost.id}>`, inline: true },
+        { name: "◇ Co-hoster", value: cohost ? `${cohost}` : "None", inline: true },
         { name: "◇ Format", value: "**FT3** — FT5 optional", inline: true },
         { name: "◇ Session", value: `\`${sessionId.slice(0, 8)}\``, inline: true }
-      ).setFooter(paradiseFooter("Hoster-only controls"))], components: [controls] });
+      ).setFooter(paradiseFooter("Hoster-only controls"))], components: [controls] };
+    await interaction.deferReply({ ephemeral: true });
+    const target = await configuredChannel(interaction.guild, "training_channel", "training") || interaction.channel;
+    const announcement = await target.send(payload);
+    session.channelId = target.id;
+    session.messageId = announcement.id;
+    activeTrainings.set(sessionId, session);
+    await saveState(state => { state.trainings[sessionId] = session; return state; });
+    return interaction.editReply(`Training started: ${announcement.url}`);
   }
   const owned = [...activeTrainings.values()].find(item => item.hosterId === interaction.user.id && item.status !== "ended")
     || Object.values((await loadState()).trainings).find(item => item.hosterId === interaction.user.id && item.status !== "ended");
   if (!owned) return interaction.reply({ content: "You have no active training session.", ephemeral: true });
+  const state = await loadState();
+  if (state.config.verification?.requireProfileForTrainingResult !== false && !await completedProfile(interaction.user.id)) {
+    return interaction.reply({ content: "Complete `/profile create` before submitting a training result.", ephemeral: true });
+  }
+  const result = {
+    score: interaction.options.getString("score"),
+    winner: interaction.options.getString("winner"),
+    mvps: interaction.options.getString("mvps") || null,
+    note: interaction.options.getString("note") || null,
+    proof: interaction.options.getString("proof") || null
+  };
   await finishSession(owned.id, interaction.user.id, {
-    score: interaction.options.getString("score"), winner: interaction.options.getString("winner")
+    ...result
   });
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Training ended.")
-    .setDescription(`Score: ${interaction.options.getString("score")}, ${interaction.options.getString("winner")} won.`)
-    .addFields({ name: "Hoster", value: `${interaction.user}` }).setFooter({ text: "Made by Paradise bot" })] });
+  const resultEmbed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Training ended.")
+    .setDescription(`## Score\n**${result.score} — ${result.winner} won.**`)
+    .addFields(
+      { name: "Hoster", value: `${interaction.user}`, inline: true },
+      { name: "MVPs", value: result.mvps || "Not recorded", inline: true },
+      { name: "Note", value: result.note || "No note", inline: false },
+      { name: "Proof", value: result.proof || "Not supplied", inline: false }
+    ).setFooter(paradiseFooter("Activity counted automatically"));
+  const originalChannel = interaction.guild.channels.cache.get(owned.channelId);
+  const original = originalChannel?.isTextBased?.() ? await originalChannel.messages.fetch(owned.messageId).catch(() => null) : null;
+  if (original) {
+    const endedEmbed = EmbedBuilder.from(original.embeds[0]).setTitle("✓ TRAINING ENDED")
+      .setFooter(paradiseFooter(`Ended with ${result.score}`));
+    await original.edit({ embeds: [endedEmbed], components: [] }).catch(() => {});
+    await original.reply({ embeds: [resultEmbed] }).catch(() => {});
+  }
+  const resultsChannel = await configuredChannel(interaction.guild, "training_results_channel", "training-results");
+  if (resultsChannel) await resultsChannel.send({ embeds: [resultEmbed] }).catch(() => {});
+  const activityChannel = await configuredChannel(interaction.guild, "activity_logs_channel", "activity-logs");
+  if (activityChannel) await activityChannel.send({ embeds: [resultEmbed.setTitle("Training Activity Logged")] }).catch(() => {});
+  return interaction.reply({ content: `Training result saved.${resultsChannel ? ` Results: ${resultsChannel}` : ""}`, ephemeral: true });
 }
 
 async function finishSession(sessionId, hosterId, result = {}) {
@@ -1367,18 +1812,20 @@ function weekActivityCount(activity, key, now = Date.now()) {
 
 async function postAutomaticActivityCheck(guild, group, state) {
   const targetName = group === "Referee" ? "referee-activity-check" : "hoster-activity-check";
-  const channel = guild.channels.cache.find(item => item.name.includes(targetName));
+  const channel = await configuredChannel(guild, "activity_check_channel", targetName)
+    || guild.channels.cache.find(item => item.name.includes(targetName));
   if (!channel) return null;
   const id = crypto.randomUUID();
-  const expiresAt = Date.now() + 86_400_000;
+  const deadlineHours = Number(state.config.activity?.responseDeadlineHours || 24);
+  const expiresAt = Date.now() + deadlineHours * 3_600_000;
   const check = { group, startedBy: guild.members.me.id, automatic: true, startedAt: new Date().toISOString(), expiresAt, responses: [] };
   state.activityChecks[id] = check;
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`paradise_activity_present:${id}`).setLabel("I am active / Aktifim").setStyle(ButtonStyle.Success)
   );
   await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
-    .setDescription(`Respond within 24 hours. Missing the deadline removes the related staff role unless an active whitelist applies.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
-    .setFooter({ text: "Automatic 48-hour check • Made by Paradise bot" })], components: [row] });
+    .setDescription(`Respond within ${deadlineHours} hours. Missing the deadline creates a flag and may remove the related staff role only when automatic role changes are explicitly enabled. Whitelist and LOA exemptions apply.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
+    .setFooter({ text: "Automatic Paradise activity check • Made by Paradise bot" })], components: [row] });
   return id;
 }
 
@@ -1412,7 +1859,7 @@ async function runParadiseMaintenance(guild) {
       }
       const responded = new Set(check.responses || []);
       const removed = [];
-      if (state.config.autoActivityRoleRemoval === true) {
+      if (state.config.autoActivityRoleRemoval === true && state.config.activity?.autoRoleChanges === true) {
         for (const member of guild.members.cache.values()) {
           if (member.user.bot || responded.has(member.id) || exempt.has(member.id)) continue;
           const removable = member.roles.cache.filter(role => roles.includes(role.name));
@@ -1423,27 +1870,32 @@ async function runParadiseMaintenance(guild) {
         }
       }
       state.activityChecks[id] = { ...check, processedAt: new Date().toISOString(), removed };
-      const log = guild.channels.cache.find(channel => channel.name.includes("activity-review"));
+      const log = await configuredChannel(guild, "activity_logs_channel", "activity-review")
+        || guild.channels.cache.find(channel => channel.name.includes("activity-review"));
       if (log) await log.send(`Activity check **${check.group}** closed. Responses: ${responded.size}. Role removals: ${removed.length}. Whitelists were respected.`).catch(() => {});
     }
     if (state.config.autoActivityChecks === true) {
       const last = Number(state.config.lastAutoActivityCheckAt || 0);
-      if (now - last >= 48 * 60 * 60_000) {
+      const intervalHours = Number(state.config.activity?.checkEveryHours || 48);
+      if (now - last >= intervalHours * 60 * 60_000) {
         for (const group of ["Referee", "Tryout", "Training"]) await postAutomaticActivityCheck(guild, group, state);
         state.config.lastAutoActivityCheckAt = now;
       }
     }
     const sundayKey = new Date(now).toISOString().slice(0, 10);
     if (new Date(now).getUTCDay() === 0 && state.config.lastWeeklyReview !== sundayKey) {
-      const log = guild.channels.cache.find(channel => channel.name.includes("activity-review"));
+      const log = await configuredChannel(guild, "activity_logs_channel", "activity-review")
+        || guild.channels.cache.find(channel => channel.name.includes("activity-review"));
       if (log) {
         const lines = [];
+        const quotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
+        const promotionMultiplier = Number(state.config.activity?.promotionMultiplier || 3);
         for (const member of guild.members.cache.values()) {
-          const quota = Object.entries(WEEKLY_QUOTAS).find(([role]) => member.roles.cache.some(item => item.name === role));
+          const quota = Object.entries(quotas).find(([role]) => member.roles.cache.some(item => item.name === role));
           if (!quota) continue;
           const [role, rule] = quota;
           const count = weekActivityCount(state.staffActivity[member.id], rule.key, now);
-          const recommendation = count < rule.minimum ? "demotion review" : count >= rule.minimum * 3 ? "promotion review" : "meets quota";
+          const recommendation = count < rule.minimum ? "demotion review" : count >= rule.minimum * promotionMultiplier ? "promotion review" : "meets quota";
           lines.push(`${member} — ${role}: ${count}/${rule.minimum} — ${recommendation}`);
         }
         await log.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Sunday Staff Review")
@@ -1494,7 +1946,9 @@ async function handleActivity(interaction) {
     }
     const group = interaction.options.getString("group");
     const id = crypto.randomUUID();
-    const expiresAt = Date.now() + 86_400_000;
+    const policy = (await loadState()).config.activity || {};
+    const deadlineHours = Number(policy.responseDeadlineHours || 24);
+    const expiresAt = Date.now() + deadlineHours * 3_600_000;
     await saveState(state => {
       state.activityChecks[id] = { group, startedBy: interaction.user.id, startedAt: new Date().toISOString(), expiresAt, responses: [] };
       return state;
@@ -1503,23 +1957,27 @@ async function handleActivity(interaction) {
       new ButtonBuilder().setCustomId(`paradise_activity_present:${id}`).setLabel("I am active / Aktifim").setStyle(ButtonStyle.Success)
     );
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
-      .setDescription(`Respond within 24 hours. Staff who do not respond may lose the related role unless they have an active whitelist.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
+      .setDescription(`Respond within ${deadlineHours} hours. Missing responses create review flags; automatic role changes require explicit dashboard opt-in. Whitelist and LOA exemptions apply.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
       .setFooter({ text: "Made by Paradise bot" })], components: [row] });
   }
   const state = await loadState();
   const now = Date.now();
   const rows = [];
+  const quotas = state.config.weeklyQuotas || WEEKLY_QUOTAS;
+  const promotionMultiplier = Number(state.config.activity?.promotionMultiplier || 3);
   for (const member of interaction.guild.members.cache.values()) {
-    const quota = Object.entries(WEEKLY_QUOTAS).find(([role]) => member.roles.cache.some(item => item.name === role));
+    const quota = Object.entries(quotas).find(([role]) => member.roles.cache.some(item => item.name === role));
     if (!quota) continue;
     const [role, rule] = quota;
     const count = weekActivityCount(state.staffActivity[member.id], rule.key, now);
     const exempt = state.whitelists[member.id] && (!state.whitelists[member.id].expiresAt || Date.parse(state.whitelists[member.id].expiresAt) > now);
-    const recommendation = exempt ? "WHITELIST" : count < rule.minimum ? "DEMOTION REVIEW" : count >= rule.minimum * 3 ? "PROMOTION REVIEW" : "OK";
+    const recommendation = exempt ? "WHITELIST" : count < rule.minimum ? "DEMOTION REVIEW" : count >= rule.minimum * promotionMultiplier ? "PROMOTION REVIEW" : "OK";
     rows.push(`${member} — ${role}: ${count}/${rule.minimum} — **${recommendation}**`);
   }
+  const pendingTickets = Object.values(state.pendingChallenges).filter(item => ["open", "pending"].includes(item.status)).length;
+  const missedChecks = Object.values(state.activityChecks).filter(item => item.processedAt && (item.removed || []).length).length;
   return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ WEEKLY STAFF ACTIVITY")
-    .setDescription(`## ◆ Quota review\n${rows.join("\n").slice(0, 3850) || "_No quota roles found._"}\n\n-# Recommendations require manager review; the bot does not auto-promote or auto-demote.`)
+    .setDescription(`## ◆ Operations snapshot\n- **Pending/open challenge records:** ${pendingTickets}\n- **Activity checks with missed-role actions:** ${missedChecks}\n\n## ◆ Quota review\n${rows.join("\n").slice(0, 3500) || "_No quota roles found._"}\n\n-# Recommendations require manager review; automatic changes require explicit dashboard opt-in.`)
     .setFooter(paradiseFooter("Sunday staff review"))], ephemeral: true });
 }
 
@@ -1587,7 +2045,18 @@ async function handleStaffReport(interaction) {
   return interaction.reply({ content: `Private report opened: ${channel}`, ephemeral: true });
 }
 
-function helpEmbed(scope) {
+function helpEmbed(scope, locale = "en") {
+  if (String(locale).toLowerCase().startsWith("tr")) {
+    const descriptions = {
+      community: "# Fieel's Community\n## ◆ Üye komutları\n- `/fima_account` — bağlı Fima hesabı\n- `/fima_ticket` — özel destek menüsü\n- `/fima_help` — ürün ve hesap yardımı\n- `/sendpingroleselector` — bildirim rolleri\n\n## ◆ Yetkili kurulumları\nFima destek panelleri yalnızca Community şablonunda kullanılmalıdır.\n\n-# Gerekli yetki: panel kurulumlarında yönetici; üye yardım komutlarında normal üye.",
+      clan: "# Paradise Clan\n## ◆ Oyuncular\n- `/profile create|view|edit|verify-status`\n- `/challenge create` — uygun hedef menüsü\n- `/availability panel` — canlı durum panosu\n\n## ◆ Hoster ve hakemler\n- `/tryout start|result`\n- `/training setup|start|result`\n- `/challenge post|autowin|close`\n\n## ◆ Yönetim\n- `/set ...` kanal eşlemeleri\n- `/relation add|edit|remove|panel`\n- `/loa request|add|approve|deny|remove|panel`\n- `/handbook post`\n\n-# Komut kanalları `/commandchannel` ile sınırlandırılır.",
+      tsbtr: "# TSBTR-style Operasyon\n## ◆ Liderlik ve challenge\n- `/challenge create|post|autowin`\n- `/availability panel`\n- `/referee guide|works`\n\n## ◆ Staff\n- `/activity check|summary`\n- `/whitelist add|remove|list`\n- `/loa request|approve|deny|panel`\n\n## ◆ Güvenli kurulum\n- `/setupfieelstsbtr action:preview|repair|guides`\n\n-# Destructive rebuild yalnızca yedek + diff + yazılı son onayla çalışır."
+    };
+    return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR)
+      .setTitle(`✦ ${scope === "community" ? "COMMUNITY" : scope === "tsbtr" ? "TSBTR-STYLE" : "PARADISE CLAN"} KOMUT REHBERİ`)
+      .setDescription(descriptions[scope] || descriptions.clan)
+      .setFooter(paradiseFooter("Türkçe yardım"));
+  }
   if (scope === "community") {
     return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("✦ COMMUNITY COMMAND GUIDE")
       .setDescription("# Fieel's Community\n## ◆ Member commands\n- `/fima_account` — linked account; use in **bot-commands**\n- `/fima_ticket` — private support menu; use in **open-ticket**\n- `/fima_help` — Fima product/account help\n- `/fima_support_ai question:<text>` — approved knowledge-base answer\n- `/language choice:<language>` — support language\n\n## ◆ Staff setup\n- `/fima_ticket_setup channel:#open-ticket`\n- `/fima_trust_setup channel:#security-and-trust`\n- `/fima_faq_setup channel:#faq`\n- `/fima_language_setup channel:#choose-language`\n- `/sendpingroleselector` in **choose-pings**\n\n-# Fima commands are reserved for app, licensing, payment and product support.")
@@ -1603,18 +2072,23 @@ function helpEmbed(scope) {
     .setFooter(paradiseFooter("Clan help"));
 }
 
-function helpButtons() {
+function helpButtons(scope = "clan") {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("paradise_help:community").setLabel("Community").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("paradise_help:clan").setLabel("Clan").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("paradise_help:tsbtr").setLabel("TSBTR-style").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("paradise_help:tsbtr").setLabel("TSBTR-style").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_help_lang:en:${scope}`).setLabel("English").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_help_lang:tr:${scope}`).setLabel("Türkçe").setStyle(ButtonStyle.Secondary)
   );
 }
 
 async function handleHelp(interaction) {
+  const turkish = String(interaction.locale || "").toLowerCase().startsWith("tr");
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ WHAT DO YOU NEED HELP WITH?")
-      .setDescription("Choose a system below. Its command guide is shown privately, including what each command does and where it belongs.")
+      .setDescription(turkish
+        ? "Bir sistem seçin. Komutun ne yaptığı, gereken yetki ve kullanılacağı kanal yalnızca size gösterilir."
+        : "Choose a system below. Its command guide is shown privately, including what each command does, required permissions and where it belongs.")
       .setFooter(paradiseFooter("Interactive command directory"))],
     components: [helpButtons()],
     ephemeral: true
@@ -1622,11 +2096,11 @@ async function handleHelp(interaction) {
 }
 
 async function publishSetupGuides(guild, mode) {
-  const channel = guild.channels.cache.find(item => item.name === "command-guide");
+  const channel = await configuredChannel(guild, "command_guide_channel", "command-guide");
   if (!channel?.isTextBased?.()) return null;
   const message = await channel.send({
     embeds: [helpEmbed(mode).setColor(await paradiseBrandColor())],
-    components: [helpButtons()]
+    components: [helpButtons(mode)]
   });
   await saveState(state => {
     state.config.commandGuideMessageIds = state.config.commandGuideMessageIds || {};
@@ -1634,6 +2108,107 @@ async function publishSetupGuides(guild, mode) {
     return state;
   });
   return message;
+}
+
+async function configuredChannel(guild, mappingKey, fallbackName) {
+  const state = await loadState();
+  const configuredId = state.config.channelMappings?.[mappingKey];
+  if (configuredId) {
+    const configured = guild.channels.cache.get(configuredId) || await guild.channels.fetch(configuredId).catch(() => null);
+    if (configured?.isTextBased?.()) return configured;
+  }
+  return guild.channels.cache.find(item => item.name === fallbackName && item.isTextBased?.()) || null;
+}
+
+const GUIDE_POSTS = Object.freeze([
+  {
+    key: "rules",
+    channel: "rules",
+    title: "✦ PARADISE COMMUNITY RULES",
+    body: "# English\n## Respect & safety\n- No harassment, threats, hate speech, scams, account theft or malicious links.\n- Never request cookies, passwords, tokens or private authentication data.\n- Use approved media channels for links and attachments.\n- Staff actions require evidence and remain auditable.\n\n# Türkçe\n## Saygı ve güvenlik\n- Taciz, tehdit, nefret söylemi, dolandırıcılık ve zararlı bağlantılar yasaktır.\n- Cookie, şifre, token veya özel giriş bilgisi istemeyin.\n- Link ve dosyaları yalnızca izin verilen kanallarda paylaşın.\n- Yetkili işlemleri kanıtlı ve denetlenebilir olmalıdır."
+  },
+  {
+    key: "challenge_rules",
+    channel: "challenge-rules",
+    title: "⚔️ CHALLENGE HANDBOOK",
+    body: "# Challenge range\n- **Top 1–10:** 1 position\n- **Top 11–20:** 2 positions\n- **Top 21–30:** 3 positions\n- **Unranked:** #29 or #30 only\n\n## Before opening / Açmadan önce\n- Complete `/profile create`.\n- Cooldown, immunity, LOA and open-ticket state are checked twice.\n- Record the full set and keep proof in the ticket.\n\n## Result approval\nTrial Referee and Referee cannot approve results. Experienced Referee, Head Referee or Referee Manager approval is required.\n\n-# Süreler Discord timestamp ile yerel saat diliminde gösterilir."
+  },
+  {
+    key: "referee_guide",
+    channel: "referee-guide",
+    title: "⚖️ REFEREE OPERATIONS GUIDE",
+    body: "# Neutrality first / Tarafsızlık önce\n1. Check both Paradise profiles.\n2. Check availability, ranks and ticket context.\n3. Record the complete match.\n4. Submit `/challenge post` or `/challenge autowin` inside the ticket.\n5. Wait for authorized approval.\n\n## Authority\n- **Trial Referee:** assisted lower-range sets; no result approval.\n- **Referee:** normal sets; no result approval.\n- **Experienced Referee:** may review and approve.\n- **Referee Manager / Head Referee:** manages disputes and audit decisions.\n\n-# Approved work is counted automatically; denied work remains in the audit trail."
+  },
+  {
+    key: "training_rules",
+    channel: "training-hoster-rules",
+    title: "✦ TRAINING HOSTER HANDBOOK",
+    body: "# Training standard\n- Keep teams balanced and the session organized.\n- Never humiliate participants.\n- Record host, co-host, duration, participants, score, MVPs and proof.\n- Use `/training start`; finish with `/training result`.\n\n# Eğitim standardı\n- Takımları dengeli ve oturumu düzenli tutun.\n- Katılımcıları aşağılamayın.\n- Hoster, co-hoster, süre, katılımcı, skor, MVP ve kanıtı kaydedin.\n- Başlatmak için `/training start`, bitirmek için `/training result` kullanın."
+  },
+  {
+    key: "tryout_rules",
+    channel: "tryout-hoster-rules",
+    title: "✦ TRYOUT HOSTER HANDBOOK",
+    body: "# Evaluate play, not only wins\nObserve RC timing, catches, dash reactions, movement, pressure, adaptation and game sense.\n\n## Required flow\n1. Start with `/tryout start`.\n2. Lock the server after the entry window.\n3. Submit Stage → Level → Strength in order.\n4. Never assign above your configured authority.\n5. Wait for manager approval.\n\n-# Kazanmak tek başına yüksek rank garantisi değildir."
+  },
+  {
+    key: "role_guide",
+    channel: "role-guide",
+    title: "✦ ROLE & AUTHORITY GUIDE",
+    body: "# Rank model\n`Stage 0` is best. Progression inside a stage is **Low → Mid → High**, and inside each level **Weak → Stable → Strong**.\n\n## Staff boundaries\n- Trial roles have limited visibility and no high-impact approvals.\n- Hoster roles use bot workflows instead of manual rank-role management.\n- Only configured managers can approve scores, LOA and destructive setup.\n\n-# Rol yetkileri metinden değil, bot kontrolleri ve Discord izinlerinden uygulanır."
+  },
+  {
+    key: "faq_trust",
+    channel: "security-and-trust",
+    title: "🛡️ TRUST & SECURITY",
+    body: "# Paradise and Fima safety\n- Paradise never asks for cookies, passwords or Discord/Roblox tokens.\n- Fima downloads must come from official channels only.\n- Screenshots are not automatic proof of Roblox ownership or payment.\n- Suspicious links should be reported through the support ticket panel.\n\n# Güvenlik\n- Paradise cookie, şifre veya token istemez.\n- Fima dosyalarını yalnızca resmi kanallardan indirin.\n- Şüpheli bağlantıları destek ticket sistemiyle bildirin."
+  },
+  {
+    key: "mainer_guide",
+    channel: "maining-guide",
+    title: "✦ PARADISE MAINING GUIDE",
+    body: "# Official flow\nUse `/mainer guide` to display the current Paradise code and approved TSBCC command format.\n\n- Keep proof in **mainer-proof**.\n- Never share account credentials.\n- Staff role selection must match your approved role.\n\n-# Güncel kod bot state’inden alınır; eski mesajlardaki kodlara güvenmeyin."
+  },
+  {
+    key: "availability_guide",
+    channel: "availability",
+    title: "✦ AVAILABILITY GUIDE",
+    body: "# What the board means\n- **Cooldown:** player cannot initiate a challenge until expiry.\n- **Immunity:** player cannot be challenged until expiry.\n- **Being challenged:** an open ticket blocks another challenge.\n- **LOA:** shown separately when it affects ranked availability.\n\n-# Times use Discord relative timestamps and adapt to every user's timezone."
+  },
+  {
+    key: "loa_guide",
+    channel: "loa",
+    title: "🌙 LOA GUIDE",
+    body: "# Leave of absence\nUse `/loa request` with the duration and reason. A manager must approve it.\n\n## Separate from challenge availability\nLOA is a staff attendance record. Cooldown and immunity belong to the challenge system.\n\n-# İzin süresi dolduğunda durum otomatik olarak expired olur; yönetici erken kaldırabilir."
+  }
+]);
+
+async function publishGuidePost(guild, definition) {
+  const channel = guild.channels.cache.find(item => item.name === definition.channel && item.isTextBased?.());
+  if (!channel) return false;
+  const state = await loadState();
+  const oldId = state.config.guideMessageIds?.[definition.key];
+  let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
+  const payload = {
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(definition.title)
+      .setDescription(definition.body.slice(0, 4096)).setFooter(paradiseFooter("TR / EN handbook")).setTimestamp()]
+  };
+  if (message) await message.edit(payload); else message = await channel.send(payload);
+  await saveState(next => {
+    next.config.guideMessageIds = next.config.guideMessageIds || {};
+    next.config.guideMessageIds[definition.key] = message.id;
+    return next;
+  });
+  return true;
+}
+
+async function publishAllGuides(guild, mode) {
+  let posted = 0;
+  if (await publishSetupGuides(guild, mode)) posted += 1;
+  for (const definition of GUIDE_POSTS) {
+    if (await publishGuidePost(guild, definition).catch(() => false)) posted += 1;
+  }
+  return { posted, mode };
 }
 
 function canManageClan(member) {
@@ -1644,12 +2219,12 @@ function canManageClan(member) {
 function relationshipLines(entries) {
   const rows = Object.values(entries || {}).sort((a, b) => a.clan.localeCompare(b.clan));
   return rows.length
-    ? rows.map(item => `◆ **${item.clan}**${item.representativeId ? ` — <@${item.representativeId}>` : ""}${item.invite ? `\n  [Server invite](${item.invite})` : ""}${item.note ? `\n  _${item.note}_` : ""}`).join("\n")
+    ? rows.map(item => `◆ **${item.clan}**${item.status ? ` · \`${item.status}\`` : ""}${item.representativeId ? ` — <@${item.representativeId}>` : ""}${item.invite ? `\n  [Server invite](${item.invite})` : ""}${item.note ? `\n  _${item.note}_` : ""}`).join("\n")
     : "_None configured._";
 }
 
 async function updateRelationsPanel(guild) {
-  const channel = guild.channels.cache.find(item => item.name === "clan-relations");
+  const channel = await configuredChannel(guild, "relation_panel_channel", "clan-relations");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🤝 PARADISE CLAN RELATIONS")
@@ -1686,11 +2261,14 @@ async function handleRelation(interaction) {
       if (sub === "remove") delete bucket[key];
       else {
         delete opposite[key];
+        const existing = bucket[key] || {};
         bucket[key] = {
+          ...existing,
           clan,
-          representativeId: interaction.options.getUser("representative")?.id || null,
-          invite,
-          note: interaction.options.getString("note") || null,
+          representativeId: interaction.options.getUser("representative")?.id || existing.representativeId || null,
+          invite: invite || existing.invite || null,
+          note: interaction.options.getString("note") || existing.note || null,
+          status: interaction.options.getString("status") || existing.status || "active",
           updatedBy: interaction.user.id,
           updatedAt: new Date().toISOString()
         };
@@ -1723,20 +2301,33 @@ export function challengedLines(state) {
     .join("\n\n") || "_No active challenge tickets._";
 }
 
+function rankedLoaLines(state, now = Date.now()) {
+  const rows = Object.values(state.loa || {})
+    .filter(item => item.status === "approved" && Number(item.expiresAt) > now && state.leaderboard[item.userId]?.spot)
+    .sort((a, b) => Number(a.expiresAt) - Number(b.expiresAt));
+  return rows.length
+    ? rows.map(item => `• <@${item.userId}> | **Rank #${state.leaderboard[item.userId].spot}** unavailable until <t:${Math.floor(item.expiresAt / 1000)}:R>`).join("\n")
+    : "_None._";
+}
+
 async function updateAvailabilityPanel(guild) {
-  const channel = guild.channels.cache.find(item => item.name === "availability");
+  const channel = await configuredChannel(guild, "availability_channel", "availability");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHALLENGE AVAILABILITY")
     .setDescription(("## ◆ Current Cooldowns\n" + timedAvailabilityLines(state, "cooldownUntil")
       + "\n\n## ◆ Current Immunity\n" + timedAvailabilityLines(state, "immunityUntil")
       + "\n\n## ◆ Being Challenged\n" + challengedLines(state)
-      + "\n\n-# LOA entries are intentionally kept in the separate LOA panel.").slice(0, 4096))
+      + "\n\n## ◆ Ranked LOA Impact\n" + rankedLoaLines(state)
+      + "\n\n-# Full LOA records remain in the separate LOA panel.").slice(0, 4096))
     .setFooter(paradiseFooter("Automatically refreshed by challenge results"));
   let message = state.config.availabilityMessageId
     ? await channel.messages.fetch(state.config.availabilityMessageId).catch(() => null)
     : null;
-  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  const components = [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("paradise_availability_refresh").setLabel("Refresh availability").setStyle(ButtonStyle.Secondary)
+  )];
+  if (message) await message.edit({ embeds: [embed], components }); else message = await channel.send({ embeds: [embed], components });
   await saveState(next => { next.config.availabilityMessageId = message.id; return next; });
   return message;
 }
@@ -1778,12 +2369,12 @@ function activeLoaLines(state) {
     .filter(item => item.status === "approved" && item.expiresAt > now)
     .sort((a, b) => a.expiresAt - b.expiresAt);
   return rows.length
-    ? rows.map(item => `◆ <@${item.userId}>\n- **Ends:** <t:${Math.floor(item.expiresAt / 1000)}:F> (<t:${Math.floor(item.expiresAt / 1000)}:R>)\n- **Reason:** ${item.reason}`).join("\n\n")
+    ? rows.map(item => `◆ <@${item.userId}>${item.robloxUsername ? ` · **${item.robloxUsername}**` : ""}${item.region ? ` · ${item.region}` : ""}\n- **Ends:** <t:${Math.floor(item.expiresAt / 1000)}:F> (<t:${Math.floor(item.expiresAt / 1000)}:R>)\n- **Note:** ${item.reason || item.note || "No note"}${item.decidedBy ? `\n- **Approved by:** <@${item.decidedBy}>` : ""}`).join("\n\n")
     : "_No active staff LOAs._";
 }
 
 async function updateLoaPanel(guild) {
-  const channel = guild.channels.cache.find(item => item.name === "loa");
+  const channel = await configuredChannel(guild, "loa_channel", "loa");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🌙 STAFF LEAVE OF ABSENCE")
@@ -1800,10 +2391,23 @@ async function updateLoaPanel(guild) {
 async function handleLoa(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "request") {
-    const expiresAt = Date.now() + interaction.options.getInteger("days") * 86_400_000;
+    const state = await loadState();
+    const days = interaction.options.getInteger("days");
+    const maxDays = Number(state.config.loa?.maxDays || 90);
+    if (days > maxDays) return interaction.reply({ content: `Maximum configured LOA is **${maxDays} days**.`, ephemeral: true });
+    const evidence = interaction.options.getString("evidence") || null;
+    if (state.config.loa?.requireEvidence && !evidence) {
+      return interaction.reply({ content: "Evidence is required by the current LOA policy.", ephemeral: true });
+    }
+    const profile = await verifiedProfile(interaction.user.id);
+    const expiresAt = Date.now() + days * 86_400_000;
     const record = {
       userId: interaction.user.id,
       reason: interaction.options.getString("reason"),
+      evidence,
+      robloxUsername: profile?.robloxUsername || null,
+      region: profile?.region || null,
+      startsAt: Date.now(),
       expiresAt,
       status: "pending",
       requestedAt: new Date().toISOString()
@@ -1819,6 +2423,55 @@ async function handleLoa(interaction) {
         .setFooter(paradiseFooter("Manager approval required"))],
       components: [row]
     });
+  }
+  if (["add", "approve", "deny", "remove"].includes(sub)) {
+    if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
+    const user = interaction.options.getUser("user");
+    const currentState = await loadState();
+    const current = currentState.loa[user.id];
+    if (sub === "add") {
+      const days = interaction.options.getInteger("days");
+      const profile = await verifiedProfile(user.id);
+      const record = {
+        userId: user.id,
+        note: interaction.options.getString("note"),
+        reason: interaction.options.getString("note"),
+        evidence: interaction.options.getString("evidence") || null,
+        robloxUsername: profile?.robloxUsername || null,
+        region: profile?.region || null,
+        startsAt: Date.now(),
+        expiresAt: Date.now() + days * 86_400_000,
+        status: "approved",
+        decidedBy: interaction.user.id,
+        decidedAt: new Date().toISOString(),
+        requestedAt: new Date().toISOString()
+      };
+      await saveState(state => { state.loa[user.id] = record; return state; });
+      const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+      const role = await ensureRole(interaction.guild, "LOA");
+      if (member) await member.roles.add(role).catch(() => {});
+    } else {
+      if (!current) return interaction.reply({ content: "No LOA record exists for that user.", ephemeral: true });
+      const status = sub === "approve" ? "approved" : sub === "deny" ? "denied" : "removed";
+      await saveState(state => {
+        state.loa[user.id] = {
+          ...state.loa[user.id],
+          status,
+          decisionReason: interaction.options.getString("reason") || null,
+          decidedBy: interaction.user.id,
+          decidedAt: new Date().toISOString()
+        };
+        return state;
+      });
+      const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+      const role = interaction.guild.roles.cache.find(item => item.name === "LOA");
+      if (status === "approved") {
+        const loaRole = role || await ensureRole(interaction.guild, "LOA");
+        if (member) await member.roles.add(loaRole).catch(() => {});
+      } else if (member && role) await member.roles.remove(role).catch(() => {});
+    }
+    const panel = await updateLoaPanel(interaction.guild);
+    return interaction.reply({ content: `LOA **${sub}** completed for ${user}.${panel ? ` Board: ${panel.url}` : ""}`, ephemeral: true });
   }
   if (sub === "end") {
     await saveState(state => {
@@ -1884,6 +2537,51 @@ async function handleCommandChannel(interaction) {
     return next;
   });
   return interaction.reply({ content: sub === "add" ? `/${command} is now allowed in this channel.` : `This channel was removed from /${command}.`, ephemeral: true });
+}
+
+async function postChallengeCreatePanel(guild, channel) {
+  const state = await loadState();
+  const oldId = state.config.challengeCreatePanelMessageId;
+  let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
+  const payload = {
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ CREATE A RANKED CHALLENGE")
+      .setDescription("# Ready to challenge?\nParadise will check your completed profile, leaderboard range, cooldown, opponent immunity, LOA and open tickets.\n\n## ◆ Before you continue\n- Record the complete set.\n- Keep evidence inside the ticket.\n- Result approval is restricted to senior referee roles.\n\n-# Hedef seçimi ve ticket açılışı sırasında durum iki kez kontrol edilir.")
+      .setFooter(paradiseFooter("Guided challenge flow"))],
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("paradise_challenge_open").setLabel("Choose an eligible opponent").setStyle(ButtonStyle.Primary)
+    )]
+  };
+  if (message) await message.edit(payload); else message = await channel.send(payload);
+  await saveState(next => { next.config.challengeCreatePanelMessageId = message.id; return next; });
+  return message;
+}
+
+async function handleSetChannel(interaction) {
+  if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
+  const key = interaction.options.getSubcommand();
+  if (!PARADISE_CHANNEL_MAPPINGS.some(([name]) => name === key)) {
+    return interaction.reply({ content: "Unknown Paradise channel mapping.", ephemeral: true });
+  }
+  const channel = interaction.options.getChannel("channel");
+  await saveState(state => {
+    state.config.channelMappings = state.config.channelMappings || {};
+    state.config.channelMappings[key] = channel.id;
+    state.config.channelMappingsUpdatedAt = new Date().toISOString();
+    return state;
+  });
+  if (key === "challenge_channel") await postChallengeCreatePanel(interaction.guild, channel);
+  if (key === "availability_channel") await updateAvailabilityPanel(interaction.guild);
+  if (key === "loa_channel") await updateLoaPanel(interaction.guild);
+  if (key === "relation_panel_channel") await updateRelationsPanel(interaction.guild);
+  return interaction.reply({ content: `**${key}** is now mapped to ${channel}.`, ephemeral: true });
+}
+
+async function handleHandbook(interaction) {
+  if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
+  await interaction.deferReply({ ephemeral: true });
+  const mode = interaction.options.getString("template");
+  const result = await publishAllGuides(interaction.guild, mode);
+  return interaction.editReply(`Handbook regeneration complete: **${result.posted}** guide messages updated or created.`);
 }
 
 async function enforceCommandChannel(interaction) {
@@ -2017,6 +2715,10 @@ export async function handleParadiseInteraction(interaction) {
     await handleVerifyModal(interaction);
     return true;
   }
+  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_setup_final:")) {
+    await handleSetupFinalConfirmation(interaction, interaction.customId.split(":")[1]);
+    return true;
+  }
   if (interaction.isButton?.()) {
     if (interaction.customId === "paradise_verify_open") {
       const modal = new ModalBuilder().setCustomId("paradise_verify_modal").setTitle("Roblox Verification");
@@ -2046,19 +2748,30 @@ export async function handleParadiseInteraction(interaction) {
     }
     if (interaction.customId === "paradise_profile_create") { await beginProfileCreation(interaction); return true; }
     if (interaction.customId === "paradise_profile_region_change") { await beginProfileRegionChange(interaction); return true; }
-    if (interaction.customId === "paradise_setup_confirm_clan") { await applyServerSetup(interaction, "clan"); return true; }
+    if (interaction.customId === "paradise_challenge_open") { await presentChallengeTargetMenu(interaction); return true; }
+    if (interaction.customId === "paradise_availability_refresh") {
+      const panel = await updateAvailabilityPanel(interaction.guild);
+      await interaction.reply({ content: panel ? "Availability refreshed." : "Availability channel is not configured.", ephemeral: true });
+      return true;
+    }
+    if (interaction.customId === "paradise_setup_confirm_clan") { await showSetupFinalConfirmation(interaction, "clan"); return true; }
     if (interaction.customId.startsWith("paradise_setup_select:")) {
       await setupPreview(interaction, interaction.customId.split(":")[1], true);
       return true;
     }
-    if (interaction.customId.startsWith("paradise_setup_confirm:")) {
-      await applyServerSetup(interaction, interaction.customId.split(":")[1]);
+    if (interaction.customId.startsWith("paradise_setup_review:")) {
+      await showSetupFinalConfirmation(interaction, interaction.customId.split(":")[1]);
       return true;
     }
     if (interaction.customId === "paradise_setup_cancel") { await interaction.update({ content: "Setup cancelled.", embeds: [], components: [] }); return true; }
     if (interaction.customId.startsWith("paradise_help:")) {
       const scope = interaction.customId.split(":")[1];
-      await interaction.update({ embeds: [helpEmbed(scope).setColor(await paradiseBrandColor())], components: [helpButtons()] });
+      await interaction.update({ embeds: [helpEmbed(scope, interaction.locale).setColor(await paradiseBrandColor())], components: [helpButtons(scope)] });
+      return true;
+    }
+    if (interaction.customId.startsWith("paradise_help_lang:")) {
+      const [, locale, scope] = interaction.customId.split(":");
+      await interaction.reply({ embeds: [helpEmbed(scope, locale).setColor(await paradiseBrandColor())], ephemeral: true });
       return true;
     }
     if (interaction.customId.startsWith("paradise_loa_")) { await handleLoaDecision(interaction); return true; }
@@ -2108,10 +2821,10 @@ export async function handleParadiseInteraction(interaction) {
   if (!await enforceCommandChannel(interaction)) return true;
   if (interaction.commandName === "setupfieels" || interaction.commandName === "previewserversetup") { await setupChooser(interaction); return true; }
   if (interaction.commandName === "backupserverstructure") { await setupPreview(interaction, "clan"); return true; }
-  if (interaction.commandName === "setupfieelscommunity") { await setupPreview(interaction, "community"); return true; }
-  if (interaction.commandName === "setupfieelsclan") { await setupPreview(interaction, "clan"); return true; }
-  if (interaction.commandName === "setupfieelstsbtr") { await setupPreview(interaction, "tsbtr"); return true; }
-  if (interaction.commandName === "setup") { await setupPreview(interaction, interaction.options.getString("mode") || "community"); return true; }
+  if (interaction.commandName === "setupfieelscommunity") { await handleSetupAction(interaction, "community"); return true; }
+  if (interaction.commandName === "setupfieelsclan") { await handleSetupAction(interaction, "clan"); return true; }
+  if (interaction.commandName === "setupfieelstsbtr") { await handleSetupAction(interaction, "tsbtr"); return true; }
+  if (interaction.commandName === "setup") { await handleSetupAction(interaction, interaction.options.getString("mode") || "community"); return true; }
   if (interaction.commandName === "help") { await handleHelp(interaction); return true; }
   if (interaction.commandName === "verifyroblox") { await verifyStart(interaction); return true; }
   if (interaction.commandName === "verifyrobloxcheck") { await verifyCheck(interaction); return true; }
@@ -2131,7 +2844,7 @@ export async function handleParadiseInteraction(interaction) {
   }
   if (interaction.commandName === "tryout") { await handleTryout(interaction); return true; }
   if (interaction.commandName === "challenge") { await handleChallenge(interaction); return true; }
-  if (interaction.commandName === "paradisetraining") { await handleTraining(interaction); return true; }
+  if (interaction.commandName === "paradisetraining" || interaction.commandName === "training") { await handleTraining(interaction); return true; }
   if (interaction.commandName === "tournament") { await handleTournament(interaction); return true; }
   if (interaction.commandName === "giveaway") { await handleGiveaway(interaction); return true; }
   if (interaction.commandName === "gamenight") { await handleCommunityEvent(interaction, "gamenight"); return true; }
@@ -2148,5 +2861,7 @@ export async function handleParadiseInteraction(interaction) {
   if (interaction.commandName === "relation") { await handleRelation(interaction); return true; }
   if (interaction.commandName === "availability") { await handleAvailability(interaction); return true; }
   if (interaction.commandName === "loa") { await handleLoa(interaction); return true; }
+  if (interaction.commandName === "set") { await handleSetChannel(interaction); return true; }
+  if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;
 }

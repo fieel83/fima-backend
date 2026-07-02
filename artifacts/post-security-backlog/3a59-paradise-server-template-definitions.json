@@ -1,0 +1,30 @@
+{
+  "id": "3a59-paradise-server-template-definitions",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "templates": {
+    "community": {
+      "purpose": "Fima product, support, safety, updates and community server",
+      "setupCommand": "/setupfieelscommunity",
+      "mode": ["preview", "repair", "guides"],
+      "destructiveConfirmation": "REBUILD COMMUNITY"
+    },
+    "clan": {
+      "purpose": "Paradise clan, training, tryout, challenge and event server",
+      "setupCommand": "/setupfieelsclan",
+      "mode": ["preview", "repair", "guides"],
+      "destructiveConfirmation": "REBUILD CLAN"
+    },
+    "tsbtr": {
+      "purpose": "Expanded TSB-style community/reference template kept separate from Paradise Clan",
+      "setupCommand": "/setupfieelstsbtr",
+      "mode": ["preview", "repair", "guides"],
+      "destructiveConfirmation": "REBUILD TSBTR"
+    }
+  },
+  "safety": {
+    "testGuildOnlyForDestructiveMode": true,
+    "backupBeforeMutation": true,
+    "previewRequired": true,
+    "repairIsNonDestructive": true
+  }
+}

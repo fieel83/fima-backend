@@ -1,0 +1,29 @@
+{
+  "id": "3a59-paradise-dashboard-field-map",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "route": "/paradise",
+  "access": {
+    "requiresFimaLogin": true,
+    "requiresLinkedDiscordId": "762858334440521739",
+    "indexing": "noindex",
+    "botTokenRendered": false
+  },
+  "sections": {
+    "runtime": ["guild", "bot status", "command sync count", "categories", "channels", "roles", "AutoMod", "webhooks"],
+    "template": ["community", "clan", "tsbtr"],
+    "branding": ["embed HEX color"],
+    "challenge": ["top size", "top ranges", "cooldown", "top-10 cooldown", "immunity", "proof"],
+    "channels": ["18 operational channel mappings"],
+    "verification": ["expiry", "training profile requirement"],
+    "loa": ["maximum days", "evidence", "automatic expiry"],
+    "activity": ["check interval", "response deadline", "promotion multiplier", "automatic role changes"],
+    "automod": ["enabled", "invite filter", "scam filter", "mention spam limit"],
+    "advanced": ["mainer code", "quota JSON", "command channel JSON", "automation"],
+    "safeExport": ["configuration JSON without credentials"]
+  },
+  "responsiveQA": {
+    "desktop": "PASS",
+    "mobile390x844": "PASS",
+    "horizontalOverflow": false
+  }
+}

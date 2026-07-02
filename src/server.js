@@ -46,6 +46,7 @@ import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicen
 import {
   discordBotHealth,
   giveDiscordRole,
+  paradiseDiscordRuntimeSnapshot,
   removeDiscordRole,
   sendPasswordResetDm,
   sendPaymentSubmissionLog,
@@ -604,9 +605,11 @@ app.get("/paradise", requireUser, requireParadiseOwner, (_req, res) => {
 app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, res) => {
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? row.value : {};
+  const runtime = await paradiseDiscordRuntimeSnapshot().catch(error => ({ status: "error", error: error.message }));
   return res.json({
     success: true,
     config: state.config || {},
+    runtime,
     summary: {
       verifiedProfiles: Object.keys(state.profiles || {}).length,
       pendingTryouts: Object.values(state.pendingTryouts || {}).filter(item => item.status !== "approved").length,
@@ -626,7 +629,9 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   const origin = String(req.get("origin") || "");
   if (origin && new URL(origin).host !== new URL(apiBaseUrl()).host) return res.status(403).json({ error: "origin_mismatch" });
   const kind = String(req.body?.kind || "");
-  if (!["mainer", "quotas", "channels", "automation", "branding"].includes(kind)) return res.status(400).json({ error: "invalid_config_kind" });
+  if (!["mainer", "quotas", "channels", "channelMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility"].includes(kind)) {
+    return res.status(400).json({ error: "invalid_config_kind" });
+  }
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
   state.config = state.config && typeof state.config === "object" ? state.config : {};
@@ -640,10 +645,67 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   } else if (kind === "channels") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_channels" });
     state.config.commandChannels = req.body.value;
+  } else if (kind === "channelMappings") {
+    if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_channel_mappings" });
+    const mappings = {};
+    for (const [key, value] of Object.entries(req.body.value)) {
+      if (!/^[a-z][a-z0-9_]{1,48}$/.test(key)) continue;
+      const channelId = String(value || "");
+      if (/^\d{16,22}$/.test(channelId)) mappings[key] = channelId;
+    }
+    state.config.channelMappings = mappings;
   } else if (kind === "branding") {
     const brandColor = String(req.body?.value || "").trim().toUpperCase();
     if (!/^#[0-9A-F]{6}$/.test(brandColor)) return res.status(400).json({ error: "invalid_brand_color" });
     state.config.brandColor = brandColor;
+  } else if (kind === "template") {
+    const template = String(req.body?.value || "");
+    if (!["community", "clan", "tsbtr"].includes(template)) return res.status(400).json({ error: "invalid_template" });
+    state.config.activeSetupMode = template;
+  } else if (kind === "challenge") {
+    const value = req.body?.value || {};
+    state.config.challenge = {
+      topSize: Math.min(100, Math.max(2, Number(value.topSize) || 30)),
+      top10Range: Math.min(10, Math.max(1, Number(value.top10Range) || 1)),
+      top20Range: Math.min(10, Math.max(1, Number(value.top20Range) || 2)),
+      top30Range: Math.min(10, Math.max(1, Number(value.top30Range) || 3)),
+      cooldownDays: Math.min(30, Math.max(1, Number(value.cooldownDays) || 3)),
+      top10CooldownDays: Math.min(30, Math.max(1, Number(value.top10CooldownDays) || 7)),
+      immunityDays: Math.min(30, Math.max(1, Number(value.immunityDays) || 3)),
+      proofRequired: value.proofRequired === true
+    };
+  } else if (kind === "loa") {
+    const value = req.body?.value || {};
+    state.config.loa = {
+      maxDays: Math.min(365, Math.max(1, Number(value.maxDays) || 90)),
+      requireEvidence: value.requireEvidence === true,
+      autoExpire: value.autoExpire !== false
+    };
+  } else if (kind === "verification") {
+    const value = req.body?.value || {};
+    state.config.verification = {
+      codeExpiryMinutes: Math.min(30, Math.max(3, Number(value.codeExpiryMinutes) || 10)),
+      requireProfileForTrainingResult: value.requireProfileForTrainingResult !== false
+    };
+  } else if (kind === "activity") {
+    const value = req.body?.value || {};
+    state.config.activity = {
+      checkEveryHours: Math.min(168, Math.max(24, Number(value.checkEveryHours) || 48)),
+      responseDeadlineHours: Math.min(72, Math.max(1, Number(value.responseDeadlineHours) || 24)),
+      promotionMultiplier: Math.min(10, Math.max(2, Number(value.promotionMultiplier) || 3)),
+      autoRoleChanges: value.autoRoleChanges === true
+    };
+  } else if (kind === "automod") {
+    const value = req.body?.value || {};
+    state.config.automod = {
+      enabled: value.enabled !== false,
+      blockInvites: value.blockInvites !== false,
+      blockScamKeywords: value.blockScamKeywords !== false,
+      mentionSpamLimit: Math.min(50, Math.max(3, Number(value.mentionSpamLimit) || 8))
+    };
+  } else if (kind === "commandVisibility") {
+    if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_visibility" });
+    state.config.commandVisibility = req.body.value;
   } else {
     state.config.autoActivityChecks = req.body?.value?.autoActivityChecks === true;
     state.config.autoActivityRoleRemoval = req.body?.value?.autoActivityRoleRemoval === true;

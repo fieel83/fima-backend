@@ -1,0 +1,33 @@
+{
+  "id": "3a59-paradise-final-unresolved-blockers",
+  "status": "LIVE PENDING",
+  "blockers": [
+    {
+      "action": "Destructive test-server setup",
+      "requiredInput": "Run preview/backup, then type REBUILD COMMUNITY, REBUILD CLAN or REBUILD TSBTR in Discord.",
+      "why": "Required by the owner's own safety specification."
+    },
+    {
+      "action": "Production least-privilege permission hardening",
+      "requiredInput": "Complete the test-guild live workflow first and measure the permissions actually exercised.",
+      "why": "Administrator permission is allowed only in the test server."
+    },
+    {
+      "action": "Cross-server FCW discovery",
+      "requiredInput": "Obtain bot authorization and permission in the external server or use an approved API/data feed.",
+      "why": "Normal-user/self-bot automation is prohibited."
+    },
+    {
+      "action": "Live multi-user end-to-end test",
+      "requiredInput": "Real member/referee/manager test accounts must press the buttons and exercise role hierarchy.",
+      "why": "A single bot runtime cannot truthfully validate every human permission boundary alone."
+    }
+  ],
+  "notBlockers": [
+    "Source implementation",
+    "Local command schema verification",
+    "Dashboard desktop/mobile layout",
+    "Typed destructive confirmation",
+    "Short verification code generation"
+  ]
+}

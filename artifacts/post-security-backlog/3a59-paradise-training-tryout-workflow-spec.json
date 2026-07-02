@@ -1,0 +1,18 @@
+{
+  "id": "3a59-paradise-training-tryout-workflow-spec",
+  "status": "LOCAL RUNTIME VERIFIED",
+  "training": {
+    "commands": ["/training setup", "/training start", "/training result"],
+    "records": ["session ID", "host", "co-host", "server link", "rules", "start time", "result", "MVP", "proof"],
+    "ownership": "Only the recorded host or authorized staff may finish a session.",
+    "endBehavior": "The original announcement is updated/replied with ENDED and the result is logged."
+  },
+  "tryout": {
+    "commands": ["/tryout start", "/tryout result"],
+    "rankInputs": ["stage", "level", "strength"],
+    "authority": "Staff cannot assign a better rank than their configured authority; ordinary tryout staff cannot assign below Stage 3 Low Weak.",
+    "approval": "Optional pending approval before role mutation.",
+    "profileRequirement": "Target must have verified Roblox identity."
+  },
+  "activity": "Completed sessions increment host activity and feed quota/recommendation reports."
+}
