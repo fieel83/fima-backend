@@ -1,13 +1,28 @@
 {
   "status": "SOURCE ONLY",
-  "commands": ["/blacklist add", "/blacklist remove", "/blacklist panel", "/blacklist appeal-panel"],
+  "commands": [
+    "/blacklist add",
+    "/blacklist remove",
+    "/blacklist status",
+    "/blacklist panel",
+    "/blacklist appeal-panel",
+    "/appeal open",
+    "/appeal approve",
+    "/appeal deny",
+    "/bail offer",
+    "/bail resolve",
+    "/bail deny"
+  ],
   "persistence": ["blacklists", "appeals", "bails"],
   "rules": {
     "evidenceRequiredConfig": true,
     "appealCooldownConfig": true,
     "bailDefault": "disabled",
     "bailAutoUnblacklist": false,
-    "bailOwnerApproval": true
+    "bailOwnerApproval": true,
+    "duplicatePendingAppealBlocked": true,
+    "privateThreadPreferred": true,
+    "privateAuditLogs": true
   },
   "warning": "Bail is never guaranteed and payment status is separate from resolution."
 }

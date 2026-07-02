@@ -58,12 +58,19 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("lineup"));
   assert.ok(names.includes("roster"));
   assert.ok(names.includes("blacklist"));
+  assert.ok(names.includes("appeal"));
+  assert.ok(names.includes("bail"));
+  assert.ok(names.includes("setlogchannel"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
   assert.deepEqual(commands.find(command => command.name === "profile").options.map(option => option.name), ["create", "view", "edit", "verify-status"]);
-  assert.equal(commands.find(command => command.name === "set").options.length, PARADISE_CHANNEL_MAPPINGS.length);
-  assert.ok(PARADISE_CHANNEL_MAPPINGS.length <= 25);
+  const mappingCommands = ["set", "setlogchannel"].flatMap(name => commands.find(command => command.name === name).options);
+  assert.equal(mappingCommands.length, PARADISE_CHANNEL_MAPPINGS.length);
+  assert.ok(commands.find(command => command.name === "set").options.length <= 25);
+  assert.ok(commands.find(command => command.name === "setlogchannel").options.length <= 25);
+  assert.deepEqual(commands.find(command => command.name === "lineup").options.map(option => option.name), ["add", "remove", "move", "edit", "clear", "panel", "repost"]);
+  assert.deepEqual(commands.find(command => command.name === "roster").options.map(option => option.name), ["add", "update", "remove", "panel", "repost"]);
 });
 
 test("Roblox verification codes stay short and avoid ambiguous filtered characters", () => {

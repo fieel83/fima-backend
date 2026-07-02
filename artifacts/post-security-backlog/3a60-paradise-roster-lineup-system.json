@@ -1,12 +1,13 @@
 {
   "status": "SOURCE ONLY",
   "commands": {
-    "/lineup add|remove|move|panel": "Implemented with Main and War boards",
-    "/roster add|remove|panel": "Implemented with region and optional note"
+    "/lineup add|remove|move|edit|clear|panel|repost": "Implemented with Main and War boards, duties and notes",
+    "/roster add|update|remove|panel|repost": "Implemented with region, rank, main and optional note"
   },
   "persistence": ["lineups", "rosters", "per-guild panel message IDs"],
   "display": ["main lineup", "war lineup", "competitive roster"],
   "permissions": "Administrator, Manage Server or configured competitive manager role names",
+  "auditLogs": ["roster logs", "war logs"],
   "dashboard": ["approval policy", "Roblox field", "stage field", "region field", "lineup limit", "density"],
   "liveDiscordTest": "NOT RUN — deployment required"
 }

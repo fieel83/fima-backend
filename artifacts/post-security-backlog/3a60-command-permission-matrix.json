@@ -6,6 +6,10 @@
     "challengeApprove": ["Experienced Referee", "Head Referee", "Referee Manager", "Owner", "Administrator"],
     "lineupRosterEdit": ["Competitive manager", "Manage Server", "Administrator"],
     "blacklistEdit": ["Blacklist or server manager", "Manage Server", "Administrator"],
+    "blacklistStatus": ["Public command", "Ephemeral response"],
+    "appealOpen": ["Blacklisted user", "Private thread when supported", "One pending appeal per user"],
+    "appealDecision": ["Blacklist or server manager", "Manage Server", "Administrator"],
+    "bailReview": ["Dashboard opt-in", "Manage Server or Administrator", "Never auto-unblacklists"],
     "dashboard": ["Fima login", "linked Discord owner ID 762858334440521739"],
     "guideRepost": ["Owner dashboard or Administrator handbook command"]
   },

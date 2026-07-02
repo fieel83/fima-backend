@@ -171,7 +171,12 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
   ["main_lineup_channel", "Main lineup board"],
   ["war_lineup_channel", "War lineup board"],
   ["mainer_proof_channel", "Mainer proof review"],
-  ["blacklist_channel", "Blacklist board"]
+  ["blacklist_channel", "Blacklist board"],
+  ["blacklist_appeal_channel", "Private blacklist appeals"],
+  ["bail_appeal_channel", "Private bail reviews"],
+  ["blacklist_logs_channel", "Private blacklist logs"],
+  ["roster_logs_channel", "Private roster logs"],
+  ["war_logs_channel", "Private war and lineup logs"]
 ]);
 
 export const PARADISE_COMMUNITY_SCHEMA = [
@@ -486,7 +491,9 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("add").setDescription("Add a member to a lineup")
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
-        .addIntegerOption(o => o.setName("position").setDescription("Optional display position").setMinValue(1).setMaxValue(50)))
+        .addIntegerOption(o => o.setName("position").setDescription("Optional display position").setMinValue(1).setMaxValue(50))
+        .addStringOption(o => o.setName("role").setDescription("Lineup duty or role").setMaxLength(80))
+        .addStringOption(o => o.setName("note").setDescription("Optional private-safe board note").setMaxLength(160)))
       .addSubcommand(s => s.setName("remove").setDescription("Remove a member from a lineup")
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true)))
@@ -494,16 +501,35 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
         .addIntegerOption(o => o.setName("position").setDescription("New display position").setRequired(true).setMinValue(1).setMaxValue(50)))
+      .addSubcommand(s => s.setName("edit").setDescription("Edit a lineup member's role or note")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("role").setDescription("Updated lineup duty or role").setMaxLength(80))
+        .addStringOption(o => o.setName("note").setDescription("Updated board note").setMaxLength(160)))
+      .addSubcommand(s => s.setName("clear").setDescription("Clear one lineup slot by position")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
+        .addIntegerOption(o => o.setName("position").setDescription("Slot to clear").setRequired(true).setMinValue(1).setMaxValue(50)))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh a lineup board")
+        .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" })))
+      .addSubcommand(s => s.setName("repost").setDescription("Update the existing lineup board in place")
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))),
     new SlashCommandBuilder().setName("roster").setDescription("Manage the Paradise competitive roster")
       .addSubcommand(s => s.setName("add").setDescription("Add or update a roster member")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
         .addStringOption(o => o.setName("region").setDescription("Region").setRequired(true).addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))
+        .addStringOption(o => o.setName("rank").setDescription("Competitive rank or duty").setMaxLength(80))
+        .addStringOption(o => o.setName("main").setDescription("Main character or role").setMaxLength(80))
         .addStringOption(o => o.setName("note").setDescription("Optional roster note").setMaxLength(160)))
+      .addSubcommand(s => s.setName("update").setDescription("Update an existing roster member")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("region").setDescription("Updated region").addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))
+        .addStringOption(o => o.setName("rank").setDescription("Updated competitive rank or duty").setMaxLength(80))
+        .addStringOption(o => o.setName("main").setDescription("Updated main character or role").setMaxLength(80))
+        .addStringOption(o => o.setName("note").setDescription("Updated roster note").setMaxLength(160)))
       .addSubcommand(s => s.setName("remove").setDescription("Remove a roster member")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true)))
-      .addSubcommand(s => s.setName("panel").setDescription("Refresh the roster board")),
+      .addSubcommand(s => s.setName("panel").setDescription("Refresh the roster board"))
+      .addSubcommand(s => s.setName("repost").setDescription("Update the existing roster board in place")),
     new SlashCommandBuilder().setName("blacklist").setDescription("Manage blacklist, appeal and owner-approved bail workflows")
       .addSubcommand(s => s.setName("add").setDescription("Add an audited blacklist record")
         .addUserOption(o => o.setName("user").setDescription("User").setRequired(true))
@@ -512,13 +538,46 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("remove").setDescription("Resolve and remove a blacklist record")
         .addUserOption(o => o.setName("user").setDescription("User").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Resolution reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("status").setDescription("Privately check a user's blacklist status")
+        .addUserOption(o => o.setName("user").setDescription("User; defaults to you")))
       .addSubcommand(s => s.setName("appeal-panel").setDescription("Post or refresh the appeal information panel"))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the public blacklist board")),
+    new SlashCommandBuilder().setName("appeal").setDescription("Open or review a private Paradise blacklist appeal")
+      .addSubcommand(s => s.setName("open").setDescription("Open your private blacklist appeal")
+        .addStringOption(o => o.setName("reason").setDescription("Why the record should be reviewed").setRequired(true).setMaxLength(700))
+        .addStringOption(o => o.setName("evidence").setDescription("Optional evidence URL").setMaxLength(500)))
+      .addSubcommand(s => s.setName("approve").setDescription("Manager: approve an appeal")
+        .addUserOption(o => o.setName("user").setDescription("Appealing user").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Decision note").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("deny").setDescription("Manager: deny an appeal")
+        .addUserOption(o => o.setName("user").setDescription("Appealing user").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Decision note").setRequired(true).setMaxLength(500))),
+    new SlashCommandBuilder().setName("bail").setDescription("Owner-managed blacklist bail review; never automatic")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+      .addSubcommand(s => s.setName("offer").setDescription("Create an owner-approved bail condition")
+        .addUserOption(o => o.setName("user").setDescription("Blacklisted user").setRequired(true))
+        .addStringOption(o => o.setName("condition").setDescription("Amount or non-payment condition").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("resolve").setDescription("Mark an offer resolved; does not auto-unblacklist")
+        .addUserOption(o => o.setName("user").setDescription("Blacklisted user").setRequired(true))
+        .addStringOption(o => o.setName("note").setDescription("Resolution note").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("deny").setDescription("Deny or cancel a bail offer")
+        .addUserOption(o => o.setName("user").setDescription("Blacklisted user").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Decision reason").setRequired(true).setMaxLength(500))),
     (() => {
       const command = new SlashCommandBuilder().setName("set").setDescription("Map Paradise systems to Discord channels")
         .setDescriptionLocalizations({ tr: "Paradise sistemlerini Discord kanallarına eşle" });
       command.setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator);
-      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS) {
+      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS.slice(0, 25)) {
+        command.addSubcommand(subcommand => subcommand.setName(name).setDescription(description)
+          .addChannelOption(option => option.setName("channel").setDescription(description).addChannelTypes(ChannelType.GuildText).setRequired(true)));
+      }
+      return command;
+    })(),
+    (() => {
+      const command = new SlashCommandBuilder().setName("setlogchannel").setDescription("Map Paradise appeal, bail and private log channels")
+        .setDescriptionLocalizations({ tr: "Paradise itiraz, bail ve özel log kanallarını eşle" });
+      command.setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator);
+      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS.slice(25)) {
         command.addSubcommand(subcommand => subcommand.setName(name).setDescription(description)
           .addChannelOption(option => option.setName("channel").setDescription(description).addChannelTypes(ChannelType.GuildText).setRequired(true)));
       }
@@ -2789,9 +2848,23 @@ function canManageCompetitiveBoards(member) {
     ].includes(role.name));
 }
 
+function normalizeLineupEntries(entries = []) {
+  return entries.map(entry => typeof entry === "string" ? { userId: entry } : entry)
+    .filter(entry => entry?.userId);
+}
+
+async function logParadiseAction(guild, mappingKey, fallbackName, title, description) {
+  const channel = await configuredChannel(guild, mappingKey, fallbackName);
+  if (!channel?.isTextBased?.()) return null;
+  return channel.send({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(title)
+      .setDescription(description).setFooter(paradiseFooter("Private operations log")).setTimestamp()]
+  }).catch(() => null);
+}
+
 async function updateLineupPanel(guild, board) {
   const state = await loadState();
-  const entries = state.lineups?.[guild.id]?.[board] || [];
+  const entries = normalizeLineupEntries(state.lineups?.[guild.id]?.[board] || []);
   const mappingKey = board === "war" ? "war_lineup_channel" : "main_lineup_channel";
   const channel = await configuredChannel(guild, mappingKey, board === "war" ? "war-lineup" : "main-line");
   if (!channel) return null;
@@ -2799,7 +2872,9 @@ async function updateLineupPanel(guild, board) {
   const messageKey = `${board}LineupMessageId`;
   let message = guildConfig[messageKey] ? await channel.messages.fetch(guildConfig[messageKey]).catch(() => null) : null;
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(board === "war" ? "⚔ PARADISE WAR LINEUP" : "♟ PARADISE MAIN LINEUP")
-    .setDescription(entries.length ? entries.map((userId, index) => `**${index + 1}.** <@${userId}>`).join("\n") : "_No members assigned yet._")
+    .setDescription(entries.length
+      ? entries.map((entry, index) => `**${index + 1}.** <@${entry.userId}>${entry.role ? ` · **${entry.role}**` : ""}${entry.note ? `\n-# ${entry.note}` : ""}`).join("\n")
+      : "_No members assigned yet._")
     .setFooter(paradiseFooter("Managed with /lineup"))
     .setTimestamp();
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
@@ -2815,24 +2890,61 @@ async function handleLineup(interaction) {
   if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Roster or server manager authority required.", ephemeral: true });
   const sub = interaction.options.getSubcommand();
   const board = interaction.options.getString("board") || "main";
-  if (sub === "panel") {
+  if (sub === "panel" || sub === "repost") {
     const panel = await updateLineupPanel(interaction.guild, board);
     return interaction.reply({ content: panel ? `${board} lineup refreshed.` : "Map the lineup channel first.", ephemeral: true });
   }
   const user = interaction.options.getUser("user");
   const requestedPosition = interaction.options.getInteger("position");
+  const role = interaction.options.getString("role");
+  const note = interaction.options.getString("note");
+  let affectedUserId = user?.id || null;
+  let found = true;
   await saveState(state => {
     state.lineups[interaction.guildId] = state.lineups[interaction.guildId] || { main: [], war: [] };
-    const entries = [...(state.lineups[interaction.guildId][board] || [])].filter(id => id !== user.id);
-    if (sub !== "remove") {
-      const index = requestedPosition ? Math.min(entries.length, requestedPosition - 1) : entries.length;
-      entries.splice(index, 0, user.id);
+    const entries = normalizeLineupEntries(state.lineups[interaction.guildId][board] || []);
+    if (sub === "clear") {
+      const index = requestedPosition - 1;
+      const removed = entries.splice(index, 1)[0];
+      affectedUserId = removed?.userId || null;
+      found = Boolean(removed);
+    } else {
+      const existingIndex = entries.findIndex(entry => entry.userId === user.id);
+      const existing = existingIndex >= 0 ? entries.splice(existingIndex, 1)[0] : null;
+      if (sub === "remove") {
+        found = Boolean(existing);
+      } else if (sub === "edit") {
+        found = Boolean(existing);
+        if (existing) {
+          entries.splice(existingIndex, 0, {
+            ...existing,
+            ...(role !== null ? { role } : {}),
+            ...(note !== null ? { note } : {}),
+            updatedBy: interaction.user.id,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } else {
+        const index = requestedPosition ? Math.min(entries.length, requestedPosition - 1) : entries.length;
+        entries.splice(index, 0, {
+          ...(existing || {}),
+          userId: user.id,
+          role: role ?? existing?.role ?? null,
+          note: note ?? existing?.note ?? null,
+          updatedBy: interaction.user.id,
+          updatedAt: new Date().toISOString()
+        });
+      }
     }
     state.lineups[interaction.guildId][board] = entries;
     return state;
   });
+  if (!found) return interaction.reply({ content: "That lineup member or slot does not exist. Nothing changed.", ephemeral: true });
   await updateLineupPanel(interaction.guild, board).catch(() => {});
-  return interaction.reply({ content: `${user} ${sub === "remove" ? "removed from" : "saved to"} the **${board} lineup**.`, ephemeral: true });
+  const actionText = sub === "remove" || sub === "clear" ? "removed from" : sub === "edit" ? "updated in" : "saved to";
+  await logParadiseAction(interaction.guild, board === "war" ? "war_logs_channel" : "roster_logs_channel", board === "war" ? "war-logs" : "roster-logs",
+    "Lineup record updated", `<@${affectedUserId}> was **${actionText}** the **${board} lineup** by <@${interaction.user.id}>.`);
+  return interaction.reply({ content: `<@${affectedUserId}> ${actionText} the **${board} lineup**.`, ephemeral: true });
 }
 
 async function updateRosterPanel(guild) {
@@ -2843,7 +2955,7 @@ async function updateRosterPanel(guild) {
   const guildConfig = configForGuild(state, guild.id);
   let message = guildConfig.rosterMessageId ? await channel.messages.fetch(guildConfig.rosterMessageId).catch(() => null) : null;
   const description = entries.length
-    ? entries.map(item => `**${item.region}** · <@${item.userId}>${item.note ? ` — ${item.note}` : ""}`).join("\n").slice(0, 3900)
+    ? entries.map(item => `**${item.region}** · <@${item.userId}>${item.rank ? ` · **${item.rank}**` : ""}${item.main ? ` · ${item.main}` : ""}${item.note ? `\n-# ${item.note}` : ""}`).join("\n").slice(0, 3900)
     : "_Roster is currently empty._";
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("♟ PARADISE COMPETITIVE ROSTER").setDescription(description).setFooter(paradiseFooter("Managed with /roster")).setTimestamp();
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
@@ -2858,24 +2970,40 @@ async function updateRosterPanel(guild) {
 async function handleRoster(interaction) {
   if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Roster manager authority required.", ephemeral: true });
   const sub = interaction.options.getSubcommand();
-  if (sub === "panel") {
+  if (sub === "panel" || sub === "repost") {
     const panel = await updateRosterPanel(interaction.guild);
     return interaction.reply({ content: panel ? "Roster board refreshed." : "Map the roster channel first.", ephemeral: true });
   }
   const user = interaction.options.getUser("user");
+  let found = true;
   await saveState(state => {
     state.rosters[interaction.guildId] = state.rosters[interaction.guildId] || {};
     if (sub === "remove") delete state.rosters[interaction.guildId][user.id];
-    else state.rosters[interaction.guildId][user.id] = {
-      userId: user.id,
-      region: interaction.options.getString("region"),
-      note: interaction.options.getString("note") || null,
-      addedBy: interaction.user.id,
-      addedAt: new Date().toISOString()
-    };
+    else {
+      const existing = state.rosters[interaction.guildId][user.id];
+      if (sub === "update" && !existing) {
+        found = false;
+        return state;
+      }
+      state.rosters[interaction.guildId][user.id] = {
+        ...(existing || {}),
+        userId: user.id,
+        region: interaction.options.getString("region") || existing?.region,
+        rank: interaction.options.getString("rank") ?? existing?.rank ?? null,
+        main: interaction.options.getString("main") ?? existing?.main ?? null,
+        note: interaction.options.getString("note") ?? existing?.note ?? null,
+        addedBy: existing?.addedBy || interaction.user.id,
+        addedAt: existing?.addedAt || new Date().toISOString(),
+        updatedBy: interaction.user.id,
+        updatedAt: new Date().toISOString()
+      };
+    }
     return state;
   });
+  if (!found) return interaction.reply({ content: "That user is not on this server's roster. Nothing changed.", ephemeral: true });
   await updateRosterPanel(interaction.guild).catch(() => {});
+  await logParadiseAction(interaction.guild, "roster_logs_channel", "roster-logs", "Roster record updated",
+    `${user} was **${sub === "remove" ? "removed from" : sub === "update" ? "updated in" : "saved to"}** the roster by <@${interaction.user.id}>.`);
   return interaction.reply({ content: `${user} ${sub === "remove" ? "removed from" : "saved to"} the roster.`, ephemeral: true });
 }
 
@@ -2900,8 +3028,16 @@ async function updateBlacklistPanel(guild) {
 }
 
 async function handleBlacklist(interaction) {
-  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Blacklist manager authority required.", ephemeral: true });
   const sub = interaction.options.getSubcommand();
+  if (sub === "status") {
+    const user = interaction.options.getUser("user") || interaction.user;
+    const record = (await loadState()).blacklists?.[interaction.guildId]?.[user.id];
+    const summary = record?.status === "active"
+      ? `${user} has an active Paradise blacklist record from <t:${Math.floor(Date.parse(record.createdAt) / 1000)}:R>. Use the private appeal flow for review.`
+      : `${user} does not have an active Paradise blacklist record in this server.`;
+    return interaction.reply({ content: summary, ephemeral: true });
+  }
+  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Blacklist manager authority required.", ephemeral: true });
   if (sub === "panel") {
     const panel = await updateBlacklistPanel(interaction.guild);
     return interaction.reply({ content: panel ? "Blacklist board refreshed." : "Map the blacklist channel first.", ephemeral: true });
@@ -2933,7 +3069,128 @@ async function handleBlacklist(interaction) {
     return state;
   });
   await updateBlacklistPanel(interaction.guild).catch(() => {});
+  await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", "Blacklist record updated",
+    `${user} record was **${sub === "remove" ? "resolved" : "created"}** by <@${interaction.user.id}>.\n**Reason:** ${reason}`);
   return interaction.reply({ content: `${user} blacklist record ${sub === "remove" ? "resolved" : "created"}.`, ephemeral: true });
+}
+
+async function handleAppeal(interaction) {
+  const sub = interaction.options.getSubcommand();
+  if (sub === "open") {
+    const state = await loadState();
+    const blacklist = state.blacklists?.[interaction.guildId]?.[interaction.user.id];
+    if (blacklist?.status !== "active") return interaction.reply({ content: "You do not have an active blacklist record in this server.", ephemeral: true });
+    const existing = state.appeals?.[interaction.guildId]?.[interaction.user.id];
+    if (existing?.status === "pending") {
+      return interaction.reply({ content: `You already have a pending appeal${existing.threadId ? `: <#${existing.threadId}>` : "."}`, ephemeral: true });
+    }
+    await interaction.deferReply({ ephemeral: true });
+    const parent = await configuredChannel(interaction.guild, "blacklist_appeal_channel", "blacklist-appeal");
+    let thread = null;
+    if (parent?.threads?.create) {
+      thread = await parent.threads.create({
+        name: `appeal-${interaction.user.username}`.slice(0, 90),
+        type: ChannelType.PrivateThread,
+        invitable: false,
+        reason: "Paradise private blacklist appeal"
+      }).catch(() => null);
+      if (thread) {
+        await thread.members.add(interaction.user.id).catch(() => {});
+        await thread.send({
+          content: `<@${interaction.user.id}>`,
+          embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◇ PRIVATE BLACKLIST APPEAL")
+            .setDescription(`**Applicant:** <@${interaction.user.id}>\n**Reason:** ${interaction.options.getString("reason")}\n**Evidence:** ${interaction.options.getString("evidence") || "Not supplied"}\n\n> Staff review is evidence-based. Bail is never guaranteed and cannot automatically remove a blacklist.`)
+            .setFooter(paradiseFooter("Private staff review")).setTimestamp()]
+        }).catch(() => {});
+      }
+    }
+    await saveState(next => {
+      next.appeals[interaction.guildId] = next.appeals[interaction.guildId] || {};
+      next.appeals[interaction.guildId][interaction.user.id] = {
+        userId: interaction.user.id,
+        status: "pending",
+        reason: interaction.options.getString("reason"),
+        evidence: interaction.options.getString("evidence") || null,
+        threadId: thread?.id || null,
+        createdAt: new Date().toISOString()
+      };
+      return next;
+    });
+    await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", "Blacklist appeal opened",
+      `<@${interaction.user.id}> opened a private appeal${thread ? ` in ${thread}` : ""}.`);
+    return interaction.editReply(thread
+      ? `Your private appeal was created: ${thread}`
+      : "Your appeal was recorded. Staff will review it privately; the mapped channel could not create a private thread.");
+  }
+  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Blacklist manager authority required.", ephemeral: true });
+  const user = interaction.options.getUser("user");
+  const reason = interaction.options.getString("reason");
+  let found = true;
+  await saveState(state => {
+    state.appeals[interaction.guildId] = state.appeals[interaction.guildId] || {};
+    const appeal = state.appeals[interaction.guildId][user.id];
+    if (!appeal || appeal.status !== "pending") {
+      found = false;
+      return state;
+    }
+    state.appeals[interaction.guildId][user.id] = {
+      ...appeal,
+      status: sub === "approve" ? "approved" : "denied",
+      decisionReason: reason,
+      decidedBy: interaction.user.id,
+      decidedAt: new Date().toISOString()
+    };
+    if (sub === "approve" && state.blacklists?.[interaction.guildId]?.[user.id]) {
+      state.blacklists[interaction.guildId][user.id] = {
+        ...state.blacklists[interaction.guildId][user.id],
+        status: "resolved",
+        resolution: `Appeal approved: ${reason}`,
+        resolvedBy: interaction.user.id,
+        resolvedAt: new Date().toISOString()
+      };
+    }
+    return state;
+  });
+  if (!found) return interaction.reply({ content: "No pending appeal was found for that user.", ephemeral: true });
+  await updateBlacklistPanel(interaction.guild).catch(() => {});
+  await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", `Appeal ${sub === "approve" ? "approved" : "denied"}`,
+    `${user} appeal was decided by <@${interaction.user.id}>.\n**Decision:** ${reason}`);
+  return interaction.reply({ content: `${user} appeal ${sub === "approve" ? "approved and blacklist record resolved" : "denied"}.`, ephemeral: true });
+}
+
+async function handleBail(interaction) {
+  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Owner or blacklist manager authority required.", ephemeral: true });
+  const state = await loadState();
+  if (configForGuild(state, interaction.guildId).blacklist?.bailEnabled !== true) {
+    return interaction.reply({ content: "Bail review is disabled for this server in the Paradise dashboard.", ephemeral: true });
+  }
+  const sub = interaction.options.getSubcommand();
+  const user = interaction.options.getUser("user");
+  if (state.blacklists?.[interaction.guildId]?.[user.id]?.status !== "active") {
+    return interaction.reply({ content: "That user does not have an active blacklist record.", ephemeral: true });
+  }
+  const detail = interaction.options.getString("condition") || interaction.options.getString("note") || interaction.options.getString("reason");
+  await saveState(next => {
+    next.bails[interaction.guildId] = next.bails[interaction.guildId] || {};
+    const existing = next.bails[interaction.guildId][user.id] || {};
+    next.bails[interaction.guildId][user.id] = {
+      ...existing,
+      userId: user.id,
+      status: sub === "offer" ? "offered" : sub === "resolve" ? "resolved" : "denied",
+      condition: sub === "offer" ? detail : existing.condition || null,
+      decisionNote: sub === "offer" ? null : detail,
+      updatedBy: interaction.user.id,
+      updatedAt: new Date().toISOString(),
+      createdAt: existing.createdAt || new Date().toISOString()
+    };
+    return next;
+  });
+  await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", `Bail review ${sub}`,
+    `${user} bail review was marked **${sub}** by <@${interaction.user.id}>.\n**Condition / note:** ${detail}\n\n-# This action did not automatically remove the blacklist.`);
+  return interaction.reply({
+    content: `${user} bail review marked **${sub}**. The blacklist was not automatically removed.`,
+    ephemeral: true
+  });
 }
 
 async function handleSetChannel(interaction) {
@@ -3265,7 +3522,9 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "lineup") { await handleLineup(interaction); return true; }
   if (interaction.commandName === "roster") { await handleRoster(interaction); return true; }
   if (interaction.commandName === "blacklist") { await handleBlacklist(interaction); return true; }
-  if (interaction.commandName === "set") { await handleSetChannel(interaction); return true; }
+  if (interaction.commandName === "appeal") { await handleAppeal(interaction); return true; }
+  if (interaction.commandName === "bail") { await handleBail(interaction); return true; }
+  if (interaction.commandName === "set" || interaction.commandName === "setlogchannel") { await handleSetChannel(interaction); return true; }
   if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;
 }
