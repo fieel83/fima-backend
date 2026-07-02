@@ -47,6 +47,7 @@ import {
   discordBotHealth,
   giveDiscordRole,
   paradiseDiscordRuntimeSnapshot,
+  repostParadiseGuides,
   removeDiscordRole,
   sendPasswordResetDm,
   sendPaymentSubmissionLog,
@@ -112,6 +113,7 @@ const adminRuntimeLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20, sta
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
 const adminFailedLoginState = new Map();
 const USER_SESSION_COOKIE = "fima_user_session";
+const PARADISE_OWNER_DISCORD_ID = "762858334440521739";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
@@ -596,10 +598,55 @@ app.get("/api/auth/me", requireUser, async (req, res) => {
   return res.json({ success: true, user: publicUser(req.user) });
 });
 
-app.get("/paradise", requireUser, requireParadiseOwner, (_req, res) => {
+app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
+  if (req.path === "/dashboard/paradise") return res.redirect(302, `${frontendUrl()}/paradise`);
+  if (isParadiseApiHost(req.hostname)) return res.redirect(302, `${frontendUrl()}/paradise`);
   res.set("Cache-Control", "no-store");
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-  return res.type("html").send(paradiseDashboardHtml({ clientId: env("DISCORD_CLIENT_ID", "") }));
+  return res.type("html").send(paradiseDashboardHtml({
+    clientId: env("DISCORD_CLIENT_ID", ""),
+    apiBaseUrl: apiBaseUrl(),
+    frontendUrl: frontendUrl()
+  }));
+});
+
+app.get("/api/paradise/session-status", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const user = await getOptionalUser(req, res);
+    if (!user) {
+      return res.json({
+        authenticated: false,
+        discordLinked: false,
+        ownerAuthorized: false,
+        reasonCode: "login_required",
+        dashboardUrl: `${frontendUrl()}/paradise`
+      });
+    }
+    const access = await paradiseOwnerAccess(user);
+    if (!access.ownerAuthorized) {
+      await createAuditLog("paradise_dashboard_access_denied", "user", user.id, {
+        reasonCode: access.reasonCode,
+        discordIdMasked: maskExternalId(access.discordUserId)
+      }).catch(() => {});
+    }
+    return res.json({
+      authenticated: true,
+      discordLinked: access.discordLinked,
+      ownerAuthorized: access.ownerAuthorized,
+      reasonCode: access.reasonCode,
+      dashboardUrl: `${frontendUrl()}/paradise`
+    });
+  } catch (error) {
+    console.error("Paradise session status failed", publicError(error));
+    return res.status(500).json({
+      authenticated: false,
+      discordLinked: false,
+      ownerAuthorized: false,
+      reasonCode: "session_check_failed",
+      dashboardUrl: `${frontendUrl()}/paradise`
+    });
+  }
 });
 
 app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, res) => {
@@ -627,9 +674,9 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (_req, 
 app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
-  if (origin && new URL(origin).host !== new URL(apiBaseUrl()).host) return res.status(403).json({ error: "origin_mismatch" });
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
   const kind = String(req.body?.kind || "");
-  if (!["mainer", "quotas", "channels", "channelMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility"].includes(kind)) {
+  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations"].includes(kind)) {
     return res.status(400).json({ error: "invalid_config_kind" });
   }
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
@@ -654,6 +701,15 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       if (/^\d{16,22}$/.test(channelId)) mappings[key] = channelId;
     }
     state.config.channelMappings = mappings;
+  } else if (kind === "roleMappings") {
+    if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_role_mappings" });
+    const mappings = {};
+    for (const [key, value] of Object.entries(req.body.value)) {
+      if (!/^[a-z][a-z0-9_]{1,48}$/.test(key)) continue;
+      const roleId = String(value || "");
+      if (/^\d{16,22}$/.test(roleId)) mappings[key] = roleId;
+    }
+    state.config.roleMappings = mappings;
   } else if (kind === "branding") {
     const brandColor = String(req.body?.value || "").trim().toUpperCase();
     if (!/^#[0-9A-F]{6}$/.test(brandColor)) return res.status(400).json({ error: "invalid_brand_color" });
@@ -703,6 +759,13 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       blockScamKeywords: value.blockScamKeywords !== false,
       mentionSpamLimit: Math.min(50, Math.max(3, Number(value.mentionSpamLimit) || 8))
     };
+  } else if (kind === "relations") {
+    const value = req.body?.value || {};
+    state.config.relationSettings = {
+      displayInvites: value.displayInvites !== false,
+      showRepresentatives: value.showRepresentatives !== false,
+      sortMode: value.sortMode === "updated" ? "updated" : "alphabetical"
+    };
   } else if (kind === "commandVisibility") {
     if (!req.body?.value || typeof req.body.value !== "object" || Array.isArray(req.body.value)) return res.status(400).json({ error: "invalid_command_visibility" });
     state.config.commandVisibility = req.body.value;
@@ -717,6 +780,26 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   });
   await createAuditLog("paradise_owner_config_updated", "discord_user", "762858334440521739", { kind, userId: req.user.id });
   return res.json({ success: true, kind });
+});
+
+app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const mode = String(req.body?.mode || "clan");
+  if (!["community", "clan", "tsbtr"].includes(mode)) return res.status(400).json({ error: "invalid_template" });
+  try {
+    const result = await repostParadiseGuides(mode);
+    await createAuditLog("paradise_guides_reposted", "discord_guild", env("DISCORD_GUILD_ID", null), {
+      mode,
+      posted: result.posted,
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, mode, posted: result.posted });
+  } catch (error) {
+    console.error("Paradise guide repost failed", publicError(error));
+    return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "guide_repost_failed" });
+  }
 });
 
 app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
@@ -7115,20 +7198,54 @@ async function requireUser(req, res, next) {
 
 async function requireParadiseOwner(req, res, next) {
   try {
-    const link = await prisma.oAuthLink.findFirst({
-      where: { userId: req.user.id, provider: "discord", providerSubject: "762858334440521739" },
-      select: { id: true, providerSubject: true, providerUsername: true }
-    });
-    if (!link) {
-      if (req.path.startsWith("/api/")) return res.status(403).json({ error: "paradise_owner_discord_required" });
-      const returnTo = encodeURIComponent("/paradise");
-      return res.redirect(`/auth/discord/start?returnTo=${returnTo}`);
+    const access = await paradiseOwnerAccess(req.user);
+    if (!access.ownerAuthorized) {
+      await createAuditLog("paradise_api_access_denied", "user", req.user.id, {
+        reasonCode: access.reasonCode,
+        discordIdMasked: maskExternalId(access.discordUserId)
+      }).catch(() => {});
+      return res.status(403).json({ error: access.reasonCode });
     }
-    req.paradiseOwnerDiscord = link;
+    req.paradiseOwnerDiscord = access.link;
     return next();
   } catch (error) {
     console.error("Paradise owner authorization failed", publicError(error));
     return res.status(500).json({ error: "paradise_owner_auth_failed" });
+  }
+}
+
+async function paradiseOwnerAccess(user) {
+  const link = await prisma.oAuthLink.findFirst({
+    where: { userId: user.id, provider: "discord" },
+    select: { id: true, providerSubject: true, providerUsername: true }
+  });
+  const discordUserId = String(link?.providerSubject || user.discordUserId || "");
+  const discordLinked = Boolean(discordUserId);
+  const ownerAuthorized = discordUserId === PARADISE_OWNER_DISCORD_ID;
+  return {
+    authenticated: true,
+    discordLinked,
+    ownerAuthorized,
+    discordUserId: discordUserId || null,
+    reasonCode: ownerAuthorized ? "ok" : discordLinked ? "not_owner" : "discord_link_required",
+    link
+  };
+}
+
+function isParadiseApiHost(hostname) {
+  try {
+    return String(hostname || "").toLowerCase() === new URL(apiBaseUrl()).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedParadiseOrigin(origin) {
+  try {
+    const normalized = new URL(origin).origin;
+    return new Set([new URL(frontendUrl()).origin, new URL(apiBaseUrl()).origin]).has(normalized);
+  } catch {
+    return false;
   }
 }
 

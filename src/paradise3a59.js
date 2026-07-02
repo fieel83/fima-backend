@@ -1335,7 +1335,7 @@ async function handleChallenge(interaction) {
     return opponent ? createChallengeTicket(interaction, opponent, region) : presentChallengeTargetMenu(interaction, region);
   }
   if (sub === "close") {
-    if (!canApproveReferee(interaction.member)) {
+    if (!await canApproveReferee(interaction.member)) {
       return interaction.reply({ content: "Experienced Referee, Head Referee or Referee Manager required.", ephemeral: true });
     }
     const state = await loadState();
@@ -1441,13 +1441,23 @@ async function handleChallenge(interaction) {
     .addFields({ name: "Score", value: score }, { name: "Referee", value: `${interaction.user}` })] });
 }
 
-function canApproveReferee(member) {
-  return member.permissions.has(PermissionsBitField.Flags.Administrator)
-    || member.roles.cache.some(role => ["Owner", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee"].includes(role.name));
+async function canApproveReferee(member) {
+  if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
+  const state = await loadState();
+  const mapped = new Set([
+    state.config.roleMappings?.owner_role,
+    state.config.roleMappings?.overseer_role,
+    state.config.roleMappings?.referee_manager_role,
+    state.config.roleMappings?.experienced_referee_role
+  ].filter(Boolean));
+  return member.roles.cache.some(role =>
+    mapped.has(role.id)
+    || ["Owner", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee"].includes(role.name)
+  );
 }
 
 async function handleChallengeApproval(interaction) {
-  if (!canApproveReferee(interaction.member)) return interaction.reply({ content: "Referee Manager or Experienced Referee required.", ephemeral: true });
+  if (!await canApproveReferee(interaction.member)) return interaction.reply({ content: "Referee Manager or Experienced Referee required.", ephemeral: true });
   const [action, id] = interaction.customId.replace("paradise_challenge_", "").split(":");
   const record = pendingChallenges.get(id) || (await loadState()).pendingChallenges[id];
   if (!record || record.status !== "pending") return interaction.reply({ content: "This score post is no longer pending.", ephemeral: true });
@@ -2211,15 +2221,33 @@ async function publishAllGuides(guild, mode) {
   return { posted, mode };
 }
 
+export async function publishParadiseGuidesFromDashboard(guild, mode = "clan") {
+  if (!guild) {
+    const error = new Error("paradise_guild_unavailable");
+    error.code = "paradise_guild_unavailable";
+    throw error;
+  }
+  if (!["community", "clan", "tsbtr"].includes(mode)) {
+    const error = new Error("invalid_paradise_setup_mode");
+    error.code = "invalid_paradise_setup_mode";
+    throw error;
+  }
+  return publishAllGuides(guild, mode);
+}
+
 function canManageClan(member) {
   return member.permissions.has(PermissionsBitField.Flags.Administrator)
     || member.roles.cache.some(role => ["Owner", "Admin", "Overseer", "Community Manager"].includes(role.name));
 }
 
-function relationshipLines(entries) {
-  const rows = Object.values(entries || {}).sort((a, b) => a.clan.localeCompare(b.clan));
+function relationshipLines(entries, settings = {}) {
+  const rows = Object.values(entries || {}).sort((a, b) =>
+    settings.sortMode === "updated"
+      ? Date.parse(b.updatedAt || b.createdAt || 0) - Date.parse(a.updatedAt || a.createdAt || 0)
+      : a.clan.localeCompare(b.clan)
+  );
   return rows.length
-    ? rows.map(item => `◆ **${item.clan}**${item.status ? ` · \`${item.status}\`` : ""}${item.representativeId ? ` — <@${item.representativeId}>` : ""}${item.invite ? `\n  [Server invite](${item.invite})` : ""}${item.note ? `\n  _${item.note}_` : ""}`).join("\n")
+    ? rows.map(item => `◆ **${item.clan}**${item.status ? ` · \`${item.status}\`` : ""}${settings.showRepresentatives !== false && item.representativeId ? ` — <@${item.representativeId}>` : ""}${settings.displayInvites !== false && item.invite ? `\n  [Server invite](${item.invite})` : ""}${item.note ? `\n  _${item.note}_` : ""}`).join("\n")
     : "_None configured._";
 }
 
@@ -2227,11 +2255,12 @@ async function updateRelationsPanel(guild) {
   const channel = await configuredChannel(guild, "relation_panel_channel", "clan-relations");
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
+  const relationSettings = state.config.relationSettings || {};
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🤝 PARADISE CLAN RELATIONS")
     .setDescription("Relations are managed by authorized clan leadership and update automatically.")
     .addFields(
-      { name: "◆ __Currently Allies__", value: relationshipLines(state.relations.allies).slice(0, 1024) },
-      { name: "⚔️ __Enemy Clans__", value: relationshipLines(state.relations.enemies).slice(0, 1024) }
+      { name: "◆ __Currently Allies__", value: relationshipLines(state.relations.allies, relationSettings).slice(0, 1024) },
+      { name: "⚔️ __Enemy Clans__", value: relationshipLines(state.relations.enemies, relationSettings).slice(0, 1024) }
     )
     .setFooter(paradiseFooter("Use /relation"));
   let message = state.config.relationsMessageId
@@ -2334,7 +2363,7 @@ async function updateAvailabilityPanel(guild) {
 
 async function handleAvailability(interaction) {
   const sub = interaction.options.getSubcommand();
-  if (sub !== "panel" && !canApproveReferee(interaction.member)) {
+  if (sub !== "panel" && !await canApproveReferee(interaction.member)) {
     return interaction.reply({ content: "Referee Manager or administrator required.", ephemeral: true });
   }
   if (["cooldown", "immunity"].includes(sub)) {

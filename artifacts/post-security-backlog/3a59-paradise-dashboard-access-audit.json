@@ -1,0 +1,60 @@
+{
+  "id": "3a59-paradise-dashboard-access-audit",
+  "date": "2026-07-02",
+  "status": "LOCAL VERIFIED",
+  "finding": {
+    "rootCause": "The same server-side protected /paradise route was mounted on both fimamacro.com and api.fimamacro.com. The Fima user session cookie is intentionally host-only to api.fimamacro.com, so a normal navigation on the frontend host could not perform server-side API-cookie authentication and returned raw JSON 401.",
+    "cookieFailure": false,
+    "routeArchitectureFailure": true,
+    "previousMainDomainBehavior": "401 JSON",
+    "previousApiDomainBehavior": "401 JSON",
+    "previousDashboardAliasBehavior": "404"
+  },
+  "correctArchitecture": {
+    "ownerFacingUrl": "https://fimamacro.com/paradise",
+    "alias": "https://fimamacro.com/dashboard/paradise redirects to /paradise",
+    "apiDirectNavigation": "https://api.fimamacro.com/paradise redirects to the owner-facing URL",
+    "configApi": "https://api.fimamacro.com/api/paradise/config",
+    "sessionStatusApi": "https://api.fimamacro.com/api/paradise/session-status"
+  },
+  "authentication": {
+    "fimaLoginRequired": true,
+    "discordLinkRequired": true,
+    "ownerDiscordId": "762858334440521739",
+    "wrongUserBehavior": "Clean access-restricted UI; protected API returns 403 JSON",
+    "loggedOutBehavior": "Clean login-required UI with safe /login?next=/paradise",
+    "discordMissingBehavior": "Clean Discord-link-required UI",
+    "denialLogging": "User ID plus masked Discord ID and reason code only"
+  },
+  "cookieAndCorsAudit": {
+    "userCookieDomain": "Host-only api.fimamacro.com; intentionally retained as the narrower scope",
+    "sameSite": "Lax",
+    "secure": true,
+    "httpOnly": true,
+    "path": "/",
+    "frontendFetchCredentials": "include",
+    "corsCredentials": true,
+    "corsOrigins": ["https://fimamacro.com", "https://www.fimamacro.com", "https://api.fimamacro.com"],
+    "wildcardCredentialOrigin": false,
+    "mutationOriginPolicy": "Only official frontend and API origins"
+  },
+  "localVerification": {
+    "tests": "51/51 passed",
+    "desktop": "PASS at 1265px; no horizontal overflow",
+    "mobile": "PASS at 390px; no horizontal overflow",
+    "ownerState": "Console visible; 3 template cards, 18 channel mappings, 12 role mappings and 3 guide actions",
+    "loggedOutState": "Login-required card visible; console hidden",
+    "discordMissingState": "Discord-required card visible; console hidden",
+    "wrongOwnerState": "Access-restricted card visible; console hidden",
+    "browserConsoleErrors": 0,
+    "secretPatternsInHtml": false
+  },
+  "liveVerification": {
+    "status": "PENDING DEPLOY"
+  },
+  "releaseSafety": {
+    "latestJsonChanged": false,
+    "publicReleaseCreated": false,
+    "desktopAppReleasePublished": false
+  }
+}

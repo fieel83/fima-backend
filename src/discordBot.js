@@ -4,7 +4,14 @@ import path from "node:path";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
-import { handleParadiseGuildMemberUpdate, handleParadiseInteraction, handleParadiseMessage, initializeParadise, paradiseCommands } from "./paradise3a59.js";
+import {
+  handleParadiseGuildMemberUpdate,
+  handleParadiseInteraction,
+  handleParadiseMessage,
+  initializeParadise,
+  paradiseCommands,
+  publishParadiseGuidesFromDashboard
+} from "./paradise3a59.js";
 
 const ROLE_TYPES = {
   buyer: {
@@ -1822,6 +1829,13 @@ export async function paradiseDiscordRuntimeSnapshot() {
       botRolePosition: me?.roles?.highest?.position ?? null,
       botPermissions: me?.permissions?.toArray?.() || []
     },
+    botIdentity: {
+      applicationUsername: client.user?.username || null,
+      guildNickname: me?.nickname || null,
+      intendedName: "Paradise",
+      usernameMatches: client.user?.username === "Paradise",
+      nicknameMatches: (me?.nickname || client.user?.username) === "Paradise"
+    },
     commandScope: env("DISCORD_GUILD_ID") ? "guild" : "global",
     commands: [...commands.values()].map(command => ({
       id: command.id,
@@ -1868,6 +1882,16 @@ export async function paradiseDiscordRuntimeSnapshot() {
       applicationId: webhook.applicationId || null
     }))
   };
+}
+
+export async function repostParadiseGuides(mode = "clan") {
+  const guild = await getGuild();
+  if (!guild || !client?.isReady?.()) {
+    const error = new Error("paradise_bot_not_ready");
+    error.code = "paradise_bot_not_ready";
+    throw error;
+  }
+  return publishParadiseGuidesFromDashboard(guild, mode);
 }
 
 export async function giveDiscordRole(discordUserId, type) {
