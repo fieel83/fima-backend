@@ -1,0 +1,42 @@
+{
+  "checkpoint": "priority-3a59-paradise-docx-master-implementation",
+  "date": "2026-07-02",
+  "sourceDocument": "C:\\Users\\fieel\\Downloads\\Paradise Bot, Fima Site ve Yönetim Paneli İçin Araştırma Tabanlı Uygulama Şartnamesi.docx",
+  "commit": "cb499e944897891eb1c9c990b101b007fb32eee2",
+  "deployment": {
+    "backend": "LIVE VERIFIED",
+    "health": "ok",
+    "buildTime": "2026-07-02T01:01:03.794Z",
+    "paradiseUnauthenticatedStatus": 401,
+    "discordRuntimeInventory": "OWNER DASHBOARD AVAILABLE; LIVE OWNER SESSION NOT INSPECTED"
+  },
+  "verification": {
+    "tests": "49/49 PASS",
+    "sourceSyntax": "PASS",
+    "dashboardDesktop": "PASS",
+    "dashboardMobile390x844": "PASS",
+    "horizontalOverflow": false,
+    "latestJsonChanged": false,
+    "desktopReleaseCreated": false
+  },
+  "implemented": [
+    "Community, Clan and TSBTR setup templates",
+    "Backup, diff preview, repair, guide-only and typed rebuild confirmation",
+    "Owner-only Paradise Operations Console",
+    "Live Discord inventory API for the authenticated owner",
+    "Configurable branding, channels, challenge, LOA, activity and AutoMod",
+    "Profile create/view/edit/status and short Roblox verification",
+    "Challenge target rules, cooldown, immunity, LOA and active-ticket blocks",
+    "Challenge sticky header, autowin, close and approval workflow",
+    "Training session ownership, result, MVP, proof and activity logging",
+    "Structured tryout rank authority and approval",
+    "Turkish/English help and regenerated handbook messages",
+    "Relations, channel mapping and staff activity safety controls"
+  ],
+  "blockedOrDeferred": [
+    "Destructive live server rebuild requires typed Discord confirmation.",
+    "Multi-user Discord role and permission test requires real member/referee/manager interactions.",
+    "External server FCW scraping/DM is not implemented because self-bot behavior is prohibited.",
+    "Voice music playback requires a separate licensed media service."
+  ]
+}
