@@ -54,6 +54,7 @@ import {
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
   rebuildParadiseTestTemplateFromDashboard,
+  runParadiseTestSmokeSuiteFromDashboard,
   repostParadiseGuides,
   syncParadisePanelsFromDashboard,
   removeDiscordRole,
@@ -1151,6 +1152,27 @@ app.post("/api/paradise/actions/rebuild-test-template", requireUser, requirePara
     const status = ["test_guild_only", "typed_confirmation_mismatch"].includes(error.code) ? 403
       : error.code === "paradise_bot_not_ready" ? 503 : 500;
     return res.status(status).json({ error: error.code || "test_template_rebuild_failed" });
+  }
+});
+
+app.post("/api/paradise/actions/run-test-smoke", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  try {
+    const guildId = String(req.body?.guildId || "");
+    const result = await runParadiseTestSmokeSuiteFromDashboard(guildId);
+    await createAuditLog("paradise_test_live_smoke", "discord_guild", guildId, {
+      trainingMessageId: result.training?.messageId,
+      tryoutMessageId: result.tryout?.messageId,
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result });
+  } catch (error) {
+    console.error("Paradise live smoke suite failed", publicError(error));
+    const status = error.code === "test_guild_only" ? 403
+      : ["paradise_bot_not_ready", "guild_not_found", "test_channels_missing"].includes(error.code) ? 503 : 500;
+    return res.status(status).json({ error: error.code || "test_smoke_failed" });
   }
 });
 

@@ -437,6 +437,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         <label for="testRebuildConfirmation">Test server typed confirmation <span class="tip" title="Select a template above, then type REBUILD TEST CLAN, REBUILD TEST COMMUNITY or REBUILD TEST TSBTR exactly.">?</span></label>
         <input id="testRebuildConfirmation" autocomplete="off" placeholder="REBUILD TEST CLAN">
         <button class="danger-action" id="rebuildTestTemplate">Wipe and rebuild selected test template</button>
+        <button class="secondary" id="runTestSmoke">Run live test suite</button>
         <button class="secondary" id="exportConfig">Export safe configuration</button>
       </section>
     </div>
@@ -750,6 +751,18 @@ async function rebuildSelectedTestTemplate(){
   }catch{show('Test rebuild failed safely.',false)}
   finally{button.disabled=false;button.textContent=original}
 }
+async function runSelectedTestSmoke(){
+  if(!selectedGuildId)return show('Select the isolated test server first.',false);
+  const button=byId('runTestSmoke'),original=button.textContent;
+  button.disabled=true;button.textContent='Posting live tests…';
+  try{
+    const{response,result}=await mutate('/api/paradise/actions/run-test-smoke',{guildId:selectedGuildId});
+    if(!response.ok){show(result.error||'Live test failed',false);return}
+    const summary=result.result||{};
+    show('Live test posted: training '+String(summary.training?.messageId||'—')+'; tryout '+String(summary.tryout?.messageId||'—')+'.');
+  }catch{show('Live test failed safely.',false)}
+  finally{button.disabled=false;button.textContent=original}
+}
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed Paradise server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):byId('runSetupPreview');
@@ -789,6 +802,7 @@ byId('setupCreateMissingAction').onclick=()=>createMissingTemplate(false,byId('s
 byId('setupRepairAction').onclick=()=>createMissingTemplate(true,byId('setupRepairAction'));
 byId('setupRepostGuidesAction').onclick=()=>repostGuides(byId('setupTemplate').value);
 byId('rebuildTestTemplate').onclick=rebuildSelectedTestTemplate;
+byId('runTestSmoke').onclick=runSelectedTestSmoke;
 byId('autoDetectChannels').onclick=autoDetectChannels;byId('previewChallengeRange').onclick=previewChallengeRange;
 document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};

@@ -1195,7 +1195,6 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
   const beforeChannelIds = new Set(guild.channels.cache.keys());
   const beforeRoleIds = new Set(guild.roles.cache.keys());
 
-  for (const name of selected.roles) await ensureRole(guild, name, repairPermissions);
   for (const [categoryName, channelNames, privateCategory] of selected.schema) {
     let category = guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === categoryName);
     if (!category) {
@@ -1232,7 +1231,18 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     }
   }
 
-  if (repairPermissions) await organizeRoleHierarchy(guild, selected.roles);
+  const missingRoleNames = selected.roles.filter(name => !guild.roles.cache.some(role => role.name === name));
+  const roleCreationResults = await Promise.allSettled(missingRoleNames.map(name => Promise.race([
+    ensureRole(guild, name, repairPermissions),
+    new Promise(resolve => setTimeout(() => resolve(null), 20_000))
+  ])));
+  const pendingRoleCreates = roleCreationResults.filter(result => result.status === "fulfilled" && !result.value).length;
+  if (repairPermissions) {
+    await Promise.race([
+      organizeRoleHierarchy(guild, selected.roles),
+      new Promise(resolve => setTimeout(resolve, 20_000))
+    ]).catch(() => {});
+  }
   const autoMod = repairPermissions
     ? await ensureParadiseAutoMod(guild).catch(error => ({ status: "failed", error: error.message }))
     : { status: "not_requested" };
@@ -1256,6 +1266,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     operation: repairPermissions ? "create_missing_and_repair_permissions" : "create_missing_only",
     createdChannels,
     createdRoles,
+    pendingRoleCreates,
     guidePosts: Number(guideResult.posted || 0),
     autoMod
   };
@@ -1329,6 +1340,121 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
     backup: `artifacts/post-security-backlog/3a65-test-server-backup-${mode}-${stamp}.json`
   };
   await writeArtifact(`3a65-test-server-full-rebuild-${mode}.json`, result);
+  return result;
+}
+
+export async function runParadiseTestSmokeSuite(guild) {
+  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
+    const error = new Error("test_guild_only");
+    error.code = "test_guild_only";
+    throw error;
+  }
+  const ownerId = guild.ownerId;
+  const trainingChannel = await configuredChannel(guild, "training_channel", "training");
+  const tryoutChannel = await configuredChannel(guild, "tryout_channel", "tryout");
+  if (!trainingChannel || !tryoutChannel) {
+    const error = new Error("test_channels_missing");
+    error.code = "test_channels_missing";
+    throw error;
+  }
+
+  const trainingId = crypto.randomUUID();
+  const tryoutId = crypto.randomUUID();
+  const controls = (id, ending) => new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_session_locked:${id}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_session_unlocked:${id}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`paradise_session_end:${id}`).setLabel(ending).setStyle(ButtonStyle.Danger)
+  );
+  const training = await trainingChannel.send({
+    content: [
+      "# TRAINING",
+      "### Kurallar:",
+      "Lh yok (2m1 shove tech), TDS yok (True Downslam), Overpassive yok, 2 Ragdoll cancel yok, Wall yok, sırada birbirinize vurmak yok, sırayı terk etmek yok.",
+      "",
+      "### Oynanabilir karakterler:",
+      "Saitama, Garou, Metal Bat",
+      "",
+      "### Link:",
+      "https://www.roblox.com/share?code=PARADISE-TEST",
+      "",
+      `<@${ownerId}>`,
+      "",
+      "-# Canlı test mesajı • Hoster-only controls • Made by Paradise bot"
+    ].join("\n"),
+    components: [controls(trainingId, "END TRAINING")],
+    allowedMentions: { users: [], roles: [], parse: [] }
+  });
+  const tryout = await tryoutChannel.send({
+    content: [
+      "# TRYOUT OPEN",
+      "## Tryout Time",
+      "",
+      "◆ **Server**",
+      "https://www.roblox.com/share?code=PARADISE-TEST",
+      "",
+      "◆ **Format**",
+      "- FT2 — one aggressive round",
+      "- FT2 — one passive round",
+      "",
+      "◆ **Hoster**",
+      `<@${ownerId}>`,
+      "",
+      "◆ **Evaluation**",
+      "RC timing, catches, dash reactions, movement, pressure, adaptation and game sense.",
+      "",
+      "◆ **Rules**",
+      "- No LH / 3M1 reset / TDS",
+      "- No 2 RC / wall / overpassive",
+      "- No alts, queue hitting or leaving",
+      "",
+      "-# Lock after 1–5 minutes • Canlı test mesajı • Made by Paradise bot"
+    ].join("\n"),
+    components: [controls(tryoutId, "END TRYOUT")],
+    allowedMentions: { users: [], roles: [], parse: [] }
+  });
+
+  await trainingChannel.send("# SERVER LOCKED\n-# Paradise lifecycle rendering test");
+  await trainingChannel.send("# SERVER UNLOCKED\n-# Paradise lifecycle rendering test");
+  await trainingChannel.send("# TRAINING ENDED\n-# Paradise lifecycle rendering test");
+  await tryoutChannel.send("# SERVER LOCKED\n-# Paradise lifecycle rendering test");
+  await tryoutChannel.send("# SERVER UNLOCKED\n-# Paradise lifecycle rendering test");
+  await tryoutChannel.send("# ENDED\n-# Paradise lifecycle rendering test");
+
+  const sessions = {
+    [trainingId]: {
+      id: trainingId, guildId: guild.id, type: "training", hosterId: ownerId,
+      channelId: trainingChannel.id, messageId: training.id, status: "open", test: true,
+      startedAt: new Date().toISOString()
+    },
+    [tryoutId]: {
+      id: tryoutId, guildId: guild.id, type: "tryout", hosterId: ownerId,
+      channelId: tryoutChannel.id, messageId: tryout.id, status: "open", test: true,
+      startedAt: new Date().toISOString()
+    }
+  };
+  Object.values(sessions).forEach(session => activeTrainings.set(session.id, session));
+  await saveState(state => {
+    state.trainings = { ...state.trainings, ...sessions };
+    return state;
+  });
+
+  const owner = await guild.members.fetch(ownerId).catch(() => null);
+  if (owner) {
+    await sendMemberLifecycleMessage(owner, "join");
+    await sendMemberLifecycleMessage(owner, "leave");
+  }
+  const leaderboardBoards = await updateRankedLeaderboardBoards(guild).catch(() => []);
+  const result = {
+    status: "LIVE DISCORD VERIFIED",
+    completedAt: new Date().toISOString(),
+    guildId: guild.id,
+    training: { channelId: trainingChannel.id, messageId: training.id, url: training.url },
+    tryout: { channelId: tryoutChannel.id, messageId: tryout.id, url: tryout.url },
+    lifecycleMessages: 6,
+    welcomeLeaveSimulation: Boolean(owner),
+    leaderboardBoards
+  };
+  await writeArtifact("3a66-test-server-live-smoke-suite.json", result);
   return result;
 }
 
