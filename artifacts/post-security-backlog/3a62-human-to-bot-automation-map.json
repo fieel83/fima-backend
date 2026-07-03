@@ -1,5 +1,5 @@
 {
-  "status": "SOURCE IMPLEMENTED / LIVE TEST PARTIAL",
+  "status": "LIVE VERIFIED SOURCE / LIVE INTERACTION TEST PARTIAL",
   "sources": [
     "owner-provided screenshots and pasted guide text",
     "owner-saved Paradise/Fima requirements",
@@ -11,7 +11,7 @@
       "inspiration": "manual training announcement, SERVER LOCKED and ENDED messages",
       "implementation": "/training start and /training result with Lock, Unlock and End buttons, stored host and activity log",
       "dashboard": "Training / Staff",
-      "status": "SOURCE ONLY pending new deploy"
+      "status": "LIVE SOURCE on f3f484b; buttons not manually exercised"
     },
     {
       "feature": "Tryout rank safety",
@@ -32,35 +32,35 @@
       "inspiration": "application-ticket and human review channels",
       "implementation": "modal forms, cooldown, blacklist gate, private review queue, approve/deny/more-info, hierarchy-safe role grant",
       "dashboard": "Applications",
-      "status": "SOURCE ONLY pending new deploy"
+      "status": "LIVE SOURCE on f3f484b; application review interaction not exercised"
     },
     {
       "feature": "Moderation approval queue",
       "inspiration": "human kick/ban decisions and Wick-style quarantine",
       "implementation": "warn/timeout/quarantine plus senior-approved kick/ban requests and audited cases",
       "dashboard": "Moderation / Security",
-      "status": "SOURCE ONLY pending new deploy"
+      "status": "LIVE SOURCE on f3f484b; moderation execution not exercised"
     },
     {
       "feature": "Join-to-Create",
       "inspiration": "temporary voice ownership panels",
       "implementation": "create/move/delete plus rename, limit, lock, hide, permit, reject and transfer",
       "dashboard": "Voice / Join-to-Create",
-      "status": "PARTIAL LIVE; expanded controls pending new deploy"
+      "status": "LIVE SOURCE on f3f484b; expanded controls not exercised"
     },
     {
       "feature": "XP leaderboards",
       "inspiration": "manual activity logs and level systems",
       "implementation": "chat/voice/total/weekly/monthly XP, cooldown exclusions, /rank and /leaderboard",
       "dashboard": "XP / Levels",
-      "status": "SOURCE ONLY pending new deploy"
+      "status": "LIVE SOURCE on f3f484b; XP earning/leaderboard interaction not exercised"
     },
     {
       "feature": "Daily question reward queue",
       "inspiration": "owner's 25 Robux daily-question design",
       "implementation": "13:00 Berlin scheduler, exact-answer race, winner-only gamepass modal, staff paid/invalid/rejected queue",
       "dashboard": "Events / Daily Question",
-      "status": "PARTIAL LIVE; payout review pending new deploy"
+      "status": "LIVE SOURCE on f3f484b; payout review buttons not exercised"
     }
   ]
 }

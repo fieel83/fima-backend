@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL VERIFIED / SOURCE ONLY",
+  "status": "LIVE VERIFIED SOURCE / LIVE INTERACTION NOT STARTED",
   "commands": [
     "/mod warn",
     "/mod mute",
@@ -45,5 +45,6 @@
     "image-content classification beyond Discord/keyword/link signals",
     "live kick/ban execution test",
     "live quarantine permission-overwrite test"
-  ]
+  ],
+  "liveDeployment": "f3f484b; moderation/security commands are included in the healthy 62/62 guild command sync"
 }

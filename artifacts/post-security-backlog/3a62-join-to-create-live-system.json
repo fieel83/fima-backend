@@ -1,5 +1,5 @@
 {
-  "status": "PARTIAL LIVE / EXPANDED SOURCE LOCAL VERIFIED",
+  "status": "LIVE VERIFIED SOURCE / EXPANDED INTERACTIONS NOT STARTED",
   "liveCommit2726e1a": [
     "create temporary room",
     "move room owner",
@@ -28,5 +28,6 @@
     "token/cookie scam text"
   ],
   "fallback": "Safe Discord display-name based room name",
-  "liveInteractionVerification": "BLOCKED until the expanded source is deployed and a member joins Join to Create in the test guild"
+  "liveDeployment": "f3f484b",
+  "liveInteractionVerification": "NOT STARTED until a member joins Join to Create in the test guild"
 }

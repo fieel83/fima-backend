@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL VERIFIED",
+  "status": "LIVE VERIFIED SOURCE / LIVE TEMPLATE APPLY NOT STARTED",
   "templates": {
     "Paradise Clan": {
       "includes": [
@@ -61,5 +61,6 @@
     "communityApplicationPresent": true,
     "joinToCreatePresentAllTemplates": true,
     "privateVoiceCategoryPresentAllTemplates": true
-  }
+  },
+  "liveDeployment": "f3f484b; command sync 62/62"
 }

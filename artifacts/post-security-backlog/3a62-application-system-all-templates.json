@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL VERIFIED / SOURCE ONLY",
+  "status": "LIVE VERIFIED SOURCE / LIVE INTERACTION NOT STARTED",
   "commands": [
     "/application panel",
     "/application apply",
@@ -37,5 +37,6 @@
     "clanMainerHiddenInCommunity": true,
     "fimaSupportHelperLimitedToCommunity": true
   },
-  "liveDiscordInteractionTest": "NOT STARTED; new source requires deployment and configured review channels"
+  "liveDeployment": "f3f484b; 62/62 commands synchronized",
+  "liveDiscordInteractionTest": "NOT STARTED; configured review channels and an applicant/reviewer test are still required"
 }

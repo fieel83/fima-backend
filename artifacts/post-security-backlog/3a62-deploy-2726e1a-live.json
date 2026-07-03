@@ -28,5 +28,24 @@
     "latestJsonChanged": false,
     "fimaAppReleasePublished": false,
     "publicReleaseCreated": false
+  },
+  "followUpLiveDeployment": {
+    "status": "LIVE VERIFIED",
+    "commit": "f3f484bccf02d7cdeb40fe0a941d62e04811521d",
+    "buildTime": "2026-07-03T03:13:53.836Z",
+    "botReady": true,
+    "managedGuildCount": 4,
+    "commandSync": {
+      "count": 62,
+      "configuredCount": 62,
+      "healthy": true,
+      "lastSyncAt": "2026-07-03T03:13:59.705Z"
+    },
+    "audit": {
+      "auditedGuildCount": 3,
+      "backedUpGuildCount": 3,
+      "previewedGuildCount": 3,
+      "lastError": null
+    }
   }
 }

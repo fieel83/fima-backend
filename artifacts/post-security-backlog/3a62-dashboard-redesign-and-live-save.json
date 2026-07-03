@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL VERIFIED / LIVE SAVE BLOCKED",
+  "status": "DASHBOARD VERIFIED / LIVE SAVE BLOCKED",
   "pages": [
     "Overview",
     "Server Selector",
@@ -55,6 +55,15 @@
     "dashboardClientParses": true,
     "twentyPageOrderVerified": true,
     "fullSuite": "61/61"
+  },
+  "livePage": {
+    "url": "https://fimamacro.com/paradise",
+    "httpStatus": 200,
+    "pageCount": 20,
+    "rawUnauthorized": false,
+    "apiRouteRedirect": "https://api.fimamacro.com/paradise returns 302 to the owner-facing dashboard",
+    "applicationVoiceXpSettingsPresent": true,
+    "csrfRetryPresent": true
   },
   "liveSave": {
     "status": "BLOCKED",

@@ -1,5 +1,5 @@
 {
-  "status": "PARTIAL LIVE / EXPANDED SOURCE LOCAL VERIFIED",
+  "status": "LIVE VERIFIED SOURCE / EXPANDED INTERACTIONS NOT STARTED",
   "liveCommit2726e1a": [
     "rate-limited chat XP",
     "non-AFK and non-deaf voice XP",
@@ -24,5 +24,6 @@
     "optional level role rewards with hierarchy guard"
   ],
   "tests": "61/61 full suite",
-  "liveInteractionVerification": "NOT STARTED for expanded commands"
+  "liveDeployment": "f3f484b; /rank and /leaderboard are in the healthy 62/62 command sync",
+  "liveInteractionVerification": "NOT STARTED for XP earning and board rendering in the test guild"
 }
