@@ -99,6 +99,7 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.deepEqual(commands.find(command => command.name === "lineup").options.map(option => option.name), ["add", "remove", "move", "edit", "clear", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "roster").options.map(option => option.name), ["add", "update", "remove", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "application").options.map(option => option.name), ["panel", "apply", "status"]);
+  assert.deepEqual(commands.find(command => command.name === "training").options.map(option => option.name), ["setup", "create", "start", "result"]);
   assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "kick-request"));
   assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "ban-request"));
 });

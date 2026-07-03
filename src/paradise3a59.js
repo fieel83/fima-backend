@@ -483,6 +483,11 @@ export function paradiseCommands() {
     new SlashCommandBuilder().setName("training").setDescription("Paradise training setup, start and result")
       .setDescriptionLocalizations({ tr: "Paradise eğitim kurulum, başlatma ve sonuç sistemi" })
       .addSubcommand(s => s.setName("setup").setDescription("Post the training help and announcement panel"))
+      .addSubcommand(s => s.setName("create").setDescription("Create a training session with a plain Markdown announcement")
+        .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
+        .addUserOption(o => o.setName("host").setDescription("Host; defaults to you"))
+        .addUserOption(o => o.setName("cohost").setDescription("Optional co-host"))
+        .addStringOption(o => o.setName("rules").setDescription("Optional extra rules")))
       .addSubcommand(s => s.setName("start").setDescription("Start a branded training session")
         .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
         .addUserOption(o => o.setName("host").setDescription("Host; defaults to you"))
@@ -1546,14 +1551,12 @@ async function handleTryout(interaction) {
     const link = interaction.options.getString("link");
     const sessionId = crypto.randomUUID();
     const session = { id: sessionId, guildId: interaction.guildId, type: "tryout", hosterId: interaction.user.id, link, status: "open", startedAt: new Date().toISOString() };
-    activeTrainings.set(sessionId, session);
-    await saveState(state => { state.trainings[sessionId] = session; return state; });
     const controls = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRYOUT").setStyle(ButtonStyle.Danger)
     );
-    return interaction.reply({
+    const payload = {
       content: [
         "# TRYOUT OPEN",
         "## Tryout Time",
@@ -1582,7 +1585,15 @@ async function handleTryout(interaction) {
       ].join("\n"),
       components: [controls],
       allowedMentions: { users: [interaction.user.id], parse: [] }
-    });
+    };
+    await interaction.deferReply({ ephemeral: true });
+    const target = await configuredChannel(interaction.guild, "tryout_channel", "tryout") || interaction.channel;
+    const announcement = await target.send(payload);
+    session.channelId = target.id;
+    session.messageId = announcement.id;
+    activeTrainings.set(sessionId, session);
+    await saveState(state => { state.trainings[sessionId] = session; return state; });
+    return interaction.editReply(`Tryout started: ${announcement.url}`);
   }
   const target = interaction.options.getUser("user");
   if (!await completedProfile(target.id)) return interaction.reply({ content: "Target must complete `/profile create` first.", ephemeral: true });
@@ -2053,7 +2064,7 @@ async function handleTraining(interaction) {
     const posted = await publishGuidePost(interaction.guild, GUIDE_POSTS.find(item => item.key === "training_rules"));
     return interaction.reply({ content: posted ? "Training handbook updated." : "Create `training-hoster-rules` first.", ephemeral: true });
   }
-  if (sub === "start") {
+  if (sub === "start" || sub === "create") {
     const link = interaction.options.getString("link");
     const rules = interaction.options.getString("rules") || "No Lh, no TDS, no overpassive, no 2 Ragdoll cancel, no wall, no hitting in queue, do not leave queue.";
     const selectedHost = interaction.options.getUser("host") || interaction.user;
