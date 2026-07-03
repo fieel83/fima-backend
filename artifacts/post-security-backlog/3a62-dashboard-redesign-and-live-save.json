@@ -1,0 +1,65 @@
+{
+  "status": "LOCAL VERIFIED / LIVE SAVE BLOCKED",
+  "pages": [
+    "Overview",
+    "Server Selector",
+    "Template Setup",
+    "Channels",
+    "Roles & Permissions",
+    "Challenges",
+    "Availability & LOA",
+    "Training / Staff",
+    "Applications",
+    "Tickets & Support",
+    "Moderation / Security",
+    "Blacklist / Appeal / Bail",
+    "Roster / Lineups / Relations",
+    "Events / Daily Question",
+    "Voice / Join-to-Create",
+    "XP / Levels",
+    "Guides & Embeds",
+    "Branding / Theme / Language",
+    "Logs / Backups / Restore",
+    "Advanced JSON"
+  ],
+  "design": {
+    "premiumCharcoalPurple": true,
+    "animatedBackground": true,
+    "customScrollbar": true,
+    "stickyScrollableSidebar": true,
+    "distinctActionButtons": true,
+    "tooltips": true,
+    "turkishEnglishToggle": true,
+    "themeSelector": true,
+    "accentColor": true,
+    "saveToasts": true,
+    "unsavedChangesIndicator": true,
+    "dangerZoneSeparated": true
+  },
+  "newConfigKinds": [
+    "staffOperations",
+    "applications",
+    "moderation",
+    "events",
+    "voice",
+    "xp"
+  ],
+  "security": {
+    "ownerDiscordIdRequired": "…521739",
+    "csrfRetryImplemented": true,
+    "officialOriginRequired": true,
+    "credentialsIncluded": true,
+    "secretsRendered": false
+  },
+  "tests": {
+    "dashboardClientParses": true,
+    "twentyPageOrderVerified": true,
+    "fullSuite": "61/61"
+  },
+  "liveSave": {
+    "status": "BLOCKED",
+    "reason": "The available Chrome profile did not expose a working owner-authenticated Fima dashboard session, and the Chrome extension connection failed before a tab could be claimed.",
+    "csrfRequiredObservedAfterFix": false,
+    "claim": "No live-save success is claimed."
+  }
+}

@@ -105,6 +105,19 @@ test("3A61 dashboard exposes Turkish UI, animated premium controls and real audi
   assert.match(serverSource, /\/api\/paradise\/actions\/preview/);
 });
 
+test("3A62 dashboard is split into twenty understandable operation pages", () => {
+  const pages = [...htmlSource.matchAll(/data-page-button="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(pages, [
+    "overview", "servers", "setup", "channels", "roles", "challenge", "availability",
+    "operations", "applications", "tickets", "moderation", "blacklist", "roster",
+    "events", "voice", "xp", "guides", "branding", "logs", "advanced"
+  ]);
+  for (const kind of ["staffOperations", "applications", "moderation", "events", "voice", "xp"]) {
+    assert.match(htmlSource, new RegExp(`data-save="${kind}"`));
+    assert.match(serverSource, new RegExp(`"${kind}"`));
+  }
+});
+
 test("destructive Paradise setup requires a typed final confirmation", () => {
   const paradiseSource = fs.readFileSync(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(paradiseSource, /paradise_setup_final/);

@@ -1,0 +1,32 @@
+{
+  "status": "LIVE VERIFIED",
+  "verifiedAt": "2026-07-03T02:02:47.380Z",
+  "requestedCommit": "2726e1a",
+  "renderCommit": "2726e1ad4a325692cc06e6325c841810360dbf26",
+  "renderBuildTime": "2026-07-03T02:01:45.411Z",
+  "botAuditJob": {
+    "startedAt": "2026-07-03T02:01:59.107Z",
+    "completedAt": "2026-07-03T02:02:47.380Z",
+    "auditedGuildCount": 3,
+    "backedUpGuildCount": 3,
+    "previewedGuildCount": 3,
+    "lastError": null
+  },
+  "featuresInLiveSource": [
+    "Join-to-Create basic lifecycle",
+    "safe temporary voice-name filter",
+    "voice owner lock, limit, rename and delete controls",
+    "welcome and leave logging",
+    "chat and non-AFK voice XP",
+    "Paradise Clan daily question scheduler",
+    "winner-only Roblox gamepass submission",
+    "template command filtering"
+  ],
+  "interactionVerification": "SOURCE LIVE; individual Discord button interactions were not invoked from the owner's user account",
+  "slashCommandPublicProof": "BLOCKED before the follow-up deployment because the existing public health route did not expose a secret-free command count",
+  "releaseSafety": {
+    "latestJsonChanged": false,
+    "fimaAppReleasePublished": false,
+    "publicReleaseCreated": false
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "status": "LOCAL VERIFIED",
+  "templates": {
+    "Paradise Clan": {
+      "includes": [
+        "challenge and ranking",
+        "roster, main lineup and war lineup",
+        "mainer and wars",
+        "relations",
+        "training, tryout, referee and hoster",
+        "applications and tickets",
+        "blacklist, appeal and bail",
+        "moderation and quarantine",
+        "Join-to-Create",
+        "XP and levels",
+        "daily question and events"
+      ],
+      "dailyQuestionDefault": true
+    },
+    "Fieel's Community": {
+      "includes": [
+        "general community",
+        "Fima support and updates",
+        "FAQ/trust and command guide",
+        "support/application tickets",
+        "events, giveaways and game nights",
+        "optional training",
+        "language and ping roles",
+        "security, welcome/leave, Join-to-Create and XP"
+      ],
+      "excludesByDefault": [
+        "challenge",
+        "ranking",
+        "leaderboard spots",
+        "roster and lineup",
+        "mainer",
+        "daily 25 Robux question"
+      ]
+    },
+    "TSBTR Yedek": {
+      "includes": [
+        "top 10, top 20 and top 30",
+        "profiles, challenge, cooldown, immunity and availability",
+        "LOA",
+        "training, tryout, referee and hoster",
+        "applications and tickets",
+        "stage, level, strength, region, character and ping roles",
+        "blacklist, appeal, bail, security, voice and optional XP"
+      ]
+    }
+  },
+  "modes": [
+    "preview",
+    "repair missing only",
+    "repost guides only",
+    "destructive rebuild after typed confirmation"
+  ],
+  "tests": {
+    "schemasSeparate": true,
+    "communityChallengeAbsent": true,
+    "communityApplicationPresent": true,
+    "joinToCreatePresentAllTemplates": true,
+    "privateVoiceCategoryPresentAllTemplates": true
+  }
+}

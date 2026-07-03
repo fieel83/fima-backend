@@ -1,0 +1,32 @@
+{
+  "status": "PARTIAL LIVE / EXPANDED SOURCE LOCAL VERIFIED",
+  "liveCommit2726e1a": [
+    "create temporary room",
+    "move room owner",
+    "safe room-name filtering",
+    "lock/unlock",
+    "cycle user limit",
+    "rename",
+    "delete empty room",
+    "auto-delete empty room"
+  ],
+  "expandedSource": [
+    "PRIVATE VOICE category",
+    "hide/unhide",
+    "permit user",
+    "reject and disconnect user",
+    "transfer ownership",
+    "voice action audit log",
+    "dashboard defaults",
+    "configurable auto-delete",
+    "all three templates"
+  ],
+  "blockedNameSignals": [
+    "sexual content",
+    "explicit Turkish/English terms",
+    "slurs",
+    "token/cookie scam text"
+  ],
+  "fallback": "Safe Discord display-name based room name",
+  "liveInteractionVerification": "BLOCKED until the expanded source is deployed and a member joins Join to Create in the test guild"
+}

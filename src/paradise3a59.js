@@ -13,6 +13,14 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
+const APPLICATION_TYPES = Object.freeze([
+  ["staff", "Staff"], ["moderator", "Moderator"], ["support", "Support"],
+  ["training_hoster", "Training Hoster"], ["tryout_hoster", "Tryout Hoster"],
+  ["referee", "Referee"], ["event_staff", "Event Staff"],
+  ["giveaway_staff", "Giveaway Staff"], ["content_creator", "Content Creator"],
+  ["partnership", "Partnership / Ally"], ["clan_mainer", "Clan Member / Mainer"],
+  ["fima_support", "Fima Support Helper"]
+]);
 const verificationChallenges = new Map();
 const verifiedProfiles = new Map();
 const pendingTryouts = new Map();
@@ -32,7 +40,8 @@ const EMPTY_STATE = Object.freeze({
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
-  temporaryVoices: {}, memberLevels: {}, questionOfDay: {}
+  temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
+  applications: {}, moderationCases: {}, securityState: {}
 });
 
 function normalizeState(value) {
@@ -179,7 +188,16 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
   ["bail_appeal_channel", "Private bail reviews"],
   ["blacklist_logs_channel", "Private blacklist logs"],
   ["roster_logs_channel", "Private roster logs"],
-  ["war_logs_channel", "Private war and lineup logs"]
+  ["war_logs_channel", "Private war and lineup logs"],
+  ["application_review_channel", "Private application reviews"],
+  ["application_logs_channel", "Private application logs"],
+  ["moderation_requests_channel", "Private moderation request queue"],
+  ["moderation_logs_channel", "Private moderation case logs"],
+  ["quarantine_review_channel", "Private quarantine review"],
+  ["voice_logs_channel", "Private voice control logs"],
+  ["level_logs_channel", "Private XP and level logs"],
+  ["question_channel", "Daily question channel"],
+  ["payout_queue_channel", "Private reward payout queue"]
 ]);
 
 export const PARADISE_COMMUNITY_SCHEMA = [
@@ -190,9 +208,10 @@ export const PARADISE_COMMUNITY_SCHEMA = [
   ["FIMA APP", ["fima-macro", "macro-help", "update-help", "license-help", "hwid-help", "payment-help", "robux-payments", "bug-reports", "suggestions"], false],
   ["COMMUNITY", ["general", "media", "uploads", "clips", "outfits", "capes", "macro-discussion", "success-results", "creator-resources", "partnerships", "media-approval", "bot-commands"], false],
   ["TRAINING & EVENTS", ["training-announcements", "training-results", "event-announcements", "event-results", "tournament-announcements", "tournament-results", "game-night", "giveaway-results"], false],
-  ["STAFF", ["staff-chat", "staff-command-guide", "moderation-policy", "moderation-requests", "staff-logs", "moderation-logs", "activity-logs", "security-alerts", "quarantine-review", "bot-logs"], true],
+  ["STAFF", ["staff-chat", "staff-command-guide", "moderation-policy", "moderation-requests", "staff-logs", "moderation-logs", "activity-logs", "security-alerts", "quarantine-review", "application-logs", "bot-logs"], true],
   ["MEMBER LOGS", ["welcome-logs", "leave-logs", "level-logs"], true],
-  ["VOICE", ["Join to Create", "Community Voice 1", "Community Voice 2", "AFK"], false]
+  ["VOICE", ["Join to Create", "Community Voice 1", "Community Voice 2", "AFK"], false],
+  ["PRIVATE VOICE", [], false]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
@@ -203,9 +222,10 @@ export const PARADISE_CLAN_SCHEMA = [
   ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night", "question-of-the-day", "level-leaderboard"], false],
   ["SUPPORT", ["support-ticket", "application-ticket", "application-guide", "report-staff", "report-guide"], false],
   ["BLACKLIST & APPEALS", ["blacklist", "blacklist-appeal", "bail-review"], false],
-  ["STAFF", ["staff-annc", "staff-chat", "staff-command-guide", "moderation-policy", "moderation-requests", "activity-check", "activity-review", "referee-logs", "hoster-reports", "quarantine-review", "bot-logs", "loa"], true],
+  ["STAFF", ["staff-annc", "staff-chat", "staff-command-guide", "moderation-policy", "moderation-requests", "activity-check", "activity-review", "application-reviews", "application-logs", "referee-logs", "hoster-reports", "quarantine-review", "payout-queue", "bot-logs", "loa"], true],
   ["LOGS", ["welcome-logs", "leave-logs", "message-logs", "role-logs", "channel-logs", "member-logs", "mod-logs", "level-logs"], true],
-  ["VOICE", ["war-vc-text", "Stage", "Join to Create", "War VC", "Voice 1", "Voice 2", "Voice 3", "AFK"], false]
+  ["VOICE", ["war-vc-text", "Stage", "Join to Create", "War VC", "Voice 1", "Voice 2", "Voice 3", "AFK"], false],
+  ["PRIVATE VOICE", [], false]
 ];
 
 export const PARADISE_TSBTR_SCHEMA = [
@@ -221,7 +241,8 @@ export const PARADISE_TSBTR_SCHEMA = [
   ["REFEREES", ["referee-annc", "referee-chat", "referee-rules", "referee-post", "referee-updates", "referee-works", "referee-guide", "referee-strikes", "referee-activity-check"], true],
   ["STAFF OPERATIONS", ["staff-command-guide", "moderation-policy", "moderation-requests", "quarantine-review", "application-reviews"], true],
   ["CLAN OPERATIONS", ["maining-guide", "mainer-proof", "war-announcements", "war-line-chat", "war-scores", "eu-rosters", "roster-logs", "find-a-fcw"], true],
-  ["VOICE", ["Stage", "Join to Create", "Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5", "AFK"], false]
+  ["VOICE", ["Stage", "Join to Create", "Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5", "AFK"], false],
+  ["PRIVATE VOICE", [], false]
 ];
 
 export const PARADISE_SETUP_SCHEMAS = Object.freeze({
@@ -440,11 +461,13 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("start").setDescription("Start a game night")
         .addStringOption(o => o.setName("game").setDescription("Game name").setRequired(true))
         .addStringOption(o => o.setName("link").setDescription("Game/server link").setRequired(true))
+        .addAttachmentOption(o => o.setName("image").setDescription("Game image").setRequired(true))
         .addStringOption(o => o.setName("notes").setDescription("Rules or notes"))),
     new SlashCommandBuilder().setName("event").setNameLocalizations({ tr: "etkinlik" }).setDescription("Paradise event operations").setDescriptionLocalizations({ tr: "Paradise etkinlik işlemleri" })
       .addSubcommand(s => s.setName("create").setDescription("Create an event")
         .addStringOption(o => o.setName("title").setDescription("Event title").setRequired(true))
         .addStringOption(o => o.setName("time").setDescription("Time or Discord timestamp").setRequired(true))
+        .addAttachmentOption(o => o.setName("image").setDescription("Event image").setRequired(true))
         .addStringOption(o => o.setName("link").setDescription("Optional link"))
         .addStringOption(o => o.setName("rules").setDescription("Rules or details"))),
     new SlashCommandBuilder().setName("referee").setNameLocalizations({ tr: "hakem" }).setDescription("Paradise referee operations").setDescriptionLocalizations({ tr: "Paradise hakem işlemleri" })
@@ -630,6 +653,55 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("cancel").setDescription("Cancel today's unanswered question")),
     new SlashCommandBuilder().setName("answer").setDescription("Answer today's Paradise clan question")
       .addStringOption(o => o.setName("answer").setDescription("Your answer").setRequired(true).setMaxLength(120)),
+    new SlashCommandBuilder().setName("application").setDescription("Paradise application forms and review queue")
+      .addSubcommand(s => s.setName("panel").setDescription("Post the application launcher panel"))
+      .addSubcommand(s => s.setName("apply").setDescription("Open an application form")
+        .addStringOption(o => o.setName("type").setDescription("Application type").setRequired(true)
+          .addChoices(...APPLICATION_TYPES.map(([value, name]) => ({ name, value })))))
+      .addSubcommand(s => s.setName("status").setDescription("View your latest application status")),
+    new SlashCommandBuilder().setName("mod").setDescription("Paradise moderation cases and approval queue")
+      .addSubcommand(s => s.setName("warn").setDescription("Record a staff warning")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("mute").setDescription("Timeout a member within your authority")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addIntegerOption(o => o.setName("minutes").setDescription("Timeout minutes").setRequired(true).setMinValue(1).setMaxValue(40320))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("kick-request").setDescription("Request a senior-approved kick")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Reason and evidence summary").setRequired(true).setMaxLength(750)))
+      .addSubcommand(s => s.setName("ban-request").setDescription("Request a senior-approved ban")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Reason and evidence summary").setRequired(true).setMaxLength(750)))
+      .addSubcommand(s => s.setName("quarantine").setDescription("Move a suspicious member into quarantine")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("unquarantine").setDescription("Release a reviewed member")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Review note").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("lockdown").setDescription("Enable or disable channel lockdown")
+        .addBooleanOption(o => o.setName("enabled").setDescription("Lock this channel").setRequired(true)))
+      .addSubcommand(s => s.setName("raidmode").setDescription("Enable or disable safe raid mode")
+        .addBooleanOption(o => o.setName("enabled").setDescription("Raid mode").setRequired(true)))
+      .addSubcommand(s => s.setName("case").setDescription("View a moderation case")
+        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true)))
+      .addSubcommand(s => s.setName("approve").setDescription("Senior: approve a pending kick/ban request")
+        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true)))
+      .addSubcommand(s => s.setName("deny").setDescription("Senior: deny a pending kick/ban request")
+        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true))),
+    new SlashCommandBuilder().setName("security").setDescription("Paradise security and quarantine controls")
+      .addSubcommand(s => s.setName("panel").setDescription("Post the security status panel"))
+      .addSubcommand(s => s.setName("quarantine").setDescription("Show quarantine status"))
+      .addSubcommand(s => s.setName("automod").setDescription("Show active AutoMod policy")),
+    new SlashCommandBuilder().setName("rank").setDescription("Show Paradise chat and voice XP")
+      .addUserOption(o => o.setName("user").setDescription("Member; defaults to you")),
+    new SlashCommandBuilder().setName("leaderboard").setDescription("Show Paradise XP leaderboard")
+      .addStringOption(o => o.setName("type").setDescription("Leaderboard type")
+        .addChoices(
+          { name: "Total", value: "total" }, { name: "Chat", value: "chat" },
+          { name: "Voice", value: "voice" }, { name: "Weekly", value: "weekly" },
+          { name: "Monthly", value: "monthly" }
+        )),
     (() => {
       const command = new SlashCommandBuilder().setName("set").setDescription("Map Paradise systems to Discord channels")
         .setDescriptionLocalizations({ tr: "Paradise sistemlerini Discord kanallarına eşle" });
@@ -1307,6 +1379,7 @@ async function handleTryout(interaction) {
     await saveState(state => { state.trainings[sessionId] = session; return state; });
     const controls = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRYOUT").setStyle(ButtonStyle.Danger)
     );
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ TRYOUT OPEN")
@@ -1781,6 +1854,7 @@ async function handleTraining(interaction) {
     };
     const controls = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRAINING").setStyle(ButtonStyle.Danger)
     );
     const payload = { embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ TRAINING OPEN")
@@ -1869,6 +1943,13 @@ async function handleSessionButton(interaction) {
       return state;
     });
     return interaction.reply({ content: "# SERVER LOCKED", allowedMentions: { parse: [] } });
+  }
+  if (action === "unlocked") {
+    await saveState(state => {
+      state.trainings[sessionId] = { ...state.trainings[sessionId], status: "open", unlockedAt: new Date().toISOString() };
+      return state;
+    });
+    return interaction.reply({ content: "# SERVER UNLOCKED", allowedMentions: { parse: [] } });
   }
   await finishSession(sessionId, session.hosterId);
   return interaction.update({ content: "# ENDED", embeds: interaction.message.embeds, components: [] });
@@ -1985,6 +2066,8 @@ async function handleCommunityEvent(interaction, type) {
   if (!hasEventAuthority(interaction, [role])) return interaction.reply({ content: `${role} or owner role required.`, ephemeral: true });
   await recordStaffActivity(interaction.user.id, type);
   const isGame = type === "gamenight";
+  const image = interaction.options.getAttachment("image");
+  if (!image?.contentType?.startsWith("image/")) return interaction.reply({ content: "A valid image attachment is required.", ephemeral: true });
   const title = isGame ? `Game Night: ${interaction.options.getString("game")}` : interaction.options.getString("title");
   const description = isGame
     ? `**Link:** ${interaction.options.getString("link")}\n**Notes:** ${interaction.options.getString("notes") || "Join, follow the host and have fun."}`
@@ -1993,7 +2076,7 @@ async function handleCommunityEvent(interaction, type) {
     new ButtonBuilder().setCustomId(`paradise_rsvp_yes:${crypto.randomUUID()}`).setLabel("Going").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`paradise_rsvp_maybe:${crypto.randomUUID()}`).setLabel("Maybe").setStyle(ButtonStyle.Secondary)
   );
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(title).setDescription(description)
+  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(title).setDescription(description).setImage(image.url)
     .addFields({ name: "Host", value: `${interaction.user}` }).setFooter({ text: "Made by Paradise bot" })], components: [row] });
 }
 
@@ -2055,18 +2138,21 @@ function qotdWinnerButtons(dateKey) {
 async function postDailyQuestion(guild, { force = false } = {}) {
   const state = await loadState();
   const config = configForGuild(state, guild.id);
-  if (!force && config.activeSetupMode !== "clan") return null;
-  const channel = guild.channels.cache.find(item => item.name === "question-of-the-day");
+  const eventSettings = config.eventSettings || {};
+  if (!force && (config.activeSetupMode !== "clan" || eventSettings.dailyQuestionEnabled === false)) return null;
+  const channel = await configuredChannel(guild, "question_channel", "question-of-the-day");
   if (!channel?.isTextBased?.()) return null;
   const clock = berlinClock();
   const existing = state.questionOfDay?.[guild.id];
   if (existing?.dateKey === clock.dateKey && existing?.messageId) return existing;
   const question = questionForDate(clock.dateKey);
+  const rewardLabel = String(eventSettings.dailyQuestionReward || "25 Robux").slice(0, 80);
+  const hour = Math.min(23, Math.max(0, Number(eventSettings.dailyQuestionHour ?? 13)));
   const message = await channel.send({
     embeds: [new EmbedBuilder()
       .setColor(await paradiseBrandColor())
-      .setTitle("◆ GÜNÜN SORUSU · 25 ROBUX")
-      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını Paradise paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün 13:00 Europe/Berlin · Made by Paradise bot`)
+      .setTitle(`◆ GÜNÜN SORUSU · ${rewardLabel.toUpperCase()}`)
+      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını Paradise paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün ${String(hour).padStart(2, "0")}:00 Europe/Berlin · Made by Paradise bot`)
       .setTimestamp()]
   });
   const record = {
@@ -2206,30 +2292,422 @@ async function handleQotdGamepassModal(interaction) {
   const gamepassUrl = validRobloxGamepassUrl(interaction.fields.getTextInputValue("gamepass_url"));
   if (!gamepassUrl) return interaction.reply({ content: "Yalnızca resmî bir Roblox/Create Roblox gamepass bağlantısı kabul edilir.", ephemeral: true });
   const owner = await interaction.guild.fetchOwner().catch(() => null);
-  const rewardLog = interaction.guild.channels.cache.find(channel => ["bot-logs", "staff-logs", "giveaway-results"].includes(channel.name) && channel.isTextBased?.());
+  const rewardLog = await configuredChannel(interaction.guild, "payout_queue_channel", "payout-queue")
+    || interaction.guild.channels.cache.find(channel => ["bot-logs", "staff-logs", "giveaway-results"].includes(channel.name) && channel.isTextBased?.());
   const payload = `QOTD reward claim · ${interaction.user} (${interaction.user.id}) · ${dateKey}\n${gamepassUrl}\nManual review required; Paradise does not auto-pay.`;
   const dmSent = owner ? await owner.send(payload).then(() => true).catch(() => false) : false;
-  if (rewardLog) await rewardLog.send(payload).catch(() => {});
+  let queueMessageId = null;
+  if (rewardLog) {
+    const queueMessage = await rewardLog.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ 25 ROBUX PAYOUT · PENDING")
+        .setDescription(`Winner: ${interaction.user}\nDate: **${dateKey}**\n[Open official Roblox gamepass](${gamepassUrl})\n\n-# Manual owner/staff decision required. Paradise never auto-pays.`)
+        .setFooter(paradiseFooter("Winner-verified submission"))],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_payout_paid:${dateKey}`).setLabel("Mark Paid").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_payout_invalid:${dateKey}`).setLabel("Invalid Link").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`paradise_payout_rejected:${dateKey}`).setLabel("Reject").setStyle(ButtonStyle.Danger)
+      )]
+    }).catch(() => null);
+    queueMessageId = queueMessage?.id || null;
+  }
   await saveState(next => {
     next.questionOfDay[interaction.guildId] = {
-      ...current, gamepassUrl, gamepassSubmittedAt: new Date().toISOString(), ownerDmSent: dmSent
+      ...current, gamepassUrl, gamepassSubmittedAt: new Date().toISOString(), ownerDmSent: dmSent,
+      payoutStatus: "pending", payoutQueueMessageId: queueMessageId
     };
     return next;
   });
   return interaction.reply({ content: "Gamepass bağlantın güvenli şekilde kaydedildi ve owner incelemesine gönderildi.", ephemeral: true });
 }
 
+async function handleQotdPayoutReview(interaction) {
+  if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Owner or senior staff approval required.", ephemeral: true });
+  const [status, dateKey] = interaction.customId.replace("paradise_payout_", "").split(":");
+  const current = (await loadState()).questionOfDay?.[interaction.guildId];
+  if (!current || current.dateKey !== dateKey || current.payoutStatus !== "pending") {
+    return interaction.reply({ content: "This payout is no longer pending.", ephemeral: true });
+  }
+  await saveState(next => {
+    next.questionOfDay[interaction.guildId] = {
+      ...current, payoutStatus: status, payoutReviewedBy: interaction.user.id, payoutReviewedAt: new Date().toISOString()
+    };
+    return next;
+  });
+  const winner = await interaction.client.users.fetch(current.winnerId).catch(() => null);
+  await winner?.send(`Your ${dateKey} Paradise question reward was marked **${status}** by staff.`).catch(() => {});
+  return interaction.update({
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`◆ 25 ROBUX PAYOUT · ${status.toUpperCase()}`)
+      .setFooter(paradiseFooter(`Reviewed by ${interaction.user.username}`))],
+    components: []
+  });
+}
+
+function applicationLabel(type) {
+  return APPLICATION_TYPES.find(([value]) => value === type)?.[1] || type;
+}
+
+function applicationModal(type) {
+  const modal = new ModalBuilder().setCustomId(`paradise_application_modal:${type}`).setTitle(`${applicationLabel(type)} Application`);
+  const inputs = [
+    ["motivation", "Why do you want this position?", TextInputStyle.Paragraph, 30, 900],
+    ["experience", "Relevant experience", TextInputStyle.Paragraph, 10, 900],
+    ["availability", "Timezone and weekly availability", TextInputStyle.Short, 3, 150],
+    ["additional", "Anything else? (write N/A if none)", TextInputStyle.Paragraph, 2, 600]
+  ];
+  modal.addComponents(...inputs.map(([id, label, style, min, max]) =>
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(style)
+        .setMinLength(min).setMaxLength(max).setRequired(true)
+    )));
+  return modal;
+}
+
+async function handleApplicationCommand(interaction) {
+  const sub = interaction.options.getSubcommand();
+  if (sub === "panel") {
+    if (!canManageClan(interaction.member)) return interaction.reply({ content: "Application management authority required.", ephemeral: true });
+    const channel = await configuredChannel(interaction.guild, "application_ticket_channel", "application-ticket") || interaction.channel;
+    await channel.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE APPLICATIONS")
+        .setDescription("# Join the team\nChoose a position, answer the form honestly, then follow the private status shown by Paradise.\n\n- One active application at a time\n- Blacklisted users cannot apply\n- Reviewers cannot grant roles above their own hierarchy\n-# Türkçe ve English answers are accepted.")
+        .setFooter(paradiseFooter("Private review queue"))],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("paradise_application_open").setLabel("Apply / Başvur").setEmoji("📝").setStyle(ButtonStyle.Primary)
+      )]
+    });
+    return interaction.reply({ content: `Application panel posted in ${channel}.`, ephemeral: true });
+  }
+  const state = await loadState();
+  const records = Object.values(state.applications?.[interaction.guildId] || {}).filter(item => item.userId === interaction.user.id)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  if (sub === "status") {
+    const latest = records[0];
+    return interaction.reply({
+      content: latest
+        ? `Latest application: **${applicationLabel(latest.type)}** · **${latest.status}** · <t:${Math.floor(Date.parse(latest.updatedAt || latest.createdAt) / 1000)}:R>`
+        : "You have not submitted an application in this server.",
+      ephemeral: true
+    });
+  }
+  if (state.blacklists?.[interaction.guildId]?.[interaction.user.id]?.status === "active") {
+    return interaction.reply({ content: "Active blacklist records block applications. Use the appeal flow first.", ephemeral: true });
+  }
+  const pending = records.find(item => ["pending", "more_info"].includes(item.status));
+  if (pending) return interaction.reply({ content: `You already have an active **${applicationLabel(pending.type)}** application.`, ephemeral: true });
+  const cooldownDays = Number(configForGuild(state, interaction.guildId).applicationSettings?.cooldownDays ?? 7);
+  const latestAt = records[0] ? Date.parse(records[0].createdAt) : 0;
+  const cooldownUntil = latestAt + cooldownDays * 86_400_000;
+  if (cooldownUntil > Date.now()) {
+    return interaction.reply({ content: `Application cooldown ends <t:${Math.floor(cooldownUntil / 1000)}:R>.`, ephemeral: true });
+  }
+  return interaction.showModal(applicationModal(interaction.options.getString("type")));
+}
+
+async function handleApplicationModal(interaction) {
+  const type = interaction.customId.split(":")[1];
+  if (!APPLICATION_TYPES.some(([value]) => value === type)) {
+    return interaction.reply({ content: "Unknown application type.", ephemeral: true });
+  }
+  const state = await loadState();
+  const guildConfig = configForGuild(state, interaction.guildId);
+  const applicationSettings = guildConfig.applicationSettings || {};
+  if ((guildConfig.activeSetupMode === "community" && type === "clan_mainer")
+    || (guildConfig.activeSetupMode !== "community" && type === "fima_support")) {
+    return interaction.reply({ content: "This application type is not available for the active server template.", ephemeral: true });
+  }
+  if (applicationSettings.enabled === false) return interaction.reply({ content: "Applications are currently closed.", ephemeral: true });
+  if (state.blacklists?.[interaction.guildId]?.[interaction.user.id]?.status === "active") {
+    return interaction.reply({ content: "Active blacklist records block applications.", ephemeral: true });
+  }
+  const previous = Object.values(state.applications?.[interaction.guildId] || {}).filter(item => item.userId === interaction.user.id)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  if (previous.some(item => ["pending", "more_info"].includes(item.status))) {
+    return interaction.reply({ content: "You already have an active application.", ephemeral: true });
+  }
+  const cooldownUntil = (previous[0] ? Date.parse(previous[0].createdAt) : 0)
+    + Number(applicationSettings.cooldownDays ?? 7) * 86_400_000;
+  if (cooldownUntil > Date.now()) {
+    return interaction.reply({ content: `Application cooldown ends <t:${Math.floor(cooldownUntil / 1000)}:R>.`, ephemeral: true });
+  }
+  const id = crypto.randomUUID();
+  const answers = Object.fromEntries(["motivation", "experience", "availability", "additional"]
+    .map(key => [key, interaction.fields.getTextInputValue(key).trim()]));
+  const record = {
+    id, guildId: interaction.guildId, userId: interaction.user.id, type, answers,
+    status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  };
+  await saveState(next => {
+    next.applications[interaction.guildId] = next.applications[interaction.guildId] || {};
+    next.applications[interaction.guildId][id] = record;
+    return next;
+  });
+  const review = await configuredChannel(interaction.guild, "application_review_channel", "application-reviews");
+  if (review) {
+    const fields = Object.entries(answers).map(([key, value]) => ({
+      name: key[0].toUpperCase() + key.slice(1), value: value.slice(0, 1024), inline: false
+    }));
+    await review.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(type)}`)
+        .setDescription(`Applicant: ${interaction.user}\nApplication ID: \`${id.slice(0, 8)}\``)
+        .addFields(fields).setFooter(paradiseFooter("Pending review")).setTimestamp()],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_application_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_application_more:${id}`).setLabel("Ask More Info").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`paradise_application_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+      )]
+    });
+  }
+  await logParadiseAction(interaction.guild, "application_logs_channel", "application-logs", "Application submitted",
+    `${interaction.user} submitted **${applicationLabel(type)}** · \`${id.slice(0, 8)}\`.`);
+  return interaction.reply({ content: review ? "Application submitted for private staff review." : "Application saved. Staff must map an application review channel.", ephemeral: true });
+}
+
+function canReviewApplications(member) {
+  return member.permissions.has(PermissionsBitField.Flags.ManageGuild)
+    || member.roles.cache.some(role => ["Owner", "Admin", "Overseer", "Community Manager", "Administration Manager"].includes(role.name));
+}
+
+async function handleApplicationReview(interaction) {
+  if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
+  const [action, id] = interaction.customId.replace("paradise_application_", "").split(":");
+  const state = await loadState();
+  const record = state.applications?.[interaction.guildId]?.[id];
+  if (!record || record.status !== "pending") return interaction.reply({ content: "This application is no longer pending.", ephemeral: true });
+  const status = action === "approve" ? "approved" : action === "deny" ? "denied" : "more_info";
+  let grantedRole = null;
+  if (status === "approved" && configForGuild(state, interaction.guildId).applicationSettings?.autoGrantRole === true) {
+    const guildConfig = configForGuild(state, interaction.guildId);
+    const applicationRoleKeys = {
+      moderator: "moderator_role", support: "support_role", training_hoster: "training_hoster_role",
+      tryout_hoster: "tryout_hoster_role", referee: "referee_role", event_staff: "event_staff_role",
+      giveaway_staff: "giveaway_staff_role", content_creator: "content_creator_role"
+    };
+    const roleName = guildConfig.applicationSettings?.roleMappings?.[record.type]
+      || guildConfig.roleMappings?.[applicationRoleKeys[record.type]];
+    const role = roleName ? interaction.guild.roles.cache.find(item => item.name === roleName || item.id === roleName) : null;
+    const applicant = await interaction.guild.members.fetch(record.userId).catch(() => null);
+    const botMember = interaction.guild.members.me;
+    if (role && applicant && !role.managed
+      && interaction.member.roles.highest.comparePositionTo(role) > 0
+      && botMember?.roles.highest.comparePositionTo(role) > 0) {
+      await applicant.roles.add(role, `Paradise approved ${applicationLabel(record.type)} application`).catch(() => {});
+      grantedRole = role.id;
+    }
+  }
+  await saveState(next => {
+    next.applications[interaction.guildId][id] = {
+      ...record, status, reviewedBy: interaction.user.id, reviewedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(), grantedRole
+    };
+    return next;
+  });
+  const applicant = await interaction.client.users.fetch(record.userId).catch(() => null);
+  await applicant?.send(`Your **${applicationLabel(record.type)}** application in **${interaction.guild.name}** is now **${status.replace("_", " ")}**.`).catch(() => {});
+  await logParadiseAction(interaction.guild, "application_logs_channel", "application-logs", "Application reviewed",
+    `<@${record.userId}> · **${applicationLabel(record.type)}** · **${status}** by ${interaction.user}.${grantedRole ? ` Role <@&${grantedRole}> granted.` : ""}`);
+  return interaction.update({
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`Application · ${applicationLabel(record.type)} · ${status.toUpperCase()}`)
+      .setFooter(paradiseFooter(`Reviewed by ${interaction.user.username}`))],
+    components: []
+  });
+}
+
+function canModerate(member) {
+  return member.permissions.has(PermissionsBitField.Flags.ModerateMembers)
+    || member.permissions.has(PermissionsBitField.Flags.ManageMessages)
+    || member.roles.cache.some(role => ["Owner", "Admin", "Overseer", "Moderator", "Support Staff"].includes(role.name));
+}
+
+function canApproveModeration(member) {
+  return member.permissions.has(PermissionsBitField.Flags.ManageGuild)
+    || member.roles.cache.some(role => ["Owner", "Admin", "Overseer", "Administration Manager", "Moderator Manager", "Head Moderator"].includes(role.name));
+}
+
+function moderationTargetAllowed(actor, target) {
+  return target && !target.user.bot && target.id !== actor.id
+    && (actor.guild.ownerId === actor.id || actor.roles.highest.comparePositionTo(target.roles.highest) > 0);
+}
+
+async function recordModerationCase(interaction, action, target, reason, extra = {}) {
+  const id = crypto.randomUUID();
+  const record = {
+    id, guildId: interaction.guildId, action, targetId: target.id, requestedBy: interaction.user.id,
+    reason, status: extra.status || "completed", createdAt: new Date().toISOString(), ...extra
+  };
+  await saveState(state => {
+    state.moderationCases[interaction.guildId] = state.moderationCases[interaction.guildId] || {};
+    state.moderationCases[interaction.guildId][id] = record;
+    return state;
+  });
+  return record;
+}
+
+async function handleModCommand(interaction) {
+  if (!canModerate(interaction.member)) return interaction.reply({ content: "Moderation authority required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  if (sub === "case") {
+    const prefix = interaction.options.getString("id");
+    const record = Object.values((await loadState()).moderationCases?.[interaction.guildId] || {}).find(item => item.id.startsWith(prefix));
+    return interaction.reply({ content: record
+      ? `Case \`${record.id.slice(0, 8)}\` · **${record.action}** · <@${record.targetId}> · **${record.status}**\n${record.reason}`
+      : "Case not found.", ephemeral: true });
+  }
+  if (sub === "approve" || sub === "deny") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+    const decision = await decideModerationCase(interaction, sub, interaction.options.getString("id"));
+    if (!decision) return interaction.reply({ content: "Pending case not found.", ephemeral: true });
+    return interaction.reply({
+      content: `Case \`${decision.id.slice(0, 8)}\` is now **${decision.status}**.${decision.failure ? ` Discord blocked the action: \`${decision.failure}\`` : ""}`,
+      ephemeral: true
+    });
+  }
+  if (sub === "raidmode") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+    const enabled = interaction.options.getBoolean("enabled");
+    await saveState(state => {
+      state.securityState[interaction.guildId] = { ...(state.securityState[interaction.guildId] || {}), raidMode: enabled, updatedBy: interaction.user.id, updatedAt: new Date().toISOString() };
+      return state;
+    });
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Raid mode changed", `${interaction.user} set raid mode to **${enabled}**.`);
+    return interaction.reply({ content: `Raid mode **${enabled ? "enabled" : "disabled"}**.`, ephemeral: true });
+  }
+  if (sub === "lockdown") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+    const enabled = interaction.options.getBoolean("enabled");
+    await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: enabled ? false : null }, { reason: `Paradise lockdown by ${interaction.user.id}` });
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Channel lockdown", `${interaction.user} set ${interaction.channel} lockdown to **${enabled}**.`);
+    return interaction.reply({ content: `This channel is now **${enabled ? "locked" : "unlocked"}**.`, ephemeral: true });
+  }
+  const user = interaction.options.getUser("user");
+  const target = user ? await interaction.guild.members.fetch(user.id).catch(() => null) : null;
+  if (!moderationTargetAllowed(interaction.member, target)) return interaction.reply({ content: "Target is invalid or above your role hierarchy.", ephemeral: true });
+  const reason = interaction.options.getString("reason");
+  if (sub === "warn") {
+    const record = await recordModerationCase(interaction, "warn", target, reason);
+    await target.send(`You received a warning in **${interaction.guild.name}**: ${reason}\nCase: ${record.id.slice(0, 8)}`).catch(() => {});
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Warning recorded", `${target} warned by ${interaction.user}.\n**Reason:** ${reason}`);
+    return interaction.reply({ content: `Warning recorded as \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
+  }
+  if (sub === "mute") {
+    const minutes = interaction.options.getInteger("minutes");
+    if (!target.moderatable) return interaction.reply({ content: "Paradise cannot timeout this member because of Discord role hierarchy.", ephemeral: true });
+    await target.timeout(minutes * 60_000, reason);
+    const record = await recordModerationCase(interaction, "timeout", target, reason, { minutes });
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Timeout applied", `${target} timed out for **${minutes} minutes** by ${interaction.user}.\n**Reason:** ${reason}`);
+    return interaction.reply({ content: `Timeout applied · case \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
+  }
+  if (sub === "quarantine" || sub === "unquarantine") {
+    const role = await ensureRole(interaction.guild, "Muted / Quarantined");
+    if (sub === "quarantine") await target.roles.add(role, reason); else await target.roles.remove(role, reason);
+    const record = await recordModerationCase(interaction, sub, target, reason);
+    await logParadiseAction(interaction.guild, "quarantine_review_channel", "quarantine-review", "Quarantine updated",
+      `${target} · **${sub}** by ${interaction.user}\n**Reason:** ${reason}\nCase \`${record.id.slice(0, 8)}\``);
+    return interaction.reply({ content: `${target} ${sub === "quarantine" ? "quarantined" : "released"} · \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
+  }
+  const action = sub === "kick-request" ? "kick" : "ban";
+  const record = await recordModerationCase(interaction, action, target, reason, { status: "pending" });
+  const queue = await configuredChannel(interaction.guild, "moderation_requests_channel", "moderation-requests");
+  if (queue) {
+    await queue.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${action.toUpperCase()} REQUEST · PENDING`)
+        .setDescription(`Target: ${target}\nRequested by: ${interaction.user}\nCase: \`${record.id.slice(0, 8)}\`\n\n**Reason**\n${reason}`)
+        .setFooter(paradiseFooter("Senior approval required")).setTimestamp()],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_mod_approve:${record.id}`).setLabel("Approve").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`paradise_mod_deny:${record.id}`).setLabel("Deny").setStyle(ButtonStyle.Secondary)
+      )]
+    });
+  }
+  return interaction.reply({ content: queue ? `${action} request queued as \`${record.id.slice(0, 8)}\`.` : `Request saved as \`${record.id.slice(0, 8)}\`; map moderation-requests for review.`, ephemeral: true });
+}
+
+async function decideModerationCase(interaction, decision, idOrPrefix) {
+  const state = await loadState();
+  const entries = Object.entries(state.moderationCases?.[interaction.guildId] || {});
+  const [id, record] = entries.find(([key, item]) => key.startsWith(idOrPrefix) && item.status === "pending") || [];
+  if (!record) return null;
+  const target = await interaction.guild.members.fetch(record.targetId).catch(() => null);
+  let status = "denied";
+  let failure = null;
+  if (decision === "approve") {
+    try {
+      if (!target) throw new Error("member_not_found");
+      if (record.action === "kick") {
+        if (!target.kickable) throw new Error("role_hierarchy_blocks_kick");
+        await target.kick(record.reason);
+      } else {
+        if (!target.bannable) throw new Error("role_hierarchy_blocks_ban");
+        await target.ban({ reason: record.reason });
+      }
+      status = "approved";
+    } catch (error) {
+      status = "failed";
+      failure = error.message;
+    }
+  }
+  await saveState(next => {
+    next.moderationCases[interaction.guildId][id] = {
+      ...record, status, reviewedBy: interaction.user.id, reviewedAt: new Date().toISOString(),
+      failure: failure ? String(failure).slice(0, 120) : null
+    };
+    return next;
+  });
+  await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Moderation request reviewed",
+    `Case \`${id.slice(0, 8)}\` · **${record.action}** · <@${record.targetId}> · **${status}** by ${interaction.user}.${failure ? `\nFailure: \`${failure}\`` : ""}`);
+  return { id, record, status, failure };
+}
+
+async function handleModerationReview(interaction) {
+  if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+  const [decision, id] = interaction.customId.replace("paradise_mod_", "").split(":");
+  const result = await decideModerationCase(interaction, decision, id);
+  if (!result) return interaction.reply({ content: "This request is no longer pending.", ephemeral: true });
+  return interaction.update({
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`${result.record.action.toUpperCase()} REQUEST · ${result.status.toUpperCase()}`)
+      .setFooter(paradiseFooter(`Reviewed by ${interaction.user.username}`))],
+    components: []
+  });
+}
+
+async function handleSecurityCommand(interaction) {
+  const state = await loadState();
+  const config = configForGuild(state, interaction.guildId);
+  const security = state.securityState?.[interaction.guildId] || {};
+  const quarantineRole = interaction.guild.roles.cache.find(role => role.name === "Muted / Quarantined");
+  const lines = [
+    `**Raid mode:** ${security.raidMode ? "Enabled" : "Disabled"}`,
+    `**AutoMod:** ${config.automod?.enabled === false ? "Disabled" : "Configured / Discord availability dependent"}`,
+    `**Quarantined members:** ${quarantineRole?.members.size || 0}`,
+    `**Mass mention limit:** ${config.automod?.mentionLimit || 8}`,
+    `**Invite/scam policy:** ${config.automod?.blockInvites === false ? "Disabled" : "Enabled"}`
+  ];
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ PARADISE SECURITY")
+      .setDescription(`# Safe operations\n${lines.join("\n")}\n\n-# False positives require staff review; Paradise does not auto-ban on the first mistake.`)
+      .setFooter(paradiseFooter("Quarantine and audit-first moderation"))],
+    ephemeral: interaction.options.getSubcommand() !== "panel"
+  });
+}
+
 function temporaryVoicePanel(channelId) {
   return {
     embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("◆ PRIVATE VOICE CONTROL")
-      .setDescription("Bu kanalın sahibi aşağıdaki kontrolleri kullanabilir. Uygunsuz adlar reddedilir ve kanal adı Discord adına döner.\n\n- **Lock:** yeni girişleri kapat/aç\n- **Limit:** 0 → 2 → 4 → 6 → 8 → 10\n- **Rename:** güvenli özel ad\n- **Delete:** kanal boşken kaldır")
+      .setDescription("Bu kanalın sahibi aşağıdaki kontrolleri kullanabilir. Uygunsuz adlar reddedilir ve kanal adı Discord adına döner.\n\n- **Lock / Hide:** giriş veya görünürlüğü yönet\n- **Limit:** 0 → 2 → 4 → 6 → 8 → 10\n- **Permit / Reject:** üyeye özel erişim\n- **Transfer:** sahipliği devret\n- **Delete:** kanal boşken kaldır")
       .setFooter({ text: "Made by Paradise bot" })],
-    components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`paradise_voice_lock:${channelId}`).setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`paradise_voice_limit:${channelId}`).setLabel("User Limit").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`paradise_voice_rename:${channelId}`).setLabel("Rename").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`paradise_voice_delete:${channelId}`).setLabel("Delete").setStyle(ButtonStyle.Danger)
-    )]
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_voice_lock:${channelId}`).setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`paradise_voice_hide:${channelId}`).setLabel("Hide / Unhide").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`paradise_voice_limit:${channelId}`).setLabel("User Limit").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`paradise_voice_rename:${channelId}`).setLabel("Rename").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_voice_delete:${channelId}`).setLabel("Delete").setStyle(ButtonStyle.Danger)
+      ),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_voice_permit:${channelId}`).setLabel("Permit User").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_voice_reject:${channelId}`).setLabel("Reject User").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`paradise_voice_transfer:${channelId}`).setLabel("Transfer Owner").setStyle(ButtonStyle.Primary)
+      )
+    ]
   };
 }
 
@@ -2241,11 +2719,13 @@ async function handleTemporaryVoiceButton(interaction) {
   if (!record || !channel || record.ownerId !== interaction.user.id) {
     return interaction.reply({ content: "Bu ses kanalını yalnızca onu oluşturan kişi yönetebilir.", ephemeral: true });
   }
-  if (action === "rename") {
-    const modal = new ModalBuilder().setCustomId(`paradise_voice_rename_modal:${channelId}`).setTitle("Ses kanalını yeniden adlandır");
+  if (["rename", "permit", "reject", "transfer"].includes(action)) {
+    const modal = new ModalBuilder().setCustomId(`paradise_voice_${action}_modal:${channelId}`)
+      .setTitle(action === "rename" ? "Ses kanalını yeniden adlandır" : "Ses kanalı üye kontrolü");
     modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("voice_name").setLabel("Yeni güvenli kanal adı").setStyle(TextInputStyle.Short)
-        .setMinLength(1).setMaxLength(80).setRequired(true)
+      new TextInputBuilder().setCustomId(action === "rename" ? "voice_name" : "target_user")
+        .setLabel(action === "rename" ? "Yeni güvenli kanal adı" : "Discord kullanıcı ID veya mention")
+        .setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(action === "rename" ? 80 : 30).setRequired(true)
     ));
     return interaction.showModal(modal);
   }
@@ -2261,6 +2741,13 @@ async function handleTemporaryVoiceButton(interaction) {
     const nextLimit = limits[(limits.indexOf(channel.userLimit) + 1) % limits.length];
     await channel.setUserLimit(nextLimit, "Paradise private voice owner control");
     return interaction.reply({ content: `Kullanıcı limiti **${nextLimit || "sınırsız"}** olarak ayarlandı.`, ephemeral: true });
+  }
+  if (action === "hide") {
+    const everyone = interaction.guild.roles.everyone;
+    const hidden = Boolean(record.hidden);
+    await channel.permissionOverwrites.edit(everyone, { ViewChannel: hidden ? null : false }, { reason: "Paradise private voice owner control" });
+    await saveState(next => { next.temporaryVoices[channelId] = { ...record, hidden: !hidden }; return next; });
+    return interaction.reply({ content: hidden ? "Ses kanalı görünür oldu." : "Ses kanalı gizlendi.", ephemeral: true });
   }
   if (channel.members.size > 0) return interaction.reply({ content: "Kanalı silmeden önce herkesin çıkması gerekir.", ephemeral: true });
   await channel.delete("Paradise private voice owner request");
@@ -2286,18 +2773,57 @@ async function handleTemporaryVoiceRenameModal(interaction) {
   });
 }
 
+function discordUserId(value) {
+  const match = String(value || "").match(/\d{15,22}/);
+  return match?.[0] || null;
+}
+
+async function handleTemporaryVoiceMemberModal(interaction) {
+  const [, action, channelId] = interaction.customId.match(/^paradise_voice_(permit|reject|transfer)_modal:(\d+)$/) || [];
+  const state = await loadState();
+  const record = state.temporaryVoices?.[channelId];
+  const channel = interaction.guild.channels.cache.get(channelId);
+  if (!action || !record || !channel || record.ownerId !== interaction.user.id) {
+    return interaction.reply({ content: "Bu ses kanalını yönetme yetkin yok.", ephemeral: true });
+  }
+  const userId = discordUserId(interaction.fields.getTextInputValue("target_user"));
+  const member = userId ? await interaction.guild.members.fetch(userId).catch(() => null) : null;
+  if (!member || member.user.bot || member.id === interaction.user.id) {
+    return interaction.reply({ content: "Geçerli bir sunucu üyesi seç.", ephemeral: true });
+  }
+  if (action === "permit") {
+    await channel.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true }, { reason: "Paradise private voice permit" });
+  } else if (action === "reject") {
+    if (member.voice.channelId === channel.id) await member.voice.disconnect("Paradise private voice owner rejected member").catch(() => {});
+    await channel.permissionOverwrites.edit(member, { Connect: false }, { reason: "Paradise private voice reject" });
+  } else {
+    await channel.permissionOverwrites.edit(interaction.user.id, { ManageChannels: null, MoveMembers: null }, { reason: "Paradise voice ownership transfer" });
+    await channel.permissionOverwrites.edit(member, {
+      ViewChannel: true, Connect: true, ManageChannels: true, MoveMembers: true
+    }, { reason: "Paradise voice ownership transfer" });
+    await saveState(next => { next.temporaryVoices[channelId] = { ...record, ownerId: member.id, transferredAt: new Date().toISOString() }; return next; });
+  }
+  await logParadiseAction(interaction.guild, "voice_logs_channel", "bot-logs", "Private voice control",
+    `<@${interaction.user.id}> used **${action}** for <@${member.id}> in <#${channel.id}>.`);
+  return interaction.reply({ content: `Voice action **${action}** applied for ${member}.`, ephemeral: true });
+}
+
 export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   const guild = newState.guild || oldState.guild;
   if (!guild || newState.member?.user?.bot) return false;
-  const activeMode = configForGuild(await loadState(), guild.id).activeSetupMode;
-  if (!activeMode) return false;
+  const guildConfig = configForGuild(await loadState(), guild.id);
+  const activeMode = guildConfig.activeSetupMode;
+  const voiceConfig = guildConfig.voiceSettings || {};
+  if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
   if (joined?.name === "Join to Create") {
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
+    const privateCategory = guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE VOICE");
     const channel = await guild.channels.create({
       name: sanitizeTemporaryVoiceName(fallbackName, "Private Room"),
       type: ChannelType.GuildVoice,
-      parent: joined.parentId,
+      parent: privateCategory?.id || joined.parentId,
+      userLimit: Math.min(99, Math.max(0, Number(voiceConfig.defaultLimit) || 0)),
       permissionOverwrites: [
         { id: guild.roles.everyone.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect] },
         { id: newState.member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.MoveMembers] }
@@ -2317,7 +2843,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   const oldChannel = oldState.channel;
   if (oldChannel && oldChannel.id !== newState.channelId) {
     const record = (await loadState()).temporaryVoices?.[oldChannel.id];
-    if (record && oldChannel.members.size === 0) {
+    if (record && oldChannel.members.size === 0 && voiceConfig.autoDelete !== false) {
       await oldChannel.delete("Paradise empty temporary voice cleanup").catch(() => {});
       await saveState(state => { delete state.temporaryVoices[oldChannel.id]; return state; });
       return true;
@@ -2330,15 +2856,36 @@ function levelFromXp(xp) {
   return Math.floor(Math.sqrt(Math.max(0, Number(xp) || 0) / 100));
 }
 
+function xpPeriodKeys(now = new Date()) {
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((date - yearStart) / 86_400_000) + 1) / 7);
+  return {
+    week: `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`,
+    month: `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`
+  };
+}
+
 async function addMemberXp(guild, member, amount, source, sourceChannel = null) {
   if (!guild || !member || member.user?.bot || amount <= 0) return null;
   let result = null;
   await saveState(state => {
     const key = guildUserKey(guild.id, member.id);
     const previous = state.memberLevels[key] || { guildId: guild.id, userId: member.id, xp: 0, level: 0 };
+    const periods = xpPeriodKeys();
+    const weeklyXp = previous.weekKey === periods.week ? Number(previous.weeklyXp || 0) + amount : amount;
+    const monthlyXp = previous.monthKey === periods.month ? Number(previous.monthlyXp || 0) + amount : amount;
     const xp = Math.max(0, Number(previous.xp) || 0) + amount;
     const level = levelFromXp(xp);
-    result = { ...previous, xp, level, lastSource: source, updatedAt: new Date().toISOString() };
+    result = {
+      ...previous, xp, level,
+      chatXp: Number(previous.chatXp || 0) + (source === "chat" ? amount : 0),
+      voiceXp: Number(previous.voiceXp || 0) + (source === "voice" ? amount : 0),
+      weeklyXp, monthlyXp, weekKey: periods.week, monthKey: periods.month,
+      lastSource: source, updatedAt: new Date().toISOString()
+    };
     state.memberLevels[key] = result;
     return state;
   });
@@ -2347,6 +2894,12 @@ async function addMemberXp(guild, member, amount, source, sourceChannel = null) 
     const log = guild.channels.cache.find(channel => channel.name === "level-logs" && channel.isTextBased?.());
     if (log) await log.send(`${member} reached **Level ${result.level}** through ${source} activity.`).catch(() => {});
     else if (sourceChannel) await sourceChannel.send(`${member} reached **Level ${result.level}**!`).catch(() => {});
+    const state = await loadState();
+    const rewardName = configForGuild(state, guild.id).xpSettings?.roleRewards?.[String(result.level)];
+    const rewardRole = rewardName ? guild.roles.cache.find(role => role.name === rewardName || role.id === rewardName) : null;
+    if (rewardRole && guild.members.me?.roles.highest.comparePositionTo(rewardRole) > 0) {
+      await member.roles.add(rewardRole, `Paradise level ${result.level} reward`).catch(() => {});
+    }
   }
   return result;
 }
@@ -2381,13 +2934,50 @@ async function updateLevelLeaderboard(guild) {
 async function handleMemberLevelMessage(message) {
   if (!message.guild || message.author.bot || !message.member) return false;
   if (!message.content?.trim() && !message.attachments?.size) return false;
-  if (!configForGuild(await loadState(), message.guild.id).activeSetupMode) return false;
+  const config = configForGuild(await loadState(), message.guild.id);
+  if (!config.activeSetupMode || config.xpSettings?.enabled === false) return false;
+  const excluded = new Set(config.xpSettings?.excludedChannels || []);
+  if (excluded.has(message.channel.id)
+    || /(?:^|[-_])(bot|spam|logs?|transcripts?)(?:$|[-_])/i.test(message.channel.name || "")) return false;
   const key = guildUserKey(message.guild.id, message.author.id);
   const last = levelMessageCooldowns.get(key) || 0;
-  if (Date.now() - last < 60_000) return false;
+  const cooldownMs = Math.max(15, Number(config.xpSettings?.chatCooldownSeconds || 60)) * 1000;
+  if (Date.now() - last < cooldownMs) return false;
   levelMessageCooldowns.set(key, Date.now());
-  await addMemberXp(message.guild, message.member, 10, "chat", message.channel);
+  await addMemberXp(message.guild, message.member, Number(config.xpSettings?.chatXp || 10), "chat", message.channel);
   return true;
+}
+
+async function handleRankCommand(interaction) {
+  const user = interaction.options.getUser("user") || interaction.user;
+  const record = guildUserRecord((await loadState()).memberLevels, interaction.guildId, user.id)
+    || { xp: 0, chatXp: 0, voiceXp: 0, weeklyXp: 0, monthlyXp: 0, level: 0 };
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ ${user.username}'s Paradise Rank`)
+      .addFields(
+        { name: "Level", value: `**${record.level || 0}**`, inline: true },
+        { name: "Total XP", value: `**${record.xp || 0}**`, inline: true },
+        { name: "Chat / Voice", value: `**${record.chatXp || 0}** / **${record.voiceXp || 0}**`, inline: true },
+        { name: "Weekly / Monthly", value: `**${record.weeklyXp || 0}** / **${record.monthlyXp || 0}**`, inline: true }
+      ).setThumbnail(user.displayAvatarURL()).setFooter(paradiseFooter("Anti-spam XP enabled"))]
+  });
+}
+
+async function handleLeaderboardCommand(interaction) {
+  const type = interaction.options.getString("type") || "total";
+  const key = { total: "xp", chat: "chatXp", voice: "voiceXp", weekly: "weeklyXp", monthly: "monthlyXp" }[type];
+  const rows = Object.values((await loadState()).memberLevels || {})
+    .filter(item => belongsToGuild(item, interaction.guildId))
+    .sort((a, b) => Number(b[key] || 0) - Number(a[key] || 0))
+    .slice(0, 20);
+  const description = rows.length
+    ? rows.map((item, index) => `**${index + 1}.** <@${item.userId}> · **${item[key] || 0} XP** · Lv. ${item.level || 0}`).join("\n")
+    : "_No XP has been recorded yet._";
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ PARADISE ${type.toUpperCase()} LEADERBOARD`)
+      .setDescription(`${description}\n\n-# Bot, spam, log and configured excluded channels do not grant chat XP.`)
+      .setFooter(paradiseFooter("Chat + voice activity"))]
+  });
 }
 
 async function sendMemberLifecycleMessage(member, kind) {
@@ -2410,6 +3000,22 @@ async function sendMemberLifecycleMessage(member, kind) {
 
 export async function handleParadiseGuildMemberAdd(member) {
   await sendMemberLifecycleMessage(member, "join");
+  const state = await loadState();
+  const config = configForGuild(state, member.guild.id);
+  const policy = config.moderationSettings || {};
+  const security = state.securityState?.[member.guild.id] || {};
+  const ageDays = Math.max(0, (Date.now() - member.user.createdTimestamp) / 86_400_000);
+  const threshold = Math.max(0, Number(policy.suspiciousAccountDays ?? 7));
+  const shouldQuarantine = policy.quarantineEnabled !== false
+    && (security.raidMode === true || policy.raidModeDefault === true || (threshold > 0 && ageDays < threshold));
+  if (shouldQuarantine) {
+    const role = await ensureRole(member.guild, "Muted / Quarantined");
+    if (member.guild.members.me?.roles.highest.comparePositionTo(role) > 0) {
+      await member.roles.add(role, security.raidMode ? "Paradise raid mode join quarantine" : "Paradise suspicious account-age review").catch(() => {});
+      await logParadiseAction(member.guild, "quarantine_review_channel", "quarantine-review", "Join quarantine review",
+        `${member} was quarantined for staff review.\n**Signal:** ${security.raidMode ? "Raid mode" : `Account age below ${threshold} days`}\n-# This is not a ban; staff can use /mod unquarantine after review.`);
+    }
+  }
   return true;
 }
 
@@ -2547,17 +3153,18 @@ async function runParadiseMaintenance(guild) {
   });
   const state = await loadState();
   const config = configForGuild(state, guild.id);
-  if (config.activeSetupMode) {
+  if (config.activeSetupMode && config.xpSettings?.enabled !== false) {
     const afkChannelId = guild.afkChannelId;
     for (const voiceState of guild.voiceStates.cache.values()) {
       if (!voiceState.member?.user?.bot && voiceState.channelId && voiceState.channelId !== afkChannelId
         && !voiceState.selfDeaf && !voiceState.serverDeaf) {
-        await addMemberXp(guild, voiceState.member, 15, "voice").catch(() => {});
+        await addMemberXp(guild, voiceState.member, Number(config.xpSettings?.voiceXpPerInterval || 15), "voice").catch(() => {});
       }
     }
   }
   const clock = berlinClock();
-  if (config.activeSetupMode === "clan" && clock.hour >= 13) {
+  const questionHour = Math.min(23, Math.max(0, Number(config.eventSettings?.dailyQuestionHour ?? 13)));
+  if (config.activeSetupMode === "clan" && config.eventSettings?.dailyQuestionEnabled !== false && clock.hour >= questionHour) {
     await postDailyQuestion(guild).catch(() => {});
   }
   if (config.activeSetupMode && (!config.lastLevelLeaderboardAt || Date.now() - Number(config.lastLevelLeaderboardAt) >= 60 * 60_000)) {
@@ -2894,6 +3501,36 @@ const GUIDE_POSTS = Object.freeze([
     channel: "loa",
     title: "🌙 LOA GUIDE",
     body: "# Leave of absence\nUse `/loa request` with the duration and reason. A manager must approve it.\n\n## Separate from challenge availability\nLOA is a staff attendance record. Cooldown and immunity belong to the challenge system.\n\n-# İzin süresi dolduğunda durum otomatik olarak expired olur; yönetici erken kaldırabilir."
+  },
+  {
+    key: "profile_guide",
+    channel: "profile-guide",
+    title: "◆ ROBLOX PROFILE & VERIFICATION",
+    body: "# Short, Roblox-safe verification\n1. Run `/profile create`.\n2. Enter the exact Roblox username.\n3. Put the six-character code in Roblox About.\n4. Confirm before it expires.\n\n## Safety\n- Paradise never requests a Roblox password, cookie or token.\n- Screenshots are not automatic ownership proof.\n- Existing profiles are not duplicated; use `/profile edit` for region changes.\n\n-# Challenge and tryout results require a completed profile."
+  },
+  {
+    key: "application_guide",
+    channel: "application-guide",
+    title: "▧ APPLICATION GUIDE",
+    body: "# Apply with `/application apply`\nChoose the correct position and answer motivation, experience and availability honestly.\n\n## Review flow\n- One active application at a time.\n- Blacklisted users are blocked.\n- Staff can approve, deny or request more information.\n- A role is granted only when configured and below both reviewer and Paradise role hierarchy.\n\n-# Başvuru durumu `/application status` ile özel olarak görüntülenebilir."
+  },
+  {
+    key: "staff_command_guide",
+    channel: "staff-command-guide",
+    title: "⛨ STAFF COMMAND GUIDE",
+    body: "# Moderation\n- `/mod warn` records a documented warning.\n- `/mod mute` applies a bounded Discord timeout.\n- `/mod kick-request` and `/mod ban-request` enter senior review.\n- `/mod quarantine` isolates suspicious accounts for review.\n\n# Operations\n- Training, tryout, referee and activity actions use their structured command groups.\n- Never grant ranks manually when Paradise provides the controlled workflow.\n\n-# Every high-impact action is logged; lower staff cannot bypass the approval queue."
+  },
+  {
+    key: "moderation_policy",
+    channel: "moderation-policy",
+    title: "🛡️ MODERATION & QUARANTINE POLICY",
+    body: "# Proportional action\n1. Preserve evidence and context.\n2. Warn for a first low-impact violation.\n3. Use a reasonable timeout for spam or disruption.\n4. Quarantine suspicious links/accounts while reviewed.\n5. Request senior approval for kick or ban where configured.\n\n## Safety boundary\nNo automatic first-offense ban. False positives must be reviewable, and appeals remain available.\n\n-# Staff must follow Discord role hierarchy and the server's configured punishment ladder."
+  },
+  {
+    key: "ticket_guide",
+    channel: "support-info",
+    title: "▣ TICKET & TRANSCRIPT GUIDE",
+    body: "# Choose the correct ticket\nSupport, application, challenge, staff report, mod report, blacklist appeal and bail are separate workflows.\n\n## Ticket lifecycle\n- Claim and work privately.\n- Close first; do not immediately delete.\n- Remove member access after closure while configured staff retain access.\n- Save a transcript and audit every reopen, note, escalation and deletion.\n\n-# Never post passwords, cookies, tokens, full license keys or private payment data."
   }
 ]);
 
@@ -3871,6 +4508,14 @@ async function handleParadiseInteractionInner(interaction) {
     await handleTemporaryVoiceRenameModal(interaction);
     return true;
   }
+  if (interaction.isModalSubmit?.() && /^paradise_voice_(permit|reject|transfer)_modal:/.test(interaction.customId)) {
+    await handleTemporaryVoiceMemberModal(interaction);
+    return true;
+  }
+  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_modal:")) {
+    await handleApplicationModal(interaction);
+    return true;
+  }
   if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_qotd_gamepass_modal:")) {
     await handleQotdGamepassModal(interaction);
     return true;
@@ -3939,6 +4584,21 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_challenge_")) { await handleChallengeApproval(interaction); return true; }
     if (interaction.customId.startsWith("paradise_session_")) { await handleSessionButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_activity_present:")) { await handleActivityResponse(interaction); return true; }
+    if (interaction.customId === "paradise_application_open") {
+      const mode = configForGuild(await loadState(), interaction.guildId).activeSetupMode;
+      const types = APPLICATION_TYPES.filter(([value]) =>
+        !(mode === "community" && value === "clan_mainer")
+        && !(mode !== "community" && value === "fima_support"));
+      const menu = new StringSelectMenuBuilder().setCustomId("paradise_application_type")
+        .setPlaceholder("Choose application type / Başvuru türü").addOptions(
+          types.map(([value, label]) => ({ value, label }))
+        );
+      await interaction.reply({ content: "Choose the form you want to open.", components: [new ActionRowBuilder().addComponents(menu)], ephemeral: true });
+      return true;
+    }
+    if (interaction.customId.startsWith("paradise_application_")) { await handleApplicationReview(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_mod_")) { await handleModerationReview(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_payout_")) { await handleQotdPayoutReview(interaction); return true; }
     if (interaction.customId.startsWith("paradise_voice_")) { await handleTemporaryVoiceButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_qotd_")) { await handleQotdButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_giveaway_enter:") || interaction.customId.startsWith("paradise_rsvp_")) { await handleOptInButton(interaction); return true; }
@@ -3955,6 +4615,10 @@ async function handleParadiseInteractionInner(interaction) {
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_profile_region") {
     await handleProfileRegion(interaction);
+    return true;
+  }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_application_type") {
+    await interaction.showModal(applicationModal(interaction.values[0]));
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_challenge_target") {
@@ -4030,6 +4694,11 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "bail") { await handleBail(interaction); return true; }
   if (interaction.commandName === "qotd") { await handleQotdCommand(interaction); return true; }
   if (interaction.commandName === "answer") { await handleQotdSlashAnswer(interaction); return true; }
+  if (interaction.commandName === "application") { await handleApplicationCommand(interaction); return true; }
+  if (interaction.commandName === "mod") { await handleModCommand(interaction); return true; }
+  if (interaction.commandName === "security") { await handleSecurityCommand(interaction); return true; }
+  if (interaction.commandName === "rank") { await handleRankCommand(interaction); return true; }
+  if (interaction.commandName === "leaderboard") { await handleLeaderboardCommand(interaction); return true; }
   if (interaction.commandName === "set" || interaction.commandName === "setlogchannel") { await handleSetChannel(interaction); return true; }
   if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;

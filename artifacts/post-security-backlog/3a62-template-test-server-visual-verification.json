@@ -1,0 +1,34 @@
+{
+  "status": "BLOCKED / NOT COMPLETE",
+  "testGuildId": "…961257",
+  "livePreconditions": {
+    "officialBotAudit": "LIVE DISCORD VERIFIED",
+    "structureBackup": "LIVE DISCORD VERIFIED",
+    "templatePreview": "LIVE DISCORD VERIFIED"
+  },
+  "templates": {
+    "Paradise Clan": {
+      "sourceSchemaTest": "LOCAL VERIFIED",
+      "livePreview": "LIVE VERIFIED",
+      "appliedToTestGuildThisRun": false,
+      "visualChannelByChannelInspection": false,
+      "buttonInteractionTest": false
+    },
+    "Fieel's Community": {
+      "sourceSchemaTest": "LOCAL VERIFIED",
+      "livePreview": "LIVE VERIFIED",
+      "appliedToTestGuildThisRun": false,
+      "visualChannelByChannelInspection": false,
+      "buttonInteractionTest": false
+    },
+    "TSBTR Yedek": {
+      "sourceSchemaTest": "LOCAL VERIFIED",
+      "livePreview": "LIVE VERIFIED",
+      "appliedToTestGuildThisRun": false,
+      "visualChannelByChannelInspection": false,
+      "buttonInteractionTest": false
+    }
+  },
+  "reason": "The current backend exposes owner-authenticated audit/backup/preview actions, but the available Chrome profile did not provide a usable owner session for test-guild apply/visual inspection. No destructive operation was inferred from source tests.",
+  "requiredNextStep": "After owner Chrome access works, run non-destructive repair/create-missing for each template in the isolated test guild and inspect every generated guide/panel before any main-server confirmation."
+}

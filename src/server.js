@@ -658,6 +658,27 @@ app.get("/api/paradise/session-status", async (req, res) => {
   }
 });
 
+app.get("/api/paradise/public-status", async (_req, res) => {
+  const [health, guilds] = await Promise.all([
+    discordBotHealth().catch(() => null),
+    paradiseDiscordGuildsSnapshot().catch(() => [])
+  ]);
+  const primary = guilds[0]?.id ? await paradiseDiscordRuntimeSnapshot(guilds[0].id).catch(() => null) : null;
+  res.set("Cache-Control", "no-store");
+  return res.json({
+    status: health?.botReady ? "ready" : "unavailable",
+    botReady: health?.botReady === true,
+    intendedName: "Paradise",
+    managedGuildCount: guilds.length,
+    commandSync: {
+      count: Number(primary?.commandSync?.count || 0),
+      configuredCount: Number(primary?.commandSync?.configuredCount || 0),
+      lastSyncAt: primary?.commandSync?.lastSyncAt || null,
+      healthy: !primary?.commandSync?.lastError
+    }
+  });
+});
+
 app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? row.value : {};
@@ -783,7 +804,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
   const kind = String(req.body?.kind || "");
-  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations", "operations", "blacklist", "roster"].includes(kind)) {
+  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations", "operations", "blacklist", "roster", "staffOperations", "applications", "moderation", "events", "voice", "xp"].includes(kind)) {
     return res.status(400).json({ error: "invalid_config_kind" });
   }
   const guildId = String(req.body?.guildId || "");
@@ -923,6 +944,76 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       showRegion: value.showRegion !== false,
       lineupLimit: Math.min(50, Math.max(5, Number(value.lineupLimit) || 15)),
       boardDensity: value.boardDensity === "compact" ? "compact" : "comfortable"
+    };
+  } else if (kind === "staffOperations") {
+    const value = req.body?.value || {};
+    config.staffOperations = {
+      trainingQuota: Math.min(50, Math.max(0, Number(value.trainingQuota) || 0)),
+      tryoutQuota: Math.min(50, Math.max(0, Number(value.tryoutQuota) || 0)),
+      refereeQuota: Math.min(50, Math.max(0, Number(value.refereeQuota) || 0)),
+      managerApprovalResults: value.managerApprovalResults !== false,
+      profileRequiredResults: value.profileRequiredResults !== false,
+      activityProofRequired: value.activityProofRequired === true
+    };
+  } else if (kind === "applications") {
+    const value = req.body?.value || {};
+    const extraQuestions = value.extraQuestions && typeof value.extraQuestions === "object" && !Array.isArray(value.extraQuestions)
+      ? Object.fromEntries(Object.entries(value.extraQuestions).slice(0, 20).map(([key, question]) => [
+        String(key).replace(/[^a-z0-9_]/gi, "").slice(0, 32),
+        String(question).trim().slice(0, 180)
+      ]).filter(([key, question]) => key && question))
+      : {};
+    config.applicationSettings = {
+      ...(config.applicationSettings || {}),
+      enabled: value.enabled !== false,
+      cooldownDays: Math.min(365, Math.max(0, Number(value.cooldownDays) || 0)),
+      autoGrantRole: value.autoGrantRole === true,
+      blockBlacklisted: value.blockBlacklisted !== false,
+      extraQuestions
+    };
+  } else if (kind === "moderation") {
+    const value = req.body?.value || {};
+    config.moderationSettings = {
+      kickBanApprovalRequired: value.kickBanApprovalRequired !== false,
+      quarantineEnabled: value.quarantineEnabled !== false,
+      raidModeDefault: value.raidModeDefault === true,
+      suspiciousAccountDays: Math.min(365, Math.max(0, Number(value.suspiciousAccountDays) || 0)),
+      defaultSpamTimeoutMinutes: Math.min(40320, Math.max(1, Number(value.defaultSpamTimeoutMinutes) || 60)),
+      violationThreshold: Math.min(20, Math.max(2, Number(value.violationThreshold) || 3))
+    };
+  } else if (kind === "events") {
+    const value = req.body?.value || {};
+    config.eventSettings = {
+      dailyQuestionEnabled: value.dailyQuestionEnabled !== false,
+      dailyQuestionHour: Math.min(23, Math.max(0, Number(value.dailyQuestionHour) || 0)),
+      dailyQuestionReward: String(value.dailyQuestionReward || "25 Robux").trim().slice(0, 80),
+      dailyQuestionWinners: Math.min(10, Math.max(1, Number(value.dailyQuestionWinners) || 1)),
+      eventImageRequired: value.eventImageRequired !== false,
+      giveawayAbuseProtection: value.giveawayAbuseProtection !== false
+    };
+  } else if (kind === "voice") {
+    const value = req.body?.value || {};
+    config.voiceSettings = {
+      enabled: value.enabled !== false,
+      defaultLimit: Math.min(99, Math.max(0, Number(value.defaultLimit) || 0)),
+      autoDelete: value.autoDelete !== false,
+      safeNames: value.safeNames !== false,
+      allowTransfer: value.allowTransfer !== false,
+      logActions: value.logActions !== false
+    };
+  } else if (kind === "xp") {
+    const value = req.body?.value || {};
+    config.xpSettings = {
+      ...(config.xpSettings || {}),
+      enabled: value.enabled !== false,
+      chatXp: Math.min(100, Math.max(1, Number(value.chatXp) || 10)),
+      chatCooldownSeconds: Math.min(3600, Math.max(15, Number(value.chatCooldownSeconds) || 60)),
+      voiceXpPerInterval: Math.min(100, Math.max(1, Number(value.voiceXpPerInterval) || 15)),
+      weeklyLeaderboard: value.weeklyLeaderboard !== false,
+      monthlyLeaderboard: value.monthlyLeaderboard !== false,
+      excludedChannels: Array.isArray(value.excludedChannels)
+        ? value.excludedChannels.map(item => String(item)).filter(item => /^\d{16,22}$/.test(item)).slice(0, 100)
+        : []
     };
   } else {
     config.autoActivityChecks = req.body?.value?.autoActivityChecks === true;

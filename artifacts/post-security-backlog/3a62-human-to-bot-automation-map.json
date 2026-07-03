@@ -1,0 +1,66 @@
+{
+  "status": "SOURCE IMPLEMENTED / LIVE TEST PARTIAL",
+  "sources": [
+    "owner-provided screenshots and pasted guide text",
+    "owner-saved Paradise/Fima requirements",
+    "official Paradise bot audits of three managed guilds"
+  ],
+  "automations": [
+    {
+      "feature": "Structured training lifecycle",
+      "inspiration": "manual training announcement, SERVER LOCKED and ENDED messages",
+      "implementation": "/training start and /training result with Lock, Unlock and End buttons, stored host and activity log",
+      "dashboard": "Training / Staff",
+      "status": "SOURCE ONLY pending new deploy"
+    },
+    {
+      "feature": "Tryout rank safety",
+      "inspiration": "flat /result screenshots",
+      "implementation": "/tryout result with Stage, Level, Strength and authority comparison",
+      "dashboard": "Training / Staff",
+      "status": "LIVE SOURCE"
+    },
+    {
+      "feature": "Referee score approval",
+      "inspiration": "manual referee works and pending score posts",
+      "implementation": "pending challenge result, manager buttons, automatic result/availability/referee-work updates",
+      "dashboard": "Challenges and Roles",
+      "status": "LIVE SOURCE"
+    },
+    {
+      "feature": "Staff applications",
+      "inspiration": "application-ticket and human review channels",
+      "implementation": "modal forms, cooldown, blacklist gate, private review queue, approve/deny/more-info, hierarchy-safe role grant",
+      "dashboard": "Applications",
+      "status": "SOURCE ONLY pending new deploy"
+    },
+    {
+      "feature": "Moderation approval queue",
+      "inspiration": "human kick/ban decisions and Wick-style quarantine",
+      "implementation": "warn/timeout/quarantine plus senior-approved kick/ban requests and audited cases",
+      "dashboard": "Moderation / Security",
+      "status": "SOURCE ONLY pending new deploy"
+    },
+    {
+      "feature": "Join-to-Create",
+      "inspiration": "temporary voice ownership panels",
+      "implementation": "create/move/delete plus rename, limit, lock, hide, permit, reject and transfer",
+      "dashboard": "Voice / Join-to-Create",
+      "status": "PARTIAL LIVE; expanded controls pending new deploy"
+    },
+    {
+      "feature": "XP leaderboards",
+      "inspiration": "manual activity logs and level systems",
+      "implementation": "chat/voice/total/weekly/monthly XP, cooldown exclusions, /rank and /leaderboard",
+      "dashboard": "XP / Levels",
+      "status": "SOURCE ONLY pending new deploy"
+    },
+    {
+      "feature": "Daily question reward queue",
+      "inspiration": "owner's 25 Robux daily-question design",
+      "implementation": "13:00 Berlin scheduler, exact-answer race, winner-only gamepass modal, staff paid/invalid/rejected queue",
+      "dashboard": "Events / Daily Question",
+      "status": "PARTIAL LIVE; payout review pending new deploy"
+    }
+  ]
+}

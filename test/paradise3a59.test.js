@@ -82,6 +82,11 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("setlogchannel"));
   assert.ok(names.includes("qotd"));
   assert.ok(names.includes("answer"));
+  assert.ok(names.includes("application"));
+  assert.ok(names.includes("mod"));
+  assert.ok(names.includes("security"));
+  assert.ok(names.includes("rank"));
+  assert.ok(names.includes("leaderboard"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
@@ -92,6 +97,9 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(commands.find(command => command.name === "setlogchannel").options.length <= 25);
   assert.deepEqual(commands.find(command => command.name === "lineup").options.map(option => option.name), ["add", "remove", "move", "edit", "clear", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "roster").options.map(option => option.name), ["add", "update", "remove", "panel", "repost"]);
+  assert.deepEqual(commands.find(command => command.name === "application").options.map(option => option.name), ["panel", "apply", "status"]);
+  assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "kick-request"));
+  assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "ban-request"));
 });
 
 test("temporary voice names reject explicit and scam-like names", () => {

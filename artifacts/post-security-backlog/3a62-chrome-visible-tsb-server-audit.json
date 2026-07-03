@@ -1,0 +1,36 @@
+{
+  "status": "BLOCKED",
+  "attemptedAt": "2026-07-03",
+  "scopeRequested": [
+    "The Strongest Battlegrounds | Türkiye",
+    "TSBER / Europe competitive servers",
+    "TSB Clanning Community",
+    "Paradise | Türkiye",
+    "Fieel's Community",
+    "other owner-visible TSB clan/community servers"
+  ],
+  "chromeDiagnostics": {
+    "chromeRunning": true,
+    "chromeVersion": "149.0.7827.201",
+    "selectedProfile": "Default",
+    "codexExtensionInstalled": true,
+    "codexExtensionEnabled": true,
+    "nativeHostManifestCorrect": true,
+    "nativeHostRegistryCorrect": true,
+    "connectionAttempts": 2,
+    "result": "The read-only Chrome control session did not respond while naming the session, before any tab could be claimed."
+  },
+  "readVerifiedThisRun": [],
+  "channelsScrolledUpThisRun": [],
+  "pinnedMessagesReadThisRun": [],
+  "oldPanelsClassifiedFromChromeThisRun": [],
+  "ownerProvidedEvidenceUsedSeparately": true,
+  "ownerProvidedEvidenceIsNotMislabelledAsChromeRead": true,
+  "privacy": {
+    "rawPrivateMessagesStored": false,
+    "messagesSentFromOwnerAccount": 0,
+    "discordMutationsFromOwnerAccount": 0,
+    "userTokenUsed": false
+  },
+  "requiredRecovery": "Open a fresh Chrome window for the selected Default profile and retry only after owner approval, or reinstall the Chrome plugin if communication remains unavailable."
+}

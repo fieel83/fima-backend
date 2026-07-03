@@ -1,0 +1,31 @@
+{
+  "status": "PARTIAL LIVE / EXPANDED SOURCE LOCAL VERIFIED",
+  "defaultTemplate": "Paradise Clan only",
+  "schedule": {
+    "timezone": "Europe/Berlin",
+    "defaultHour": 13,
+    "dashboardConfigurable": true
+  },
+  "questionCategories": [
+    "TSB",
+    "gaming and Paradise",
+    "life/common sense",
+    "community safety"
+  ],
+  "winnerRules": {
+    "defaultWinners": 1,
+    "firstExactNormalizedAnswerWins": true,
+    "fuzzyFalsePositiveProtection": true,
+    "winnerOnlyButtons": true
+  },
+  "claim": {
+    "howToCreateGamepass": true,
+    "officialRobloxUrlValidation": true,
+    "winnerOnlyModal": true,
+    "privatePayoutQueue": true,
+    "paidInvalidRejectedButtons": true,
+    "automaticPayment": false
+  },
+  "liveCommit2726e1a": "Scheduler, winner race and winner-only submission are live source.",
+  "expandedPayoutReview": "SOURCE ONLY pending new deployment"
+}

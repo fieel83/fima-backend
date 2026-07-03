@@ -1,0 +1,28 @@
+{
+  "status": "PARTIAL LIVE / EXPANDED SOURCE LOCAL VERIFIED",
+  "liveCommit2726e1a": [
+    "rate-limited chat XP",
+    "non-AFK and non-deaf voice XP",
+    "total XP",
+    "level calculation",
+    "level-up log"
+  ],
+  "expandedSource": [
+    "separate chat XP",
+    "separate voice XP",
+    "weekly XP",
+    "monthly XP",
+    "/rank",
+    "/leaderboard total",
+    "/leaderboard chat",
+    "/leaderboard voice",
+    "/leaderboard weekly",
+    "/leaderboard monthly",
+    "dashboard controls",
+    "configured channel exclusions",
+    "automatic bot/spam/log/transcript exclusion",
+    "optional level role rewards with hierarchy guard"
+  ],
+  "tests": "61/61 full suite",
+  "liveInteractionVerification": "NOT STARTED for expanded commands"
+}

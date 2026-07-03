@@ -1,0 +1,26 @@
+{
+  "status": "WAITING OWNER CONFIRMATION",
+  "safeWork": {
+    "managedGuildAudit": "LIVE DISCORD VERIFIED 3/3",
+    "structureBackup": "LIVE DISCORD VERIFIED 3/3",
+    "templatePreview": "LIVE DISCORD VERIFIED 3/3",
+    "sourceTemplateSeparation": "LOCAL VERIFIED",
+    "destructiveChanges": 0
+  },
+  "gates": {
+    "Paradise | Türkiye": {
+      "rebuildExecuted": false,
+      "requiredConfirmation": "REBUILD PARADISE TURKIYE"
+    },
+    "Fieel's Community": {
+      "rebuildExecuted": false,
+      "requiredConfirmation": "REBUILD FIEELS COMMUNITY"
+    },
+    "TSBTR Yedek": {
+      "rebuildExecuted": false,
+      "requiredConfirmation": "REBUILD TSBTR YEDEK",
+      "additionalBlocker": "Paradise bot role position was previously too low for reliable role management."
+    }
+  },
+  "important": "These confirmations must not be used until the isolated test-server visual verification is complete."
+}

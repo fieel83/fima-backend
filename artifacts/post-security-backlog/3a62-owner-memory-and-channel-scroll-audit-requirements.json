@@ -1,0 +1,54 @@
+{
+  "status": "REQUIREMENTS APPLIED TO SOURCE / CHROME SCROLL BLOCKED",
+  "ownerSavedRequirementsApplied": true,
+  "inputs": [
+    "all owner-provided Discord screenshots in this thread",
+    "pasted referee, training, tryout, activity and challenge examples",
+    "Paradise bot DOCX requirement",
+    "3A59, 3A60, 3A61 and 3A62 owner corrections",
+    "existing Fima/Paradise project artifacts"
+  ],
+  "fixedRequirements": {
+    "branding": "Paradise except true Fima product/support commands; black/charcoal embeds with configurable accent",
+    "verification": "six-character Roblox-safe code without I/O/0/1/hyphen; no duplicate profiles",
+    "rankModel": "Stage 0 best; Low to Mid to High; Weak to Stable to Strong; Stage 5 excluded",
+    "tryoutAuthority": "cannot exceed staff authority; default lowest assignable Stage 3 Low Weak",
+    "challenge": "eligible targets, double recheck, cooldown/immunity/open-ticket/LOA, sticky header and relative timestamps",
+    "referee": "Trial and normal Referee cannot approve by default",
+    "autowin": "ticket context auto-detected with audited approval",
+    "training": "link-first polished embed, lock/unlock/end and activity quota",
+    "applications": "all relevant roles, private review and hierarchy-safe grants",
+    "tickets": "close before delete, transcript, retained staff visibility",
+    "moderation": "quarantine, proportional ladder and senior kick/ban queue",
+    "voice": "full owner panel with safe-name fallback",
+    "xp": "chat, voice, weekly, monthly and exclusions",
+    "dailyQuestion": "Paradise Clan default, 13:00 Berlin, manual 25 Robux payout review",
+    "dashboard": "20 pages, Turkish/English, theme/accent, premium motion, custom scrollbar and CSRF"
+  },
+  "chromeHistoryAudit": {
+    "visibleServersReadThisRun": [],
+    "channelsScrolledUpThisRun": [],
+    "pinnedMessagesReadThisRun": [],
+    "oldPanelsClassifiedThisRun": [],
+    "status": "BLOCKED",
+    "reason": "Chrome extension/native-host installation checks passed, but the browser control connection did not respond before tab discovery."
+  },
+  "classificationFromOwnerEvidence": [
+    "referee guide and referee works",
+    "pending/approved score posts",
+    "activity logs and activity checks",
+    "training and tryout hoster handbooks",
+    "challenge rules, results and availability",
+    "staff team board",
+    "leaderboard/top roles",
+    "profile verification and creation",
+    "clan roster/mainer proof",
+    "application/ticket/channel structures",
+    "role hierarchy and ping roles"
+  ],
+  "privacy": {
+    "privateChatDumped": false,
+    "browserCookiesRead": false,
+    "userTokenUsed": false
+  }
+}

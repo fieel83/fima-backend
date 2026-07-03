@@ -1,0 +1,49 @@
+{
+  "status": "LOCAL VERIFIED / SOURCE ONLY",
+  "commands": [
+    "/mod warn",
+    "/mod mute",
+    "/mod kick-request",
+    "/mod ban-request",
+    "/mod quarantine",
+    "/mod unquarantine",
+    "/mod lockdown",
+    "/mod raidmode",
+    "/mod case",
+    "/mod approve",
+    "/mod deny",
+    "/security panel",
+    "/security quarantine",
+    "/security automod"
+  ],
+  "implemented": {
+    "casePersistence": true,
+    "roleHierarchyCheck": true,
+    "boundedTimeout": true,
+    "seniorKickBanQueue": true,
+    "buttonAndSlashReview": true,
+    "quarantineRole": true,
+    "quarantineReviewLog": true,
+    "youngAccountJoinReview": true,
+    "raidModeJoinReview": true,
+    "channelLockdown": true,
+    "discordAutoModInviteAndScamRules": true,
+    "massMentionRule": true,
+    "noAutomaticFirstOffenseBan": true,
+    "falsePositiveRelease": true,
+    "appealIntegration": true,
+    "staffCommandGuide": true,
+    "moderationPolicyGuide": true
+  },
+  "safety": {
+    "kickBanNotAvailableToLowStaffDirectly": true,
+    "seniorApprovalRequired": true,
+    "discordRoleHierarchyRechecked": true,
+    "auditLogRequired": true
+  },
+  "notClaimed": [
+    "image-content classification beyond Discord/keyword/link signals",
+    "live kick/ban execution test",
+    "live quarantine permission-overwrite test"
+  ]
+}

@@ -16,7 +16,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
     .hero{padding:26px;border-left:5px solid var(--brand);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;inset:-80% -10% auto 55%;height:240px;background:radial-gradient(circle,var(--brand-soft),transparent 68%);pointer-events:none}.badge{color:#ddd5ea;font-weight:900;text-transform:uppercase;letter-spacing:.11em;font-size:12px}
     h1{font-size:clamp(30px,5vw,44px);margin:7px 0 4px}h2{margin:0 0 4px;font-size:21px}h3{margin:18px 0 8px;font-size:15px;color:#ddd9e3}.muted,.help{color:var(--muted)}.help{margin:4px 0 14px;font-size:13px;line-height:1.45}
     .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.chip{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#0c0b10;color:#d8d4dd;font-size:12px}.chip.good{border-color:#23583d;color:var(--good)}.chip.bad{border-color:#6a2937;color:var(--bad)}
-    .console-shell{display:grid;grid-template-columns:235px minmax(0,1fr);gap:16px;margin-top:16px}.page-nav{position:sticky;top:14px;align-self:start;padding:12px}.page-nav button{margin:3px 0;text-align:left;background:transparent;border-color:transparent;color:var(--muted);font-weight:750;transition:.18s ease}.page-nav button:hover,.page-nav button.active{color:#fff;background:linear-gradient(90deg,var(--brand-soft),transparent);border-color:#ffffff12;transform:translateX(3px)}.page-nav small{display:block;padding:8px 10px;color:#7f748e;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
+    .console-shell{display:grid;grid-template-columns:255px minmax(0,1fr);gap:16px;margin-top:16px}.page-nav{position:sticky;top:14px;align-self:start;padding:12px;max-height:calc(100vh - 28px);overflow:auto;overscroll-behavior:contain}.page-nav button{margin:3px 0;text-align:left;background:transparent;border-color:transparent;color:var(--muted);font-weight:750;transition:.18s ease}.page-nav button:hover,.page-nav button.active{color:#fff;background:linear-gradient(90deg,var(--brand-soft),transparent);border-color:#ffffff12;transform:translateX(3px)}.page-nav small{display:block;padding:8px 10px;color:#7f748e;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
     .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.stack{display:grid;gap:14px}.panel{padding:22px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}.panel:hover{border-color:color-mix(in srgb,var(--brand) 44%,var(--line));box-shadow:0 26px 80px #0008,0 0 0 1px var(--brand-soft)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
     label{display:block;margin:10px 0 6px;font-weight:800;font-size:13px}input,select,textarea,button,a.button{width:100%;border-radius:11px;border:1px solid var(--line);background:#0d0914;color:#fff;padding:11px;font:inherit;transition:border-color .18s,box-shadow .18s,transform .18s}
     input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}textarea{min-height:120px;resize:vertical}button,a.button{display:block;position:relative;overflow:hidden;text-align:center;text-decoration:none;margin-top:11px;background:linear-gradient(135deg,var(--brand),#4d2d78);border-color:#ffffff25;font-weight:900;cursor:pointer}button:after,a.button:after{content:"";position:absolute;inset:-80% auto -80% -35%;width:24%;transform:rotate(18deg);background:#ffffff22;transition:left .45s ease}button:hover:after,a.button:hover:after{left:120%}button:hover,a.button:hover{transform:translateY(-2px);filter:brightness(1.12);box-shadow:0 10px 28px var(--brand-soft)}button:active,a.button:active{transform:translateY(0) scale(.99)}button:disabled{opacity:.55;cursor:wait;transform:none}
@@ -52,18 +52,25 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
   <nav class="panel page-nav" aria-label="Paradise sections">
     <small>Operations</small>
     <button data-page-button="overview" class="active">✦ Overview</button>
-    <button data-page-button="setup">◈ Setup & templates</button>
-    <button data-page-button="channels"># Channels & transcripts</button>
+    <button data-page-button="servers">◉ Server Selector</button>
+    <button data-page-button="setup">◈ Template Setup</button>
+    <button data-page-button="channels"># Channels</button>
     <button data-page-button="roles">♜ Roles & permissions</button>
-    <button data-page-button="challenge">⚔ Challenge</button>
+    <button data-page-button="challenge">⚔ Challenges</button>
     <button data-page-button="availability">◷ Availability & LOA</button>
-    <button data-page-button="roster">♟ Roster & lineup</button>
-    <button data-page-button="relations">◇ Relations</button>
-    <button data-page-button="blacklist">⊘ Blacklist & appeals</button>
-    <button data-page-button="guides">▤ Guides</button>
-    <button data-page-button="branding">✧ Branding</button>
-    <button data-page-button="security">⌁ Security</button>
-    <button data-page-button="advanced">⚙ Advanced</button>
+    <button data-page-button="operations">⌁ Training / Staff</button>
+    <button data-page-button="applications">▧ Applications</button>
+    <button data-page-button="tickets">▣ Tickets & Support</button>
+    <button data-page-button="moderation">⛨ Moderation / Security</button>
+    <button data-page-button="blacklist">⊘ Blacklist / Appeal / Bail</button>
+    <button data-page-button="roster">♟ Roster / Lineups / Relations</button>
+    <button data-page-button="events">✺ Events / Daily Question</button>
+    <button data-page-button="voice">◖ Voice / Join-to-Create</button>
+    <button data-page-button="xp">◆ XP / Levels</button>
+    <button data-page-button="guides">▤ Guides & Embeds</button>
+    <button data-page-button="branding">✧ Branding / Theme / Language</button>
+    <button data-page-button="logs">⌗ Logs / Backups / Restore</button>
+    <button data-page-button="advanced">⚙ Advanced JSON</button>
   </nav>
   <div class="layout">
     <div class="stack">
@@ -267,6 +274,107 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
       </section>
 
       <section class="panel">
+        <h2>Training, tryout, referee & hoster</h2>
+        <p class="help">Staff workflows stay structured: hosters create sessions, managers review restricted results, and weekly activity produces recommendations before any role change.</p>
+        <div class="grid">
+          <label>Training quota / week <span class="tip" title="Default minimum completed trainings for Training Staff.">?</span><input id="trainingQuota" type="number" min="0" max="50"></label>
+          <label>Tryout quota / week<input id="tryoutQuota" type="number" min="0" max="50"></label>
+          <label>Referee quota / week<input id="refereeQuota" type="number" min="0" max="50"></label>
+          <label class="switch"><input id="managerApprovalResults" type="checkbox"> Manager approval for restricted results</label>
+          <label class="switch"><input id="profileRequiredResults" type="checkbox"> Require completed Roblox profile</label>
+          <label class="switch"><input id="activityProofRequired" type="checkbox"> Require configured proof for staff activity</label>
+        </div>
+        <button data-save="staffOperations">Save staff operations</button>
+      </section>
+
+      <section class="panel">
+        <h2>Application settings</h2>
+        <p class="help">Every application enters a private review queue. Role grants remain optional and are blocked above both the reviewer and Paradise bot role.</p>
+        <div class="grid">
+          <label class="switch"><input id="applicationsEnabled" type="checkbox"> Enable application forms</label>
+          <label>Application cooldown days<input id="applicationCooldownDays" type="number" min="0" max="365"></label>
+          <label class="switch"><input id="applicationAutoGrant" type="checkbox"> Grant mapped role after safe approval</label>
+          <label class="switch"><input id="applicationBlockBlacklisted" type="checkbox"> Block blacklisted applicants</label>
+        </div>
+        <label for="applicationQuestions">Extra question JSON <span class="tip" title="Optional advanced questions. Standard motivation, experience and availability questions always remain available.">?</span></label>
+        <textarea id="applicationQuestions" spellcheck="false">{}</textarea>
+        <button data-save="applications">Save application policy</button>
+      </section>
+
+      <section class="panel">
+        <h2>Moderation, security & quarantine</h2>
+        <p class="help">Low-rank staff submit kick/ban requests; senior staff approve or deny them. Quarantine and audit logs are preferred over irreversible automatic punishment.</p>
+        <div class="grid">
+          <label class="switch"><input id="kickBanApprovalRequired" type="checkbox"> Require senior kick/ban approval</label>
+          <label class="switch"><input id="quarantineEnabled" type="checkbox"> Enable quarantine workflow</label>
+          <label class="switch"><input id="raidModeDefault" type="checkbox"> Start in raid mode</label>
+          <label>Suspicious account age (days)<input id="suspiciousAccountDays" type="number" min="0" max="365"></label>
+          <label>Default spam timeout (minutes)<input id="defaultSpamTimeout" type="number" min="1" max="40320"></label>
+          <label>Repeated violation threshold<input id="violationThreshold" type="number" min="2" max="20"></label>
+        </div>
+        <button data-save="moderation">Save moderation policy</button>
+      </section>
+
+      <section class="panel">
+        <h2>Events, giveaways & daily question</h2>
+        <p class="help">Paradise Clan can ask a daily question at 13:00 Europe/Berlin. The winner submits one official Roblox gamepass and staff completes a manual payout review.</p>
+        <div class="grid">
+          <label class="switch"><input id="dailyQuestionEnabled" type="checkbox"> Enable daily question</label>
+          <label>Question hour (Europe/Berlin)<input id="dailyQuestionHour" type="number" min="0" max="23"></label>
+          <label>Reward label<input id="dailyQuestionReward" maxlength="80"></label>
+          <label>Winners per question<input id="dailyQuestionWinners" type="number" min="1" max="10"></label>
+          <label class="switch"><input id="eventImageRequired" type="checkbox"> Require event/game-night image</label>
+          <label class="switch"><input id="giveawayAbuseProtection" type="checkbox"> Enable giveaway abuse checks</label>
+        </div>
+        <button data-save="events">Save event and reward settings</button>
+      </section>
+
+      <section class="panel">
+        <h2>Voice and Join-to-Create</h2>
+        <p class="help">Joining the lobby creates a temporary voice room under PRIVATE VOICE. Only the room owner can use rename, limits, lock, hide, permit, reject, transfer and delete controls.</p>
+        <div class="grid">
+          <label class="switch"><input id="voiceEnabled" type="checkbox"> Enable Join-to-Create</label>
+          <label>Default user limit<input id="voiceDefaultLimit" type="number" min="0" max="99"></label>
+          <label class="switch"><input id="voiceAutoDelete" type="checkbox"> Delete empty temporary rooms</label>
+          <label class="switch"><input id="voiceSafeNames" type="checkbox"> Enforce safe room names</label>
+          <label class="switch"><input id="voiceOwnerTransfer" type="checkbox"> Allow ownership transfer</label>
+          <label class="switch"><input id="voiceLogActions" type="checkbox"> Log voice panel actions</label>
+        </div>
+        <button data-save="voice">Save voice settings</button>
+      </section>
+
+      <section class="panel">
+        <h2>XP, levels and leaderboards</h2>
+        <p class="help">Chat XP is cooldown-limited and ignores bot, spam, log and transcript channels. Non-AFK, non-deaf voice activity receives interval XP.</p>
+        <div class="grid">
+          <label class="switch"><input id="xpEnabled" type="checkbox"> Enable XP and levels</label>
+          <label>Chat XP per message<input id="chatXp" type="number" min="1" max="100"></label>
+          <label>Chat cooldown seconds<input id="chatXpCooldown" type="number" min="15" max="3600"></label>
+          <label>Voice XP per interval<input id="voiceXp" type="number" min="1" max="100"></label>
+          <label class="switch"><input id="weeklyLeaderboard" type="checkbox"> Weekly leaderboard</label>
+          <label class="switch"><input id="monthlyLeaderboard" type="checkbox"> Monthly leaderboard</label>
+        </div>
+        <label for="xpExcludedChannels">Extra excluded channel IDs, one per line</label>
+        <textarea id="xpExcludedChannels"></textarea>
+        <button data-save="xp">Save XP settings</button>
+      </section>
+
+      <section class="panel">
+        <h2>Logs, backups and restore</h2>
+        <p class="help">Backups contain structure and permission metadata. Restore stays behind Discord-side owner confirmation and is never executed silently from this page.</p>
+        <div class="permission-list">
+          <div class="permission-item"><strong>Latest live audit</strong><span class="muted">Visible in Overview and scoped to the selected managed server.</span></div>
+          <div class="permission-item"><strong>Structure backup</strong><span class="muted">Create a fresh backup before every destructive preview.</span></div>
+          <div class="permission-item"><strong>Restore gate</strong><span class="muted">Requires an exact typed confirmation in Discord.</span></div>
+        </div>
+        <div class="operation-actions">
+          <button class="audit-action" onclick="runManagedOperation('audit')">Refresh audit</button>
+          <button class="backup-action" onclick="runManagedOperation('backup')">Create backup</button>
+          <button class="preview-action" onclick="runManagedOperation('preview')">Preview selected template</button>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Advanced operations</h2>
         <div class="grid">
           <div><label for="mainer">Official mainer code</label><input id="mainer" maxlength="32"><button data-save="mainer">Save code</button></div>
@@ -305,18 +413,30 @@ const CHANNEL_KEYS=[
   ['challenge_transcripts_channel','Challenge transcripts (private)'],['support_transcripts_channel','Support transcripts (private)'],['roster_channel','EU roster board'],
   ['main_lineup_channel','Main lineup'],['war_lineup_channel','War lineup'],['mainer_proof_channel','Mainer proof'],['blacklist_channel','Blacklist board'],
   ['blacklist_appeal_channel','Blacklist appeals'],['bail_appeal_channel','Bail review'],['war_management_channel','War management'],
-  ['roster_logs_channel','Roster logs'],['server_logs_channel','Server logs'],['mod_logs_channel','Moderation logs']
+  ['roster_logs_channel','Roster logs'],['server_logs_channel','Server logs'],['mod_logs_channel','Moderation logs'],
+  ['application_review_channel','Application reviews (private)'],['application_logs_channel','Application logs (private)'],
+  ['moderation_requests_channel','Moderation approval queue'],['moderation_logs_channel','Moderation cases'],
+  ['quarantine_review_channel','Quarantine review'],['voice_logs_channel','Voice control logs'],
+  ['level_logs_channel','XP and level logs'],['question_channel','Daily question'],['payout_queue_channel','Reward payout queue']
 ];
 const ROLE_KEYS=[
   ['owner_role','Owner'],['overseer_role','Overseer'],['community_manager_role','Community Manager'],['training_manager_role','Training Manager'],
   ['referee_manager_role','Referee Manager'],['experienced_referee_role','Experienced Referee'],['referee_role','Referee'],['trial_referee_role','Trial Referee'],
-  ['training_supervisor_role','Training Supervisor'],['training_hoster_role','Training Hoster'],['tryout_supervisor_role','Tryout Supervisor'],['tryout_hoster_role','Tryout Hoster']
+  ['training_supervisor_role','Training Supervisor'],['training_hoster_role','Training Hoster'],['tryout_supervisor_role','Tryout Supervisor'],['tryout_hoster_role','Tryout Hoster'],
+  ['moderator_role','Moderator'],['support_role','Support Staff'],['event_staff_role','Event Staff'],['giveaway_staff_role','Giveaway Staff'],
+  ['content_creator_role','Content Creator'],['quarantine_role','Muted / Quarantined'],['media_approved_role','Media & Links Approved']
 ];
 let currentPayload=null,selectedGuildId='',csrfPromise=null,currentTheme='paradise';
 const byId=id=>document.getElementById(id);
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const UI_TR={
   'Paradise Operations Console':'Paradise Operasyon Paneli','Operations':'Operasyonlar','Overview':'Genel Bakış','Setup & templates':'Kurulum ve şablonlar',
+  'Server Selector':'Sunucu Seçici','Template Setup':'Şablon Kurulumu','Channels':'Kanallar','Challenges':'Meydan Okumalar',
+  'Training / Staff':'Training / Personel','Applications':'Başvurular','Tickets & Support':'Ticket ve Destek','Moderation / Security':'Moderasyon / Güvenlik',
+  'Blacklist / Appeal / Bail':'Kara Liste / İtiraz / Bail','Roster / Lineups / Relations':'Roster / Kadro / İlişkiler',
+  'Events / Daily Question':'Etkinlikler / Günün Sorusu','Voice / Join-to-Create':'Ses / Join-to-Create','XP / Levels':'XP / Seviyeler',
+  'Guides & Embeds':'Rehberler ve Embedler','Branding / Theme / Language':'Marka / Tema / Dil','Logs / Backups / Restore':'Log / Yedek / Geri Yükle',
+  'Advanced JSON':'Gelişmiş JSON',
   'Channels & transcripts':'Kanallar ve transcriptler','Roles & permissions':'Roller ve yetkiler','Challenge':'Meydan Okuma','Availability & LOA':'Uygunluk ve LOA',
   'Roster & lineup':'Roster ve kadrolar','Relations':'İlişkiler','Blacklist & appeals':'Kara liste ve itirazlar','Guides':'Rehberler','Branding':'Görünüm',
   'Security':'Güvenlik','Advanced':'Gelişmiş','Operations overview':'Operasyon özeti','Real server discovery':'Gerçek sunucu incelemesi',
@@ -377,11 +497,15 @@ function buildRoleMappings(runtime,mappings){
 }
 function initializePages(){
   const routes=[
-    ['Identity & installation','overview'],['Template & appearance','branding'],['Challenge system','challenge'],['Discord channel mappings','channels'],
-    ['Discord role mappings','roles'],['Profiles, LOA & activity','availability'],['Referee & hoster permissions','roles'],['Relations board settings','relations'],
-    ['Guide & handbook repost','guides'],['Ticket & transcript operations','channels'],['Roster, lineup & mainer boards','roster'],
-    ['Blacklist, appeals & bail policy','blacklist'],['Advanced operations','advanced'],['Danger zone','setup'],['Live runtime','overview'],
-    ['Current counters','overview'],['Restore notes','setup']
+    ['Real server discovery','servers'],['Identity & installation','servers'],['Template & appearance','branding'],
+    ['Challenge system','challenge'],['Discord channel mappings','channels'],['Discord role mappings','roles'],
+    ['Profiles, LOA & activity','availability'],['Referee & hoster permissions','operations'],
+    ['Training, tryout, referee & hoster','operations'],['Application settings','applications'],
+    ['Ticket & transcript operations','tickets'],['Moderation, security & quarantine','moderation'],['Security boundaries','moderation'],
+    ['Relations board settings','roster'],['Roster, lineup & mainer boards','roster'],['Blacklist, appeals & bail policy','blacklist'],
+    ['Events, giveaways & daily question','events'],['Voice and Join-to-Create','voice'],['XP, levels and leaderboards','xp'],
+    ['Guide & handbook repost','guides'],['Logs, backups and restore','logs'],['Advanced operations','advanced'],
+    ['Danger zone','setup'],['Live runtime','overview'],['Current counters','overview'],['Restore notes','logs']
   ];
   document.querySelectorAll('#console section.panel').forEach(section=>{if(section.dataset.page)return;const title=section.querySelector('h2')?.textContent||'';const match=routes.find(([prefix])=>title.startsWith(prefix));section.dataset.page=match?match[1]:'overview'});
   document.querySelectorAll('#console aside .panel').forEach(panel=>{panel.parentElement?.classList.add('runtime-panels')});
@@ -430,7 +554,7 @@ async function load(){
   const query=selectedGuildId?'?guildId='+encodeURIComponent(selectedGuildId):'';
   const r=await fetch(API_BASE+'/api/paradise/config'+query,{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});const j=await r.json().catch(()=>({error:'invalid_response'}));
   if(!r.ok){setLoading(false);show(j.error||'Failed to load',false);return}
-  currentPayload=j;selectedGuildId=j.selectedGuildId||'';const c=j.config||{},rt=j.runtime||{},ch=c.challenge||{},loa=c.loa||{},ver=c.verification||{},act=c.activity||{},am=c.automod||{},rel=c.relationSettings||{},ops=c.operations||{},roster=c.roster||{},blacklist=c.blacklist||{};
+  currentPayload=j;selectedGuildId=j.selectedGuildId||'';const c=j.config||{},rt=j.runtime||{},ch=c.challenge||{},loa=c.loa||{},ver=c.verification||{},act=c.activity||{},am=c.automod||{},rel=c.relationSettings||{},ops=c.operations||{},roster=c.roster||{},blacklist=c.blacklist||{},staff=c.staffOperations||{},apps=c.applicationSettings||{},moderation=c.moderationSettings||{},events=c.eventSettings||{},voice=c.voiceSettings||{},xp=c.xpSettings||{};
   byId('serverSelect').innerHTML=(j.servers||[]).map(server=>'<option value="'+server.id+'" '+(server.id===selectedGuildId?'selected':'')+'>'+escapeHtml(server.name)+' · …'+String(server.id).slice(-6)+'</option>').join('')||'<option value="">No managed server online</option>';
   const guildLabel=rt.guild?rt.guild.name+' · …'+String(rt.guild.id||'').slice(-6):'unavailable';
   byId('guildChip').textContent='Guild: '+guildLabel;byId('guildChip').className='chip '+(rt.status==='ready'?'good':'bad');
@@ -451,6 +575,12 @@ async function load(){
   byId('stickyChallengeHeader').checked=ops.stickyChallengeHeader!==false;byId('refereeRequired').checked=ops.refereeRequired!==false;byId('showCooldownSnapshot').checked=ops.showCooldownSnapshot!==false;byId('showLoaOnAvailability').checked=ops.showLoaOnAvailability===true;byId('challengeTranscripts').checked=ops.challengeTranscripts!==false;byId('supportTranscripts').checked=ops.supportTranscripts!==false;byId('transcriptRetentionDays').value=ops.transcriptRetentionDays||365;byId('availabilityRefreshMinutes').value=ops.availabilityRefreshMinutes||30;byId('autowinReasons').value=(ops.autowinReasons||['No-show','Forfeit','Rule violation']).join('\\n');
   byId('rosterApprovalRequired').checked=roster.approvalRequired!==false;byId('rosterShowRoblox').checked=roster.showRobloxName!==false;byId('rosterShowStage').checked=roster.showStage!==false;byId('rosterShowRegion').checked=roster.showRegion!==false;byId('lineupLimit').value=roster.lineupLimit||15;byId('rosterDensity').value=roster.boardDensity==='compact'?'compact':'comfortable';
   byId('appealsEnabled').checked=blacklist.appealsEnabled!==false;byId('blacklistEvidenceRequired').checked=blacklist.evidenceRequired!==false;byId('bailEnabled').checked=blacklist.bailEnabled===true;byId('appealCooldownDays').value=blacklist.appealCooldownDays||30;byId('publicReasonMode').value=blacklist.publicReasonMode==='full'?'full':'summary';
+  byId('trainingQuota').value=staff.trainingQuota??2;byId('tryoutQuota').value=staff.tryoutQuota??1;byId('refereeQuota').value=staff.refereeQuota??2;byId('managerApprovalResults').checked=staff.managerApprovalResults!==false;byId('profileRequiredResults').checked=staff.profileRequiredResults!==false;byId('activityProofRequired').checked=staff.activityProofRequired===true;
+  byId('applicationsEnabled').checked=apps.enabled!==false;byId('applicationCooldownDays').value=apps.cooldownDays??7;byId('applicationAutoGrant').checked=apps.autoGrantRole===true;byId('applicationBlockBlacklisted').checked=apps.blockBlacklisted!==false;byId('applicationQuestions').value=JSON.stringify(apps.extraQuestions||{},null,2);
+  byId('kickBanApprovalRequired').checked=moderation.kickBanApprovalRequired!==false;byId('quarantineEnabled').checked=moderation.quarantineEnabled!==false;byId('raidModeDefault').checked=moderation.raidModeDefault===true;byId('suspiciousAccountDays').value=moderation.suspiciousAccountDays??7;byId('defaultSpamTimeout').value=moderation.defaultSpamTimeoutMinutes??60;byId('violationThreshold').value=moderation.violationThreshold??3;
+  byId('dailyQuestionEnabled').checked=events.dailyQuestionEnabled!==false;byId('dailyQuestionHour').value=events.dailyQuestionHour??13;byId('dailyQuestionReward').value=events.dailyQuestionReward||'25 Robux';byId('dailyQuestionWinners').value=events.dailyQuestionWinners??1;byId('eventImageRequired').checked=events.eventImageRequired!==false;byId('giveawayAbuseProtection').checked=events.giveawayAbuseProtection!==false;
+  byId('voiceEnabled').checked=voice.enabled!==false;byId('voiceDefaultLimit').value=voice.defaultLimit??0;byId('voiceAutoDelete').checked=voice.autoDelete!==false;byId('voiceSafeNames').checked=voice.safeNames!==false;byId('voiceOwnerTransfer').checked=voice.allowTransfer!==false;byId('voiceLogActions').checked=voice.logActions!==false;
+  byId('xpEnabled').checked=xp.enabled!==false;byId('chatXp').value=xp.chatXp??10;byId('chatXpCooldown').value=xp.chatCooldownSeconds??60;byId('voiceXp').value=xp.voiceXpPerInterval??15;byId('weeklyLeaderboard').checked=xp.weeklyLeaderboard!==false;byId('monthlyLeaderboard').checked=xp.monthlyLeaderboard!==false;byId('xpExcludedChannels').value=(xp.excludedChannels||[]).join('\\n');
   buildMappings(rt,c.channelMappings||{});buildRoleMappings(rt,c.roleMappings||{});
   const runtimeView={
     status:rt.status,
@@ -482,6 +612,12 @@ function valueFor(kind){
   if(kind==='operations')return{stickyChallengeHeader:byId('stickyChallengeHeader').checked,refereeRequired:byId('refereeRequired').checked,showCooldownSnapshot:byId('showCooldownSnapshot').checked,showLoaOnAvailability:byId('showLoaOnAvailability').checked,challengeTranscripts:byId('challengeTranscripts').checked,supportTranscripts:byId('supportTranscripts').checked,transcriptRetentionDays:number('transcriptRetentionDays',365),availabilityRefreshMinutes:number('availabilityRefreshMinutes',30),autowinReasons:byId('autowinReasons').value.split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean)};
   if(kind==='roster')return{approvalRequired:byId('rosterApprovalRequired').checked,showRobloxName:byId('rosterShowRoblox').checked,showStage:byId('rosterShowStage').checked,showRegion:byId('rosterShowRegion').checked,lineupLimit:number('lineupLimit',15),boardDensity:byId('rosterDensity').value};
   if(kind==='blacklist')return{appealsEnabled:byId('appealsEnabled').checked,evidenceRequired:byId('blacklistEvidenceRequired').checked,bailEnabled:byId('bailEnabled').checked,appealCooldownDays:number('appealCooldownDays',30),publicReasonMode:byId('publicReasonMode').value};
+  if(kind==='staffOperations')return{trainingQuota:number('trainingQuota',2),tryoutQuota:number('tryoutQuota',1),refereeQuota:number('refereeQuota',2),managerApprovalResults:byId('managerApprovalResults').checked,profileRequiredResults:byId('profileRequiredResults').checked,activityProofRequired:byId('activityProofRequired').checked};
+  if(kind==='applications')return{enabled:byId('applicationsEnabled').checked,cooldownDays:Number(byId('applicationCooldownDays').value)||0,autoGrantRole:byId('applicationAutoGrant').checked,blockBlacklisted:byId('applicationBlockBlacklisted').checked,extraQuestions:JSON.parse(byId('applicationQuestions').value||'{}')};
+  if(kind==='moderation')return{kickBanApprovalRequired:byId('kickBanApprovalRequired').checked,quarantineEnabled:byId('quarantineEnabled').checked,raidModeDefault:byId('raidModeDefault').checked,suspiciousAccountDays:Number(byId('suspiciousAccountDays').value)||0,defaultSpamTimeoutMinutes:number('defaultSpamTimeout',60),violationThreshold:number('violationThreshold',3)};
+  if(kind==='events')return{dailyQuestionEnabled:byId('dailyQuestionEnabled').checked,dailyQuestionHour:Number(byId('dailyQuestionHour').value)||0,dailyQuestionReward:byId('dailyQuestionReward').value.trim(),dailyQuestionWinners:number('dailyQuestionWinners',1),eventImageRequired:byId('eventImageRequired').checked,giveawayAbuseProtection:byId('giveawayAbuseProtection').checked};
+  if(kind==='voice')return{enabled:byId('voiceEnabled').checked,defaultLimit:Number(byId('voiceDefaultLimit').value)||0,autoDelete:byId('voiceAutoDelete').checked,safeNames:byId('voiceSafeNames').checked,allowTransfer:byId('voiceOwnerTransfer').checked,logActions:byId('voiceLogActions').checked};
+  if(kind==='xp')return{enabled:byId('xpEnabled').checked,chatXp:number('chatXp',10),chatCooldownSeconds:number('chatXpCooldown',60),voiceXpPerInterval:number('voiceXp',15),weeklyLeaderboard:byId('weeklyLeaderboard').checked,monthlyLeaderboard:byId('monthlyLeaderboard').checked,excludedChannels:byId('xpExcludedChannels').value.split(/\\r?\\n/).map(value=>value.trim()).filter(value=>/^\\d{16,22}$/.test(value))};
 }
 async function save(kind){let value;try{value=valueFor(kind)}catch{show('Invalid JSON',false);return}if(!selectedGuildId)return show('Select a managed Paradise server first.',false);try{const{response,result}=await mutate('/api/paradise/config',{kind,value,guildId:selectedGuildId},'PATCH');if(!response.ok){show(result.error==='csrf_required'?'Security session could not be refreshed. Reload the panel.':result.error||'Save failed',false);return}show('Saved '+kind+' for the selected server');await load()}catch(error){show(error.message==='csrf_unavailable'?'Secure session token is unavailable. Sign in again.':'Save failed safely.',false)}}
 async function repostGuides(mode){if(!confirm('Repost or update the '+mode+' guide messages in the selected Discord server?'))return;try{const{response,result}=await mutate('/api/paradise/actions/repost-guides',{mode,guildId:selectedGuildId});if(!response.ok){show(result.error||'Guide repost failed',false);return}show('Updated '+result.posted+' guide messages');await load()}catch{show('Guide repost failed safely.',false)}}

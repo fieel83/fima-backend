@@ -1,0 +1,41 @@
+{
+  "status": "LOCAL VERIFIED / SOURCE ONLY",
+  "commands": [
+    "/application panel",
+    "/application apply",
+    "/application status"
+  ],
+  "types": [
+    "Staff",
+    "Moderator",
+    "Support",
+    "Training Hoster",
+    "Tryout Hoster",
+    "Referee",
+    "Event Staff",
+    "Giveaway Staff",
+    "Content Creator",
+    "Partnership / Ally",
+    "Clan Member / Mainer",
+    "Fima Support Helper"
+  ],
+  "controls": {
+    "modalQuestions": true,
+    "dashboardExtraQuestions": true,
+    "privateReviewChannel": true,
+    "approveDenyMoreInfoButtons": true,
+    "safeOptionalRoleGrant": true,
+    "reviewerHierarchyEnforced": true,
+    "botHierarchyEnforced": true,
+    "cooldown": true,
+    "blacklistBlock": true,
+    "oneActiveApplication": true,
+    "auditLog": true,
+    "ephemeralStatus": true
+  },
+  "templateRules": {
+    "clanMainerHiddenInCommunity": true,
+    "fimaSupportHelperLimitedToCommunity": true
+  },
+  "liveDiscordInteractionTest": "NOT STARTED; new source requires deployment and configured review channels"
+}
