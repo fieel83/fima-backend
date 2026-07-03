@@ -5,6 +5,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, Embe
 import { prisma } from "./db.js";
 import { env } from "./env.js";
 import {
+  applyParadiseTemplateMissingOnly,
   handleParadiseGuildMemberAdd,
   handleParadiseGuildMemberRemove,
   handleParadiseGuildMemberUpdate,
@@ -15,7 +16,8 @@ import {
   PARADISE_SETUP_SCHEMAS,
   paradiseCommandAllowedForMode,
   paradiseCommands,
-  publishParadiseGuidesFromDashboard
+  publishParadiseGuidesFromDashboard,
+  syncParadiseMappedPanels
 } from "./paradise3a59.js";
 
 const ROLE_TYPES = {
@@ -2245,6 +2247,26 @@ export async function repostParadiseGuides(mode = "clan", guildId = null) {
     throw error;
   }
   return publishParadiseGuidesFromDashboard(guild, mode);
+}
+
+export async function syncParadisePanelsFromDashboard(guildId = null) {
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.isReady?.()) {
+    const error = new Error("paradise_bot_not_ready");
+    error.code = "paradise_bot_not_ready";
+    throw error;
+  }
+  return syncParadiseMappedPanels(guild);
+}
+
+export async function createMissingParadiseTemplateFromDashboard(mode, guildId, options = {}) {
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.isReady?.()) {
+    const error = new Error("paradise_bot_not_ready");
+    error.code = "paradise_bot_not_ready";
+    throw error;
+  }
+  return applyParadiseTemplateMissingOnly(guild, mode, options);
 }
 
 export async function giveDiscordRole(discordUserId, type) {

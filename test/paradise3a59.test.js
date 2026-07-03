@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
+  meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   sanitizeTemporaryVoiceName,
@@ -183,6 +184,22 @@ test("challenge ranges follow leaderboard distance rules", () => {
   assert.deepEqual(challengeTargetSpots(1), []);
   assert.deepEqual(challengeTargetSpots(null, { topSize: 50 }), [49, 50]);
   assert.deepEqual(challengeTargetSpots(40, { topSize: 50, top30Range: 5 }), [35, 36, 37, 38, 39]);
+  const groups = [
+    { label: "Leaders", minRank: 1, maxRank: 5, upwardDistance: 1, downwardDistance: 0 },
+    { label: "Contenders", minRank: 6, maxRank: 12, upwardDistance: 4, downwardDistance: 1 }
+  ];
+  assert.equal(normalizeChallengeGroups({ topSize: 12, groups }).length, 2);
+  assert.deepEqual(challengeTargetSpots(8, { topSize: 12, groups }), [4, 5, 6, 7, 9]);
+  assert.throws(() => normalizeChallengeGroups({
+    topSize: 5,
+    groups: [{ minRank: 1, maxRank: 3 }, { minRank: 3, maxRank: 5 }]
+  }), /overlapping_challenge_groups/);
+});
+
+test("unranked challenge eligibility requires Stage 2 High Weak or better", () => {
+  assert.equal(meetsMinimumChallengeRank({ stage: 2, level: "High", strength: "Weak" }), true);
+  assert.equal(meetsMinimumChallengeRank({ stage: 1, level: "Low", strength: "Weak" }), true);
+  assert.equal(meetsMinimumChallengeRank({ stage: 2, level: "Mid", strength: "Strong" }), false);
 });
 
 test("challenge creation explains cooldown, immunity and active ticket blocks", () => {

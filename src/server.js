@@ -44,6 +44,7 @@ import { runOwnerLifetimeGrantJobOnce } from "./ownerGrantJob.js";
 import { runSecurityE2EJobOnce } from "./securityE2EJob.js";
 import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
 import {
+  createMissingParadiseTemplateFromDashboard,
   discordBotHealth,
   giveDiscordRole,
   paradiseDiscordAuditJobStatus,
@@ -53,6 +54,7 @@ import {
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
   repostParadiseGuides,
+  syncParadisePanelsFromDashboard,
   removeDiscordRole,
   sendPasswordResetDm,
   sendPaymentSubmissionLog,
@@ -861,15 +863,51 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     config.activeSetupMode = template;
   } else if (kind === "challenge") {
     const value = req.body?.value || {};
+    const topSize = Math.min(100, Math.max(2, Number(value.topSize) || 30));
+    const minimum = value.unrankedMinimumRank || {};
+    const stage = Number(minimum.stage);
+    const level = String(minimum.level || "High");
+    const strength = String(minimum.strength || "Weak");
+    if (!Number.isInteger(stage) || stage < 0 || stage > 4
+      || !["Low", "Mid", "High"].includes(level)
+      || !["Weak", "Stable", "Strong"].includes(strength)) {
+      return res.status(400).json({ error: "invalid_unranked_minimum_rank" });
+    }
+    const rawGroups = Array.isArray(value.groups) ? value.groups.slice(0, 12) : [];
+    const groups = rawGroups.map((group, index) => ({
+      label: String(group?.label || `Group ${index + 1}`).trim().slice(0, 40),
+      minRank: Math.max(1, Number(group?.minRank) || 1),
+      maxRank: Math.min(topSize, Number(group?.maxRank) || topSize),
+      upwardDistance: Math.max(0, Math.min(topSize, Number(group?.upwardDistance) || 0)),
+      downwardDistance: Math.max(0, Math.min(topSize, Number(group?.downwardDistance) || 0)),
+      cooldownDays: Math.max(1, Math.min(30, Number(group?.cooldownDays) || Number(value.cooldownDays) || 3)),
+      immunityDays: Math.max(1, Math.min(30, Number(group?.immunityDays) || Number(value.immunityDays) || 3)),
+      refereeMinimumRole: String(group?.refereeMinimumRole || "Referee").trim().slice(0, 60)
+    })).sort((a, b) => a.minRank - b.minRank);
+    if (groups.length) {
+      const covered = new Set();
+      for (const group of groups) {
+        if (group.minRank > group.maxRank) return res.status(400).json({ error: "invalid_challenge_group_range" });
+        for (let rank = group.minRank; rank <= group.maxRank; rank += 1) {
+          if (covered.has(rank)) return res.status(400).json({ error: "overlapping_challenge_groups" });
+          covered.add(rank);
+        }
+      }
+      if (covered.size !== topSize || [...covered].some(rank => rank < 1 || rank > topSize)) {
+        return res.status(400).json({ error: "challenge_groups_must_cover_leaderboard" });
+      }
+    }
     config.challenge = {
-      topSize: Math.min(100, Math.max(2, Number(value.topSize) || 30)),
+      topSize,
       top10Range: Math.min(10, Math.max(1, Number(value.top10Range) || 1)),
       top20Range: Math.min(10, Math.max(1, Number(value.top20Range) || 2)),
       top30Range: Math.min(10, Math.max(1, Number(value.top30Range) || 3)),
       cooldownDays: Math.min(30, Math.max(1, Number(value.cooldownDays) || 3)),
       top10CooldownDays: Math.min(30, Math.max(1, Number(value.top10CooldownDays) || 7)),
       immunityDays: Math.min(30, Math.max(1, Number(value.immunityDays) || 3)),
-      proofRequired: value.proofRequired === true
+      proofRequired: value.proofRequired === true,
+      unrankedMinimumRank: { stage, level, strength },
+      groups
     };
   } else if (kind === "loa") {
     const value = req.body?.value || {};
@@ -1009,6 +1047,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       chatXp: Math.min(100, Math.max(1, Number(value.chatXp) || 10)),
       chatCooldownSeconds: Math.min(3600, Math.max(15, Number(value.chatCooldownSeconds) || 60)),
       voiceXpPerInterval: Math.min(100, Math.max(1, Number(value.voiceXpPerInterval) || 15)),
+      levelUpDeleteSeconds: Math.min(3600, Math.max(10, Number(value.levelUpDeleteSeconds) || 60)),
       weeklyLeaderboard: value.weeklyLeaderboard !== false,
       monthlyLeaderboard: value.monthlyLeaderboard !== false,
       excludedChannels: Array.isArray(value.excludedChannels)
@@ -1026,7 +1065,15 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     create: { key: "paradise_3a59_state_v1", value: state }
   });
   await createAuditLog("paradise_owner_config_updated", "discord_user", "762858334440521739", { kind, guildId, userId: req.user.id });
-  return res.json({ success: true, kind, guildId });
+  let panelSync = null;
+  if (kind === "channelMappings") {
+    panelSync = await syncParadisePanelsFromDashboard(guildId).catch(error => ({
+      updated: 0,
+      skipped: 0,
+      error: publicError(error)
+    }));
+  }
+  return res.json({ success: true, kind, guildId, panelSync });
 });
 
 app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwner, async (req, res) => {
@@ -1049,6 +1096,33 @@ app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwne
   } catch (error) {
     console.error("Paradise guide repost failed", publicError(error));
     return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "guide_repost_failed" });
+  }
+});
+
+app.post("/api/paradise/actions/create-missing", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const mode = String(req.body?.mode || "clan");
+  if (!["community", "clan", "tsbtr"].includes(mode)) return res.status(400).json({ error: "invalid_template" });
+  const guildId = String(req.body?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  try {
+    const result = await createMissingParadiseTemplateFromDashboard(mode, guildId, {
+      repairPermissions: req.body?.repairPermissions !== false
+    });
+    await createAuditLog("paradise_test_template_create_missing", "discord_guild", guildId, {
+      mode,
+      createdChannels: result.createdChannels,
+      createdRoles: result.createdRoles,
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result });
+  } catch (error) {
+    console.error("Paradise create-missing setup failed", publicError(error));
+    const status = error.code === "test_guild_only" ? 403 : error.code === "paradise_bot_not_ready" ? 503 : 500;
+    return res.status(status).json({ error: error.code || "create_missing_failed" });
   }
 });
 

@@ -105,10 +105,10 @@ test("3A61 dashboard exposes Turkish UI, animated premium controls and real audi
   assert.match(serverSource, /\/api\/paradise\/actions\/preview/);
 });
 
-test("3A62 dashboard is split into twenty understandable operation pages", () => {
+test("3A64 dashboard is split into twenty-one understandable operation pages", () => {
   const pages = [...htmlSource.matchAll(/data-page-button="([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(pages, [
-    "overview", "servers", "setup", "channels", "roles", "challenge", "availability",
+    "overview", "servers", "setup", "channels", "roles", "challenge", "leaderboard", "availability",
     "operations", "applications", "tickets", "moderation", "blacklist", "roster",
     "events", "voice", "xp", "guides", "branding", "logs", "advanced"
   ]);
@@ -116,6 +116,16 @@ test("3A62 dashboard is split into twenty understandable operation pages", () =>
     assert.match(htmlSource, new RegExp(`data-save="${kind}"`));
     assert.match(serverSource, new RegExp(`"${kind}"`));
   }
+  assert.match(htmlSource, /Auto-detect channels \(preview only\)/);
+  assert.match(htmlSource, /datalist id=/);
+  assert.match(serverSource, /syncParadisePanelsFromDashboard/);
+  assert.doesNotMatch(htmlSource, /<section class="panel">/);
+  for (const action of [
+    "previewSelectedSetup", "createMissingSetup", "repostSelectedGuides",
+    "repairSelectedPermissions", "startSelectedSetup"
+  ]) assert.match(htmlSource, new RegExp(`id="${action}"`));
+  assert.match(serverSource, /\/api\/paradise\/actions\/create-missing/);
+  assert.match(serverSource, /test_guild_only/);
 });
 
 test("destructive Paradise setup requires a typed final confirmation", () => {
