@@ -1,0 +1,10 @@
+{
+  "status": "SOURCE ONLY",
+  "welcome": [
+    "member mention", "username/avatar", "server name", "member count", "configured channel recommendations",
+    "per-template content", "timestamp", "optional configured banner", "missing-channel fallback"
+  ],
+  "leave": ["configured farewell channel", "member identity", "updated member count", "Paradise branding"],
+  "previewCommands": "Source supports guide/panel previews; real join/leave event not triggered.",
+  "liveProof": "BLOCKED pending test-server execution"
+}

@@ -1,0 +1,9 @@
+{
+  "status": "LOCAL VERIFIED",
+  "style": [
+    "Discord headings and subheadings", "bold/underline/italics", "mobile-readable lists",
+    "small footer text", "Unicode fallback symbols", "configurable black/charcoal accent embeds"
+  ],
+  "plainMessageRule": "Active tryout/training announcements are plain Markdown; guides and persistent panels may use embeds.",
+  "customEmojiRule": "Reuse a server emoji only when available; otherwise use readable Unicode fallbacks."
+}

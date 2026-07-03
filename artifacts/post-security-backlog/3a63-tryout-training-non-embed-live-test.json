@@ -1,0 +1,13 @@
+{
+  "status": "SOURCE ONLY",
+  "localVerification": "LOCAL VERIFIED — 62/62 tests pass",
+  "implementation": {
+    "tryoutStart": "Plain Discord Markdown message routed to configured tryout channel",
+    "trainingCreateAndStart": "Plain Discord Markdown message routed to configured training channel",
+    "controls": ["SERVER LOCKED", "UNLOCK", "END TRYOUT", "END TRAINING"],
+    "resultBehavior": "Original message is edited with ENDED and controls are removed"
+  },
+  "liveDiscordProof": "BLOCKED — owner-authenticated dashboard/test action could not be reached because the Chrome extension connection timed out.",
+  "releaseChanged": false,
+  "latestJsonChanged": false
+}

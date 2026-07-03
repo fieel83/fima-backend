@@ -1,0 +1,17 @@
+{
+  "status": "IMPLEMENTED MAP",
+  "automations": [
+    "Manual training post -> formatted plain message + lock/unlock/end buttons",
+    "Tryout scoring -> structured Stage/Level/Strength + authority check",
+    "Reaction activity check -> buttons, evidence and quota records",
+    "Referee screenshot work -> pending approval + referee works log",
+    "Challenge post -> validated score + approval + availability update",
+    "Challenge ticket -> sticky context header and autowin",
+    "Roster images -> persistent editable boards",
+    "LOA text -> request/approve/deny/expiry",
+    "Blacklist text -> audited board, appeal and owner-controlled bail",
+    "Low-staff punishment -> senior approval queue",
+    "Invite/scam moderation -> AutoMod and quarantine"
+  ],
+  "liveProof": "Mixed: source/local verified; Discord interaction proof remains blocked."
+}

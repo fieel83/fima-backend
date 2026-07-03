@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "boards": ["Main Line-up", "Roster Line-up", "War Line-up", "EU/region roster", "Mainer Proof"],
+  "persistence": "Stored message IDs and in-place updates",
+  "commands": ["lineup add/remove/move/edit/clear/panel/repost", "roster add/update/remove/panel/repost"],
+  "visualReference": "Owner-provided main-line and EU roster screenshots were used as structural inspiration, not copied assets.",
+  "liveTest": "BLOCKED"
+}

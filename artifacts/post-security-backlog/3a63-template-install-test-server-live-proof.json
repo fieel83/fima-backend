@@ -1,0 +1,15 @@
+{
+  "status": "BLOCKED",
+  "testGuildIdMasked": "152051…1257",
+  "safeBackendAction": "POST /api/paradise/actions/create-missing",
+  "safety": [
+    "Hard-coded test guild only",
+    "Creates missing resources without deleting extras",
+    "Creates a backup first",
+    "Can repair managed permissions",
+    "Synchronizes guides and boards"
+  ],
+  "sourceAndDeploy": "Implemented in commit 6fd820a and newer.",
+  "liveExecution": "Not executed because owner-authenticated dashboard access could not be controlled after repeated Chrome extension timeouts.",
+  "mainServersTouchedDestructively": false
+}

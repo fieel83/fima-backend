@@ -1,0 +1,11 @@
+{
+  "status": "SOURCE ONLY",
+  "community": {
+    "includes": ["support", "Fima guides", "applications", "events", "giveaways", "optional training", "XP", "voice", "moderation"],
+    "excludesByDefault": ["challenge", "leaderboard ranking", "clan roster", "lineup", "mainer"]
+  },
+  "clan": "Clan, roster, lineup, mainer, war, challenge, training, tryout, relations, daily question and moderation command families.",
+  "tsbtr": "Leaderboard, profile, challenge, availability, LOA, referee, hoster, activity, blacklist and ticket command families.",
+  "sourceTest": "Template command predicate passes.",
+  "liveGuildCommandList": "BLOCKED pending authenticated test-server execution"
+}

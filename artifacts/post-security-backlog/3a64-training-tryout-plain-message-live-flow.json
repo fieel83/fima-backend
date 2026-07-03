@@ -1,0 +1,7 @@
+{
+  "status": "SOURCE ONLY",
+  "tryout": "Plain Markdown, configured channel, hoster-only lock/unlock/end controls.",
+  "training": "Both /training create and /training start produce plain Markdown in the configured channel.",
+  "results": "Original message receives ENDED, result and activity records are plain Markdown.",
+  "liveDiscord": "BLOCKED pending authenticated test-server execution"
+}

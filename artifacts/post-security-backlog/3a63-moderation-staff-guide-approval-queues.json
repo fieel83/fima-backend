@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "guides": ["staff-command-guide", "mod-command-guide", "moderation-policy"],
+  "channels": ["moderation-requests", "quarantine-logs", "security-logs", "staff-actions", "staff-reports"],
+  "workflow": "Low staff submit kick/ban requests; authorized senior staff approve or deny; actions and evidence remain logged.",
+  "security": ["quarantine", "raid mode", "lockdown", "invite/link protection", "mass mention protection", "appeal path"],
+  "liveQueueTest": "BLOCKED pending test-server installation"
+}

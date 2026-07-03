@@ -1,0 +1,8 @@
+{
+  "status": "LIVE VERIFIED / SAVE BLOCKED",
+  "selectors": "Searchable text+datalist selectors expose channel category/name/type and role label with missing states.",
+  "autoDetect": "Preview-only; fills exact matching empty mappings and never saves automatically.",
+  "saveSync": "Channel mapping save triggers official bot panel synchronization for challenge, availability and configured guides.",
+  "liveUI": true,
+  "authenticatedSave": "BLOCKED by unavailable owner Chrome control"
+}

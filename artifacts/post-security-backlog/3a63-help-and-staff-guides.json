@@ -1,0 +1,15 @@
+{
+  "status": "LOCAL VERIFIED",
+  "helpCategories": [
+    "Community", "Clan", "TSBTR", "Staff", "Moderator", "Referee", "Training Hoster",
+    "Tryout Hoster", "Giveaway/Event Hoster", "Tickets", "Applications", "Voice / Join-to-Create",
+    "XP / Levels", "Dashboard"
+  ],
+  "behavior": "Ephemeral paged help with category selector, TR/EN buttons, command examples, permissions, channels and common mistakes.",
+  "staticGuides": [
+    "staff-command-guide", "mod-command-guide", "referee-guide", "referee-rules",
+    "training-hoster-guide", "tryout-hoster-guide", "giveaway-event-guide",
+    "ticket-guide", "application-guide", "dashboard-guide"
+  ],
+  "liveRepost": "BLOCKED pending owner-authenticated test-server action"
+}

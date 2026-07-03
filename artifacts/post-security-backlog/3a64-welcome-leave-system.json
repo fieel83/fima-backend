@@ -1,0 +1,7 @@
+{
+  "status": "SOURCE ONLY",
+  "welcomeFeatures": ["mention", "avatar", "server", "member count", "timestamp", "configured channel links", "template copy", "optional banner"],
+  "leaveFeatures": ["configured channel", "member identity", "member count", "Paradise footer"],
+  "missingMappingBehavior": "Graceful fallback without broken channel mention.",
+  "liveSimulation": "BLOCKED"
+}

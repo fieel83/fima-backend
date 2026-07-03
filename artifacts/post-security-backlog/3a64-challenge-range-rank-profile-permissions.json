@@ -1,0 +1,14 @@
+{
+  "status": "LOCAL VERIFIED",
+  "groups": "Configurable full-coverage non-overlapping rank groups with asymmetric upward/downward distances.",
+  "unrankedMinimum": "Stage 2 High Weak",
+  "profileRequirement": true,
+  "rechecks": ["rank range", "profile", "cooldown", "immunity", "active challenge", "LOA"],
+  "approval": {
+    "Trial Referee": false,
+    "Referee": false,
+    "Experienced Referee": true,
+    "Referee Manager": true
+  },
+  "dashboardPreview": true
+}

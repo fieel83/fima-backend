@@ -1,0 +1,22 @@
+{
+  "status": "DASHBOARD VERIFIED",
+  "liveCommit": "d97cf9ea1f0e06e3ec6e712bc393bb935bc09b77",
+  "publicChecks": {
+    "pageCount": 21,
+    "bareAlwaysVisiblePanels": 0,
+    "autoDetectChannels": true,
+    "createMissingButton": true,
+    "startSetupButton": true,
+    "csrfRetryPresent": true
+  },
+  "pages": [
+    "Overview", "Server Selector", "Template Setup", "Channels", "Roles & Permissions",
+    "Challenges", "Leaderboard / Profiles", "Availability & LOA", "Training / Staff",
+    "Applications", "Tickets & Support", "Moderation / Security", "Blacklist / Appeal / Bail",
+    "Roster / Lineups / Relations", "Events / Daily Question", "Voice / Join-to-Create",
+    "XP / Levels", "Guides & Embeds", "Branding / Theme / Language",
+    "Logs / Backups / Restore", "Advanced JSON"
+  ],
+  "authenticatedSave": "BLOCKED — Chrome owner session could not be controlled; no false save claim.",
+  "csrf": "Protected credentialed fetch with one safe token refresh/retry."
+}

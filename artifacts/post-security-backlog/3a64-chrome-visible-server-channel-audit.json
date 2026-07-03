@@ -1,0 +1,9 @@
+{
+  "status": "BLOCKED",
+  "verifiedInputs": ["owner screenshots", "pasted channel exports", "earlier official-bot guild inventories"],
+  "chrome": "Discord page opened, but large and then lightweight browser operations timed out.",
+  "readOnlyRuleRespected": true,
+  "userMessagesSent": false,
+  "privateChatStored": false,
+  "remaining": "Historical upward scrolling and masked message-ID capture for all visible reference servers."
+}

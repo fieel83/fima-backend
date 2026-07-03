@@ -1,0 +1,13 @@
+{
+  "status": "PARTIAL",
+  "local": "62/62 tests pass",
+  "deploy": "LIVE VERIFIED at commit d97cf9e; bot ready; 62 commands synced.",
+  "dashboardPublic": "DASHBOARD VERIFIED — 21 real pages and setup controls are live.",
+  "liveDiscordFlows": "BLOCKED — owner-authenticated test action and Discord UI control unavailable because Chrome extension calls repeatedly timed out.",
+  "notComplete": true,
+  "mainRebuildGate": [
+    "REBUILD PARADISE TURKIYE",
+    "REBUILD FIEELS COMMUNITY",
+    "REBUILD TSBTR YEDEK"
+  ]
+}

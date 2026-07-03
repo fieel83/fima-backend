@@ -1,0 +1,12 @@
+{
+  "status": "LIVE VERIFIED / EXECUTION BLOCKED",
+  "templates": {
+    "Paradise Clan": "Clan/challenge/roster/war/training/tryout/relations/applications/security/daily question.",
+    "Fieel's Community": "Community/Fima support/events/applications/voice/XP/security; no challenge/ranking/roster by default.",
+    "TSBTR Yedek": "Leaderboard/profile/challenge/availability/LOA/referee/hoster/training/tryout/security."
+  },
+  "buttons": ["Preview setup", "Create missing only", "Repost guides only", "Repair permissions", "Start setup"],
+  "danger": "Destructive rebuild is separated and still requires typed Discord confirmation.",
+  "safeCreateEndpoint": "/api/paradise/actions/create-missing",
+  "execution": "BLOCKED by owner-authenticated browser control"
+}

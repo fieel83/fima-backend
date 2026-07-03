@@ -1,0 +1,21 @@
+{
+  "status": "SOURCE ONLY",
+  "posts": ["referee-rules", "referee-guide", "post quick guide", "referee-works activity guide"],
+  "defaultRanges": {
+    "Referee Manager / Experienced Referee": "1-30",
+    "Referee": "11-30",
+    "Trial Referee": "21-30"
+  },
+  "automation": [
+    "Profile/range/cooldown/immunity/open-ticket checks", "sticky challenge header",
+    "clean score normalization", "no duplicate 'to'", "auto note requirement",
+    "approval authority", "autowin context", "availability update", "audited correction"
+  ],
+  "approvalTests": {
+    "Trial Referee": "LOCAL VERIFIED blocked",
+    "Referee": "LOCAL VERIFIED blocked by default",
+    "Experienced Referee": "LOCAL VERIFIED allowed",
+    "Referee Manager": "LOCAL VERIFIED allowed"
+  },
+  "liveDiscordEvidence": "BLOCKED pending authenticated test-server run"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "applications": "Configurable types, form/review/status, hierarchy-safe approval and audit.",
+  "tickets": "Support/application/challenge/report/appeal/bail targets with transcript mappings.",
+  "moderation": "Warn/mute, senior-approved kick/ban queue, quarantine, lockdown, raid mode, case audit.",
+  "security": "AutoMod invite/scam/mass-mention protection and approved media/link role.",
+  "liveInteraction": "BLOCKED"
+}

@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE ONLY",
+  "channels": ["main-lineup", "roster-lineup", "war-lineup", "roster-logs", "war-logs", "mainer-proof"],
+  "lineupCommands": ["add", "remove", "move", "edit", "clear", "panel", "repost"],
+  "rosterCommands": ["add", "update", "remove", "panel", "repost"],
+  "behavior": ["stored message IDs", "in-place updates", "audit logging", "guild isolation"],
+  "liveSampleUsers": "BLOCKED pending safe test-server installation"
+}

@@ -1,0 +1,10 @@
+{
+  "status": "DASHBOARD VERIFIED",
+  "liveCommit": "d97cf9ea1f0e06e3ec6e712bc393bb935bc09b77",
+  "pageCount": 21,
+  "alwaysVisiblePanelBug": "Fixed; public live HTML contains zero unscoped panel sections.",
+  "themes": ["Paradise Purple", "Charcoal", "Midnight"],
+  "language": ["Türkçe", "English"],
+  "saveSafety": "Credentialed fetch, CSRF token, one refresh/retry, trusted origin and owner Discord ID gate.",
+  "authenticatedPersistence": "BLOCKED by Chrome extension timeout; public source/runtime presence is verified but no false owner-save claim is made."
+}

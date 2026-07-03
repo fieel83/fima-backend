@@ -1,0 +1,8 @@
+{
+  "status": "LOCAL VERIFIED",
+  "embedUse": "Persistent guides/panels only",
+  "plainMessageUse": "Active training and tryout announcements",
+  "format": ["headings", "subheadings", "bold", "underline", "lists", "quotes", "small footer"],
+  "fallbackSymbols": ["◆", "➤", "✦", "⚠", "👑", "🛡️", "📌"],
+  "brand": "Paradise except genuine Fima product/support commands"
+}

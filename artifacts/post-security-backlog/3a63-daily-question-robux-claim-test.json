@@ -1,0 +1,11 @@
+{
+  "status": "SOURCE ONLY",
+  "defaultTemplate": "Paradise Clan only",
+  "schedule": "13:00 Europe/Berlin",
+  "reward": "25 Robux",
+  "safety": [
+    "One winner by default", "winner-only gamepass buttons", "URL modal", "staff payout queue",
+    "paid/rejected/invalid states", "no automatic Robux payment"
+  ],
+  "liveManualQuestion": "BLOCKED pending test-server execution"
+}

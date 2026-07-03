@@ -1,0 +1,7 @@
+{
+  "status": "SOURCE ONLY",
+  "features": ["chat XP", "voice XP", "anti-spam cooldown", "excluded channels", "level channel", "auto-delete level message", "weekly/monthly/all-time boards"],
+  "commands": ["/rank", "/leaderboard show"],
+  "dashboard": ["XP values", "cooldown", "excluded channels", "level message lifetime"],
+  "liveDiscord": "BLOCKED"
+}

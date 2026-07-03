@@ -1,0 +1,11 @@
+{
+  "status": "LOCAL VERIFIED",
+  "helpCategoryCount": 14,
+  "content": ["purpose", "audience", "commands", "examples", "permissions", "channel", "common mistakes", "related settings"],
+  "localization": ["TR", "EN"],
+  "staticReadOnlyGuideTargets": [
+    "staff", "moderator", "referee", "training hoster", "tryout hoster",
+    "giveaway/event", "ticket", "application", "dashboard"
+  ],
+  "liveRepost": "BLOCKED"
+}

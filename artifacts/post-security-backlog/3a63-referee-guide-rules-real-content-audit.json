@@ -1,0 +1,12 @@
+{
+  "status": "PARTIAL — OWNER EVIDENCE VERIFIED, CHROME HISTORY BLOCKED",
+  "found": {
+    "refereeRules": true,
+    "refereeGuide": true,
+    "refereeWorks": true,
+    "scoreApprovalExamples": true
+  },
+  "evidence": "Owner screenshots and pasted exports show role expectations, neutrality, recording, ticket checks, /post examples, work logs and pending approval cards.",
+  "maskedMessageIds": "Not available from screenshots without unsafe guessing.",
+  "chromeHistoricalScroll": "BLOCKED by extension timeout; not claimed as completed."
+}

@@ -1,0 +1,11 @@
+{
+  "status": "LOCAL VERIFIED",
+  "unrankedMinimum": "Stage 2 High Weak",
+  "separation": "Leaderboard position and Stage/Level/Strength are separate models.",
+  "challengeGroups": "Configurable non-overlapping groups with min/max rank, upward/downward distance, cooldown, immunity and referee authority.",
+  "manualLeaderboardCommands": [
+    "add", "remove", "move", "swap", "repost", "panel", "export", "import"
+  ],
+  "boardBehavior": "Top 10/20/30 messages update in place and reject duplicate ranks.",
+  "tests": ["dynamic rank group targeting", "overlap rejection", "minimum stage eligibility"]
+}

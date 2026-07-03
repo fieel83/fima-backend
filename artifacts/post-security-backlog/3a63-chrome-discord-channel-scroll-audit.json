@@ -1,0 +1,21 @@
+{
+  "status": "BLOCKED",
+  "updatedAt": "2026-07-03T16:40:00+02:00",
+  "scope": "Read-only owner Chrome Discord audit",
+  "attempts": [
+    "Chrome extension diagnostics passed and the owner profile was opened.",
+    "Discord was opened in Chrome, but a full DOM read timed out.",
+    "After reducing the request to tab listing and then session naming, both lightweight calls timed out and reset the connection."
+  ],
+  "verifiedFromOwnerEvidence": {
+    "servers": ["TSBTR-style server", "TSB Clanning Community", "Paradise | Türkiye", "Fieel's Community"],
+    "panels": ["referee guide/works", "tryout and training rules", "challenge rules/results", "availability", "main lineup", "EU roster", "rules language selector"],
+    "source": "Owner-provided screenshots and pasted channel exports; no private chat content was stored."
+  },
+  "notClaimed": [
+    "No claim that every visible server/channel was read.",
+    "No claim that historical channel scrolling completed.",
+    "No user-account message or destructive Discord action was performed."
+  ],
+  "exactBlocker": "Codex Chrome Extension communication times out before a lightweight browser operation completes. Plugin reinstall/reconnect is required for the remaining historical scroll audit."
+}
