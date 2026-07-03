@@ -1357,6 +1357,14 @@ export async function runParadiseTestSmokeSuite(guild) {
     error.code = "test_channels_missing";
     throw error;
   }
+  const smokeSend = async (channel, payload, code) => {
+    try {
+      return await channel.send(payload);
+    } catch (error) {
+      error.code = code;
+      throw error;
+    }
+  };
 
   const trainingId = crypto.randomUUID();
   const tryoutId = crypto.randomUUID();
@@ -1365,7 +1373,7 @@ export async function runParadiseTestSmokeSuite(guild) {
     new ButtonBuilder().setCustomId(`paradise_session_unlocked:${id}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`paradise_session_end:${id}`).setLabel(ending).setStyle(ButtonStyle.Danger)
   );
-  const training = await trainingChannel.send({
+  const training = await smokeSend(trainingChannel, {
     content: [
       "# TRAINING",
       "### Kurallar:",
@@ -1383,8 +1391,8 @@ export async function runParadiseTestSmokeSuite(guild) {
     ].join("\n"),
     components: [controls(trainingId, "END TRAINING")],
     allowedMentions: { users: [], roles: [], parse: [] }
-  });
-  const tryout = await tryoutChannel.send({
+  }, "smoke_training_send_failed");
+  const tryout = await smokeSend(tryoutChannel, {
     content: [
       "# TRYOUT OPEN",
       "## Tryout Time",
@@ -1411,14 +1419,14 @@ export async function runParadiseTestSmokeSuite(guild) {
     ].join("\n"),
     components: [controls(tryoutId, "END TRYOUT")],
     allowedMentions: { users: [], roles: [], parse: [] }
-  });
+  }, "smoke_tryout_send_failed");
 
-  await trainingChannel.send("# SERVER LOCKED\n-# Paradise lifecycle rendering test");
-  await trainingChannel.send("# SERVER UNLOCKED\n-# Paradise lifecycle rendering test");
-  await trainingChannel.send("# TRAINING ENDED\n-# Paradise lifecycle rendering test");
-  await tryoutChannel.send("# SERVER LOCKED\n-# Paradise lifecycle rendering test");
-  await tryoutChannel.send("# SERVER UNLOCKED\n-# Paradise lifecycle rendering test");
-  await tryoutChannel.send("# ENDED\n-# Paradise lifecycle rendering test");
+  await smokeSend(trainingChannel, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
+  await smokeSend(trainingChannel, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
+  await smokeSend(trainingChannel, "# TRAINING ENDED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
+  await smokeSend(tryoutChannel, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
+  await smokeSend(tryoutChannel, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
+  await smokeSend(tryoutChannel, "# ENDED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
 
   const sessions = {
     [trainingId]: {
@@ -1433,10 +1441,15 @@ export async function runParadiseTestSmokeSuite(guild) {
     }
   };
   Object.values(sessions).forEach(session => activeTrainings.set(session.id, session));
-  await saveState(state => {
-    state.trainings = { ...state.trainings, ...sessions };
-    return state;
-  });
+  try {
+    await saveState(state => {
+      state.trainings = { ...state.trainings, ...sessions };
+      return state;
+    });
+  } catch (error) {
+    error.code = "smoke_state_save_failed";
+    throw error;
+  }
 
   const owner = await guild.members.fetch(ownerId).catch(() => null);
   if (owner) {
