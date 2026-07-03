@@ -53,6 +53,7 @@ import {
   paradiseDiscordRuntimeSnapshot,
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
+  rebuildParadiseTestTemplateFromDashboard,
   repostParadiseGuides,
   syncParadisePanelsFromDashboard,
   removeDiscordRole,
@@ -1123,6 +1124,33 @@ app.post("/api/paradise/actions/create-missing", requireUser, requireParadiseOwn
     console.error("Paradise create-missing setup failed", publicError(error));
     const status = error.code === "test_guild_only" ? 403 : error.code === "paradise_bot_not_ready" ? 503 : 500;
     return res.status(status).json({ error: error.code || "create_missing_failed" });
+  }
+});
+
+app.post("/api/paradise/actions/rebuild-test-template", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const mode = String(req.body?.mode || "");
+  if (!["community", "clan", "tsbtr"].includes(mode)) return res.status(400).json({ error: "invalid_template" });
+  const guildId = String(req.body?.guildId || "");
+  const confirmation = String(req.body?.confirmation || "");
+  try {
+    const result = await rebuildParadiseTestTemplateFromDashboard(mode, guildId, confirmation);
+    await createAuditLog("paradise_test_template_full_rebuild", "discord_guild", guildId, {
+      mode,
+      deletedChannels: result.deleted?.channels || 0,
+      deletedRoles: result.deleted?.roles || 0,
+      createdChannels: result.createdChannels || 0,
+      createdRoles: result.createdRoles || 0,
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result });
+  } catch (error) {
+    console.error("Paradise test template rebuild failed", publicError(error));
+    const status = ["test_guild_only", "typed_confirmation_mismatch"].includes(error.code) ? 403
+      : error.code === "paradise_bot_not_ready" ? 503 : 500;
+    return res.status(status).json({ error: error.code || "test_template_rebuild_failed" });
   }
 });
 

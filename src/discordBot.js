@@ -17,6 +17,7 @@ import {
   paradiseCommandAllowedForMode,
   paradiseCommands,
   publishParadiseGuidesFromDashboard,
+  rebuildParadiseTestTemplate,
   syncParadiseMappedPanels
 } from "./paradise3a59.js";
 
@@ -2267,6 +2268,16 @@ export async function createMissingParadiseTemplateFromDashboard(mode, guildId, 
     throw error;
   }
   return applyParadiseTemplateMissingOnly(guild, mode, options);
+}
+
+export async function rebuildParadiseTestTemplateFromDashboard(mode, guildId, confirmation) {
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.isReady?.()) {
+    const error = new Error("paradise_bot_not_ready");
+    error.code = "paradise_bot_not_ready";
+    throw error;
+  }
+  return rebuildParadiseTestTemplate(guild, mode, confirmation);
 }
 
 export async function giveDiscordRole(discordUserId, type) {

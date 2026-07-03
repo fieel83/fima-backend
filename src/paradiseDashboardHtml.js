@@ -433,7 +433,10 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
 
       <section class="panel danger" data-page="setup">
         <h2>Danger zone</h2>
-        <div class="notice"><b>No destructive action is available from this page.</b> Run <b>/setupfieelstsbtr</b>, <b>/setupfieelscommunity</b> or <b>/setupfieelsclan</b> in the isolated test guild. Paradise creates a backup, shows a create/remove preview, then requires the exact typed confirmation. Repair and handbook repost modes do not delete channels or roles.</div>
+        <div class="notice"><b>Main servers cannot be rebuilt here.</b> The destructive button below is hard-locked to the isolated test guild. It creates a complete backup, removes old test channels/roles and installs the selected template from zero.</div>
+        <label for="testRebuildConfirmation">Test server typed confirmation <span class="tip" title="Select a template above, then type REBUILD TEST CLAN, REBUILD TEST COMMUNITY or REBUILD TEST TSBTR exactly.">?</span></label>
+        <input id="testRebuildConfirmation" autocomplete="off" placeholder="REBUILD TEST CLAN">
+        <button class="danger-action" id="rebuildTestTemplate">Wipe and rebuild selected test template</button>
         <button class="secondary" id="exportConfig">Export safe configuration</button>
       </section>
     </div>
@@ -730,6 +733,23 @@ async function createMissingTemplate(repairPermissions,buttonOverride=null){
   }catch{show('Create-missing action failed safely.',false)}
   finally{button.disabled=false;button.textContent=original}
 }
+async function rebuildSelectedTestTemplate(){
+  const mode=byId('setupTemplate').value;
+  const confirmation=byId('testRebuildConfirmation').value.trim();
+  const expected='REBUILD TEST '+mode.toUpperCase();
+  if(confirmation.toUpperCase()!==expected)return show('Type '+expected+' exactly. Nothing changed.',false);
+  const button=byId('rebuildTestTemplate'),original=button.textContent;
+  button.disabled=true;button.textContent='Backing up and rebuilding…';
+  try{
+    const{response,result}=await mutate('/api/paradise/actions/rebuild-test-template',{mode,guildId:selectedGuildId,confirmation});
+    if(!response.ok){show(result.error||'Test rebuild failed',false);return}
+    const summary=result.result||{};
+    byId('testRebuildConfirmation').value='';
+    show('Test rebuild complete: '+Number(summary.deleted?.channels||0)+' channels and '+Number(summary.deleted?.roles||0)+' roles removed; '+Number(summary.createdChannels||0)+' channels and '+Number(summary.createdRoles||0)+' roles created.');
+    await load();
+  }catch{show('Test rebuild failed safely.',false)}
+  finally{button.disabled=false;button.textContent=original}
+}
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed Paradise server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):byId('runSetupPreview');
@@ -768,6 +788,7 @@ byId('setupStartAction').onclick=()=>runManagedOperation('preview');
 byId('setupCreateMissingAction').onclick=()=>createMissingTemplate(false,byId('setupCreateMissingAction'));
 byId('setupRepairAction').onclick=()=>createMissingTemplate(true,byId('setupRepairAction'));
 byId('setupRepostGuidesAction').onclick=()=>repostGuides(byId('setupTemplate').value);
+byId('rebuildTestTemplate').onclick=rebuildSelectedTestTemplate;
 byId('autoDetectChannels').onclick=autoDetectChannels;byId('previewChallengeRange').onclick=previewChallengeRange;
 document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};

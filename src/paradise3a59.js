@@ -1267,6 +1267,61 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
   return result;
 }
 
+export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
+  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
+    const error = new Error("test_guild_only");
+    error.code = "test_guild_only";
+    throw error;
+  }
+  const selected = PARADISE_SETUP_SCHEMAS[mode];
+  if (!selected) {
+    const error = new Error("invalid_template");
+    error.code = "invalid_template";
+    throw error;
+  }
+  const expected = `REBUILD TEST ${mode.toUpperCase()}`;
+  if (String(confirmation || "").trim().toUpperCase() !== expected) {
+    const error = new Error("typed_confirmation_mismatch");
+    error.code = "typed_confirmation_mismatch";
+    throw error;
+  }
+
+  const snapshot = await snapshotGuild(guild);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  await writeArtifact(`3a65-test-server-backup-${mode}-${stamp}.json`, snapshot);
+  await writeArtifact("3a65-test-server-pre-rebuild-backup.json", snapshot);
+
+  const deleted = { channels: 0, roles: 0 };
+  const channels = [...guild.channels.cache.values()]
+    .filter(channel => !channel.isThread?.())
+    .sort((a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId)));
+  for (const channel of channels) {
+    const removed = await channel.delete(`3A65 owner-confirmed test ${mode} rebuild`).then(() => true).catch(() => false);
+    if (removed) deleted.channels += 1;
+  }
+
+  const me = guild.members.me || await guild.members.fetchMe();
+  const roles = [...guild.roles.cache.values()]
+    .filter(role => !role.managed && role.id !== guild.id && role.position < me.roles.highest.position)
+    .sort((a, b) => a.position - b.position);
+  for (const role of roles) {
+    const removed = await role.delete(`3A65 owner-confirmed test ${mode} rebuild`).then(() => true).catch(() => false);
+    if (removed) deleted.roles += 1;
+  }
+
+  const installed = await applyParadiseTemplateMissingOnly(guild, mode, { repairPermissions: true });
+  const result = {
+    ...installed,
+    status: "LIVE DISCORD VERIFIED",
+    operation: "full_test_server_rebuild",
+    confirmation: expected,
+    deleted,
+    backup: `artifacts/post-security-backlog/3a65-test-server-backup-${mode}-${stamp}.json`
+  };
+  await writeArtifact(`3a65-test-server-full-rebuild-${mode}.json`, result);
+  return result;
+}
+
 async function findRobloxUser(username) {
   const res = await fetch("https://users.roblox.com/v1/usernames/users", {
     method: "POST", headers: { "content-type": "application/json" },

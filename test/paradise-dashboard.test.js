@@ -126,6 +126,10 @@ test("3A64 dashboard is split into twenty-one understandable operation pages", (
     "repairSelectedPermissions", "startSelectedSetup"
   ]) assert.match(htmlSource, new RegExp(`id="${action}"`));
   assert.match(serverSource, /\/api\/paradise\/actions\/create-missing/);
+  assert.match(serverSource, /\/api\/paradise\/actions\/rebuild-test-template/);
+  assert.match(htmlSource, /id="testRebuildConfirmation"/);
+  assert.match(htmlSource, /id="rebuildTestTemplate"/);
+  assert.match(htmlSource, /REBUILD TEST/);
   assert.match(serverSource, /test_guild_only/);
 });
 
