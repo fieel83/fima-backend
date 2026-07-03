@@ -433,7 +433,11 @@ export function paradiseCommands() {
       .setDescriptionLocalizations({ tr: "Doğrulanmış Paradise oyuncu profili oluştur, düzenle veya görüntüle" })
       .addSubcommand(s => s.setName("create").setDescription("Verify Roblox and create your fighter profile"))
       .addSubcommand(s => s.setName("view").setDescription("View a Paradise fighter profile")
-        .addUserOption(o => o.setName("user").setDescription("Profile owner; defaults to you")))
+        .addUserOption(o => o.setName("user").setDescription("Discord profile owner"))
+        .addIntegerOption(o => o.setName("profile_id").setDescription("Paradise profile ID").setMinValue(1))
+        .addStringOption(o => o.setName("user_id").setDescription("Discord user ID"))
+        .addStringOption(o => o.setName("roblox_name").setDescription("Exact Roblox username"))
+        .addStringOption(o => o.setName("query").setDescription("Display name, nickname or Roblox name")))
       .addSubcommand(s => s.setName("edit").setDescription("Edit your profile region without changing Profile ID"))
       .addSubcommand(s => s.setName("verify-status").setDescription("Show your Roblox verification and profile-completion status")),
     new SlashCommandBuilder().setName("tryout").setNameLocalizations({ tr: "deneme" }).setDescription("Paradise tryout system").setDescriptionLocalizations({ tr: "Paradise deneme ve sonuç sistemi" })
@@ -1301,8 +1305,12 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
   }
 
   const me = guild.members.me || await guild.members.fetchMe();
+  const desiredRoleNames = new Set(selected.roles);
   const roles = [...guild.roles.cache.values()]
-    .filter(role => !role.managed && role.id !== guild.id && role.position < me.roles.highest.position)
+    .filter(role => !role.managed
+      && role.id !== guild.id
+      && role.position < me.roles.highest.position
+      && !desiredRoleNames.has(role.name))
     .sort((a, b) => a.position - b.position);
   for (const role of roles) {
     const removed = await role.delete(`3A65 owner-confirmed test ${mode} rebuild`).then(() => true).catch(() => false);
@@ -1316,6 +1324,8 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
     operation: "full_test_server_rebuild",
     confirmation: expected,
     deleted,
+    preservedDesiredRoles: [...guild.roles.cache.values()]
+      .filter(role => desiredRoleNames.has(role.name)).length,
     backup: `artifacts/post-security-backlog/3a65-test-server-backup-${mode}-${stamp}.json`
   };
   await writeArtifact(`3a65-test-server-full-rebuild-${mode}.json`, result);
@@ -1538,9 +1548,37 @@ async function handleProfile(interaction) {
       ephemeral: true
     });
   }
-  const target = interaction.options.getUser("user") || interaction.user;
-  const embed = await profileEmbed(interaction.guild, target.id);
-  if (!embed) return interaction.reply({ content: `${target} has not completed a Paradise fighter profile.`, ephemeral: true });
+  const selectedUser = interaction.options.getUser("user");
+  const requestedUserId = String(interaction.options.getString("user_id") || "").trim();
+  const requestedProfileId = interaction.options.getInteger("profile_id");
+  const requestedRoblox = String(interaction.options.getString("roblox_name") || "").trim().toLowerCase();
+  const requestedQuery = String(interaction.options.getString("query") || "").trim().toLowerCase();
+  let targetId = selectedUser?.id || (/^\d{16,22}$/.test(requestedUserId) ? requestedUserId : null);
+  if (!targetId && (requestedProfileId || requestedRoblox || requestedQuery)) {
+    const profiles = (await loadState()).profiles || {};
+    const matches = [];
+    for (const [discordId, profile] of Object.entries(profiles)) {
+      const member = interaction.guild.members.cache.get(discordId);
+      const exactProfile = requestedProfileId && Number(profile.profileId) === Number(requestedProfileId);
+      const exactRoblox = requestedRoblox && String(profile.robloxUsername || "").toLowerCase() === requestedRoblox;
+      const queryMatch = requestedQuery && [
+        profile.robloxUsername,
+        member?.displayName,
+        member?.user?.username
+      ].some(value => String(value || "").toLowerCase().includes(requestedQuery));
+      if (exactProfile || exactRoblox || queryMatch) matches.push(discordId);
+    }
+    if (matches.length > 1) {
+      return interaction.reply({
+        content: `Multiple profiles matched. Use an exact **profile ID**, **Discord user**, **Discord user ID** or **Roblox username**:\n${matches.slice(0, 10).map(id => `• <@${id}>`).join("\n")}`,
+        ephemeral: true
+      });
+    }
+    targetId = matches[0] || null;
+  }
+  targetId ||= interaction.user.id;
+  const embed = await profileEmbed(interaction.guild, targetId);
+  if (!embed) return interaction.reply({ content: `<@${targetId}> has not completed a Paradise fighter profile.`, ephemeral: true });
   return interaction.reply({ embeds: [embed] });
 }
 
@@ -3283,41 +3321,80 @@ async function updateRankedLeaderboardBoards(guild) {
   const entries = Object.entries(leaderboard)
     .filter(([, row]) => Number.isInteger(Number(row.spot)) && Number(row.spot) >= 1 && Number(row.spot) <= topSize)
     .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
-  const groups = [
-    { channel: "top-10", min: 1, max: Math.min(10, topSize), label: "TOP 10" },
-    ...(topSize > 10 ? [{ channel: "top-20", min: 11, max: Math.min(20, topSize), label: "TOP 11–20" }] : []),
-    ...(topSize > 20 ? [{ channel: "top-30", min: 21, max: topSize, label: `TOP 21–${topSize}` }] : [])
-  ];
+  const groups = [];
+  for (let min = 1; min <= topSize; min += 10) {
+    const max = Math.min(min + 9, topSize);
+    groups.push({
+      channel: min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30",
+      min,
+      max,
+      label: `TOP ${min}–${max}`,
+      messageKey: `${min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30"}:${min}-${max}`
+    });
+  }
   const messageIds = configForGuild(state, guild.id).rankedLeaderboardMessageIds || {};
   const posted = [];
   for (const group of groups) {
     const channel = guild.channels.cache.find(item => item.name === group.channel && item.isTextBased?.());
     if (!channel) continue;
-    const lines = [];
+    const cards = [];
     for (let rank = group.min; rank <= group.max; rank += 1) {
       const entry = entries.find(([, row]) => Number(row.spot) === rank);
       if (!entry) {
-        lines.push(`## #${rank} — Vacant`);
+        cards.push(new EmbedBuilder()
+          .setColor(await paradiseBrandColor())
+          .setTitle(`#${rank} — Vacant`)
+          .setDescription("_This leaderboard position is available._"));
         continue;
       }
       const [userId, row] = entry;
-      const member = guild.members.cache.get(userId);
+      const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
       const profile = state.profiles?.[userId];
-      const stage = member ? fighterRank(member) : row.stage || "Unranked";
-      const status = openChallengeFor(state, userId, guild.id) ? "Being Challenged"
+      const storedRank = row.stageRank || profile?.stageRank;
+      const stage = member ? fighterRank(member)
+        : storedRank?.stage != null ? rankToRoleName(storedRank)
+          : row.stage || profile?.stage || "Unranked";
+      const activeTicket = openChallengeFor(state, userId, guild.id);
+      const status = activeTicket ? "Being Challenged"
+        : Number(row.availability?.loaUntil || 0) > Date.now() ? `LOA <t:${Math.floor(row.availability.loaUntil / 1000)}:R>`
         : Number(row.availability?.immunityUntil || 0) > Date.now() ? `Immune <t:${Math.floor(row.availability.immunityUntil / 1000)}:R>`
           : Number(row.availability?.cooldownUntil || 0) > Date.now() ? `Cooldown <t:${Math.floor(row.availability.cooldownUntil / 1000)}:R>`
             : "Challengeable";
-      lines.push(`## #${rank} — ${member?.displayName || profile?.robloxUsername || "Fighter"}\n<@${userId}> • Profile **#${profile?.profileId || "—"}**\n**${stage}** • ${profile?.region || "Region not set"}\n> ${status}`);
+      const card = new EmbedBuilder()
+        .setColor(await paradiseBrandColor())
+        .setTitle(`#${rank} — ${member?.displayName || profile?.robloxUsername || "Fighter"}`)
+        .setDescription(`<@${userId}>`)
+        .addFields(
+          { name: "Profile ID", value: `**#${profile?.profileId || "—"}**`, inline: true },
+          { name: "Roblox", value: `**${profile?.robloxUsername || "Not linked"}**`, inline: true },
+          { name: "Region", value: `**${profile?.region || row.region || "Not set"}**`, inline: true },
+          { name: "Stage / Level / Strength", value: `**${stage}**`, inline: false },
+          { name: "Status", value: `**${status}**`, inline: true },
+          { name: "Wins / Losses", value: `**${Number(row.wins || 0)} / ${Number(row.losses || 0)}**`, inline: true }
+        );
+      if (activeTicket) {
+        card.addFields({
+          name: "Active challenge",
+          value: `Ticket **#${activeTicket.ticketId || activeTicket.channelId || "open"}**`,
+          inline: true
+        });
+      }
+      const notes = String(row.notes || row.feats || profile?.notes || profile?.feats || "").trim();
+      if (notes) card.addFields({ name: "Notes / Feats", value: notes.slice(0, 900), inline: false });
+      const thumbnail = profile?.thumbnailUrl || profile?.avatarUrl || (profile?.robloxId ? await robloxHeadshot(profile.robloxId) : null);
+      if (thumbnail) card.setThumbnail(thumbnail);
+      cards.push(card);
     }
-    const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`♛ ${group.label}`)
-      .setDescription(`${lines.join("\n\n").slice(0, 4000)}\n\n-# Updated in place • Made by Paradise bot`)
-      .setTimestamp();
-    let message = messageIds[group.channel]
-      ? await channel.messages.fetch(messageIds[group.channel]).catch(() => null)
+    if (cards.length) cards[cards.length - 1].setFooter(paradiseFooter(`${group.label} • Updated in place`)).setTimestamp();
+    const storedMessageId = messageIds[group.messageKey]
+      || (group.min <= 21 ? messageIds[group.channel] : null);
+    let message = storedMessageId
+      ? await channel.messages.fetch(storedMessageId).catch(() => null)
       : null;
-    if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
-    messageIds[group.channel] = message.id;
+    if (message) await message.edit({ content: `# ♛ ${group.label}`, embeds: cards.slice(0, 10) });
+    else message = await channel.send({ content: `# ♛ ${group.label}`, embeds: cards.slice(0, 10) });
+    messageIds[group.messageKey] = message.id;
+    if (group.min <= 21) messageIds[group.channel] = message.id;
     posted.push({ channelId: channel.id, messageId: message.id, range: group.label });
   }
   await saveState(next => {
