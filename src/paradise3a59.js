@@ -1344,11 +1344,14 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
 }
 
 export async function runParadiseTestSmokeSuite(guild) {
+  let smokeStep = "guard";
+  try {
   if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
     const error = new Error("test_guild_only");
     error.code = "test_guild_only";
     throw error;
   }
+  smokeStep = "channel_lookup";
   const ownerId = guild.ownerId;
   const trainingChannel = await configuredChannel(guild, "training_channel", "training");
   const tryoutChannel = await configuredChannel(guild, "tryout_channel", "tryout");
@@ -1373,6 +1376,7 @@ export async function runParadiseTestSmokeSuite(guild) {
     new ButtonBuilder().setCustomId(`paradise_session_unlocked:${id}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`paradise_session_end:${id}`).setLabel(ending).setStyle(ButtonStyle.Danger)
   );
+  smokeStep = "training_send";
   const training = await smokeSend(trainingChannel, {
     content: [
       "# TRAINING",
@@ -1392,6 +1396,7 @@ export async function runParadiseTestSmokeSuite(guild) {
     components: [controls(trainingId, "END TRAINING")],
     allowedMentions: { users: [], roles: [], parse: [] }
   }, "smoke_training_send_failed");
+  smokeStep = "tryout_send";
   const tryout = await smokeSend(tryoutChannel, {
     content: [
       "# TRYOUT OPEN",
@@ -1421,6 +1426,7 @@ export async function runParadiseTestSmokeSuite(guild) {
     allowedMentions: { users: [], roles: [], parse: [] }
   }, "smoke_tryout_send_failed");
 
+  smokeStep = "lifecycle_send";
   await smokeSend(trainingChannel, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
   await smokeSend(trainingChannel, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
   await smokeSend(trainingChannel, "# TRAINING ENDED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
@@ -1441,6 +1447,7 @@ export async function runParadiseTestSmokeSuite(guild) {
     }
   };
   Object.values(sessions).forEach(session => activeTrainings.set(session.id, session));
+  smokeStep = "state_save";
   try {
     await saveState(state => {
       state.trainings = { ...state.trainings, ...sessions };
@@ -1451,11 +1458,13 @@ export async function runParadiseTestSmokeSuite(guild) {
     throw error;
   }
 
+  smokeStep = "welcome_leave";
   const owner = await guild.members.fetch(ownerId).catch(() => null);
   if (owner) {
     await sendMemberLifecycleMessage(owner, "join");
     await sendMemberLifecycleMessage(owner, "leave");
   }
+  smokeStep = "leaderboard";
   const leaderboardBoards = await updateRankedLeaderboardBoards(guild).catch(() => []);
   const result = {
     status: "LIVE DISCORD VERIFIED",
@@ -1467,8 +1476,16 @@ export async function runParadiseTestSmokeSuite(guild) {
     welcomeLeaveSimulation: Boolean(owner),
     leaderboardBoards
   };
+  smokeStep = "artifact";
   await writeArtifact("3a66-test-server-live-smoke-suite.json", result);
   return result;
+  } catch (error) {
+    if (typeof error.code === "string" && error.code.startsWith("smoke_")) throw error;
+    const wrapped = new Error(`smoke_${smokeStep}_failed`);
+    wrapped.code = `smoke_${smokeStep}_failed`;
+    wrapped.cause = error;
+    throw wrapped;
+  }
 }
 
 async function findRobloxUser(username) {
