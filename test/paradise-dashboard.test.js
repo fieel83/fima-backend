@@ -112,6 +112,7 @@ test("3A64 dashboard is split into twenty-one understandable operation pages", (
     "operations", "applications", "tickets", "moderation", "blacklist", "roster",
     "events", "voice", "xp", "guides", "branding", "logs", "advanced"
   ]);
+  for (const page of pages) assert.match(htmlSource, new RegExp(`data-page="${page}"`));
   for (const kind of ["staffOperations", "applications", "moderation", "events", "voice", "xp"]) {
     assert.match(htmlSource, new RegExp(`data-save="${kind}"`));
     assert.match(serverSource, new RegExp(`"${kind}"`));

@@ -97,6 +97,27 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
       </section>
 
       <section class="panel" data-page="setup">
+        <h2>Template Setup</h2>
+        <p class="help">Choose the selected server's structure. Safe actions create or repair managed resources without deleting existing channels or roles.</p>
+        <div class="template-cards">
+          <button class="template-card" data-setup-template="tsbtr"><strong>TSBTR setup</strong><span>Leaderboard, profiles, challenges, referee and hoster operations.</span></button>
+          <button class="template-card" data-setup-template="community"><strong>Fieel's Community</strong><span>Community, Fima support, events, applications, voice and XP without ranking systems.</span></button>
+          <button class="template-card" data-setup-template="clan"><strong>Paradise Clan</strong><span>Clan, roster, lineup, war, challenge, training and relations.</span></button>
+        </div>
+        <label for="setupTemplate">Selected template <span class="tip" title="The template is saved per managed server.">?</span></label>
+        <select id="setupTemplate"><option value="community">Fieel's Community</option><option value="clan">Paradise Clan</option><option value="tsbtr">TSBTR-style</option></select>
+        <button class="primary" id="saveSetupTemplate">Save selected template</button>
+        <div class="operation-actions setup-actions">
+          <button class="preview-action" id="setupPreviewAction">Preview setup</button>
+          <button class="success" id="setupCreateMissingAction">Create missing only</button>
+          <button class="secondary" id="setupRepostGuidesAction">Repost guides only</button>
+          <button class="secondary" id="setupRepairAction">Repair permissions</button>
+          <button class="primary" id="setupStartAction">Start setup</button>
+        </div>
+        <p class="help">Start setup opens a preview. Destructive rebuild remains in the separate Danger Zone and requires an exact typed Discord confirmation.</p>
+      </section>
+
+      <section class="panel" data-page="branding">
         <h2>Template & appearance</h2>
         <p class="help">Selecting a template here stores the owner preference. Destructive setup still requires backup, preview and Discord-side final confirmation.</p>
         <div class="template-cards">
@@ -602,8 +623,9 @@ async function load(){
   const identity=rt.botIdentity||{};byId('botChip').textContent='Bot: '+(rt.status==='ready'?(identity.nicknameMatches?'Paradise online':'name check needed'):'unavailable');byId('botChip').className='chip '+(rt.status==='ready'&&identity.nicknameMatches?'good':'bad');
   byId('syncChip').textContent='Commands: '+((rt.commandSync&&rt.commandSync.count)||0)+' · '+((rt.commandSync&&rt.commandSync.lastError)||'synced');byId('syncChip').className='chip '+(rt.commandSync&&rt.commandSync.lastError?'bad':'good');
   byId('templateChip').textContent='Template: '+(c.activeSetupMode||'not selected');
-  byId('template').value=c.activeSetupMode||'clan';byId('mainer').value=c.mainerCode||'';byId('quotas').value=JSON.stringify(c.weeklyQuotas||{},null,2);byId('channels').value=JSON.stringify(c.commandChannels||{},null,2);
+  byId('template').value=c.activeSetupMode||'clan';byId('setupTemplate').value=byId('template').value;byId('mainer').value=c.mainerCode||'';byId('quotas').value=JSON.stringify(c.weeklyQuotas||{},null,2);byId('channels').value=JSON.stringify(c.commandChannels||{},null,2);
   document.querySelectorAll('[data-template]').forEach(card=>card.classList.toggle('is-active',card.dataset.template===byId('template').value));
+  document.querySelectorAll('[data-setup-template]').forEach(card=>card.classList.toggle('is-active',card.dataset.setupTemplate===byId('setupTemplate').value));
   byId('autoChecks').checked=c.autoActivityChecks===true;byId('autoRemoval').checked=c.autoActivityRoleRemoval===true;
   const theme=["paradise","charcoal","midnight"].includes(c.dashboardTheme)?c.dashboardTheme:'paradise';const brand=/^#[0-9a-f]{6}$/i.test(c.brandColor||'')?c.brandColor.toUpperCase():THEMES[theme].accent;byId('brandPicker').value=brand.toLowerCase();byId('brandHex').value=brand;applyTheme(theme,brand);
   byId('messageDensity').value=c.messageDensity==='compact'?'compact':'comfortable';byId('separatorStyle').value=['line','minimal'].includes(c.separatorStyle)?c.separatorStyle:'diamond';byId('footerStyle').value=c.footerStyle==='compact'?'compact':'branded';byId('defaultLanguage').value=c.language==='tr'?'tr':'en';
@@ -693,11 +715,11 @@ function previewChallengeRange(){
   byId('challengeRangePreview').textContent='Top 1–10: '+r1+' upward • Top 11–20: '+r2+' upward • Top 21–'+size+': '+r3+' upward • Unranked → #'+bottom+'/#'+size+' • minimum Stage '+byId('unrankedMinimumStage').value+' '+byId('unrankedMinimumLevel').value+' '+byId('unrankedMinimumStrength').value;
 }
 async function repostGuides(mode){if(!confirm('Repost or update the '+mode+' guide messages in the selected Discord server?'))return;try{const{response,result}=await mutate('/api/paradise/actions/repost-guides',{mode,guildId:selectedGuildId});if(!response.ok){show(result.error||'Guide repost failed',false);return}show('Updated '+result.posted+' guide messages');await load()}catch{show('Guide repost failed safely.',false)}}
-async function createMissingTemplate(repairPermissions){
+async function createMissingTemplate(repairPermissions,buttonOverride=null){
   const mode=byId('template').value;
   const action=repairPermissions?'create missing channels/roles and repair managed permissions':'create missing channels/roles only';
   if(!confirm('This test-server action will '+action+'. It will not delete existing resources. Continue?'))return;
-  const button=repairPermissions?byId('repairSelectedPermissions'):byId('createMissingSetup');
+  const button=buttonOverride||(repairPermissions?byId('repairSelectedPermissions'):byId('createMissingSetup'));
   const original=button.textContent;button.disabled=true;button.textContent='Working…';
   try{
     const{response,result}=await mutate('/api/paradise/actions/create-missing',{mode,guildId:selectedGuildId,repairPermissions});
@@ -728,6 +750,7 @@ async function runManagedOperation(kind){
 byId('brandPicker').oninput=e=>{const v=e.target.value.toUpperCase();byId('brandHex').value=v;applyBrand(v);markDirty()};byId('brandHex').oninput=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value)){byId('brandPicker').value=e.target.value;applyBrand(e.target.value);markDirty()}};
 byId('previewBrand').onclick=()=>{const value=byId('brandHex').value;if(!/^#[0-9a-f]{6}$/i.test(value))return show('Use a valid HEX color such as #000000',false);applyBrand(value);byId('brandPreview').scrollIntoView({behavior:'smooth',block:'center'})};
 document.querySelectorAll('[data-template]').forEach(card=>card.onclick=()=>{byId('template').value=card.dataset.template;document.querySelectorAll('[data-template]').forEach(item=>item.classList.toggle('is-active',item===card))});
+document.querySelectorAll('[data-setup-template]').forEach(card=>card.onclick=()=>{byId('setupTemplate').value=card.dataset.setupTemplate;byId('template').value=card.dataset.setupTemplate;document.querySelectorAll('[data-setup-template]').forEach(item=>item.classList.toggle('is-active',item===card));markDirty()});
 document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset.save));document.querySelectorAll('[data-guide-mode]').forEach(b=>b.onclick=()=>repostGuides(b.dataset.guideMode));byId('refresh').onclick=load;
 document.querySelectorAll('[data-theme]').forEach(button=>button.onclick=()=>{currentTheme=button.dataset.theme;const accent=byId('brandHex').value||THEMES[currentTheme].accent;applyTheme(currentTheme,accent);markDirty()});
 document.querySelectorAll('[data-page-button]').forEach(button=>button.onclick=()=>showPage(button.dataset.pageButton));
@@ -739,6 +762,12 @@ byId('startSelectedSetup').onclick=()=>runManagedOperation('preview');
 byId('createMissingSetup').onclick=()=>createMissingTemplate(false);
 byId('repairSelectedPermissions').onclick=()=>createMissingTemplate(true);
 byId('repostSelectedGuides').onclick=()=>repostGuides(byId('template').value);
+byId('saveSetupTemplate').onclick=()=>{byId('template').value=byId('setupTemplate').value;save('template')};
+byId('setupPreviewAction').onclick=()=>runManagedOperation('preview');
+byId('setupStartAction').onclick=()=>runManagedOperation('preview');
+byId('setupCreateMissingAction').onclick=()=>createMissingTemplate(false,byId('setupCreateMissingAction'));
+byId('setupRepairAction').onclick=()=>createMissingTemplate(true,byId('setupRepairAction'));
+byId('setupRepostGuidesAction').onclick=()=>repostGuides(byId('setupTemplate').value);
 byId('autoDetectChannels').onclick=autoDetectChannels;byId('previewChallengeRange').onclick=previewChallengeRange;
 document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};
