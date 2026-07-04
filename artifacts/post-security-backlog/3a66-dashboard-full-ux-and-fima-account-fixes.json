@@ -1,0 +1,22 @@
+{
+  "status": "DASHBOARD VERIFIED",
+  "ownerOnly": true,
+  "fimaLoginRequired": true,
+  "linkedDiscordOwnerCheck": true,
+  "serverSelector": true,
+  "realPages": 21,
+  "searchableChannelSelectors": true,
+  "searchableRoleSelectors": true,
+  "autoDetect": true,
+  "themeSelector": true,
+  "accentSelector": true,
+  "turkishEnglishSelector": true,
+  "customScrollbar": true,
+  "animatedBackground": true,
+  "csrfRefreshRetry": true,
+  "testServerLiveSmokeButton": true,
+  "accountEyeButton": {
+    "username": "works when the signed-in account payload contains the value",
+    "email": "BLOCKED — the public account API intentionally returns a masked email; it was not weakened without a step-up authentication design"
+  }
+}

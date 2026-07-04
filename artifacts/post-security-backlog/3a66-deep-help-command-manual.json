@@ -1,0 +1,14 @@
+{
+  "status": "SOURCE ONLY",
+  "categoryCount": 25,
+  "search": "/help query:<command or system>",
+  "languages": ["English", "Türkçe"],
+  "delivery": "Ephemeral interactive select menu with language buttons.",
+  "implementedCategories": [
+    "Community", "Clan", "TSBTR", "Staff", "Moderator", "Referee", "Training Hoster", "Tryout Hoster",
+    "Giveaway / Event", "Tickets", "Applications", "Voice / Join-to-Create", "XP / Levels", "Dashboard",
+    "Member / Profile / Verify", "Challenge", "Leaderboard", "Roster / Lineup", "Security / Logs"
+  ],
+  "roadmapCategoriesClearlyMarkedNotLive": ["Auto Responder", "AI Assistant", "Social Feeds", "Custom Commands", "Premium", "Music / Audio"],
+  "safety": "The manual does not advertise roadmap commands as live commands."
+}

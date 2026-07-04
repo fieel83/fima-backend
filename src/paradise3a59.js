@@ -419,7 +419,8 @@ export function paradiseCommands() {
     new SlashCommandBuilder().setName("setupfieelstsbtr").setDescription("Preview, repair or repost the TSBTR-style setup.")
       .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addStringOption(setupAction),
-    new SlashCommandBuilder().setName("help").setDescription("Open the Paradise Community or Clan command guide."),
+    new SlashCommandBuilder().setName("help").setDescription("Open or search the complete Paradise command manual.")
+      .addStringOption(option => option.setName("query").setDescription("Optional command or system to search for").setRequired(false)),
     new SlashCommandBuilder().setName("sendlanguagequestion").setDescription("Post English/Turkish language buttons."),
     new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post Paradise notification-role selector."),
     new SlashCommandBuilder().setName("backupserverstructure").setDescription("Back up channels, roles and permission overwrites.")
@@ -4113,6 +4114,61 @@ const HELP_CATEGORIES = Object.freeze({
     label: "Dashboard",
     en: "# Paradise Operations Console\n1. Select a managed server.\n2. Select its template.\n3. Auto-detect/remap channels and roles.\n4. Preview before create/repair/repost actions.\n5. Destructive rebuild always requires backup and typed confirmation.\n\n-# Owner-only: https://fimamacro.com/paradise",
     tr: "# Paradise Operations Console\n1. Yönetilecek sunucuyu seçin.\n2. Şablonunu seçin.\n3. Kanal/rolleri otomatik algılayın veya eşleyin.\n4. Create/repair/repost öncesi preview alın.\n5. Yıkıcı rebuild her zaman yedek ve yazılı onay ister.\n\n-# Yalnızca owner: https://fimamacro.com/paradise"
+  },
+  profile: {
+    label: "Member / Profile / Verify",
+    en: "# Member, Profile & Roblox Verification\n- `/help query:profile` — search this manual\n- `/profile create` — start the short Roblox-safe verification flow\n- `/profile view profile_id:<id>`\n- `/profile view user:@user`\n- `/profile view user_id:<discord id>`\n- `/profile view roblox_name:<name>`\n- `/rank` — view chat/voice XP\n\nDuplicate profiles are blocked. A completed profile is required for challenge and controlled result flows.",
+    tr: "# Üye, Profil ve Roblox Doğrulama\n- `/help query:profile` — bu rehberde arama\n- `/profile create` — kısa, Roblox-güvenli doğrulamayı başlat\n- `/profile view profile_id:<id>`\n- `/profile view user:@user`\n- `/profile view user_id:<discord id>`\n- `/profile view roblox_name:<ad>`\n- `/rank` — chat/ses XP bilgisini göster\n\nAynı kişi için ikinci profil engellenir. Challenge ve kontrollü sonuçlar için tamamlanmış profil gerekir."
+  },
+  challenge: {
+    label: "Challenge",
+    en: "# Challenge System\n- `/challenge create` — show only currently eligible targets\n- `/challenge post winner:@user loser:@user score:10-5`\n- `/autowin winner:@user reason:Dodged` — inside the ticket\n\nThe bot rechecks range, profile, cooldown, immunity and open tickets immediately before creation. Enter only the score; Paradise formats the winner wording.",
+    tr: "# Challenge Sistemi\n- `/challenge create` — yalnızca o anda uygun rakipleri gösterir\n- `/challenge post winner:@user loser:@user score:10-5`\n- `/autowin winner:@user reason:Dodged` — ticket içinde\n\nBot açmadan hemen önce range, profil, cooldown, immunity ve açık ticket kontrolünü tekrarlar. Yalnızca skoru girin; kazanan metnini Paradise yazar."
+  },
+  leaderboard: {
+    label: "Leaderboard",
+    en: "# Ranked Leaderboard\n- `/leaderboard panel` or `/leaderboard repost`\n- `/leaderboard add user:@user rank:25`\n- `/leaderboard move user:@user rank:20`\n- `/leaderboard swap user1:@a user2:@b`\n- `/leaderboard import|export`\n\nCards show full Stage + Level + Strength and update in place. Duplicate ranks are rejected.",
+    tr: "# Rank Sıralaması\n- `/leaderboard panel` veya `/leaderboard repost`\n- `/leaderboard add user:@user rank:25`\n- `/leaderboard move user:@user rank:20`\n- `/leaderboard swap user1:@a user2:@b`\n- `/leaderboard import|export`\n\nKartlar tam Stage + Level + Strength gösterir ve yerinde güncellenir. Aynı rank iki kez kullanılamaz."
+  },
+  roster: {
+    label: "Roster / Lineup",
+    en: "# Roster & Lineups\n- `/lineup panel|repost`\n- `/lineup add board:main user:@user role:Starter`\n- `/lineup move`, `/lineup remove`, `/lineup clear`\n- `/roster add|remove|update|repost`\n- `/mainer proof add|approve|deny`\n\nBoard message IDs are stored so updates edit the existing board instead of spamming.",
+    tr: "# Roster ve Kadrolar\n- `/lineup panel|repost`\n- `/lineup add board:main user:@user role:Starter`\n- `/lineup move`, `/lineup remove`, `/lineup clear`\n- `/roster add|remove|update|repost`\n- `/mainer proof add|approve|deny`\n\nPano mesaj ID'leri saklanır; güncellemeler yeni mesaj spamı yerine mevcut panoyu düzenler."
+  },
+  security: {
+    label: "Security / Logs",
+    en: "# Moderation Security\n- `/mod warn`, `/mod mute`\n- `/mod kick-request`, `/mod ban-request`\n- `/mod quarantine`, `/mod unquarantine`\n- `/mod lockdown`, `/mod raidmode`\n- `/security panel`\n\nLower staff submit approval requests. Paradise enforces role hierarchy and records audited actions.",
+    tr: "# Moderasyon Güvenliği\n- `/mod warn`, `/mod mute`\n- `/mod kick-request`, `/mod ban-request`\n- `/mod quarantine`, `/mod unquarantine`\n- `/mod lockdown`, `/mod raidmode`\n- `/security panel`\n\nAlt staff onay talebi açar. Paradise rol hiyerarşisini uygular ve işlemleri loglar."
+  },
+  autoresponder: {
+    label: "Auto Responder",
+    en: "# Auto Responder\n**Status:** roadmap — not enabled on this server yet.\n\nPlanned controls: channel/role filters, cooldowns, variables, safe exact/contains matching and dashboard previews. No fake commands are advertised until the module is live.",
+    tr: "# Otomatik Yanıt\n**Durum:** yol haritası — bu sunucuda henüz aktif değil.\n\nPlanlanan kontroller: kanal/rol filtreleri, cooldown, değişkenler, güvenli exact/contains eşleşmesi ve dashboard preview. Modül canlı olmadan sahte komut gösterilmez."
+  },
+  ai: {
+    label: "AI Assistant",
+    en: "# Safe AI Assistant\n**Status:** roadmap — disabled until an approved knowledge base and provider are configured.\n\nIt will be opt-in, channel-limited, rate-limited and escalate uncertain answers to staff tickets.",
+    tr: "# Güvenli AI Asistanı\n**Durum:** yol haritası — onaylı bilgi tabanı ve sağlayıcı ayarlanana kadar kapalı.\n\nOpt-in, kanal sınırlı ve rate-limitli olacak; emin olmadığı cevapları staff ticket'a yönlendirecek."
+  },
+  social: {
+    label: "Social Feeds",
+    en: "# Social Feeds\n**Status:** roadmap. Only official APIs, RSS or webhooks will be supported. Private scraping, passwords and bypasses are forbidden.",
+    tr: "# Sosyal Akışlar\n**Durum:** yol haritası. Yalnızca resmi API, RSS veya webhook desteklenecek. Özel scraping, şifre ve bypass yasaktır."
+  },
+  custom: {
+    label: "Custom Commands",
+    en: "# Custom Commands\n**Status:** roadmap. The planned builder will enforce cooldowns, permissions, mention limits and Discord role hierarchy before any role action.",
+    tr: "# Özel Komutlar\n**Durum:** yol haritası. Planlanan oluşturucu rol işlemlerinden önce cooldown, yetki, mention sınırı ve Discord rol hiyerarşisini uygulayacak."
+  },
+  premium: {
+    label: "Premium",
+    en: "# Paradise Premium\n**Status:** planning only. Billing is not enabled. Free/Starter/Pro/Ultimate feature boundaries will be published only after owner approval.",
+    tr: "# Paradise Premium\n**Durum:** yalnızca planlama. Ödeme açık değil. Free/Starter/Pro/Ultimate özellik sınırları owner onayından sonra yayınlanacak."
+  },
+  music: {
+    label: "Music / Audio",
+    en: "# Music / Audio\n**Status:** blocked until a licensed/legal provider is configured. Paradise will not rip YouTube or Spotify audio and will not use circumvention tools.",
+    tr: "# Müzik / Ses\n**Durum:** lisanslı/yasal sağlayıcı ayarlanana kadar kapalı. Paradise YouTube veya Spotify sesi rip etmeyecek ve bypass aracı kullanmayacak."
   }
 });
 
@@ -4143,6 +4199,23 @@ function helpComponents(scope = "clan") {
 
 async function handleHelp(interaction) {
   const turkish = String(interaction.locale || "").toLowerCase().startsWith("tr");
+  const query = interaction.options.getString("query")?.trim().toLowerCase();
+  if (query) {
+    const matches = Object.entries(HELP_CATEGORIES).filter(([, item]) =>
+      `${item.label} ${item.en} ${item.tr}`.toLowerCase().includes(query)
+    ).slice(0, 12);
+    const description = matches.length
+      ? matches.map(([key, item]) => "- **" + item.label + "** — `" + key + "`").join("\n")
+      : turkish ? "Eşleşen komut veya sistem bulunamadı." : "No matching command or system was found.";
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor())
+        .setTitle(turkish ? `✦ YARDIM ARAMASI: ${query}` : `✦ HELP SEARCH: ${query}`)
+        .setDescription(`${description}\n\n-# ${turkish ? "Aşağıdaki menüden ilgili kategoriyi açın." : "Open the matching category from the menu below."}`)
+        .setFooter(paradiseFooter("Searchable command directory"))],
+      components: helpComponents(matches[0]?.[0] || "profile"),
+      ephemeral: true
+    });
+  }
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ WHAT DO YOU NEED HELP WITH?")
       .setDescription(turkish

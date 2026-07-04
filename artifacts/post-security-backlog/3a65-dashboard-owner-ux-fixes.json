@@ -1,0 +1,37 @@
+{
+  "status": "DASHBOARD VERIFIED",
+  "ownerUrl": "https://fimamacro.com/paradise",
+  "pages": 21,
+  "implemented": [
+    "top server selector",
+    "per-server template selector",
+    "real page navigation",
+    "searchable channel datalists with category names",
+    "searchable role datalists with hierarchy positions",
+    "auto-detect channel suggestions",
+    "setup preview",
+    "create missing only",
+    "repair permissions",
+    "repost guides only",
+    "test-server typed destructive confirmation",
+    "custom scrollbar",
+    "animated charcoal/purple background",
+    "primary, secondary, audit, backup, preview and danger button hierarchy",
+    "CSRF refresh-and-retry once",
+    "save toasts",
+    "unsaved-change indicator",
+    "Paradise, charcoal and midnight themes",
+    "accent color preview and persistence"
+  ],
+  "turkishUxFix": {
+    "comfortable": "Rahat görünüm",
+    "compact": "Sıkı görünüm",
+    "channelSearch": "Kanal adı yazıp arayın…",
+    "roleSearch": "Rol adı yazıp arayın…",
+    "expandedLabelsAndButtons": true
+  },
+  "remaining": [
+    "The account-dashboard email reveal remains masked by the backend privacy model; no weaker reveal endpoint was introduced.",
+    "The visual leaderboard editor is still SOURCE ONLY."
+  ]
+}

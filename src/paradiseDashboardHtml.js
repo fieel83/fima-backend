@@ -504,14 +504,39 @@ const UI_TR={
   'Fima login required':'Fima girişi gerekli','Discord account required':'Discord hesabı gerekli','Paradise access is restricted':'Paradise erişimi kısıtlı',
   'Session check unavailable':'Oturum kontrolü kullanılamıyor','Sign in to Fima':'Fima hesabına giriş yap','Link Discord account':'Discord hesabını bağla',
   'Account settings':'Hesap ayarları','Review linked accounts':'Bağlı hesapları kontrol et','Try again':'Tekrar dene'
+  ,'Managed server':'Yönetilen sunucu','Panel language':'Panel dili','Selected template':'Seçili şablon','Active template':'Aktif şablon'
+  ,'Message density':'Mesaj yoğunluğu','Comfortable':'Rahat görünüm','Compact':'Sıkı görünüm','Default language':'Varsayılan dil'
+  ,'Save selected template':'Seçili şablonu kaydet','Preview setup':'Kurulumu önizle','Create missing only':'Yalnızca eksikleri oluştur'
+  ,'Repost guides only':'Yalnızca rehberleri yenile','Repair permissions':'Yetkileri onar','Start setup':'Kurulumu başlat'
+  ,'Wipe and rebuild selected test template':'Seçili test şablonunu sil ve yeniden kur','Run live test suite':'Canlı test paketini çalıştır'
+  ,'Preview panels before save':'Kaydetmeden önce panelleri önizle','Save and repost panel':'Kaydet ve paneli yenile','Open channel in Discord':'Kanalı Discord’da aç'
+  ,'Leaderboard size':'Sıralama boyutu','Normal cooldown days':'Normal bekleme günü','Normal immunity days':'Normal dokunulmazlık günü'
+  ,'Require proof on configured challenge results':'Ayarlı challenge sonuçlarında kanıt zorunlu','Board density':'Pano yoğunluğu'
+  ,'All settings loaded':'Tüm ayarlar yüklendi','Unsaved changes':'Kaydedilmemiş değişiklikler','Type to search channels…':'Kanal adı yazıp arayın…'
+  ,'Type to search roles…':'Rol adı yazıp arayın…','Not configured':'Ayarlanmadı','Safe name fallback':'Güvenli isim yedeği'
 };
+function translateDirectText(element,lang){
+  const node=[...element.childNodes].find(item=>item.nodeType===3&&item.nodeValue.trim());if(!node)return;
+  if(!element.dataset.enDirectText)element.dataset.enDirectText=node.nodeValue.trim();
+  const source=element.dataset.enDirectText;const value=lang==='tr'?(UI_TR[source]||source):source;
+  node.nodeValue=node.nodeValue.replace(node.nodeValue.trim(),value);
+}
 function applyUiLanguage(language){
   const lang=language==='en'?'en':'tr';document.documentElement.lang=lang;try{localStorage.setItem('paradiseUiLanguage',lang)}catch{}
-  document.querySelectorAll('h1,h2,h3,button,nav small').forEach(element=>{
+  document.querySelectorAll('h1,h2,h3,button,nav small,.help,.muted').forEach(element=>{
     if(element.childElementCount)return;
     if(!element.dataset.enText)element.dataset.enText=element.textContent.trim();
     element.textContent=lang==='tr'?(UI_TR[element.dataset.enText]||element.dataset.enText):element.dataset.enText;
   });
+  document.querySelectorAll('label,option').forEach(element=>translateDirectText(element,lang));
+  document.querySelectorAll('input[placeholder]').forEach(element=>{
+    if(!element.dataset.enPlaceholder)element.dataset.enPlaceholder=element.placeholder;
+    element.placeholder=lang==='tr'?(UI_TR[element.dataset.enPlaceholder]||element.dataset.enPlaceholder):element.dataset.enPlaceholder;
+  });
+  if(byId('saveState')){
+    const dirty=byId('saveState').style.color!=='var(--good)';
+    byId('saveState').textContent=lang==='tr'?(dirty?'Kaydedilmemiş değişiklikler':'Tüm ayarlar yüklendi'):(dirty?'Unsaved changes':'All settings loaded');
+  }
 }
 function show(message,ok=true){const el=byId('toast');el.className='toast '+(ok?'ok':'error');el.textContent=message;setTimeout(()=>el.className='toast',4500)}
 function hexToRgb(value){const match=/^#([0-9a-f]{6})$/i.exec(value);if(!match)return'139,92,246';const n=parseInt(match[1],16);return[(n>>16)&255,(n>>8)&255,n&255].join(',')}
@@ -519,7 +544,7 @@ function applyBrand(value){document.documentElement.style.setProperty('--brand',
 const THEMES={paradise:{bg:'#0d0914',panel:'#171121',line:'#392b4e',accent:'#8B5CF6'},charcoal:{bg:'#101114',panel:'#1a1c21',line:'#383c45',accent:'#8B8FA3'},midnight:{bg:'#070d1b',panel:'#101a2d',line:'#273b5c',accent:'#4F8CFF'}};
 function applyTheme(name,accent){const theme=THEMES[name]||THEMES.paradise;currentTheme=name;for(const [key,value] of Object.entries(theme)){if(key!=='accent')document.documentElement.style.setProperty('--'+key,value)}applyBrand(accent||theme.accent);document.querySelectorAll('[data-theme]').forEach(button=>button.classList.toggle('is-active',button.dataset.theme===name))}
 function setLoading(active){byId('loadingState').hidden=!active}
-function markDirty(){byId('saveState').textContent='Unsaved changes';byId('saveState').className='dirty'}
+function markDirty(){byId('saveState').textContent=byId('uiLanguage')?.value==='tr'?'Kaydedilmemiş değişiklikler':'Unsaved changes';byId('saveState').className='dirty';byId('saveState').style.color='var(--warn)'}
 async function csrfToken(force=false){
   if(force)csrfPromise=null;
   if(!csrfPromise)csrfPromise=fetch(API_BASE+'/api/csrf-token',{credentials:'include',headers:{accept:'application/json'},cache:'no-store'}).then(async response=>{const body=await response.json().catch(()=>({}));if(!response.ok||!body.csrfToken)throw new Error('csrf_unavailable');return body.csrfToken});
