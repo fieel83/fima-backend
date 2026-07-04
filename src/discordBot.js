@@ -18,6 +18,7 @@ import {
   paradiseCommands,
   publishParadiseGuidesFromDashboard,
   rebuildParadiseTestTemplate,
+  runParadiseAutoSmokeOnce,
   runParadiseTestSmokeSuite,
   syncParadiseMappedPanels
 } from "./paradise3a59.js";
@@ -359,6 +360,21 @@ export function startDiscordBot() {
       });
     }, 5_000);
     auditTimer.unref?.();
+    const smokeTimer = setTimeout(() => {
+      const guild = client.guilds.cache.get("1520519015661961257");
+      if (!guild) return;
+      runParadiseAutoSmokeOnce(guild).then(result => {
+        console.info("Paradise test-lab smoke status", {
+          skipped: Boolean(result?.skipped),
+          reason: result?.reason || null,
+          revision: result?.revision || null
+        });
+      }).catch(error => {
+        lastError = error.message;
+        console.warn("Paradise test-lab smoke failed", { message: error.message });
+      });
+    }, 12_000);
+    smokeTimer.unref?.();
   });
 
   client.on("interactionCreate", (interaction) => {

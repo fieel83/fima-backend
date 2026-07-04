@@ -11,6 +11,7 @@ import {
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
+const PARADISE_AUTO_SMOKE_REVISION = "3a66-workflow-panels-v1";
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
 const APPLICATION_TYPES = Object.freeze([
@@ -1615,6 +1616,29 @@ export async function runParadiseTestSmokeSuite(guild) {
     wrapped.cause = error;
     throw wrapped;
   }
+}
+
+export async function runParadiseAutoSmokeOnce(guild) {
+  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) return { skipped: true, reason: "test_guild_only" };
+  const state = await loadState();
+  if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
+    return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
+  }
+  const result = await runParadiseTestSmokeSuite(guild);
+  await saveState(next => {
+    next.securityState[guild.id] = {
+      ...(next.securityState[guild.id] || {}),
+      lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
+      lastAutoSmokeAt: new Date().toISOString(),
+      lastAutoSmokeResult: {
+        trainingMessageId: result.training?.messageId || null,
+        tryoutMessageId: result.tryout?.messageId || null,
+        supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null
+      }
+    };
+    return next;
+  });
+  return { skipped: false, revision: PARADISE_AUTO_SMOKE_REVISION, result };
 }
 
 async function findRobloxUser(username) {
