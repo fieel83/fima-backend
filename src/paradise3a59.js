@@ -11,7 +11,7 @@ import {
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
-const PARADISE_AUTO_SMOKE_REVISION = "3a67-visual-footer-smoke-v2";
+const PARADISE_AUTO_SMOKE_REVISION = "3a67-blacklist-permission-smoke-v3";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -1743,7 +1743,29 @@ export async function runParadiseAutoSmokeOnce(guild) {
   if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
     return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
   }
+  const repair = await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
   const result = await runParadiseTestSmokeSuite(guild);
+  const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
+  const appealChannel = guild.channels.cache.find(channel =>
+    ["ban-appeal", "blacklist-appeal"].includes(channel.name) && channel.isTextBased?.()
+  );
+  const staffReviewChannels = [...guild.channels.cache.values()].filter(channel =>
+    ["unblacklist", "bail-review", "blacklist-logs"].includes(channel.name) && channel.isTextBased?.()
+  );
+  const everyoneAppealOverwrite = appealChannel?.permissionOverwrites?.cache?.get(guild.roles.everyone.id);
+  const blacklistedAppealOverwrite = blacklistedRole
+    ? appealChannel?.permissionOverwrites?.cache?.get(blacklistedRole.id)
+    : null;
+  const blacklistPermissionReady = Boolean(
+    blacklistedRole
+    && appealChannel
+    && everyoneAppealOverwrite?.deny?.has(PermissionsBitField.Flags.ViewChannel)
+    && blacklistedAppealOverwrite?.allow?.has(PermissionsBitField.Flags.ViewChannel)
+    && staffReviewChannels.length >= 2
+    && staffReviewChannels.every(channel =>
+      channel.permissionOverwrites.cache.get(guild.roles.everyone.id)?.deny?.has(PermissionsBitField.Flags.ViewChannel)
+    )
+  );
   await saveState(next => {
     next.securityState[guild.id] = {
       ...(next.securityState[guild.id] || {}),
@@ -1757,12 +1779,23 @@ export async function runParadiseAutoSmokeOnce(guild) {
         supportPanelReady: Boolean(result.workflowPanels?.support),
         moderationPanelReady: Boolean(result.workflowPanels?.moderation),
         securityPanelReady: Boolean(result.workflowPanels?.security),
-        xpPanelReady: Boolean(result.workflowPanels?.xp)
+        xpPanelReady: Boolean(result.workflowPanels?.xp),
+        repairCreatedChannels: Number(repair?.created?.channels || 0),
+        repairCreatedRoles: Number(repair?.created?.roles || 0),
+        blacklistedRoleReady: Boolean(blacklistedRole),
+        blacklistPermissionReady
       }
     };
     return next;
   });
-  return { skipped: false, revision: PARADISE_AUTO_SMOKE_REVISION, result };
+  return {
+    skipped: false,
+    revision: PARADISE_AUTO_SMOKE_REVISION,
+    repair,
+    blacklistedRoleReady: Boolean(blacklistedRole),
+    blacklistPermissionReady,
+    result
+  };
 }
 
 export async function paradiseTestLabStatus() {
@@ -1780,7 +1813,11 @@ export async function paradiseTestLabStatus() {
     supportPanelReady: result.supportPanelReady === true,
     moderationPanelReady: result.moderationPanelReady === true,
     securityPanelReady: result.securityPanelReady === true,
-    xpPanelReady: result.xpPanelReady === true
+    xpPanelReady: result.xpPanelReady === true,
+    blacklistedRoleReady: result.blacklistedRoleReady === true,
+    blacklistPermissionReady: result.blacklistPermissionReady === true,
+    repairCreatedChannels: Number(result.repairCreatedChannels || 0),
+    repairCreatedRoles: Number(result.repairCreatedRoles || 0)
   };
 }
 

@@ -2,7 +2,7 @@
   "priority": "3A67",
   "status": "LIVE VERIFIED",
   "createdAt": "2026-07-04",
-  "targetSmokeRevision": "3a67-visual-footer-smoke-v2",
+  "targetSmokeRevision": "3a67-blacklist-permission-smoke-v3",
   "changesExpectedInSmoke": [
     "Footer text defaults to Made By Fieel",
     "Training smoke post remains plain Markdown and uses readable bullet rules",
