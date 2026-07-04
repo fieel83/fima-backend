@@ -1,6 +1,6 @@
 {
   "priority": "3A67",
-  "status": "SOURCE ONLY",
+  "status": "LIVE VERIFIED",
   "existingSafeState": {
     "Paradise | Türkiye": {
       "backup": true,
@@ -17,6 +17,13 @@
       "preview": true,
       "confirmation": "REBUILD TSBTR YEDEK"
     }
+  },
+  "liveChromeVerification": {
+    "Paradise | Türkiye": "Existing clan layout is visible with tickets, boosts, events, training/tryout, wars, main-line and roster channels.",
+    "Fieel's Community": "Existing layout is community/Fima oriented with rules, joins, announcements, updates, uploads, Fieel info, reaction roles, Fima Macro, support, social and voice channels. No ranking/challenge structure was observed in the visible list.",
+    "TSBTR Yedek": "Existing rules, role-guide, welcome, blacklist, announcements, applications, tickets, events, tryouts and general channels were visible. The rules channel opened at its beginning and contained no posted rule panel.",
+    "privacy": "Read-only inspection only. No user-account message or destructive Discord action was performed.",
+    "limit": "This is a live structure check, not a claim that every channel history, pin and old message was read."
   },
   "destructiveRebuildExecuted": false,
   "rule": "Main servers remain unchanged until the matching exact typed owner confirmation is received."

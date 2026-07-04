@@ -9,6 +9,18 @@
     "Owner-only authorization checks"
   ],
   "blockedVerification": "A usable owner-authenticated browser session was not exercised in this continuation, so save/reload/CSRF and visual page-by-page proof are not claimed.",
+  "loggedOutRouteVerification": {
+    "status": "DASHBOARD VERIFIED",
+    "dashboardUrl": "https://fimamacro.com/paradise",
+    "behavior": "A normal browser navigation opens the Fima login-required page instead of raw unauthorized JSON.",
+    "sessionStatus": {
+      "authenticated": false,
+      "discordLinked": false,
+      "ownerAuthorized": false,
+      "csrfReady": false,
+      "reasonCode": "login_required"
+    }
+  },
   "requiredNextProof": [
     "Owner login",
     "Select each managed server",

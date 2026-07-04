@@ -1,8 +1,8 @@
 {
   "priority": "3A67",
   "status": "LIVE VERIFIED",
-  "verifiedCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
-  "testLabRoleCount": 87,
+  "verifiedCommit": "8a0e16f8f600a605bc1b612ebeb3dd7888e1f57b",
+  "testLabRoleCount": 164,
   "groups": [
     "Owner Rank",
     "Administration",
@@ -17,10 +17,16 @@
     "Top Players",
     "Stage / Level / Strength"
   ],
-  "newPendingChange": {
-    "status": "LIVE VERIFIED",
+  "blacklistRoleVerification": {
+    "status": "LIVE DISCORD VERIFIED",
     "role": "BLACKLISTED",
     "purpose": "Restrict blacklisted members to appeal information while keeping internal resolution channels staff-only.",
-    "executionNote": "Code is deployed; existing guild permission overwrites are applied on the next safe repair/create-missing/setup run."
+    "testLabPermissionReady": true,
+    "mainServerExecutionNote": "Main-server role and overwrite changes remain gated behind backup, preview and typed confirmation."
+  },
+  "idempotency": {
+    "repairCreatedChannels": 0,
+    "repairCreatedRoles": 0,
+    "duplicateCreationDetected": false
   }
 }

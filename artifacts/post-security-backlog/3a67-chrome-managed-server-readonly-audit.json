@@ -1,0 +1,58 @@
+{
+  "priority": "3A67",
+  "status": "CHROME READ VERIFIED",
+  "checkedAt": "2026-07-04",
+  "method": "Owner's existing Chrome Discord session, screenshot-based read-only inspection. No messages were sent and no server settings were changed.",
+  "servers": {
+    "Paradise | Türkiye": {
+      "verified": true,
+      "visibleSystems": [
+        "challenge and mod report tickets",
+        "boosts and perks",
+        "advertisement, Roblox group, capes and outfits",
+        "game nights, giveaways, events, training, tryouts and raids",
+        "wars, war-line-chat, scores, main-line, EU rosters, roster logs and mainer",
+        "English and Turkish general chat"
+      ],
+      "classification": "Existing clan/mixed structure; requires backup and owner-approved rebuild before replacement."
+    },
+    "Fieel's Community": {
+      "verified": true,
+      "visibleSystems": [
+        "rules and joins",
+        "announcements, updates, uploads and Fieel info",
+        "reaction roles",
+        "Fima Macro/product area",
+        "support",
+        "outfits and capes",
+        "stage and voice channels"
+      ],
+      "classification": "Community/Fima structure. No visible challenge, ranking or roster channels; this supports keeping the Community template free of those systems by default."
+    },
+    "TSBTR Yedek": {
+      "verified": true,
+      "visibleSystems": [
+        "server link/reference channels",
+        "rules, role guide, welcome and blacklist",
+        "announcements, applications, reaction roles, memories, polls, boosts and update log",
+        "support and challenge ticket channels",
+        "game nights and giveaways",
+        "tryouts, tryout results and training",
+        "general, media and bot commands"
+      ],
+      "channelOpened": "rules",
+      "channelFinding": "The rules channel was opened at its beginning and no rule panel/message was present.",
+      "classification": "Incomplete backup/ranking-community structure that needs guide and panel installation after explicit rebuild confirmation."
+    }
+  },
+  "privacy": {
+    "privateConversationContentStored": false,
+    "rawMessageDumpStored": false,
+    "userAccountActionsPerformed": false
+  },
+  "limits": [
+    "Discord's accessibility DOM snapshot failed in the connected Chrome integration, so verification used small screenshot-based reads.",
+    "A full upward scroll of every important channel and every pinned message is not claimed.",
+    "Reference screenshots supplied by the owner remain OWNER PROVIDED REFERENCE unless separately verified here."
+  ]
+}

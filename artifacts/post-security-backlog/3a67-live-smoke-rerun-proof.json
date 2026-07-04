@@ -12,12 +12,12 @@
   ],
   "liveVerification": {
     "deployStatus": "live",
-    "renderCommit": "0f5eb852f55420146a1d1746287068fe8e368725",
-    "renderBuildTime": "2026-07-04T17:00:06.095Z",
-    "publicStatusRevision": "3a67-visual-footer-smoke-v2",
+    "renderCommit": "8a0e16f8f600a605bc1b612ebeb3dd7888e1f57b",
+    "renderBuildTime": "2026-07-04T22:28:53.343Z",
+    "publicStatusRevision": "3a67-blacklist-permission-smoke-v3",
     "testLabCompleted": true,
-    "testLabCompletedAt": "2026-07-04T16:15:24.260Z",
-    "checkedAt": "2026-07-04T17:02:48.967Z",
+    "testLabCompletedAt": "2026-07-04T17:19:33.415Z",
+    "checkedAt": "2026-07-04T23:01:35.421Z",
     "liveBooleans": {
       "trainingReady": true,
       "tryoutReady": true,
@@ -26,14 +26,22 @@
       "supportPanelReady": true,
       "moderationPanelReady": true,
       "securityPanelReady": true,
-      "xpPanelReady": true
+      "xpPanelReady": true,
+      "blacklistedRoleReady": true,
+      "blacklistPermissionReady": true
     },
     "testLabStructure": {
       "categories": 14,
       "channels": 123,
-      "roles": 87,
+      "roles": 164,
       "autoModRules": 2,
-      "commands": 62
+      "commands": 62,
+      "capturedAt": "2026-07-04T23:01:35.421Z"
+    },
+    "idempotentRepair": {
+      "createdChannels": 0,
+      "createdRoles": 0,
+      "result": "The live repair rerun found the required structure already present and did not create duplicates."
     }
   },
   "mainServerDestructiveRebuild": {

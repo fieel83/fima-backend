@@ -42,7 +42,7 @@
     },
     "languageSetup": {
       "requirement": "Setup flow must ask Turkish/English and render starter embeds/panels in selected language where supported.",
-      "status": "SOURCE ONLY"
+      "status": "LIVE DISCORD VERIFIED in the test/template laboratory"
     },
     "blacklistAppealVisibility": {
       "requirement": "Blacklisted members should receive BLACKLISTED role and only see ban appeal information; unblacklist/bail-review are staff-only/review channels.",
@@ -76,6 +76,14 @@
       "implementation": "Smoke and command training/tryout start payloads remain content messages with buttons, not embeds."
     }
   },
-  "notChromeVerified": true,
-  "notes": "These findings come from owner screenshots and pasted instructions; they supplement but do not replace Chrome read-only channel audit."
+  "chromeVerification": {
+    "status": "CHROME READ VERIFIED",
+    "managedServersSeen": [
+      "Paradise | Türkiye",
+      "Fieel's Community",
+      "TSBTR Yedek"
+    ],
+    "scope": "Visible server/category/channel structure and the empty TSBTR Yedek rules channel were checked read-only. The full history of every channel was not audited."
+  },
+  "notes": "Detailed styling decisions still primarily come from owner screenshots and pasted instructions. The live Chrome check confirms the three current managed-server structures but does not replace a full channel-history audit."
 }
