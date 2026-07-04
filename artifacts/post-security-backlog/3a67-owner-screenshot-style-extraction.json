@@ -1,0 +1,66 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "createdAt": "2026-07-04",
+  "sourceType": "OWNER PROVIDED REFERENCE SCREENSHOTS",
+  "screenshotsReviewed": [
+    "codex-clipboard-cdcf9ccb-a512-4f12-ae29-f83899d2bd6f.png",
+    "codex-clipboard-c2a0a6f9-39a1-44ff-9c45-08aac8cf15b8.png",
+    "codex-clipboard-1437dc5d-8a85-4aa8-baa8-4838c37e4c98.png",
+    "codex-clipboard-38575a91-2997-45b0-a844-4b32404cbf5c.png",
+    "codex-clipboard-1f0f9ba0-83ba-473d-8806-1b756d2aa7ea.png",
+    "codex-clipboard-5cf96f0a-3a14-4e6d-9beb-6ae50f111121.png",
+    "codex-clipboard-72b3cdca-92a1-4d13-9fc2-ef4d74c1c21d.png",
+    "codex-clipboard-d3a34b6a-1da2-4115-99d3-9a920cf634b3.png",
+    "codex-clipboard-9a7ce272-2a88-4726-8c43-182a50071595.png",
+    "codex-clipboard-c79acd1f-29b4-4462-8945-9562c0076b36.png",
+    "codex-clipboard-8866105d-8d9d-4a73-a1f0-897cda9b8564.png",
+    "codex-clipboard-c7732e75-3b5e-4120-94cc-d9dde51e40f2.png",
+    "codex-clipboard-10f0353b-19b7-46f1-955f-6efbcd8f6860.png",
+    "codex-clipboard-60b4edb8-53d9-4d74-ac41-645c57935930.png",
+    "codex-clipboard-286cfce2-a14f-47a2-8a96-b3334225eaa5.png",
+    "codex-clipboard-20f25a40-435d-46e9-a8a0-ae501fa86e23.png",
+    "codex-clipboard-6b4e591d-2da4-42e4-b3e4-42285a63f1f0.png",
+    "codex-clipboard-950b0638-ce24-41ea-8e5f-50e90241ed52.png"
+  ],
+  "visualDecisions": {
+    "footerBrand": {
+      "default": "Made By Fieel",
+      "reason": "Owner explicitly rejected old Made by Paradise bot footer in panels and voice controls.",
+      "implementation": "Footer brand is now config-backed with Made By Fieel default."
+    },
+    "staffDirectory": {
+      "requiredStyle": "Grouped directory, not one flat staff list.",
+      "groups": [
+        "Kurucular / Owners",
+        "Adminler / Administration",
+        "Hosterlar / Operations",
+        "Hakemler / Referees",
+        "Moderasyon & Destek"
+      ],
+      "implementation": "updateStaffTeamEmbed now renders grouped fields and supports optional staffTeamBannerUrl."
+    },
+    "languageSetup": {
+      "requirement": "Setup flow must ask Turkish/English and render starter embeds/panels in selected language where supported.",
+      "status": "SOURCE ONLY"
+    },
+    "blacklistAppealVisibility": {
+      "requirement": "Blacklisted members should receive BLACKLISTED role and only see ban appeal information; unblacklist/bail-review are staff-only/review channels.",
+      "status": "SOURCE ONLY"
+    },
+    "roleHierarchy": {
+      "requirement": "Clean separator roles and missing admin/hoster roles must exist.",
+      "implementation": "Paradise Clan and Community role arrays now include owner/admin/moderation/hoster/referee/community/ping/language/region/top/stage separators."
+    },
+    "leaderboardCards": {
+      "requirement": "Top boards must be cleaner, show full Stage / Level / Strength, and use line GIF separators only where helpful.",
+      "implementation": "Leaderboard cards now render full rank text and attach the owner-provided fixedbulletlines GIF to the first board card."
+    },
+    "activeTrainingTryoutMessages": {
+      "requirement": "Active training/tryout announcements must be normal Markdown messages, not embeds.",
+      "implementation": "Smoke and command training/tryout start payloads remain content messages with buttons, not embeds."
+    }
+  },
+  "notChromeVerified": true,
+  "notes": "These findings come from owner screenshots and pasted instructions; they supplement but do not replace Chrome read-only channel audit."
+}

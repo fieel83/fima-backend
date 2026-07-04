@@ -678,10 +678,11 @@ app.get("/api/paradise/session-status", async (req, res) => {
 });
 
 app.get("/api/paradise/public-status", async (_req, res) => {
-  const [health, guilds, testLab] = await Promise.all([
+  const [health, guilds, testLab, testRuntime] = await Promise.all([
     discordBotHealth().catch(() => null),
     paradiseDiscordGuildsSnapshot().catch(() => []),
-    paradiseTestLabPublicStatus().catch(() => null)
+    paradiseTestLabPublicStatus().catch(() => null),
+    paradiseDiscordRuntimeSnapshot("1520519015661961257").catch(() => null)
   ]);
   const primary = guilds[0]?.id ? await paradiseDiscordRuntimeSnapshot(guilds[0].id).catch(() => null) : null;
   res.set("Cache-Control", "no-store");
@@ -696,7 +697,17 @@ app.get("/api/paradise/public-status", async (_req, res) => {
       lastSyncAt: primary?.commandSync?.lastSyncAt || null,
       healthy: !primary?.commandSync?.lastError
     },
-    testLab
+    testLab: testLab ? {
+      ...testLab,
+      structure: testRuntime?.status === "ready" ? {
+        categories: testRuntime.categories?.length || 0,
+        channels: testRuntime.channels?.length || 0,
+        roles: testRuntime.roles?.length || 0,
+        autoModRules: testRuntime.autoModRules?.length || 0,
+        commands: testRuntime.commandSync?.count || 0,
+        capturedAt: testRuntime.capturedAt || null
+      } : null
+    } : null
   });
 });
 

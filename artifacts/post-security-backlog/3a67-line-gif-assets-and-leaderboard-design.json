@@ -1,0 +1,42 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "createdAt": "2026-07-04",
+  "ownerProvidedAssets": {
+    "sourceDirectory": "C:/Users/fieel/Downloads/Line gifs",
+    "files": [
+      {
+        "name": "fixedbulletlines.gif",
+        "bytes": 29927,
+        "selectedUse": "Primary subtle separator for leaderboard/top boards"
+      },
+      {
+        "name": "t-TMi3xS.gif",
+        "bytes": 13866,
+        "selectedUse": "Reserve / alternate"
+      },
+      {
+        "name": "WHITE.gif",
+        "bytes": 143081,
+        "selectedUse": "Reserve / light separator if theme needs contrast"
+      },
+      {
+        "name": "0401.gif",
+        "bytes": 1040989,
+        "selectedUse": "Reserve only; larger file, avoid overusing in embeds"
+      }
+    ],
+    "copiedTo": "public/assets/images/paradise/line-gifs"
+  },
+  "implementation": {
+    "publicUrlBase": "Configured from FRONTEND_URL or PUBLIC_BASE_URL, defaults to https://fimamacro.com",
+    "leaderboardSeparatorUrl": "/assets/images/paradise/line-gifs/fixedbulletlines.gif",
+    "usageRule": "Use decorative line GIFs mostly on leaderboard/top boards and not on every embed, to avoid visual clutter and mobile lag."
+  },
+  "designRules": [
+    "Top boards must show #rank, display name, profile ID, Discord mention, Roblox username, region, full Stage/Level/Strength, status, wins/losses and active ticket if any.",
+    "Vacant slots should still look intentional, with clear instructions for /leaderboard add.",
+    "Cards update in place and do not spam the channel.",
+    "Line GIFs are optional accents, not required in every message."
+  ]
+}

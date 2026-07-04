@@ -1,0 +1,54 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "createdAt": "2026-07-04",
+  "roleStructureUpdate": {
+    "paradiseClan": {
+      "separatorsAdded": [
+        "OWNER RANK",
+        "ADMINS",
+        "MODERATION",
+        "HOSTERS",
+        "REFEREES",
+        "COMMUNITY",
+        "PING ROLES",
+        "LANGUAGE",
+        "REGION ROLES",
+        "CHARACTERS",
+        "TOP PLAYERS",
+        "STAGE / LEVEL"
+      ],
+      "rolesAddedOrPromoted": [
+        "Security Staff",
+        "Event Hoster",
+        "Giveaway Hoster",
+        "War Hoster",
+        "Trial Training Hoster"
+      ]
+    },
+    "fieelsCommunity": {
+      "separatorsAdded": [
+        "OWNER RANK",
+        "STAFF",
+        "PRODUCT ACCESS",
+        "COMMUNITY",
+        "PING ROLES",
+        "LANGUAGE"
+      ],
+      "explicitNonRankingRule": "Community template stays support/community/event focused; challenge/ranking/roster is not enabled by default."
+    }
+  },
+  "staffDirectoryUpdate": {
+    "oldProblem": "Flat list was hard to read and missed clear admin/hoster grouping.",
+    "newGrouping": [
+      "Kurucular / Owners",
+      "Adminler / Administration",
+      "Hosterlar / Operations",
+      "Hakemler / Referees",
+      "Moderasyon & Destek"
+    ],
+    "autoRefresh": true,
+    "bannerSupport": "Optional staffTeamBannerUrl / banners.staffTeam can be used for a TSBER-style image header."
+  },
+  "mainServerStatus": "No destructive main-server rebuild was executed; exact typed confirmation is still required."
+}

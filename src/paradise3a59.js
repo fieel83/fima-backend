@@ -11,7 +11,10 @@ import {
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
-const PARADISE_AUTO_SMOKE_REVISION = "3a66-workflow-panels-v3";
+const PARADISE_AUTO_SMOKE_REVISION = "3a67-visual-footer-smoke-v2";
+const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
+const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
+const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
 const APPLICATION_TYPES = Object.freeze([
@@ -44,6 +47,7 @@ const EMPTY_STATE = Object.freeze({
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
   applications: {}, moderationCases: {}, securityState: {}, supportTickets: {}
 });
+let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_PARADISE_FOOTER_BRAND } });
 
 function normalizeState(value) {
   const input = value && typeof value === "object" ? value : {};
@@ -86,9 +90,18 @@ async function loadState() {
   try {
     const { prisma } = await import("./db.js");
     const row = await prisma.setting.findUnique({ where: { key: STATE_KEY } });
-    if (row?.value) return normalizeState(row.value);
+    if (row?.value) {
+      lastKnownStateSnapshot = normalizeState(row.value);
+      return lastKnownStateSnapshot;
+    }
   } catch {}
-  try { return normalizeState(JSON.parse(await fs.readFile(PROFILE_STORE, "utf8"))); } catch { return normalizeState({}); }
+  try {
+    lastKnownStateSnapshot = normalizeState(JSON.parse(await fs.readFile(PROFILE_STORE, "utf8")));
+    return lastKnownStateSnapshot;
+  } catch {
+    lastKnownStateSnapshot = normalizeState({});
+    return lastKnownStateSnapshot;
+  }
 }
 
 async function saveState(mutator) {
@@ -100,6 +113,7 @@ async function saveState(mutator) {
   } catch {
     await writeArtifact("3a59-paradise-state-fallback.json", next);
   }
+  lastKnownStateSnapshot = next;
   return next;
 }
 
@@ -117,30 +131,44 @@ async function paradiseBrandColor() {
   return paradiseBrandColorInteger(configForGuild(state, paradiseGuildContext.getStore()).brandColor);
 }
 
-function paradiseFooter(context = "") {
-  return { text: `${context ? `${context} • ` : ""}Made by Paradise bot` };
+function paradiseFooter(context = "", guildId = paradiseGuildContext.getStore()) {
+  const footerBrand = String(configForGuild(lastKnownStateSnapshot, guildId).footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim()
+    || DEFAULT_PARADISE_FOOTER_BRAND;
+  return { text: `${context ? `${context} • ` : ""}${footerBrand}` };
 }
 
 export const PARADISE_CLAN_ROLES = [
-  "Owner", "Admin", "Overseer", "Community Manager", "Training Manager",
-  "Administration Manager", "Head Admin", "Senior Admin", "Moderator Manager",
-  "Head Moderator", "Senior Moderator", "Moderator", "Helper",
+  "✦・OWNER RANK",
+  "Owner",
+  "━━━━━ ADMINS ━━━━━", "Admin", "Overseer", "Community Manager", "Training Manager",
+  "Administration Manager", "Head Admin", "Senior Admin",
+  "━━━━━ MODERATION ━━━━━", "Moderator Manager",
+  "Head Moderator", "Senior Moderator", "Moderator", "Helper", "Security Staff",
+  "━━━━━ HOSTERS ━━━━━",
   "Trial Training Manager", "Training Supervisor", "Experienced Training Hoster",
   "Training Hoster", "Trial Training Hoster", "Tryout Manager",
   "Experienced Tryout Hoster", "Tryout Hoster",
-  "Tournament Manager", "Event Manager", "Giveaway Manager",
-  "Game Night Manager", "Referee Manager", "Head Referee",
-  "Experienced Referee", "Referee", "Trial Referee", "War Hoster",
+  "Tournament Manager", "Event Manager", "Event Hoster", "Giveaway Manager", "Giveaway Hoster",
+  "Game Night Manager", "War Hoster",
+  "━━━━━ REFEREES ━━━━━",
+  "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee",
   "Tryout Staff", "Trial Tryout Staff", "Coach / Helper",
-  "Verified Fighter", "Media & Links Approved", "Training Ping",
-  "Tryout Ping", "Referee Ping", "Spar Ping", "Tournament Ping", "Event Ping",
+  "━━━━━ COMMUNITY ━━━━━",
+  "Verified Fighter", "Media & Links Approved",
+  "━━━━━ PING ROLES ━━━━━",
+  "Training Ping", "Tryout Ping", "Referee Ping", "Spar Ping", "Tournament Ping", "Event Ping",
   "Giveaway Ping", "Game Night Ping", "Staff Updates", "Server Updates",
+  "━━━━━ LANGUAGE ━━━━━",
   "Turkish", "English", "Activity Whitelist", "LOA", "Muted / Quarantined",
+  "━━━━━ REGION ROLES ━━━━━",
   "Frankfurt, Germany", "Paris, France", "London, United Kingdom", "Amsterdam, Netherlands",
+  "━━━━━ CHARACTERS ━━━━━",
   "The Strongest Hero", "Hero Hunter", "Monster Form", "Destructive Cyborg",
   "Deadly Ninja", "Brutal Demon", "Blade Master", "Wild Psychic", "Martial Artist", "Tech Prodigy",
+  "━━━━━ TOP PLAYERS ━━━━━",
   "Top Player 1-10", "Top Player 11-20", "Top Player 21-30", "Top Player", "Retired Top Player",
   ...Array.from({ length: 30 }, (_, index) => `Top ${index + 1}`),
+  "━━━━━ STAGE / LEVEL ━━━━━",
   ...Array.from({ length: 5 }, (_, stage) =>
     ["Low", "Mid", "High"].flatMap(level =>
       ["Weak", "Stable", "Strong"].map(strength => `Stage ${stage} ${level} ${strength}`)
@@ -149,11 +177,16 @@ export const PARADISE_CLAN_ROLES = [
 ];
 
 export const PARADISE_COMMUNITY_ROLES = [
-  "Owner", "Admin", "Manager", "Moderator", "Support Staff", "Trial Support",
-  "Bot Manager", "Developer", "Buyer", "Trial User", "Lifetime Buyer",
-  "Creator", "Partner / Reseller", "Media & Links Approved", "Verified",
+  "✦・OWNER RANK",
+  "Owner",
+  "━━━━━ STAFF ━━━━━", "Admin", "Manager", "Moderator", "Support Staff", "Trial Support",
+  "Bot Manager", "Developer", "Security Staff",
+  "━━━━━ PRODUCT ACCESS ━━━━━", "Buyer", "Trial User", "Lifetime Buyer",
+  "━━━━━ COMMUNITY ━━━━━", "Creator", "Partner / Reseller", "Media & Links Approved", "Verified",
+  "━━━━━ PING ROLES ━━━━━",
   "Update Ping", "Training Ping", "Tournament Ping", "Giveaway Ping",
   "Event Ping", "Game Night Ping", "Security Alert Ping", "Robux Payment Ping",
+  "━━━━━ LANGUAGE ━━━━━",
   "Turkish", "English", "LOA", "Muted / Quarantined"
 ];
 
@@ -831,6 +864,7 @@ export async function initializeParadise(client) {
       state.config.blackThemeVersion = 1;
       state.config.blackThemeAppliedAt = new Date().toISOString();
     }
+    state.config.footerBrand = String(state.config.footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim() || DEFAULT_PARADISE_FOOTER_BRAND;
     return state;
   });
   if (client.user?.username !== "Paradise") {
@@ -841,6 +875,7 @@ export async function initializeParadise(client) {
   for (const guild of client.guilds.cache.values()) {
     await saveState(state => {
       state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
+      state.guildConfigs[guild.id].footerBrand = String(state.guildConfigs[guild.id].footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim() || DEFAULT_PARADISE_FOOTER_BRAND;
       return state;
     });
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
@@ -1395,18 +1430,28 @@ export async function runParadiseTestSmokeSuite(guild) {
   const training = await smokeSend(trainingChannel, {
     content: [
       "# TRAINING",
+      "## Competitive Practice",
+      "",
       "### Kurallar:",
-      "Lh yok (2m1 shove tech), TDS yok (True Downslam), Overpassive yok, 2 Ragdoll cancel yok, Wall yok, sırada birbirinize vurmak yok, sırayı terk etmek yok.",
+      "- LH yok / 2M1 shove tech yok",
+      "- TDS yok / True Downslam yok",
+      "- Overpassive yok",
+      "- 2 Ragdoll Cancel yok",
+      "- Wall abuse yok",
+      "- Sırada birbirinize vurmak yok",
+      "- Sırayı terk etmek yok",
       "",
       "### Oynanabilir karakterler:",
-      "Saitama, Garou, Metal Bat",
+      "- Saitama",
+      "- Garou",
+      "- Metal Bat",
       "",
       "### Link:",
       "https://www.roblox.com/share?code=PARADISE-TEST",
       "",
       `<@${ownerId}>`,
       "",
-      "-# Canlı test mesajı • Hoster-only controls • Made by Paradise bot"
+      "-# Canlı test mesajı • Hoster-only controls • Made By Fieel"
     ].join("\n"),
     components: [controls(trainingId, "END TRAINING")],
     allowedMentions: { users: [], roles: [], parse: [] }
@@ -1435,7 +1480,7 @@ export async function runParadiseTestSmokeSuite(guild) {
       "- No 2 RC / wall / overpassive",
       "- No alts, queue hitting or leaving",
       "",
-      "-# Lock after 1–5 minutes • Canlı test mesajı • Made by Paradise bot"
+      "-# Lock after 1–5 minutes • Canlı test mesajı • Made By Fieel"
     ].join("\n"),
     components: [controls(tryoutId, "END TRYOUT")],
     allowedMentions: { users: [], roles: [], parse: [] }
@@ -2050,7 +2095,7 @@ async function handleTryout(interaction) {
         "- No 2 RC / wall / overpassive",
         "- No alts, queue hitting or leaving",
         "",
-        "-# Lock after 1–5 minutes • Hoster-only controls • Made by Paradise bot"
+        "-# Lock after 1–5 minutes • Hoster-only controls • Made By Fieel"
       ].join("\n"),
       components: [controls],
       allowedMentions: { users: [interaction.user.id], parse: [] }
@@ -2412,7 +2457,7 @@ async function handleChallenge(interaction) {
       { name: "Note", value: submission.note || "—", inline: false },
       { name: "Ticket ID", value: submission.ticketId || "—", inline: true },
       { name: "Status", value: "Pending Referee Manager / Experienced Referee approval", inline: false }
-    ).setFooter({ text: "Made by Paradise bot" })], components: [approvalRow] });
+    ).setFooter({ text: "Made By Fieel" })], components: [approvalRow] });
   const winner = interaction.options.getUser("winner");
   const loser = interaction.options.getUser("loser");
   const score = interaction.options.getString("score").trim().replace(/\s+to\s+to\s+/gi, " to ");
@@ -2455,7 +2500,7 @@ async function handleChallengeApproval(interaction) {
     });
     pendingChallenges.delete(id);
     return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
-      .setTitle("Challenge Score — Denied").setFooter({ text: `Denied by ${interaction.user.username} • Made by Paradise bot` })], components: [] });
+      .setTitle("Challenge Score — Denied").setFooter({ text: `Denied by ${interaction.user.username} • Made By Fieel` })], components: [] });
   }
   const now = Date.now();
   await saveState(state => {
@@ -2517,13 +2562,13 @@ async function handleChallengeApproval(interaction) {
   if (results) {
     await results.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
       .setTitle(record.resultType === "autowin" ? "Approved Automatic Win" : "Approved Challenge Result")
-      .setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })] }).catch(() => {});
+      .setFooter({ text: `Approved by ${interaction.user.username} • Made By Fieel` })] }).catch(() => {});
   }
   const works = await configuredChannel(interaction.guild, "referee_works_channel", "referee-works");
   if (works) await works.send({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
-    .setTitle("Approved Referee Work").setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })] });
+    .setTitle("Approved Referee Work").setFooter({ text: `Approved by ${interaction.user.username} • Made By Fieel` })] });
   return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
-    .setTitle("Challenge Score — Approved").setFooter({ text: `Approved by ${interaction.user.username} • Made by Paradise bot` })], components: [] });
+    .setTitle("Challenge Score — Approved").setFooter({ text: `Approved by ${interaction.user.username} • Made By Fieel` })], components: [] });
 }
 
 async function handleTraining(interaction) {
@@ -2535,7 +2580,15 @@ async function handleTraining(interaction) {
   }
   if (sub === "start" || sub === "create") {
     const link = interaction.options.getString("link");
-    const rules = interaction.options.getString("rules") || "No Lh, no TDS, no overpassive, no 2 Ragdoll cancel, no wall, no hitting in queue, do not leave queue.";
+    const rules = interaction.options.getString("rules") || [
+      "LH yok / 2M1 shove tech yok",
+      "TDS yok / True Downslam yok",
+      "Overpassive yok",
+      "2 Ragdoll Cancel yok",
+      "Wall abuse yok",
+      "Sırada birbirinize vurmak yok",
+      "Sırayı terk etmek yok"
+    ].join("\n");
     const selectedHost = interaction.options.getUser("host") || interaction.user;
     if (selectedHost.id !== interaction.user.id && !canManageClan(interaction.member)) {
       return interaction.reply({ content: "Only training management can start a session for another host.", ephemeral: true });
@@ -2571,7 +2624,7 @@ async function handleTraining(interaction) {
         "◆ **Format**",
         "FT3 • FT5 optional",
         "",
-        `-# Session ${sessionId.slice(0, 8)} • Hoster-only controls • Made by Paradise bot`
+        `-# Session ${sessionId.slice(0, 8)} • Hoster-only controls • Made By Fieel`
       ].join("\n"),
       components: [controls],
       allowedMentions: { users: [selectedHost.id, ...(cohost ? [cohost.id] : [])], roles: [] }
@@ -2609,7 +2662,7 @@ async function handleTraining(interaction) {
     result.note ? `### Note\n${result.note}` : null,
     result.proof ? `### Proof\n${result.proof}` : null,
     "",
-    `-# Hoster: ${interaction.user} • Activity counted automatically • Made by Paradise bot`
+    `-# Hoster: ${interaction.user} • Activity counted automatically • Made By Fieel`
   ].filter(value => value !== null).join("\n");
   const originalChannel = interaction.guild.channels.cache.get(owned.channelId);
   const original = originalChannel?.isTextBased?.() ? await originalChannel.messages.fetch(owned.messageId).catch(() => null) : null;
@@ -2714,7 +2767,7 @@ async function handleTournament(interaction) {
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(tournament.title)
       .setDescription(`**Server:** ${tournament.link}\n**Rules:** ${tournament.rules || "Standard Paradise tournament rules."}\n**Prize:** ${tournament.prize || "None announced"}`)
       .addFields({ name: "Tournament ID", value: id, inline: true }, { name: "Host", value: `${interaction.user}`, inline: true })
-      .setFooter({ text: "Simple tournament • Made by Paradise bot" })] });
+      .setFooter({ text: "Simple tournament • Made By Fieel" })] });
   }
   if (sub === "result-simple") {
     const winner = interaction.options.getUser("winner");
@@ -2722,7 +2775,7 @@ async function handleTournament(interaction) {
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Tournament Winner")
       .setDescription(`${winner} won the tournament.`)
       .addFields({ name: "Proof", value: interaction.options.getString("proof") }, { name: "Recorded by", value: `${interaction.user}` })
-      .setFooter({ text: "Made by Paradise bot" })] });
+      .setFooter({ text: "Made By Fieel" })] });
   }
   if (sub === "create-bracket") {
     const participants = [...new Set(interaction.options.getString("participants").split(",").map(value => value.replace(/\D/g, "")).filter(value => /^\d{15,22}$/.test(value)))];
@@ -2738,7 +2791,7 @@ async function handleTournament(interaction) {
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${tournament.title} — Round 1`)
       .setDescription(lines.join("\n").slice(0, 4000))
       .addFields({ name: "Tournament ID", value: id }, { name: "Server", value: tournament.link })
-      .setFooter({ text: "Bracket state is stored in PostgreSQL • Made by Paradise bot" })] });
+      .setFooter({ text: "Bracket state is stored in PostgreSQL • Made By Fieel" })] });
   }
   const id = interaction.options.getString("tournament_id");
   const matchNumber = interaction.options.getInteger("match");
@@ -2776,7 +2829,7 @@ async function handleGiveaway(interaction) {
   const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`paradise_giveaway_enter:${id}`).setLabel("Enter Giveaway").setStyle(ButtonStyle.Success));
   return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Giveaway: ${interaction.options.getString("prize")}`)
     .setDescription(`Ends <t:${Math.floor(endsAt / 1000)}:R>\nWinners: **${interaction.options.getInteger("winners") || 1}**\nRequirements: ${interaction.options.getString("requirements") || "Follow server rules."}`)
-    .setFooter({ text: "Entries are opt-in • Made by Paradise bot" })], components: [row] });
+    .setFooter({ text: "Entries are opt-in • Made By Fieel" })], components: [row] });
 }
 
 async function handleCommunityEvent(interaction, type) {
@@ -2795,7 +2848,7 @@ async function handleCommunityEvent(interaction, type) {
     new ButtonBuilder().setCustomId(`paradise_rsvp_maybe:${crypto.randomUUID()}`).setLabel("Maybe").setStyle(ButtonStyle.Secondary)
   );
   return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(title).setDescription(description).setImage(image.url)
-    .addFields({ name: "Host", value: `${interaction.user}` }).setFooter({ text: "Made by Paradise bot" })], components: [row] });
+    .addFields({ name: "Host", value: `${interaction.user}` }).setFooter({ text: "Made By Fieel" })], components: [row] });
 }
 
 async function handleOptInButton(interaction) {
@@ -2870,7 +2923,7 @@ async function postDailyQuestion(guild, { force = false } = {}) {
     embeds: [new EmbedBuilder()
       .setColor(await paradiseBrandColor())
       .setTitle(`◆ GÜNÜN SORUSU · ${rewardLabel.toUpperCase()}`)
-      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını Paradise paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün ${String(hour).padStart(2, "0")}:00 Europe/Berlin · Made by Paradise bot`)
+      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını Paradise paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün ${String(hour).padStart(2, "0")}:00 Europe/Berlin · Made By Fieel`)
       .setTimestamp()]
   });
   const record = {
@@ -3539,7 +3592,7 @@ function temporaryVoicePanel(channelId) {
   return {
     embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("◆ PRIVATE VOICE CONTROL")
       .setDescription("Bu kanalın sahibi aşağıdaki kontrolleri kullanabilir. Uygunsuz adlar reddedilir ve kanal adı Discord adına döner.\n\n- **Lock / Hide:** giriş veya görünürlüğü yönet\n- **Limit:** 0 → 2 → 4 → 6 → 8 → 10\n- **Permit / Reject:** üyeye özel erişim\n- **Transfer:** sahipliği devret\n- **Delete:** kanal boşken kaldır")
-      .setFooter({ text: "Made by Paradise bot" })],
+      .setFooter({ text: "Made By Fieel" })],
     components: [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`paradise_voice_lock:${channelId}`).setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary),
@@ -3847,8 +3900,14 @@ async function updateRankedLeaderboardBoards(guild) {
       if (!entry) {
         cards.push(new EmbedBuilder()
           .setColor(await paradiseBrandColor())
-          .setTitle(`#${rank} — Vacant`)
-          .setDescription("_This leaderboard position is available._"));
+          .setTitle(`✦ #${rank} — Vacant`)
+          .setDescription([
+            "◆ **Status:** Challengeable opening",
+            "◆ **Profile:** _No fighter assigned yet._",
+            "◆ **Use:** `/leaderboard add user:@fighter rank:" + rank + "`",
+            "",
+            "-# This slot is intentionally empty and can be assigned by leaderboard staff."
+          ].join("\n")));
         continue;
       }
       const [userId, row] = entry;
@@ -3866,11 +3925,15 @@ async function updateRankedLeaderboardBoards(guild) {
             : "Challengeable";
       const card = new EmbedBuilder()
         .setColor(await paradiseBrandColor())
-        .setTitle(`#${rank} — ${member?.displayName || profile?.robloxUsername || "Fighter"}`)
-        .setDescription(`<@${userId}>`)
+        .setTitle(`✦ #${rank} — ${member?.displayName || profile?.robloxUsername || "Fighter"}`)
+        .setDescription([
+          `◆ **Discord:** <@${userId}>`,
+          `◆ **Roblox:** **${profile?.robloxUsername || "Not linked"}**`,
+          `◆ **Rank:** **${stage}**`
+        ].join("\n"))
         .addFields(
           { name: "Profile ID", value: `**#${profile?.profileId || "—"}**`, inline: true },
-          { name: "Roblox", value: `**${profile?.robloxUsername || "Not linked"}**`, inline: true },
+          { name: "Discord ID", value: `\`${userId}\``, inline: true },
           { name: "Region", value: `**${profile?.region || row.region || "Not set"}**`, inline: true },
           { name: "Stage / Level / Strength", value: `**${stage}**`, inline: false },
           { name: "Status", value: `**${status}**`, inline: true },
@@ -3889,14 +3952,22 @@ async function updateRankedLeaderboardBoards(guild) {
       if (thumbnail) card.setThumbnail(thumbnail);
       cards.push(card);
     }
-    if (cards.length) cards[cards.length - 1].setFooter(paradiseFooter(`${group.label} • Updated in place`)).setTimestamp();
+    if (cards.length) {
+      cards[0].setImage(PARADISE_LEADERBOARD_SEPARATOR_ASSET);
+      cards[cards.length - 1].setFooter(paradiseFooter(`${group.label} • Full Stage/Level/Strength • Updated in place`)).setTimestamp();
+    }
     const storedMessageId = messageIds[group.messageKey]
       || (group.min <= 21 ? messageIds[group.channel] : null);
     let message = storedMessageId
       ? await channel.messages.fetch(storedMessageId).catch(() => null)
       : null;
-    if (message) await message.edit({ content: `# ♛ ${group.label}`, embeds: cards.slice(0, 10) });
-    else message = await channel.send({ content: `# ♛ ${group.label}`, embeds: cards.slice(0, 10) });
+    const boardContent = [
+      `# ♛ ${group.label}`,
+      "### Ranked fighter cards",
+      "-# Full stage text is shown as Stage / Level / Strength. Cooldowns, immunity and active tickets are refreshed in place."
+    ].join("\n");
+    if (message) await message.edit({ content: boardContent, embeds: cards.slice(0, 10) });
+    else message = await channel.send({ content: boardContent, embeds: cards.slice(0, 10) });
     messageIds[group.messageKey] = message.id;
     if (group.min <= 21) messageIds[group.channel] = message.id;
     posted.push({ channelId: channel.id, messageId: message.id, range: group.label });
@@ -4008,8 +4079,8 @@ async function sendMemberLifecycleMessage(member, kind) {
     ].filter(Boolean);
     const title = joined ? `Welcome, ${member.displayName}!` : `${member.displayName} left the server`;
     const description = joined
-      ? `# ${member.user.username}\nWelcome to **${member.guild.name}**!\n\n${destinations.join("\n") || "- Explore the server and choose your roles."}\n\n## Member #${member.guild.memberCount}\n\n-# Never share passwords, cookies or tokens • Made by Paradise bot`
-      : `${member.user.username} is no longer in **${member.guild.name}**.\n\n-# Member count: ${member.guild.memberCount} • Made by Paradise bot`;
+      ? `# ${member.user.username}\nWelcome to **${member.guild.name}**!\n\n${destinations.join("\n") || "- Explore the server and choose your roles."}\n\n## Member #${member.guild.memberCount}\n\n-# Never share passwords, cookies or tokens • Made By Fieel`
+      : `${member.user.username} is no longer in **${member.guild.name}**.\n\n-# Member count: ${member.guild.memberCount} • Made By Fieel`;
     const embed = new EmbedBuilder().setColor(await paradiseBrandColor())
       .setTitle(title)
       .setDescription(description)
@@ -4094,7 +4165,7 @@ async function postAutomaticActivityCheck(guild, group, state) {
   );
   await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
     .setDescription(`Respond within ${deadlineHours} hours. Missing the deadline creates a flag and may remove the related staff role only when automatic role changes are explicitly enabled. Whitelist and LOA exemptions apply.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
-    .setFooter({ text: "Automatic Paradise activity check • Made by Paradise bot" })], components: [row] });
+    .setFooter({ text: "Automatic Paradise activity check • Made By Fieel" })], components: [row] });
   return id;
 }
 
@@ -4174,7 +4245,7 @@ async function runParadiseMaintenance(guild) {
         }
         await log.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Sunday Staff Review")
           .setDescription(lines.join("\n").slice(0, 4000) || "No quota roles found.")
-          .setFooter({ text: "Recommendations only unless autoStaffChanges is explicitly enabled • Made by Paradise bot" })] }).catch(() => {});
+          .setFooter({ text: "Recommendations only unless autoStaffChanges is explicitly enabled • Made By Fieel" })] }).catch(() => {});
       }
       config.lastWeeklyReview = sundayKey;
     }
@@ -4255,7 +4326,7 @@ async function handleActivity(interaction) {
     );
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
       .setDescription(`Respond within ${deadlineHours} hours. Missing responses create review flags; automatic role changes require explicit dashboard opt-in. Whitelist and LOA exemptions apply.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
-      .setFooter({ text: "Made by Paradise bot" })], components: [row] });
+      .setFooter({ text: "Made By Fieel" })], components: [row] });
   }
   const state = await loadState();
   const now = Date.now();
@@ -4344,7 +4415,7 @@ async function handleStaffReport(interaction) {
       { name: "Reported member", value: `${reported}` },
       { name: "Reason", value: interaction.options.getString("reason").slice(0, 1000) },
       { name: "Proof", value: interaction.options.getString("proof") || "Not supplied" }
-    ).setFooter({ text: "Keep evidence private • Made by Paradise bot" })] });
+    ).setFooter({ text: "Keep evidence private • Made By Fieel" })] });
   return interaction.reply({ content: `Private report opened: ${channel}`, ephemeral: true });
 }
 
@@ -4625,7 +4696,7 @@ const GUIDE_POSTS = Object.freeze([
     key: "referee_guide",
     channel: "referee-guide",
     title: "👑 REFEREE GUIDE 👑",
-    body: "# __Ticket control checklist__\n1. Confirm both Paradise profiles exist.\n2. Check challenger cooldown and target immunity.\n3. Check allowed rank range and open challenges.\n4. Add/ping both players and keep the pinned context header current.\n5. Record the complete set and remain neutral.\n\n## __If the ticket is valid__\n- Claim the match and add a co-referee when required.\n- Use `/challenge post` or `/challenge autowin` **inside the ticket**.\n- Close first; save transcript before access is removed.\n\n## __Score format__\n- `winner` = winning fighter\n- `loser` = losing fighter\n- `score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never type `to @user`; Paradise formats the sentence.\n- Auto/strike requires a clear note; co-referee is optional.\n\n## __Recovery and corrections__\nIf a ticket was closed, recover context from the transcript/header. Managers use the correction workflow; never silently delete evidence.\n\n-# Yanlış postu aktif Referee Manager'a iletin • Made by Paradise bot"
+    body: "# __Ticket control checklist__\n1. Confirm both Paradise profiles exist.\n2. Check challenger cooldown and target immunity.\n3. Check allowed rank range and open challenges.\n4. Add/ping both players and keep the pinned context header current.\n5. Record the complete set and remain neutral.\n\n## __If the ticket is valid__\n- Claim the match and add a co-referee when required.\n- Use `/challenge post` or `/challenge autowin` **inside the ticket**.\n- Close first; save transcript before access is removed.\n\n## __Score format__\n- `winner` = winning fighter\n- `loser` = losing fighter\n- `score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never type `to @user`; Paradise formats the sentence.\n- Auto/strike requires a clear note; co-referee is optional.\n\n## __Recovery and corrections__\nIf a ticket was closed, recover context from the transcript/header. Managers use the correction workflow; never silently delete evidence.\n\n-# Yanlış postu aktif Referee Manager'a iletin • Made By Fieel"
   },
   {
     key: "referee_rules",
@@ -5719,25 +5790,57 @@ async function updateStaffTeamEmbed(guild) {
   const channel = guild.channels.cache.find(item => item.name === "staff-team");
   if (!channel) return null;
   await guild.members.fetch().catch(() => {});
-  const roleNames = [
-    "Owner", "Admin", "Overseer", "Community Manager", "Training Manager", "Training Supervisor",
-    "Tryout Manager", "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
-    "Referee Manager", "Experienced Referee", "Referee", "Trial Referee",
-    "Experienced Training Hoster", "Training Hoster", "Experienced Tryout Hoster", "Tryout Hoster", "War Hoster"
-  ];
-  const lines = [];
-  for (const name of roleNames) {
-    const role = guild.roles.cache.find(item => item.name === name);
-    if (!role) continue;
-    const members = [...role.members.values()].filter(member => !member.user.bot);
-    lines.push(`**${name}**\n${members.length ? members.map(member => `${member}`).join(", ") : "Vacant"}`);
-  }
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE STAFF TEAM")
-    .setDescription(`# Staff Directory\n${lines.join("\n\n").slice(0, 3900) || "_Staff roles are not configured yet._"}\n\n-# This directory refreshes automatically when staff roles change.`)
-    .setFooter(paradiseFooter("Live role directory"))
-    .setTimestamp();
   const state = await loadState();
   const guildConfig = configForGuild(state, guild.id);
+  const groups = [
+    {
+      title: "👑 Kurucular / Owners",
+      names: ["Owner"]
+    },
+    {
+      title: "🛡️ Adminler / Administration",
+      names: ["Admin", "Overseer", "Community Manager", "Training Manager", "Administration Manager", "Head Admin", "Senior Admin"]
+    },
+    {
+      title: "⚔️ Hosterlar / Operations",
+      names: [
+        "Training Supervisor", "Experienced Training Hoster", "Training Hoster", "Trial Training Hoster",
+        "Tryout Manager", "Experienced Tryout Hoster", "Tryout Hoster",
+        "Tournament Manager", "Event Manager", "Event Hoster", "Giveaway Manager", "Giveaway Hoster",
+        "Game Night Manager", "War Hoster"
+      ]
+    },
+    {
+      title: "🎓 Hakemler / Referees",
+      names: ["Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee"]
+    },
+    {
+      title: "🧰 Moderasyon & Destek",
+      names: ["Moderator Manager", "Head Moderator", "Senior Moderator", "Moderator", "Helper", "Security Staff", "Support Staff", "Trial Support"]
+    }
+  ];
+  const lineForRole = name => {
+    const role = guild.roles.cache.find(item => item.name === name);
+    if (!role) return `◆ **${name}** → _not configured_`;
+    const members = [...role.members.values()].filter(member => !member.user.bot);
+    return `◆ **${name}** → ${members.length ? members.map(member => `${member}`).join(", ") : "_Vacant_"}`;
+  };
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE STAFF TEAM")
+    .setDescription([
+      "# Staff Directory",
+      "Her staff rolü kendi başlığı altında görünür. Boş roller **Vacant** olarak kalır; biri role katıldığında bu panel otomatik güncellenir.",
+      "",
+      "-# Owner / Admin / Hoster / Referee / Moderation ayrımı karışıklığı azaltmak için ayrı tutulur."
+    ].join("\n"))
+    .addFields(groups.map(group => ({
+      name: group.title,
+      value: group.names.map(lineForRole).join("\n").slice(0, 1024) || "_No roles configured._",
+      inline: false
+    })))
+    .setFooter(paradiseFooter("Live role directory"))
+    .setTimestamp();
+  const banner = String(guildConfig.staffTeamBannerUrl || guildConfig.banners?.staffTeam || "").trim();
+  if (/^https?:\/\//i.test(banner)) embed.setImage(banner);
   let message = guildConfig.staffTeamMessageId
     ? await channel.messages.fetch(guildConfig.staffTeamMessageId).catch(() => null)
     : null;

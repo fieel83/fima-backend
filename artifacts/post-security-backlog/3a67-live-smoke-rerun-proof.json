@@ -1,0 +1,28 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "createdAt": "2026-07-04",
+  "targetSmokeRevision": "3a67-visual-footer-smoke-v2",
+  "changesExpectedInSmoke": [
+    "Footer text defaults to Made By Fieel",
+    "Training smoke post remains plain Markdown and uses readable bullet rules",
+    "Tryout smoke post remains plain Markdown with lock/unlock/end buttons",
+    "Staff directory updates in grouped sections",
+    "Leaderboard board cards include full Stage/Level/Strength and line GIF separator"
+  ],
+  "liveVerification": {
+    "deployStatus": "pending",
+    "renderCommit": null,
+    "publicStatusRevision": null,
+    "testLabCompleted": null,
+    "checkedAt": null
+  },
+  "mainServerDestructiveRebuild": {
+    "executed": false,
+    "requiredConfirmations": [
+      "REBUILD PARADISE TURKIYE",
+      "REBUILD FIEELS COMMUNITY",
+      "REBUILD TSBTR YEDEK"
+    ]
+  }
+}
