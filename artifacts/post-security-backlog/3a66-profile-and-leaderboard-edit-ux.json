@@ -1,0 +1,12 @@
+{
+  "status": "SOURCE ONLY",
+  "sourceCommit": "d276eb4",
+  "profileViewSearch": ["profile_id", "Discord user", "Discord user ID", "Roblox username", "free query"],
+  "multipleMatchBehavior": "Returns a constrained result list instead of silently choosing the wrong profile.",
+  "profileDisplay": "Uses complete Stage + Level + Strength.",
+  "leaderboard": {
+    "liveDiscordCards": true,
+    "guidedDashboardEditor": false,
+    "reason": "Searchable visual profile/rank editor and preview-before-save page are not yet implemented."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "status": "LIVE DISCORD VERIFIED",
+  "guild": "Paradise deneme · …961257",
+  "guildId": "152051…1257",
+  "authorization": "Owner explicitly designated this guild as the disposable test/template lab.",
+  "backupBeforeWipe": true,
+  "templatesExecuted": {
+    "community": {
+      "destructiveRebuild": true,
+      "removedChannels": 100,
+      "removedRoles": 28,
+      "createdChannels": 88,
+      "createdRoles": 27,
+      "audit": { "categories": 11, "text": 73, "voice": 4, "roles": 29, "guides": 8, "panels": 2 },
+      "verifiedExclusion": "Challenge, ranking and roster systems were not installed by default."
+    },
+    "clan": {
+      "destructiveRebuild": true,
+      "removedChannels": 88,
+      "removedRoles": 27,
+      "createdChannels": 108,
+      "createdRoles": 145,
+      "audit": { "categories": 11, "text": 90, "voice": 7, "roles": 147, "guides": 17, "panels": 7 },
+      "verifiedChannels": ["main-line", "roster-lineup", "war-lineup", "mainer-proof", "training", "tryout", "challenge-results"]
+    },
+    "tsbtr": {
+      "destructiveRebuild": true,
+      "createdChannelsReportedByInstaller": 135,
+      "audit": { "categories": 14, "text": 113, "voice": 8, "roles": 86, "permissionOverwrites": 2181, "guides": 16, "panels": 7 },
+      "verifiedChannels": ["top-10", "top-20", "top-30", "availability", "training", "tryout", "referee-rules"],
+      "roleCreationStatus": "BLOCKED",
+      "roleCreationBlocker": "Discord role-write rate limits interrupted completion of the full 145-role target; safe create-missing repair remains required after the bucket resets."
+    }
+  },
+  "liveSmoke": {
+    "status": "LIVE DISCORD VERIFIED",
+    "trainingMessageId": "1522756261135777872",
+    "tryoutMessageId": "1522756262465503292",
+    "trainingPlainMarkdown": true,
+    "tryoutPlainMarkdown": true,
+    "controlsRendered": ["SERVER LOCKED", "UNLOCK", "END TRAINING", "END TRYOUT"],
+    "lifecycleRendering": ["SERVER LOCKED", "SERVER UNLOCKED", "TRAINING ENDED", "ENDED"],
+    "leaderboardUpdatedInPlace": true,
+    "welcomeLeaveSimulation": true
+  },
+  "commandsSynced": 62,
+  "mainServersChangedDestructively": false
+}

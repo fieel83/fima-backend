@@ -1,0 +1,10 @@
+{
+  "status": "BLOCKED",
+  "reason": "Destructive main-server rebuild requires the owner's exact typed confirmation after backup and preview.",
+  "prepared": {
+    "Paradise | Türkiye": { "backup": true, "preview": true, "template": "Paradise Clan", "confirmation": "REBUILD PARADISE TURKIYE" },
+    "Fieel's Community": { "backup": true, "preview": true, "template": "Fieel's Community", "confirmation": "REBUILD FIEELS COMMUNITY" },
+    "TSBTR Yedek": { "backup": true, "preview": true, "template": "TSBTR-style", "confirmation": "REBUILD TSBTR YEDEK" }
+  },
+  "destructiveMainServerChangesPerformed": false
+}

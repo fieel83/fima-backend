@@ -3550,8 +3550,8 @@ async function updateRankedLeaderboardBoards(guild) {
       const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
       const profile = state.profiles?.[userId];
       const storedRank = row.stageRank || profile?.stageRank;
-      const stage = member ? fighterRank(member)
-        : storedRank?.stage != null ? rankToRoleName(storedRank)
+      const stage = storedRank?.stage != null ? rankToRoleName(storedRank)
+        : member ? fighterRank(member)
           : row.stage || profile?.stage || "Unranked";
       const activeTicket = openChallengeFor(state, userId, guild.id);
       const status = activeTicket ? "Being Challenged"

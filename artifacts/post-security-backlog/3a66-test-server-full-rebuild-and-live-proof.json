@@ -1,0 +1,26 @@
+{
+  "status": "LIVE DISCORD VERIFIED",
+  "deployedCommit": "0151d96",
+  "latestFeatureCommitPendingOrLive": "d00a1c7",
+  "unitTests": { "passed": 62, "failed": 0 },
+  "testGuild": "Paradise deneme · …961257",
+  "fullWipeAndRebuild": true,
+  "templatesVisuallyInspected": ["Fieel's Community", "Paradise Clan", "TSBTR-style"],
+  "liveVerified": [
+    "community template excludes ranking/challenge by default",
+    "clan lineup/roster/war channels",
+    "TSBTR top 10/top 20/top 30 channels",
+    "TSBTR referee and hoster channels",
+    "plain Markdown training post",
+    "plain Markdown tryout post",
+    "session control buttons",
+    "lifecycle text rendering",
+    "welcome and leave simulation",
+    "ranked board update in place"
+  ],
+  "blocked": [
+    "TSBTR target role inventory is incomplete because Discord role-write rate limits stopped at 86 roles.",
+    "A real human click of each Discord component was intentionally not performed from the owner's browser account; the official bot smoke suite verified rendering and stored handler state.",
+    "Main-server destructive rebuilds remain gated by exact owner confirmations."
+  ]
+}

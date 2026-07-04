@@ -1,0 +1,35 @@
+{
+  "status": "LIVE DISCORD VERIFIED",
+  "sourceCommit": "d00a1c7",
+  "boards": ["top-10", "top-20", "top-30"],
+  "updateMode": "Stored message IDs; boards edit in place instead of posting duplicates.",
+  "cardFields": [
+    "rank number",
+    "display name",
+    "profile ID",
+    "Discord mention",
+    "Roblox username",
+    "Roblox/avatar thumbnail",
+    "region",
+    "full Stage + Level + Strength",
+    "challenge/LOA/immunity/cooldown status",
+    "wins and losses",
+    "active ticket",
+    "notes and feats"
+  ],
+  "rankModel": {
+    "stages": [0, 1, 2, 3, 4],
+    "levels": ["Low", "Mid", "High"],
+    "strength": ["Weak", "Stable", "Strong"],
+    "stage5Default": false,
+    "unrankedEntryRequirement": "Stage 2 High Weak or better"
+  },
+  "manualCommands": ["panel", "repost", "add", "move", "swap", "remove", "import", "export"],
+  "liveProof": {
+    "top10ChannelId": "1522709064428163233",
+    "top20ChannelId": "1522709065413955807",
+    "top30ChannelId": "1522709066982363226",
+    "liveBoardMessageEditedAt": "2026-07-04T02:09:00+02:00",
+    "sampleFullRankCards": "Seeded by the test-only smoke suite; no production leaderboard data is modified."
+  }
+}

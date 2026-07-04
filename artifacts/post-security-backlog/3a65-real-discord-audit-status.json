@@ -1,0 +1,70 @@
+{
+  "status": "LIVE DISCORD VERIFIED",
+  "updatedAt": "2026-07-04T02:15:00+02:00",
+  "chromeRead": {
+    "verifiedReferenceServers": [
+      {
+        "name": "TSB Clanning Community",
+        "channel": "EU clan leaderboard",
+        "method": "owner Chrome session, read-only",
+        "scrollUp": true,
+        "observations": [
+          "regional clan leaderboard split",
+          "clan and representative mapping",
+          "support-ticket and levels category patterns",
+          "dense manual mentions should be replaced by structured Paradise records"
+        ]
+      }
+    ],
+    "notClaimedAsChromeRead": [
+      "all private/reference servers",
+      "all historical messages in every visible channel"
+    ]
+  },
+  "officialBotAudits": {
+    "Paradise | Türkiye": {
+      "categories": 10,
+      "textChannels": 58,
+      "voiceChannels": 12,
+      "roles": 120,
+      "permissionOverwrites": 403,
+      "automodRules": 3,
+      "webhooks": 7,
+      "sampledMessages": 178,
+      "botMessages": 133,
+      "guideMessages": 30,
+      "panels": 15,
+      "blockedImportantChannels": 0
+    },
+    "Fieel's Community": {
+      "categories": 7,
+      "textChannels": 34,
+      "forumChannels": 1,
+      "voiceChannels": 1,
+      "stageChannels": 1,
+      "roles": 84,
+      "permissionOverwrites": 253,
+      "automodRules": 6,
+      "webhooks": 8,
+      "sampledMessages": 310,
+      "botMessages": 161,
+      "guideMessages": 2,
+      "panels": 155,
+      "blockedImportantChannels": 0
+    },
+    "TSBTR Yedek": {
+      "categories": 14,
+      "textChannels": 64,
+      "voiceChannels": 4,
+      "roles": 102,
+      "permissionOverwrites": 523,
+      "automodRules": 0,
+      "webhooks": 0,
+      "sampledMessages": 1,
+      "guideMessages": 1,
+      "panels": 1,
+      "blockedImportantChannels": 0
+    }
+  },
+  "privacy": "Only channel/system classifications and aggregate counts are stored; private conversation content is not copied."
+}

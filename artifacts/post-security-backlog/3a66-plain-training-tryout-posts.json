@@ -1,0 +1,19 @@
+{
+  "status": "LIVE DISCORD VERIFIED",
+  "training": {
+    "channelId": "1522709027715547226",
+    "messageId": "1522756261135777872",
+    "embed": false,
+    "markdownHeadings": true,
+    "buttons": ["SERVER LOCKED", "UNLOCK", "END TRAINING"]
+  },
+  "tryout": {
+    "channelId": "1522709025018347650",
+    "messageId": "1522756262465503292",
+    "embed": false,
+    "markdownHeadings": true,
+    "buttons": ["SERVER LOCKED", "UNLOCK", "END TRYOUT"]
+  },
+  "chromeReadVerification": true,
+  "mainServerMessagesChanged": false
+}
