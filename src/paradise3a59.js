@@ -1633,12 +1633,36 @@ export async function runParadiseAutoSmokeOnce(guild) {
       lastAutoSmokeResult: {
         trainingMessageId: result.training?.messageId || null,
         tryoutMessageId: result.tryout?.messageId || null,
-        supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null
+        supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
+        applicationPanelReady: Boolean(result.workflowPanels?.application),
+        supportPanelReady: Boolean(result.workflowPanels?.support),
+        moderationPanelReady: Boolean(result.workflowPanels?.moderation),
+        securityPanelReady: Boolean(result.workflowPanels?.security),
+        xpPanelReady: Boolean(result.workflowPanels?.xp)
       }
     };
     return next;
   });
   return { skipped: false, revision: PARADISE_AUTO_SMOKE_REVISION, result };
+}
+
+export async function paradiseTestLabStatus() {
+  const state = await loadState();
+  const record = state.securityState?.[PARADISE_TEST_GUILD_ID] || {};
+  const result = record.lastAutoSmokeResult || {};
+  return {
+    completed: record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION,
+    revision: record.lastAutoSmokeRevision || null,
+    completedAt: record.lastAutoSmokeAt || null,
+    trainingReady: Boolean(result.trainingMessageId),
+    tryoutReady: Boolean(result.tryoutMessageId),
+    supportTicketReady: Boolean(result.supportTicketChannelId),
+    applicationPanelReady: result.applicationPanelReady === true,
+    supportPanelReady: result.supportPanelReady === true,
+    moderationPanelReady: result.moderationPanelReady === true,
+    securityPanelReady: result.securityPanelReady === true,
+    xpPanelReady: result.xpPanelReady === true
+  };
 }
 
 async function findRobloxUser(username) {

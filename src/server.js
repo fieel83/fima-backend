@@ -53,6 +53,7 @@ import {
   paradiseDiscordRuntimeSnapshot,
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
+  paradiseTestLabPublicStatus,
   rebuildParadiseTestTemplateFromDashboard,
   runParadiseTestSmokeSuiteFromDashboard,
   repostParadiseGuides,
@@ -677,9 +678,10 @@ app.get("/api/paradise/session-status", async (req, res) => {
 });
 
 app.get("/api/paradise/public-status", async (_req, res) => {
-  const [health, guilds] = await Promise.all([
+  const [health, guilds, testLab] = await Promise.all([
     discordBotHealth().catch(() => null),
-    paradiseDiscordGuildsSnapshot().catch(() => [])
+    paradiseDiscordGuildsSnapshot().catch(() => []),
+    paradiseTestLabPublicStatus().catch(() => null)
   ]);
   const primary = guilds[0]?.id ? await paradiseDiscordRuntimeSnapshot(guilds[0].id).catch(() => null) : null;
   res.set("Cache-Control", "no-store");
@@ -693,7 +695,8 @@ app.get("/api/paradise/public-status", async (_req, res) => {
       configuredCount: Number(primary?.commandSync?.configuredCount || 0),
       lastSyncAt: primary?.commandSync?.lastSyncAt || null,
       healthy: !primary?.commandSync?.lastError
-    }
+    },
+    testLab
   });
 });
 

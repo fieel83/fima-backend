@@ -16,6 +16,7 @@ import {
   PARADISE_SETUP_SCHEMAS,
   paradiseCommandAllowedForMode,
   paradiseCommands,
+  paradiseTestLabStatus,
   publishParadiseGuidesFromDashboard,
   rebuildParadiseTestTemplate,
   runParadiseAutoSmokeOnce,
@@ -2305,6 +2306,10 @@ export async function runParadiseTestSmokeSuiteFromDashboard(guildId) {
     throw error;
   }
   return runParadiseTestSmokeSuite(guild);
+}
+
+export async function paradiseTestLabPublicStatus() {
+  return paradiseTestLabStatus();
 }
 
 export async function giveDiscordRole(discordUserId, type) {
