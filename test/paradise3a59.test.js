@@ -6,6 +6,7 @@ import {
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  paradiseSupportPanelPayload, paradiseSupportTicketControls,
   sanitizeTemporaryVoiceName,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
@@ -16,6 +17,23 @@ test("score approval excludes Trial Referee and Referee by default", () => {
   assert.equal(canRoleNamesApproveScore(["Experienced Referee"]), true);
   assert.equal(canRoleNamesApproveScore(["Referee Manager"]), true);
   assert.equal(canRoleNamesApproveScore([], true), true);
+});
+
+test("Paradise support panel has a real audited ticket lifecycle", () => {
+  const launcher = paradiseSupportPanelPayload(0).components[0].toJSON();
+  assert.equal(launcher.components[0].custom_id, "paradise_support_open");
+  const open = paradiseSupportTicketControls("ticket-id", "open")[0].toJSON().components;
+  assert.deepEqual(open.map(item => item.custom_id), [
+    "paradise_support_claim:ticket-id",
+    "paradise_support_close:ticket-id",
+    "paradise_support_reopen:ticket-id",
+    "paradise_support_transcript:ticket-id"
+  ]);
+  assert.equal(open[1].disabled, false);
+  assert.equal(open[2].disabled, true);
+  const closed = paradiseSupportTicketControls("ticket-id", "closed")[0].toJSON().components;
+  assert.equal(closed[1].disabled, true);
+  assert.equal(closed[2].disabled, false);
 });
 
 test("server templates hide irrelevant command families", () => {

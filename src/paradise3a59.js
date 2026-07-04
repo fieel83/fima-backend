@@ -41,7 +41,7 @@ const EMPTY_STATE = Object.freeze({
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
-  applications: {}, moderationCases: {}, securityState: {}
+  applications: {}, moderationCases: {}, securityState: {}, supportTickets: {}
 });
 
 function normalizeState(value) {
@@ -1369,6 +1369,19 @@ export async function runParadiseTestSmokeSuite(guild) {
       throw error;
     }
   };
+  const upsertSmokePanel = async (key, channel, payload) => {
+    const state = await loadState();
+    const storedId = configForGuild(state, guild.id).smokePanelMessageIds?.[key];
+    let message = storedId ? await channel.messages.fetch(storedId).catch(() => null) : null;
+    if (message) await message.edit(payload); else message = await smokeSend(channel, payload, `smoke_${key}_send_failed`);
+    await saveState(next => {
+      next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+      next.guildConfigs[guild.id].smokePanelMessageIds = next.guildConfigs[guild.id].smokePanelMessageIds || {};
+      next.guildConfigs[guild.id].smokePanelMessageIds[key] = message.id;
+      return next;
+    });
+    return message;
+  };
 
   const trainingId = crypto.randomUUID();
   const tryoutId = crypto.randomUUID();
@@ -1512,6 +1525,67 @@ export async function runParadiseTestSmokeSuite(guild) {
   const leaderboardBoards = await updateRankedLeaderboardBoards(guild).catch(() => []);
   smokeStep = "help_guide";
   const helpGuide = await publishSetupGuides(guild, "tsbtr").catch(() => null);
+  smokeStep = "workflow_panels";
+  const applicationChannel = await configuredChannel(guild, "application_ticket_channel", "application-ticket");
+  const supportChannel = await configuredChannel(guild, "support_ticket_channel", "support-ticket")
+    || guild.channels.cache.find(item => item.name === "open-ticket" && item.isTextBased?.());
+  const moderationChannel = await configuredChannel(guild, "moderation_requests_channel", "moderation-requests");
+  const securityChannel = await configuredChannel(guild, "quarantine_review_channel", "quarantine-review")
+    || guild.channels.cache.find(item => item.name === "security-alerts" && item.isTextBased?.());
+  const applicationPanel = applicationChannel
+    ? await upsertSmokePanel("application", applicationChannel, paradiseApplicationPanelPayload(await paradiseBrandColor()))
+    : null;
+  const supportPanel = supportChannel
+    ? await upsertSmokePanel("support", supportChannel, paradiseSupportPanelPayload(await paradiseBrandColor()))
+    : null;
+  const supportTicket = owner && supportChannel
+    ? await createParadiseSupportTicket(guild, owner.user, supportChannel, { test: true })
+    : null;
+
+  let moderationPanel = null;
+  if (moderationChannel) {
+    const currentState = await loadState();
+    let moderationRecord = Object.values(currentState.moderationCases?.[guild.id] || {})
+      .find(item => item.test === true && item.action === "review-only" && item.status === "pending");
+    if (!moderationRecord) {
+      moderationRecord = {
+        id: crypto.randomUUID(), guildId: guild.id, action: "review-only", targetId: ownerId,
+        requestedBy: ownerId, reason: "Safe live approval-queue rendering test; no member action is executed.",
+        status: "pending", test: true, createdAt: new Date().toISOString()
+      };
+      await saveState(next => {
+        next.moderationCases[guild.id] = next.moderationCases[guild.id] || {};
+        next.moderationCases[guild.id][moderationRecord.id] = moderationRecord;
+        return next;
+      });
+    }
+    moderationPanel = await upsertSmokePanel("moderation", moderationChannel, {
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("MODERATION REQUEST · SAFE TEST")
+        .setDescription(`Case: \`${moderationRecord.id.slice(0, 8)}\`\nRequested by: <@${ownerId}>\nAction: **review-only**\n\nThis validates the senior approval queue without kicking, banning, muting or quarantining anyone.`)
+        .setFooter(paradiseFooter("No member action on approval"))],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_mod_approve:${moderationRecord.id}`).setLabel("Approve safe test").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_mod_deny:${moderationRecord.id}`).setLabel("Deny safe test").setStyle(ButtonStyle.Secondary)
+      )]
+    });
+  }
+  const securityPanel = securityChannel
+    ? await upsertSmokePanel("security", securityChannel, {
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("PARADISE SECURITY · LIVE STATUS")
+        .setDescription("# Audit-first protection\n- Discord AutoMod rules installed\n- Invite/scam and mention-spam guards configured\n- Quarantine review channel mapped\n- Raid mode and lockdown remain owner/senior-staff actions\n- No automatic first-offense ban\n\n-# Safe test: this message changes no moderation state.")
+        .setFooter(paradiseFooter("Quarantine and false-positive review"))]
+    })
+    : null;
+  smokeStep = "xp_board";
+  await saveState(next => {
+    next.memberLevels[guildUserKey(guild.id, ownerId)] = {
+      ...(next.memberLevels[guildUserKey(guild.id, ownerId)] || {}),
+      guildId: guild.id, userId: ownerId, xp: 1250, chatXp: 800, voiceXp: 450,
+      level: 5, weeklyXp: 240, monthlyXp: 1250, test: true, updatedAt: new Date().toISOString()
+    };
+    return next;
+  });
+  const xpBoard = await updateLevelLeaderboard(guild).catch(() => null);
   const result = {
     status: "LIVE DISCORD VERIFIED",
     completedAt: new Date().toISOString(),
@@ -1521,7 +1595,15 @@ export async function runParadiseTestSmokeSuite(guild) {
     lifecycleMessages: 6,
     welcomeLeaveSimulation: Boolean(owner),
     leaderboardBoards,
-    helpGuide: helpGuide ? { channelId: helpGuide.channelId, messageId: helpGuide.id, url: helpGuide.url } : null
+    helpGuide: helpGuide ? { channelId: helpGuide.channelId, messageId: helpGuide.id, url: helpGuide.url } : null,
+    workflowPanels: {
+      application: applicationPanel ? { channelId: applicationPanel.channelId, messageId: applicationPanel.id, url: applicationPanel.url } : null,
+      support: supportPanel ? { channelId: supportPanel.channelId, messageId: supportPanel.id, url: supportPanel.url } : null,
+      supportTicket: supportTicket ? { channelId: supportTicket.channel.id, ticketId: supportTicket.record.id, existing: supportTicket.existing } : null,
+      moderation: moderationPanel ? { channelId: moderationPanel.channelId, messageId: moderationPanel.id, url: moderationPanel.url } : null,
+      security: securityPanel ? { channelId: securityPanel.channelId, messageId: securityPanel.id, url: securityPanel.url } : null,
+      xp: xpBoard ? { channelId: xpBoard.channelId, messageId: xpBoard.id, url: xpBoard.url } : null
+    }
   };
   smokeStep = "artifact";
   await writeArtifact("3a66-test-server-live-smoke-suite.json", result);
@@ -2887,6 +2969,138 @@ async function handleQotdPayoutReview(interaction) {
   });
 }
 
+function paradiseApplicationPanelPayload(color) {
+  return {
+    embeds: [new EmbedBuilder().setColor(color).setTitle("PARADISE APPLICATIONS")
+      .setDescription("# Join the team\nChoose a position, answer the form honestly, then follow the private status shown by Paradise.\n\n- One active application at a time\n- Blacklisted users cannot apply\n- Reviewers cannot grant roles above their own hierarchy\n-# Turkish and English answers are accepted.")
+      .setFooter(paradiseFooter("Private review queue"))],
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("paradise_application_open").setLabel("Apply / Basvur").setEmoji("📝").setStyle(ButtonStyle.Primary)
+    )]
+  };
+}
+
+export function paradiseSupportPanelPayload(color) {
+  return {
+    embeds: [new EmbedBuilder().setColor(color).setTitle("PARADISE SUPPORT")
+      .setDescription("# Private support ticket\nOpen one private ticket for account, application, payment, moderation or server help.\n\n- Close first; tickets are not deleted immediately\n- Staff retain access after member access is removed\n- Transcripts are saved to the configured private channel\n- Never share passwords, cookies, tokens or full license keys\n\n-# One active support ticket per member.")
+      .setFooter(paradiseFooter("Audited ticket lifecycle"))],
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("paradise_support_open").setLabel("Open Support Ticket").setEmoji("🎫").setStyle(ButtonStyle.Primary)
+    )]
+  };
+}
+
+export function paradiseSupportTicketControls(ticketId, status = "open") {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_support_claim:${ticketId}`).setLabel("Claim").setStyle(ButtonStyle.Primary).setDisabled(status !== "open"),
+    new ButtonBuilder().setCustomId(`paradise_support_close:${ticketId}`).setLabel("Close").setStyle(ButtonStyle.Danger).setDisabled(status !== "open"),
+    new ButtonBuilder().setCustomId(`paradise_support_reopen:${ticketId}`).setLabel("Reopen").setStyle(ButtonStyle.Success).setDisabled(status === "open"),
+    new ButtonBuilder().setCustomId(`paradise_support_transcript:${ticketId}`).setLabel("Transcript").setStyle(ButtonStyle.Secondary)
+  )];
+}
+
+async function createParadiseSupportTicket(guild, user, sourceChannel, { test = false } = {}) {
+  const state = await loadState();
+  const existing = Object.values(state.supportTickets?.[guild.id] || {}).find(item => item.userId === user.id && item.status === "open");
+  if (existing) {
+    const channel = guild.channels.cache.get(existing.channelId) || await guild.channels.fetch(existing.channelId).catch(() => null);
+    if (channel) return { channel, record: existing, existing: true };
+  }
+  const ticketId = crypto.randomUUID();
+  const safeName = String(user.username || "member").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 24) || "member";
+  const staffRoles = [...guild.roles.cache.values()].filter(role => ["Owner", "Admin", "Overseer", "Manager", "Moderator", "Support Staff"].includes(role.name));
+  const overwrites = [
+    { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+    { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+    { id: guild.members.me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.ManageMessages] },
+    ...staffRoles.map(role => ({ id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] }))
+  ];
+  const channel = await guild.channels.create({
+    name: `${test ? "smoke-" : ""}support-${safeName}`.slice(0, 90),
+    type: ChannelType.GuildText,
+    parent: sourceChannel?.parentId || undefined,
+    topic: `Paradise support ticket ${ticketId.slice(0, 8)}. Keep secrets masked.`,
+    permissionOverwrites: overwrites,
+    reason: test ? "Paradise live support-ticket smoke test" : "Paradise support ticket opened"
+  });
+  const record = {
+    id: ticketId, guildId: guild.id, channelId: channel.id, userId: user.id,
+    status: "open", test, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  };
+  await saveState(next => {
+    next.supportTickets[guild.id] = next.supportTickets[guild.id] || {};
+    next.supportTickets[guild.id][ticketId] = record;
+    return next;
+  });
+  const header = await channel.send({
+    content: `<@${user.id}>`,
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("SUPPORT TICKET")
+      .setDescription(`Member: <@${user.id}>\nTicket: \`${ticketId.slice(0, 8)}\`\nStatus: **OPEN**\n\nUse the controls below. Close first; save a transcript before deletion.`)
+      .setFooter(paradiseFooter(test ? "Live smoke ticket" : "Private support"))],
+    components: paradiseSupportTicketControls(ticketId),
+    allowedMentions: { users: [user.id], roles: [], parse: [] }
+  });
+  await saveState(next => {
+    next.supportTickets[guild.id][ticketId] = { ...record, headerMessageId: header.id };
+    return next;
+  });
+  return { channel, record: { ...record, headerMessageId: header.id }, existing: false };
+}
+
+async function saveParadiseSupportTranscript(guild, channel, record, trigger) {
+  const destination = await configuredChannel(guild, "support_transcripts_channel", "support-ticket-transcripts")
+    || guild.channels.cache.find(item => item.name === "transcripts" && item.isTextBased?.());
+  if (!destination || !channel?.isTextBased?.()) return null;
+  const messages = [...(await channel.messages.fetch({ limit: 100 })).values()].reverse();
+  const lines = messages.map(message => {
+    const timestamp = message.createdAt?.toISOString?.() || "unknown";
+    const author = message.author ? `${message.author.username} (${message.author.id})` : "unknown";
+    return `[${timestamp}] ${author}: ${String(message.cleanContent || message.content || "[embed / attachment]").replace(/\r?\n/g, " ")}`;
+  });
+  const sent = await destination.send({
+    content: `Support transcript · Ticket **${record.id.slice(0, 8)}** · ${trigger}`,
+    files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `paradise-support-${record.id.slice(0, 8)}.txt` }]
+  });
+  return sent;
+}
+
+async function handleParadiseSupportButton(interaction) {
+  if (interaction.customId === "paradise_support_open") {
+    const created = await createParadiseSupportTicket(interaction.guild, interaction.user, interaction.channel);
+    return interaction.reply({ content: created.existing ? `You already have an open ticket: ${created.channel}` : `Support ticket opened: ${created.channel}`, ephemeral: true });
+  }
+  const [action, ticketId] = interaction.customId.replace("paradise_support_", "").split(":");
+  const state = await loadState();
+  const record = state.supportTickets?.[interaction.guildId]?.[ticketId];
+  if (!record || record.channelId !== interaction.channelId) return interaction.reply({ content: "Support ticket record not found.", ephemeral: true });
+  const isStaff = canModerate(interaction.member) || canApproveModeration(interaction.member);
+  if (action !== "close" && !isStaff) return interaction.reply({ content: "Staff authority required.", ephemeral: true });
+  if (action === "claim") {
+    await saveState(next => {
+      next.supportTickets[interaction.guildId][ticketId] = { ...record, claimedBy: interaction.user.id, updatedAt: new Date().toISOString() };
+      return next;
+    });
+    return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFooter(paradiseFooter(`Claimed by ${interaction.user.username}`))], components: paradiseSupportTicketControls(ticketId, "open") });
+  }
+  if (action === "transcript") {
+    const transcript = await saveParadiseSupportTranscript(interaction.guild, interaction.channel, record, "manual");
+    return interaction.reply({ content: transcript ? "Transcript saved to the private transcript channel." : "No transcript channel is configured.", ephemeral: true });
+  }
+  const status = action === "reopen" ? "open" : "closed";
+  await interaction.channel.permissionOverwrites.edit(record.userId, { ViewChannel: status === "open" }).catch(() => {});
+  await interaction.channel.setName(status === "open" ? interaction.channel.name.replace(/^closed-/, "") : `closed-${interaction.channel.name}`.slice(0, 90)).catch(() => {});
+  if (status === "closed") await saveParadiseSupportTranscript(interaction.guild, interaction.channel, record, "closed").catch(() => {});
+  await saveState(next => {
+    next.supportTickets[interaction.guildId][ticketId] = { ...record, status, updatedAt: new Date().toISOString(), updatedBy: interaction.user.id };
+    return next;
+  });
+  return interaction.update({
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`SUPPORT TICKET · ${status.toUpperCase()}`)],
+    components: paradiseSupportTicketControls(ticketId, status)
+  });
+}
+
 function applicationLabel(type) {
   return APPLICATION_TYPES.find(([value]) => value === type)?.[1] || type;
 }
@@ -2912,14 +3126,7 @@ async function handleApplicationCommand(interaction) {
   if (sub === "panel") {
     if (!canManageClan(interaction.member)) return interaction.reply({ content: "Application management authority required.", ephemeral: true });
     const channel = await configuredChannel(interaction.guild, "application_ticket_channel", "application-ticket") || interaction.channel;
-    await channel.send({
-      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE APPLICATIONS")
-        .setDescription("# Join the team\nChoose a position, answer the form honestly, then follow the private status shown by Paradise.\n\n- One active application at a time\n- Blacklisted users cannot apply\n- Reviewers cannot grant roles above their own hierarchy\n-# Türkçe ve English answers are accepted.")
-        .setFooter(paradiseFooter("Private review queue"))],
-      components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("paradise_application_open").setLabel("Apply / Başvur").setEmoji("📝").setStyle(ButtonStyle.Primary)
-      )]
-    });
+    await channel.send(paradiseApplicationPanelPayload(await paradiseBrandColor()));
     return interaction.reply({ content: `Application panel posted in ${channel}.`, ephemeral: true });
   }
   const state = await loadState();
@@ -3176,8 +3383,11 @@ async function decideModerationCase(interaction, decision, idOrPrefix) {
   let failure = null;
   if (decision === "approve") {
     try {
-      if (!target) throw new Error("member_not_found");
-      if (record.action === "kick") {
+      if (record.action === "review-only" && record.test === true) {
+        status = "approved";
+      } else if (!target) {
+        throw new Error("member_not_found");
+      } else if (record.action === "kick") {
         if (!target.kickable) throw new Error("role_hierarchy_blocks_kick");
         await target.kick(record.reason);
       } else {
@@ -5553,6 +5763,7 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_challenge_")) { await handleChallengeApproval(interaction); return true; }
     if (interaction.customId.startsWith("paradise_session_")) { await handleSessionButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_activity_present:")) { await handleActivityResponse(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_support_")) { await handleParadiseSupportButton(interaction); return true; }
     if (interaction.customId === "paradise_application_open") {
       const mode = configForGuild(await loadState(), interaction.guildId).activeSetupMode;
       const types = APPLICATION_TYPES.filter(([value]) =>
