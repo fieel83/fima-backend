@@ -1788,10 +1788,19 @@ async function profileEmbed(guild, discordId) {
   const profile = await completedProfile(discordId);
   if (!profile) return null;
   const member = await guild.members.fetch(discordId).catch(() => null);
-  const rank = member ? fighterRank(member) : "Unranked";
   const thumbnail = await robloxHeadshot(profile.robloxId);
   const state = await loadState();
-  const topSpot = leaderboardForGuild(state, guild.id)[discordId]?.spot || null;
+  const leaderboardRow = leaderboardForGuild(state, guild.id)[discordId] || {};
+  const topSpot = leaderboardRow.spot || null;
+  const storedRank = leaderboardRow.stageRank || profile.stageRank;
+  const rank = storedRank?.stage != null ? rankToRoleName(storedRank)
+    : member ? fighterRank(member) : "Unranked";
+  const activeTicket = openChallengeFor(state, discordId, guild.id);
+  const status = activeTicket ? "Being Challenged"
+    : Number(leaderboardRow.availability?.loaUntil || 0) > Date.now() ? `LOA <t:${Math.floor(leaderboardRow.availability.loaUntil / 1000)}:R>`
+      : Number(leaderboardRow.availability?.immunityUntil || 0) > Date.now() ? `Immunity <t:${Math.floor(leaderboardRow.availability.immunityUntil / 1000)}:R>`
+        : Number(leaderboardRow.availability?.cooldownUntil || 0) > Date.now() ? `Cooldown <t:${Math.floor(leaderboardRow.availability.cooldownUntil / 1000)}:R>`
+          : "Challengeable";
   const createdAt = Math.floor(new Date(profile.createdAt || profile.verifiedAt || Date.now()).getTime() / 1000);
   const updatedAt = Math.floor(new Date(profile.updatedAt || profile.profileUpdatedAt || profile.verifiedAt || Date.now()).getTime() / 1000);
   const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE FIGHTER PROFILE")
@@ -1802,10 +1811,15 @@ async function profileEmbed(guild, discordId) {
       { name: "Region", value: `**${profile.region}**`, inline: true },
       { name: "Rank", value: `**${rank}**`, inline: false },
       { name: "Leaderboard", value: topSpot ? `**Rank #${topSpot}**` : "**Unranked**", inline: true },
+      { name: "Status", value: `**${status}**`, inline: true },
+      { name: "Wins / Losses", value: `**${Number(leaderboardRow.wins || 0)} / ${Number(leaderboardRow.losses || 0)}**`, inline: true },
       { name: "Verification", value: "✓ Roblox About code confirmed", inline: true },
       { name: "Created / Updated", value: `<t:${createdAt}:D> · <t:${updatedAt}:R>`, inline: false }
     )
     .setFooter(paradiseFooter("Rank updates automatically after approved tryout results"));
+  if (activeTicket) embed.addFields({ name: "Active challenge", value: `Ticket **#${activeTicket.ticketId || activeTicket.channelId || "open"}**`, inline: true });
+  const notes = String(leaderboardRow.notes || leaderboardRow.feats || profile.notes || profile.feats || "").trim();
+  if (notes) embed.addFields({ name: "Notes / Feats", value: notes.slice(0, 900), inline: false });
   if (thumbnail) embed.setThumbnail(thumbnail);
   return embed;
 }
@@ -1902,8 +1916,21 @@ async function handleProfile(interaction) {
       if (exactProfile || exactRoblox || queryMatch) matches.push(discordId);
     }
     if (matches.length > 1) {
+      const profilesById = (await loadState()).profiles || {};
+      const menu = new StringSelectMenuBuilder().setCustomId("paradise_profile_lookup")
+        .setPlaceholder("Choose the matching Paradise profile")
+        .addOptions(...matches.slice(0, 25).map(id => {
+          const member = interaction.guild.members.cache.get(id);
+          const profile = profilesById[id] || {};
+          return {
+            label: String(member?.displayName || profile.robloxUsername || `Profile ${profile.profileId || id}`).slice(0, 100),
+            description: `#${profile.profileId || "—"} · Roblox: ${profile.robloxUsername || "Not linked"}`.slice(0, 100),
+            value: id
+          };
+        }));
       return interaction.reply({
-        content: `Multiple profiles matched. Use an exact **profile ID**, **Discord user**, **Discord user ID** or **Roblox username**:\n${matches.slice(0, 10).map(id => `• <@${id}>`).join("\n")}`,
+        content: "Multiple profiles matched. Choose the correct profile:",
+        components: [new ActionRowBuilder().addComponents(menu)],
         ephemeral: true
       });
     }
@@ -1913,6 +1940,13 @@ async function handleProfile(interaction) {
   const embed = await profileEmbed(interaction.guild, targetId);
   if (!embed) return interaction.reply({ content: `<@${targetId}> has not completed a Paradise fighter profile.`, ephemeral: true });
   return interaction.reply({ embeds: [embed] });
+}
+
+async function handleProfileLookupSelect(interaction) {
+  const targetId = interaction.values[0];
+  const embed = await profileEmbed(interaction.guild, targetId);
+  if (!embed) return interaction.update({ content: "That profile is no longer available.", embeds: [], components: [] });
+  return interaction.update({ content: "", embeds: [embed], components: [] });
 }
 
 async function handleProfileRegion(interaction) {
@@ -5851,6 +5885,10 @@ async function handleParadiseInteractionInner(interaction) {
       embeds: [helpEmbed(scope, interaction.locale).setColor(await paradiseBrandColor())],
       components: helpComponents(scope)
     });
+    return true;
+  }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_profile_lookup") {
+    await handleProfileLookupSelect(interaction);
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_application_type") {
