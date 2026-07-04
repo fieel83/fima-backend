@@ -1465,6 +1465,49 @@ export async function runParadiseTestSmokeSuite(guild) {
     await sendMemberLifecycleMessage(owner, "leave");
   }
   smokeStep = "leaderboard";
+  const botMember = guild.members.me;
+  await saveState(next => {
+    const target = ensureLeaderboardForGuild(next, guild.id);
+    target[ownerId] = {
+      ...(target[ownerId] || {}),
+      spot: 1,
+      stageRank: { stage: 0, level: "High", strength: "Strong" },
+      region: "Frankfurt, Germany",
+      wins: 12,
+      losses: 2,
+      notes: "Template-lab owner profile",
+      updatedAt: new Date().toISOString(),
+      updatedBy: ownerId,
+      test: true
+    };
+    if (botMember) {
+      target[botMember.id] = {
+        ...(target[botMember.id] || {}),
+        spot: 2,
+        stageRank: { stage: 2, level: "High", strength: "Strong" },
+        region: "Paris, France",
+        wins: 8,
+        losses: 3,
+        availability: { immunityUntil: Date.now() + 24 * 60 * 60 * 1000 },
+        notes: "Live smoke-suite demonstration card",
+        updatedAt: new Date().toISOString(),
+        updatedBy: ownerId,
+        test: true
+      };
+      next.profiles = next.profiles || {};
+      next.profiles[botMember.id] = next.profiles[botMember.id] || {
+        profileId: 9002,
+        discordUserId: botMember.id,
+        robloxUsername: "ParadiseTest",
+        region: "Paris, France",
+        thumbnailUrl: botMember.user.displayAvatarURL(),
+        stageRank: { stage: 2, level: "High", strength: "Strong" },
+        createdAt: new Date().toISOString(),
+        test: true
+      };
+    }
+    return next;
+  });
   const leaderboardBoards = await updateRankedLeaderboardBoards(guild).catch(() => []);
   const result = {
     status: "LIVE DISCORD VERIFIED",
