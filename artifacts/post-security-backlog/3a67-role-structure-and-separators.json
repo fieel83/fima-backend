@@ -1,0 +1,25 @@
+{
+  "priority": "3A67",
+  "status": "LIVE VERIFIED",
+  "verifiedCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
+  "testLabRoleCount": 87,
+  "groups": [
+    "Owner Rank",
+    "Administration",
+    "Moderation",
+    "Hosters",
+    "Referees",
+    "Community",
+    "Ping Roles",
+    "Language",
+    "Regions",
+    "Characters",
+    "Top Players",
+    "Stage / Level / Strength"
+  ],
+  "newPendingChange": {
+    "status": "SOURCE ONLY",
+    "role": "BLACKLISTED",
+    "purpose": "Restrict blacklisted members to appeal information while keeping internal resolution channels staff-only."
+  }
+}

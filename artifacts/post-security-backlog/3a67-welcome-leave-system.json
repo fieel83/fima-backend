@@ -1,0 +1,13 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "requirements": [
+    "Per-template Turkish/English welcome and farewell content",
+    "Original configurable banner",
+    "User avatar and member count",
+    "Configured channel recommendations only",
+    "Missing channel references are hidden",
+    "Made By Fieel default footer"
+  ],
+  "liveLimit": "No real member join/leave event was triggered in this pass."
+}

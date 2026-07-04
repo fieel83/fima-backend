@@ -1,0 +1,23 @@
+{
+  "priority": "3A67",
+  "status": "LIVE VERIFIED",
+  "verifiedCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
+  "smokeRevision": "3a67-visual-footer-smoke-v2",
+  "runtimeProof": {
+    "completed": true,
+    "completedAt": "2026-07-04T16:15:24.260Z",
+    "categories": 14,
+    "channels": 123,
+    "roles": 87,
+    "autoModRules": 2,
+    "commands": 62,
+    "trainingReady": true,
+    "tryoutReady": true,
+    "supportTicketReady": true,
+    "applicationPanelReady": true,
+    "moderationPanelReady": true,
+    "securityPanelReady": true,
+    "xpPanelReady": true
+  },
+  "visualLimit": "Official bot runtime confirms the test-lab structure and panels. A complete owner-side manual visual review of every channel and button is not claimed."
+}

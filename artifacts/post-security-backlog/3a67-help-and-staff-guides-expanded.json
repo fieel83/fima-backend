@@ -1,0 +1,21 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "requiredGuides": [
+    "command-guide",
+    "staff-command-guide",
+    "mod-command-guide",
+    "referee-guide",
+    "referee-rules",
+    "training-hoster-guide",
+    "tryout-hoster-guide",
+    "event-hoster-guide",
+    "giveaway-hoster-guide",
+    "ticket-guide",
+    "application-guide",
+    "profile-guide",
+    "leaderboard-guide"
+  ],
+  "languageRule": "Starter guide content follows selected Turkish or English setup language; slash command names remain English.",
+  "completionRule": "Do not mark live until the guide messages are reposted and visually checked in Discord."
+}

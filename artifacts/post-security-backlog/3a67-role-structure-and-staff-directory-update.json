@@ -23,7 +23,8 @@
         "Event Hoster",
         "Giveaway Hoster",
         "War Hoster",
-        "Trial Training Hoster"
+        "Trial Training Hoster",
+        "BLACKLISTED"
       ]
     },
     "fieelsCommunity": {
@@ -37,6 +38,22 @@
       ],
       "explicitNonRankingRule": "Community template stays support/community/event focused; challenge/ranking/roster is not enabled by default."
     }
+  },
+  "blacklistPermissionRepair": {
+    "status": "SOURCE ONLY",
+    "role": "BLACKLISTED",
+    "appealChannels": [
+      "ban-appeal",
+      "blacklist-appeal"
+    ],
+    "staffOnlyChannels": [
+      "unblacklist",
+      "bail-review",
+      "blacklist-logs"
+    ],
+    "publicReadOnlyChannels": [
+      "blacklist"
+    ]
   },
   "staffDirectoryUpdate": {
     "oldProblem": "Flat list was hard to read and missed clear admin/hoster grouping.",

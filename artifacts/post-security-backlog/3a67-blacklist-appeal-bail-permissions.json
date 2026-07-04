@@ -1,0 +1,22 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "role": "BLACKLISTED",
+  "channelPermissions": {
+    "blacklist": "Visible to everyone, read-only",
+    "ban-appeal": "Hidden from everyone; visible/read-only to BLACKLISTED; staff can manage",
+    "blacklist-appeal": "Hidden from everyone; visible/read-only to BLACKLISTED; staff can manage",
+    "unblacklist": "Staff-only",
+    "bail-review": "Staff-only",
+    "blacklist-logs": "Staff-only"
+  },
+  "automation": {
+    "blacklistAdd": "Adds BLACKLISTED role",
+    "blacklistRemove": "Removes BLACKLISTED role",
+    "approvedAppeal": "Removes BLACKLISTED role",
+    "setupAndRepair": "Reapplies the channel visibility matrix during full setup and create-missing/repair"
+  },
+  "tests": "63/63 passed locally",
+  "deployment": "Pending commit/deploy at artifact creation time",
+  "mainServersChanged": false
+}

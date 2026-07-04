@@ -46,6 +46,13 @@
     },
     "blacklistAppealVisibility": {
       "requirement": "Blacklisted members should receive BLACKLISTED role and only see ban appeal information; unblacklist/bail-review are staff-only/review channels.",
+      "channelMatrix": {
+        "blacklist": "Public read-only board",
+        "ban-appeal / blacklist-appeal": "Hidden from everyone; readable by BLACKLISTED members and staff",
+        "unblacklist": "Staff-only resolution/reason history",
+        "bail-review": "Staff-only unless a future ticket grants explicit participant access",
+        "blacklist-logs": "Staff-only audit trail"
+      },
       "status": "SOURCE ONLY"
     },
     "roleHierarchy": {
@@ -55,6 +62,14 @@
     "leaderboardCards": {
       "requirement": "Top boards must be cleaner, show full Stage / Level / Strength, and use line GIF separators only where helpful.",
       "implementation": "Leaderboard cards now render full rank text and attach the owner-provided fixedbulletlines GIF to the first board card."
+    },
+    "referencePanelPatterns": {
+      "staffTeam": "Banner/header plus clearly separated Owner Rank, High Rank, Low Rank, Hoster and Referee groups.",
+      "pingRoles": "Compact native buttons with grouped event and competitive pings.",
+      "regionRoles": "One-click region buttons with clean continent labels.",
+      "faq": "Short question/answer sections with linked guide channels and strike-system explanation.",
+      "rules": "Original banner, numbered sections, concise enforcement text and escalation route.",
+      "applicationOverview": "Original banner, server purpose, requirements, tryout/application explanation and ownership summary."
     },
     "activeTrainingTryoutMessages": {
       "requirement": "Active training/tryout announcements must be normal Markdown messages, not embeds.",

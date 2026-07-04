@@ -1,0 +1,16 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "panels": {
+    "rules": "Original banner, numbered concise rules, enforcement path and Discord policy reminder",
+    "faq": "Short Q/A groups for profiles, tryouts, trainings, banned techniques, strikes and support escalation",
+    "overview": "Server purpose, template features, ownership/management summary and safe links",
+    "applications": "Application types, requirements, cooldown, review flow and blacklisted-user restriction"
+  },
+  "formatRules": [
+    "Mobile-readable sections",
+    "No copied TSBER artwork or text",
+    "Turkish/English according to server setup language",
+    "Stored message IDs so repost edits in place"
+  ]
+}

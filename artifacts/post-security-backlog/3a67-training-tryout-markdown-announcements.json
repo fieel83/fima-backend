@@ -1,0 +1,17 @@
+{
+  "priority": "3A67",
+  "status": "LIVE VERIFIED",
+  "verifiedCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
+  "defaultStyle": "Normal Discord Markdown content, not an embed",
+  "controls": [
+    "SERVER LOCKED",
+    "UNLOCK",
+    "END TRAINING / END TRYOUT"
+  ],
+  "footerDefault": "Made By Fieel",
+  "liveSmoke": {
+    "trainingReady": true,
+    "tryoutReady": true,
+    "revision": "3a67-visual-footer-smoke-v2"
+  }
+}

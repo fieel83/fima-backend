@@ -1,0 +1,20 @@
+{
+  "priority": "3A67",
+  "status": "BLOCKED",
+  "implementedInSource": [
+    "Multi-server selector",
+    "Theme/language/accent settings",
+    "Template and channel/role configuration",
+    "Backup, preview and safe setup controls",
+    "Owner-only authorization checks"
+  ],
+  "blockedVerification": "A usable owner-authenticated browser session was not exercised in this continuation, so save/reload/CSRF and visual page-by-page proof are not claimed.",
+  "requiredNextProof": [
+    "Owner login",
+    "Select each managed server",
+    "Save theme/language/accent",
+    "Save searchable channel mapping",
+    "Reload and confirm persistence",
+    "Verify no csrf_required error"
+  ]
+}

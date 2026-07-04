@@ -1,0 +1,17 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "panels": {
+    "language": ["English", "Türkçe"],
+    "regions": ["Europe", "Asia", "North America", "South America", "Oceania"],
+    "pings": ["Training", "Tryout", "Sparring", "Giveaways", "Game Nights", "Content", "Updates", "Security Alerts"]
+  },
+  "behavior": [
+    "Press again to remove a self-role",
+    "Ephemeral confirmation",
+    "Only configured self-assignable roles",
+    "Template-specific options",
+    "Setup language controls starter guide language, not slash command names"
+  ],
+  "reference": "Compact TSBER role-button layout inspired the grouping; wording and implementation remain original."
+}

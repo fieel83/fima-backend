@@ -1,0 +1,14 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "style": {
+    "background": "Discord-native charcoal embed",
+    "accent": "Per-server configurable",
+    "footerDefault": "Made By Fieel",
+    "headings": ["# Heading", "## Section", "### Detail"],
+    "emphasis": ["**bold**", "__underline__", "_italic_", "-# small footer"],
+    "safeSymbols": ["◆", "➤", "✦", "⚠", "👑", "🛡️", "📌"],
+    "avoid": ["Unreadable fancy fonts", "Emoji clutter", "Random hotlinked assets", "Very long mobile-unfriendly walls"]
+  },
+  "referenceUse": "Owner screenshots are inspiration only; Paradise text, assets and layout remain original."
+}

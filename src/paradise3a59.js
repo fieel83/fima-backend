@@ -159,7 +159,7 @@ export const PARADISE_CLAN_ROLES = [
   "Training Ping", "Tryout Ping", "Referee Ping", "Spar Ping", "Tournament Ping", "Event Ping",
   "Giveaway Ping", "Game Night Ping", "Staff Updates", "Server Updates",
   "━━━━━ LANGUAGE ━━━━━",
-  "Turkish", "English", "Activity Whitelist", "LOA", "Muted / Quarantined",
+  "Turkish", "English", "Activity Whitelist", "LOA", "BLACKLISTED", "Muted / Quarantined",
   "━━━━━ REGION ROLES ━━━━━",
   "Frankfurt, Germany", "Paris, France", "London, United Kingdom", "Amsterdam, Netherlands",
   "━━━━━ CHARACTERS ━━━━━",
@@ -187,7 +187,7 @@ export const PARADISE_COMMUNITY_ROLES = [
   "Update Ping", "Training Ping", "Tournament Ping", "Giveaway Ping",
   "Event Ping", "Game Night Ping", "Security Alert Ping", "Robux Payment Ping",
   "━━━━━ LANGUAGE ━━━━━",
-  "Turkish", "English", "LOA", "Muted / Quarantined"
+  "Turkish", "English", "LOA", "BLACKLISTED", "Muted / Quarantined"
 ];
 
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
@@ -1043,7 +1043,7 @@ const ROLE_PERMISSION_NAMES = Object.freeze({
 const PRIVATE_ACCESS_ROLES = new Set([
   "Owner", "Admin", "Overseer", "Manager", "Community Manager", "Moderator",
   "Administration Manager", "Head Admin", "Senior Admin", "Moderator Manager", "Head Moderator", "Senior Moderator",
-  "Support Staff", "Bot Manager", "Training Manager", "Tryout Manager",
+  "Support Staff", "Bot Manager", "Security Staff", "Training Manager", "Tryout Manager",
   "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
   "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee",
   "Training Supervisor", "Experienced Training Hoster", "Training Hoster", "Trial Training Hoster",
@@ -1066,6 +1066,69 @@ async function ensureRole(guild, name, applyPermissions = false) {
     await role.setPermissions(permissions, "3A59 Paradise permission template").catch(() => {});
   }
   return role;
+}
+
+async function ensureBlacklistVisibility(guild, channel, channelName, roleNames = []) {
+  if (!guild || !channel?.permissionOverwrites?.edit) return;
+  const name = String(channelName || channel.name || "").toLowerCase();
+  const staffOnly = new Set(["unblacklist", "bail-review", "blacklist-logs"]);
+  const appealOnly = new Set(["ban-appeal", "blacklist-appeal"]);
+  const publicReadOnly = new Set(["blacklist"]);
+  if (!staffOnly.has(name) && !appealOnly.has(name) && !publicReadOnly.has(name)) return;
+
+  const staffRoles = roleNames.length
+    ? roleNames.filter(roleName => PRIVATE_ACCESS_ROLES.has(roleName))
+    : [...PRIVATE_ACCESS_ROLES];
+
+  if (appealOnly.has(name)) {
+    const blacklisted = guild.roles.cache.find(role => role.name === "BLACKLISTED") || await ensureRole(guild, "BLACKLISTED");
+    await channel.permissionOverwrites.edit(guild.roles.everyone, {
+      ViewChannel: false,
+      SendMessages: false,
+      AddReactions: false
+    }, { reason: "Paradise blacklist appeal visibility" }).catch(() => {});
+    await channel.permissionOverwrites.edit(blacklisted, {
+      ViewChannel: true,
+      SendMessages: false,
+      AddReactions: false,
+      ReadMessageHistory: true
+    }, { reason: "Paradise blacklist appeal visibility" }).catch(() => {});
+    for (const roleName of staffRoles) {
+      const role = guild.roles.cache.find(item => item.name === roleName);
+      if (role) await channel.permissionOverwrites.edit(role, {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true
+      }, { reason: "Paradise blacklist staff review visibility" }).catch(() => {});
+    }
+    return;
+  }
+
+  if (staffOnly.has(name)) {
+    await channel.permissionOverwrites.edit(guild.roles.everyone, {
+      ViewChannel: false,
+      SendMessages: false,
+      AddReactions: false
+    }, { reason: "Paradise staff-only blacklist review visibility" }).catch(() => {});
+    for (const roleName of staffRoles) {
+      const role = guild.roles.cache.find(item => item.name === roleName);
+      if (role) await channel.permissionOverwrites.edit(role, {
+        ViewChannel: true,
+        SendMessages: true,
+        ReadMessageHistory: true
+      }, { reason: "Paradise staff-only blacklist review visibility" }).catch(() => {});
+    }
+    return;
+  }
+
+  if (publicReadOnly.has(name)) {
+    await channel.permissionOverwrites.edit(guild.roles.everyone, {
+      ViewChannel: true,
+      SendMessages: false,
+      AddReactions: false,
+      ReadMessageHistory: true
+    }, { reason: "Paradise public blacklist board read-only" }).catch(() => {});
+  }
 }
 
 async function organizeRoleHierarchy(guild, roleNames) {
@@ -1166,6 +1229,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
           parent: category.id, reason: "3A59 Paradise setup"
         });
       } else if (channel.parentId !== category.id) await channel.setParent(category.id, { lockPermissions: privateCategory });
+      await ensureBlacklistVisibility(interaction.guild, channel, channelName, selected.roles).catch(() => {});
     }
   }
   const removableChannels = [...interaction.guild.channels.cache.values()]
@@ -1265,6 +1329,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
       } else if (channel.parentId !== category.id) {
         await channel.setParent(category.id, { lockPermissions: privateCategory }).catch(() => {});
       }
+      await ensureBlacklistVisibility(guild, channel, channelName, selected.roles).catch(() => {});
     }
   }
 
@@ -5538,6 +5603,15 @@ async function handleBlacklist(interaction) {
     }
     return state;
   });
+  const blacklistedRole = await ensureRole(interaction.guild, "BLACKLISTED").catch(() => null);
+  const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
+  if (blacklistedRole && targetMember) {
+    if (sub === "remove") {
+      await targetMember.roles.remove(blacklistedRole, "Paradise blacklist resolved").catch(() => {});
+    } else {
+      await targetMember.roles.add(blacklistedRole, "Paradise blacklist active").catch(() => {});
+    }
+  }
   await updateBlacklistPanel(interaction.guild).catch(() => {});
   await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", "Blacklist record updated",
     `${user} record was **${sub === "remove" ? "resolved" : "created"}** by <@${interaction.user.id}>.\n**Reason:** ${reason}`);
@@ -5622,6 +5696,11 @@ async function handleAppeal(interaction) {
     return state;
   });
   if (!found) return interaction.reply({ content: "No pending appeal was found for that user.", ephemeral: true });
+  if (sub === "approve") {
+    const blacklistedRole = interaction.guild.roles.cache.find(role => role.name === "BLACKLISTED");
+    const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
+    if (blacklistedRole && targetMember) await targetMember.roles.remove(blacklistedRole, "Paradise appeal approved").catch(() => {});
+  }
   await updateBlacklistPanel(interaction.guild).catch(() => {});
   await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", `Appeal ${sub === "approve" ? "approved" : "denied"}`,
     `${user} appeal was decided by <@${interaction.user.id}>.\n**Decision:** ${reason}`);

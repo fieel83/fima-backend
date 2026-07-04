@@ -1,0 +1,23 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "existingSafeState": {
+    "Paradise | Türkiye": {
+      "backup": true,
+      "preview": true,
+      "confirmation": "REBUILD PARADISE TURKIYE"
+    },
+    "Fieel's Community": {
+      "backup": true,
+      "preview": true,
+      "confirmation": "REBUILD FIEELS COMMUNITY"
+    },
+    "TSBTR Yedek": {
+      "backup": true,
+      "preview": true,
+      "confirmation": "REBUILD TSBTR YEDEK"
+    }
+  },
+  "destructiveRebuildExecuted": false,
+  "rule": "Main servers remain unchanged until the matching exact typed owner confirmation is received."
+}

@@ -1,0 +1,16 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "assetPolicy": "Use original generated or owner-provided assets; do not copy reference-server artwork or hotlink unsafe images.",
+  "prompts": {
+    "staffTeam": "Premium Discord staff directory banner for Paradise, dark charcoal and deep purple, elegant gold accent, abstract crown and shield motifs, no copyrighted characters, wide 16:9, readable STAFF TEAM title.",
+    "rules": "Premium Discord rules banner, black and deep purple atmosphere, subtle red warning accent, abstract shield and document icons, no copyrighted characters, wide 16:9, readable RULES title.",
+    "applications": "Premium Paradise applications banner, dark purple/charcoal, abstract gateway and team silhouettes, clean neon accent, no copyrighted characters, wide 16:9, readable APPLICATIONS title.",
+    "leaderboard": "Competitive leaderboard banner, dark charcoal with purple and gold rank glow, abstract podium and crown, no copyrighted characters, wide 16:9, readable LEADERBOARD title.",
+    "welcome": "Paradise community welcome banner, premium dark purple nebula, subtle cyan highlights, abstract portal and community silhouettes, no copyrighted characters, wide 16:9, readable WELCOME title."
+  },
+  "existingOwnerAssets": {
+    "lineGifs": "public/assets/images/paradise/line-gifs",
+    "usage": "Leaderboard/top boards only by default"
+  }
+}

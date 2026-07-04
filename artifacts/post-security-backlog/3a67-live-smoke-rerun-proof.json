@@ -1,6 +1,6 @@
 {
   "priority": "3A67",
-  "status": "SOURCE ONLY",
+  "status": "LIVE VERIFIED",
   "createdAt": "2026-07-04",
   "targetSmokeRevision": "3a67-visual-footer-smoke-v2",
   "changesExpectedInSmoke": [
@@ -11,11 +11,30 @@
     "Leaderboard board cards include full Stage/Level/Strength and line GIF separator"
   ],
   "liveVerification": {
-    "deployStatus": "pending",
-    "renderCommit": null,
-    "publicStatusRevision": null,
-    "testLabCompleted": null,
-    "checkedAt": null
+    "deployStatus": "live",
+    "renderCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
+    "renderBuildTime": "2026-07-04T16:14:52.158Z",
+    "publicStatusRevision": "3a67-visual-footer-smoke-v2",
+    "testLabCompleted": true,
+    "testLabCompletedAt": "2026-07-04T16:15:24.260Z",
+    "checkedAt": "2026-07-04T16:20:01.273Z",
+    "liveBooleans": {
+      "trainingReady": true,
+      "tryoutReady": true,
+      "supportTicketReady": true,
+      "applicationPanelReady": true,
+      "supportPanelReady": true,
+      "moderationPanelReady": true,
+      "securityPanelReady": true,
+      "xpPanelReady": true
+    },
+    "testLabStructure": {
+      "categories": 14,
+      "channels": 123,
+      "roles": 87,
+      "autoModRules": 2,
+      "commands": 62
+    }
   },
   "mainServerDestructiveRebuild": {
     "executed": false,

@@ -1,0 +1,19 @@
+{
+  "priority": "3A67",
+  "status": "LIVE VERIFIED",
+  "verifiedCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
+  "groups": [
+    "Kurucular / Owners",
+    "Adminler / Administration",
+    "Hosterlar / Operations",
+    "Hakemler / Referees",
+    "Moderasyon & Destek"
+  ],
+  "behavior": [
+    "Refreshes when staff roles change",
+    "Shows Vacant when a configured role has no members",
+    "Supports an optional original staff-team banner",
+    "Uses configurable footer with Made By Fieel default"
+  ],
+  "visualLimitation": "Deployed source is verified; an owner-side Discord visual pass is still recommended after the next permission deploy."
+}

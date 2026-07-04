@@ -1,0 +1,19 @@
+{
+  "priority": "3A67",
+  "status": "LIVE VERIFIED",
+  "verifiedCommit": "c6cb3f4ab1668fe004cc41837d10ca832a89e9e3",
+  "liveSmokeRevision": "3a67-visual-footer-smoke-v2",
+  "requirements": [
+    "Top 10, Top 20 and Top 30 boards update in place",
+    "Cards show profile ID, Discord mention, Roblox name, region, full Stage/Level/Strength, status and wins/losses",
+    "Vacant positions remain intentionally formatted",
+    "Decorative line GIF is limited to ranking boards"
+  ],
+  "liveProof": {
+    "testLabCompleted": true,
+    "channels": 123,
+    "roles": 87,
+    "commands": 62
+  },
+  "limitation": "Runtime smoke is live; a fresh owner-side Discord screenshot review of every populated card remains pending."
+}

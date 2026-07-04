@@ -1,0 +1,18 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "implementedScope": [
+    "Moderation and security panels exist in the live test-lab smoke",
+    "Role hierarchy and approval checks exist in source",
+    "Audit channels are part of template structures"
+  ],
+  "liveSmoke": {
+    "moderationPanelReady": true,
+    "securityPanelReady": true
+  },
+  "notYetProven": [
+    "Full low-staff request to senior approval interaction",
+    "Real quarantine role apply/remove on a safe test member",
+    "Owner-side visual verification of every moderation case state"
+  ]
+}

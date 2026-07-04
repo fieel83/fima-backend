@@ -1,0 +1,18 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "tests": "Template command-family filtering is covered by local tests.",
+  "templates": {
+    "FieelsCommunity": {
+      "show": ["community", "support", "Fima", "applications", "events", "giveaways", "optional training", "moderation", "voice", "XP"],
+      "hideByDefault": ["challenge", "ranking", "roster", "war", "referee"]
+    },
+    "ParadiseClan": {
+      "show": ["clan", "challenge", "leaderboard", "roster", "war", "training", "tryout", "applications", "moderation", "tickets", "voice", "XP"]
+    },
+    "TSBTRYedek": {
+      "show": ["profiles", "leaderboard", "challenge", "availability", "LOA", "referee", "hoster", "training", "tryout", "activity", "moderation", "tickets"]
+    }
+  },
+  "liveLimit": "A fresh Discord client command-list comparison for every guild was not performed in this pass."
+}

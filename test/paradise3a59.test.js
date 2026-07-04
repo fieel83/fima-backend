@@ -5,7 +5,7 @@ import {
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   paradiseSupportPanelPayload, paradiseSupportTicketControls,
   sanitizeTemporaryVoiceName,
   timedAvailabilityLines
@@ -174,6 +174,8 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Stage 2 High Strong"));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Top 30"));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Frankfurt, Germany"));
+  assert.ok(PARADISE_CLAN_ROLES.includes("BLACKLISTED"));
+  assert.ok(PARADISE_COMMUNITY_ROLES.includes("BLACKLISTED"));
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("challenge-results"), false);
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("application-ticket"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("Join to Create"), true);

@@ -1,0 +1,19 @@
+{
+  "priority": "3A67",
+  "status": "SOURCE ONLY",
+  "principle": "Use major-bot usability patterns as inspiration only; do not copy branding, CSS, text or protected assets.",
+  "inspiration": [
+    "Clear landing page and server selector",
+    "Searchable command documentation",
+    "Auto responder editor with variables and channel/role filters",
+    "Level, reputation and premium feature separation",
+    "Strong logs, moderation and custom command controls"
+  ],
+  "ParadiseDirection": [
+    "Template-aware commands",
+    "TSB-specific profile/challenge/leaderboard automation",
+    "Safe backup/preview/rebuild workflow",
+    "TR/EN guides",
+    "Original Paradise/Fieel visual identity"
+  ]
+}
