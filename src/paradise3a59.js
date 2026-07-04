@@ -11,7 +11,7 @@ import {
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
-const PARADISE_AUTO_SMOKE_REVISION = "3a66-workflow-panels-v2";
+const PARADISE_AUTO_SMOKE_REVISION = "3a66-workflow-panels-v3";
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
 const APPLICATION_TYPES = Object.freeze([
@@ -240,7 +240,7 @@ export const PARADISE_TSBTR_SCHEMA = [
   ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "training-hoster-announcements", "training-hoster-rules", "trainer-annc", "activity-check"], false],
   ["TICKET", ["challenge-ticket", "support-ticket", "payment-ticket", "bug-ticket", "macro-ticket", "application-ticket", "application-guide", "report-staff"], false],
   ["GENERAL", ["tr-chat", "chat", "media", "bot-commands", "teamer-help", "spar-request"], false],
-  ["LEADERBOARD", ["top-10", "top-20", "top-30", "challenge-rules", "set-rules", "availability", "challenges", "challenge-results"], false],
+  ["LEADERBOARD", ["top-10", "top-20", "top-30", "level-leaderboard", "challenge-rules", "set-rules", "availability", "challenges", "challenge-results"], false],
   ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports", "loa"], true],
   ["REFEREES", ["referee-annc", "referee-chat", "referee-rules", "referee-post", "referee-updates", "referee-works", "referee-guide", "referee-strikes", "referee-activity-check"], true],
   ["STAFF OPERATIONS", ["staff-command-guide", "mod-command-guide", "giveaway-event-guide", "ticket-guide", "dashboard-guide", "moderation-policy", "moderation-requests", "quarantine-review", "application-reviews"], true],
@@ -1586,6 +1586,15 @@ export async function runParadiseTestSmokeSuite(guild) {
     };
     return next;
   });
+  if (!guild.channels.cache.some(item => item.name === "level-leaderboard" && item.isTextBased?.())) {
+    const parent = guild.channels.cache.find(item => item.type === ChannelType.GuildCategory && item.name === "LEADERBOARD");
+    await guild.channels.create({
+      name: "level-leaderboard",
+      type: ChannelType.GuildText,
+      parent: parent?.id,
+      reason: "Paradise test-lab XP board verification"
+    });
+  }
   const xpBoard = await updateLevelLeaderboard(guild).catch(() => null);
   const result = {
     status: "LIVE DISCORD VERIFIED",
