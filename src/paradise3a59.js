@@ -1510,6 +1510,8 @@ export async function runParadiseTestSmokeSuite(guild) {
     return next;
   });
   const leaderboardBoards = await updateRankedLeaderboardBoards(guild).catch(() => []);
+  smokeStep = "help_guide";
+  const helpGuide = await publishSetupGuides(guild, "tsbtr").catch(() => null);
   const result = {
     status: "LIVE DISCORD VERIFIED",
     completedAt: new Date().toISOString(),
@@ -1518,7 +1520,8 @@ export async function runParadiseTestSmokeSuite(guild) {
     tryout: { channelId: tryoutChannel.id, messageId: tryout.id, url: tryout.url },
     lifecycleMessages: 6,
     welcomeLeaveSimulation: Boolean(owner),
-    leaderboardBoards
+    leaderboardBoards,
+    helpGuide: helpGuide ? { channelId: helpGuide.channelId, messageId: helpGuide.id, url: helpGuide.url } : null
   };
   smokeStep = "artifact";
   await writeArtifact("3a66-test-server-live-smoke-suite.json", result);
@@ -4230,10 +4233,15 @@ async function handleHelp(interaction) {
 async function publishSetupGuides(guild, mode) {
   const channel = await configuredChannel(guild, "command_guide_channel", "command-guide");
   if (!channel?.isTextBased?.()) return null;
-  const message = await channel.send({
+  const state = await loadState();
+  const storedMessageId = configForGuild(state, guild.id).commandGuideMessageIds?.[mode];
+  let message = storedMessageId ? await channel.messages.fetch(storedMessageId).catch(() => null) : null;
+  const payload = {
     embeds: [helpEmbed(mode).setColor(await paradiseBrandColor())],
     components: helpComponents(mode)
-  });
+  };
+  if (message) await message.edit(payload);
+  else message = await channel.send(payload);
   await saveState(state => {
     state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
     state.guildConfigs[guild.id].commandGuideMessageIds = state.guildConfigs[guild.id].commandGuideMessageIds || {};
