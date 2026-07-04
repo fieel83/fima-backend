@@ -18,8 +18,9 @@
     "Stage / Level / Strength"
   ],
   "newPendingChange": {
-    "status": "SOURCE ONLY",
+    "status": "LIVE VERIFIED",
     "role": "BLACKLISTED",
-    "purpose": "Restrict blacklisted members to appeal information while keeping internal resolution channels staff-only."
+    "purpose": "Restrict blacklisted members to appeal information while keeping internal resolution channels staff-only.",
+    "executionNote": "Code is deployed; existing guild permission overwrites are applied on the next safe repair/create-missing/setup run."
   }
 }

@@ -1,6 +1,6 @@
 {
   "priority": "3A67",
-  "status": "SOURCE ONLY",
+  "status": "LIVE VERIFIED",
   "role": "BLACKLISTED",
   "channelPermissions": {
     "blacklist": "Visible to everyone, read-only",
@@ -17,6 +17,16 @@
     "setupAndRepair": "Reapplies the channel visibility matrix during full setup and create-missing/repair"
   },
   "tests": "63/63 passed locally",
-  "deployment": "Pending commit/deploy at artifact creation time",
+  "deployment": {
+    "status": "LIVE VERIFIED",
+    "commit": "0f5eb852f55420146a1d1746287068fe8e368725",
+    "buildTime": "2026-07-04T17:00:06.095Z",
+    "botReady": true,
+    "commandSync": "66/66 healthy"
+  },
+  "discordPermissionApplication": {
+    "status": "BLOCKED",
+    "reason": "The repaired visibility matrix runs during setup/create-missing/repair. This pass did not trigger a fresh destructive setup or owner-approved main-server repair after deploy."
+  },
   "mainServersChanged": false
 }
