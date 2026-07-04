@@ -1,0 +1,21 @@
+{
+  "status": "SOURCE ONLY",
+  "routes": {
+    "landing": "/paradise-bot",
+    "commands": "/paradise/commands",
+    "premium": "/paradise/premium",
+    "feedback": "/paradise/feedback",
+    "invite": "/paradise/invite",
+    "ownerDashboard": "/paradise"
+  },
+  "homepageSection": true,
+  "commandSearch": true,
+  "templatesExplained": ["Fieel's Community", "Paradise Clan", "TSBTR-style"],
+  "premium": {
+    "billingEnabled": false,
+    "tiersProposed": ["Free", "Starter", "Pro", "Ultimate"],
+    "label": "Coming soon",
+    "ownerApprovalRequiredBeforeBilling": true
+  },
+  "safety": "The public page separates LIVE modules from roadmap modules and does not collect credentials or private feedback data."
+}

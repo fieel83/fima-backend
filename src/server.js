@@ -620,6 +620,20 @@ app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
   }));
 });
 
+app.get(["/paradise/invite", "/bot/invite"], (_req, res) => {
+  const clientId = env("DISCORD_CLIENT_ID", "");
+  if (!/^\d{16,22}$/.test(clientId)) return res.redirect(302, "/paradise-bot#invite-unavailable");
+  const url = new URL("https://discord.com/oauth2/authorize");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("permissions", "8");
+  url.searchParams.set("scope", "bot applications.commands");
+  return res.redirect(302, url.toString());
+});
+
+app.get(["/paradise/commands", "/bot/commands"], (_req, res) => res.redirect(302, "/paradise-bot#commands"));
+app.get(["/paradise/premium", "/bot/premium"], (_req, res) => res.redirect(302, "/paradise-bot#premium"));
+app.get(["/paradise/feedback", "/bot/feedback"], (_req, res) => res.redirect(302, "/paradise-bot#feedback"));
+
 app.get("/api/paradise/session-status", async (req, res) => {
   res.set("Cache-Control", "no-store");
   try {
