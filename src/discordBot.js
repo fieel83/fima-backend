@@ -2282,16 +2282,10 @@ export async function rebuildParadiseTestTemplateFromDashboard(mode, guildId, co
 }
 
 export async function runParadiseTestSmokeSuiteFromDashboard(guildId) {
-  if (!discordClient?.isReady?.()) {
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.isReady?.()) {
     const error = new Error("paradise_bot_not_ready");
     error.code = "paradise_bot_not_ready";
-    throw error;
-  }
-  const guild = discordClient.guilds.cache.get(String(guildId))
-    || await discordClient.guilds.fetch(String(guildId)).catch(() => null);
-  if (!guild) {
-    const error = new Error("guild_not_found");
-    error.code = "guild_not_found";
     throw error;
   }
   return runParadiseTestSmokeSuite(guild);
