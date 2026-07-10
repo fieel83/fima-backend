@@ -11,7 +11,9 @@ import {
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
-const PARADISE_AUTO_SMOKE_REVISION = "3a68-dashboard-application-ticket-leaderboard-v6";
+// Changing this revision reruns the guarded smoke suite only in the fixed
+// Paradise test guild. It never targets a production guild.
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-license-ticket-live-smoke-v1";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
