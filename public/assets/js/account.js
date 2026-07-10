@@ -1211,8 +1211,14 @@
     const text = String(value || "").trim();
     if (!text) throw new Error(t("licenseNotFound"));
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return;
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch (error) {
+        // Some browsers expose the Clipboard API but reject it outside a
+        // trusted gesture. Continue to the safe in-page fallback instead of
+        // leaving Copy License as a silent no-op.
+      }
     }
     const textarea = document.createElement("textarea");
     textarea.value = text;
@@ -2981,7 +2987,7 @@
       if (copyLicenseIdButton) {
         copyLicenseIdButton.disabled = true;
         try {
-          const data = await api(`/api/me/license-records/${encodeURIComponent(copyLicenseIdButton.dataset.copyLicenseId)}/key`);
+          const data = await api(`/api/me/license-records/${encodeURIComponent(copyLicenseIdButton.dataset.copyLicenseId)}/key`, { method: "POST" });
           if (!data.licenseKey) throw new Error(t("licenseNotFound"));
           await copyTextToClipboard(data.licenseKey);
           setMessage(data.repaired ? t("licenseKeyReadyCopied") : t("copied"), "good");

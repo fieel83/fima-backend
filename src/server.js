@@ -2593,10 +2593,22 @@ function safeLicenseKeyRepairRow(license, state = licenseKeyRepairClass(license)
 }
 
 async function scanProductionLicenseKeyRepairs() {
-  const licenses = await prisma.license.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 2000
-  });
+  // Do not silently stop after an arbitrary number of rows. This scan is used
+  // to protect paid customers, so it must walk the complete license table and
+  // only return masked diagnostics.
+  const licenses = [];
+  const pageSize = 500;
+  let cursorId = null;
+  for (;;) {
+    const page = await prisma.license.findMany({
+      orderBy: { id: "asc" },
+      take: pageSize,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {})
+    });
+    licenses.push(...page);
+    if (page.length < pageSize) break;
+    cursorId = page[page.length - 1].id;
+  }
   const rows = licenses.map((license) => ({ license, state: licenseKeyRepairClass(license) }));
   const paidActive = rows.filter(({ state }) => state.active && state.paidStripeWebsite);
   const paidAffected = paidActive.filter(({ state }) => state.needsRepair);
@@ -2614,6 +2626,7 @@ async function scanProductionLicenseKeyRepairs() {
   const result = {
     success: true,
     dryRun: true,
+    scanScope: "all_license_records_paginated",
     scannedAt: new Date().toISOString(),
     paidActiveScanned: paidActive.length,
     paidAffectedCount: paidAffected.length,
@@ -2698,8 +2711,34 @@ async function repairPaidLicenseKey(licenseId, { actorType = "admin", actorId = 
   };
 }
 
+// Key metadata is safe to inspect with an authenticated GET, but a raw key is
+// only returned by the CSRF-protected POST below. A missing paid key can be
+// repaired by that POST on the existing license record; it is never mutated by
+// a cacheable GET request.
 app.get("/api/me/license-records/:licenseId/key", downloadLimiter, requireUser, async (req, res) => {
   try {
+    res.setHeader("Cache-Control", "no-store, private");
+    const license = await findOwnedLicenseById(req.user, req.params.licenseId);
+    if (!license) return res.status(404).json({ error: "license_not_found" });
+    const access = licenseAccessState(license);
+    if (!access.valid) return res.status(403).json({ error: access.reason || "license_unavailable" });
+    const repairState = licenseKeyRepairState(license);
+    return res.json({
+      success: true,
+      licenseKey: null,
+      licenseKeyMasked: maskCode(license.licenseKey),
+      keyRepairNeeded: repairState.needsRepair,
+      canRepairLicenseKey: repairState.canRepair
+    });
+  } catch (error) {
+    console.error("License key status failed", publicError(error));
+    return res.status(500).json({ error: "license_key_status_failed" });
+  }
+});
+
+app.post("/api/me/license-records/:licenseId/key", downloadLimiter, requireUser, async (req, res) => {
+  try {
+    res.setHeader("Cache-Control", "no-store, private");
     let license = await findOwnedLicenseById(req.user, req.params.licenseId);
     if (!license) return res.status(404).json({ error: "license_not_found" });
     const access = licenseAccessState(license);
@@ -2717,55 +2756,12 @@ app.get("/api/me/license-records/:licenseId/key", downloadLimiter, requireUser, 
         return res.status(409).json({ error: "license_key_repair_blocked", reason: repairState.reason });
       }
 
-      const repairedLicense = await prisma.$transaction(async (tx) => {
-        const current = await findOwnedLicenseById(req.user, license.id, tx);
-        if (!current) {
-          const error = new Error("license_not_found");
-          error.statusCode = 404;
-          throw error;
-        }
-        const currentAccess = licenseAccessState(current);
-        if (!currentAccess.valid) {
-          const error = new Error(currentAccess.reason || "license_unavailable");
-          error.statusCode = 403;
-          throw error;
-        }
-        const currentRepairState = licenseKeyRepairState(current);
-        if (!currentRepairState.needsRepair) return current;
-        if (!currentRepairState.canRepair) {
-          const error = new Error("license_key_repair_blocked");
-          error.statusCode = 409;
-          error.reason = currentRepairState.reason;
-          throw error;
-        }
-        const replacementKey = await generateUniqueLicenseKey(tx);
-        const note = `[${new Date().toISOString()}] license_key_reissued reason:${currentRepairState.reason} previous:${maskCode(current.licenseKey) || "none"}`;
-        const updated = await tx.license.update({
-          where: { id: current.id },
-          data: {
-            licenseKey: replacementKey,
-            notes: appendNote(current.notes, note)
-          }
-        });
-        await tx.auditLog.create({
-          data: {
-            action: "license_key_reissued",
-            targetType: "license",
-            targetId: updated.id,
-            metadata: {
-              userId: req.user.id,
-              reason: currentRepairState.reason,
-              oldKeyMasked: maskCode(current.licenseKey),
-              newKeyMasked: maskCode(replacementKey),
-              source: licenseSource(updated)
-            }
-          }
-        }).catch(() => {});
-        return updated;
+      const repairedLicense = await repairPaidLicenseKey(license.id, {
+        actorType: "user",
+        actorId: req.user.id
       });
-
-      repaired = repairedLicense.id === license.id && repairedLicense.licenseKey !== license.licenseKey;
-      license = repairedLicense;
+      repaired = repairedLicense.repaired;
+      license = repairedLicense.license;
       repairState = licenseKeyRepairState(license);
     }
     if (repairState.needsRepair || !license.licenseKey) {

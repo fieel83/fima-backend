@@ -16,6 +16,7 @@
 
   let activeLicenseKey = "";
   let activeGiftCode = "";
+  let licenseRequiresSecureReveal = false;
   let siteSettings = {};
 
   const formatPlan = (plan) => ({
@@ -45,6 +46,30 @@
     toast.textContent = text;
     toast.classList.add("is-visible");
     window.setTimeout(() => toast.classList.remove("is-visible"), 3000);
+  };
+
+  const copyWithFallback = async (value) => {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return;
+      } catch (error) {
+        // Continue to the legacy in-page fallback. Some browser privacy modes
+        // reject Clipboard API calls even after a user clicked the button.
+      }
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "readonly");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const copied = document.execCommand?.("copy");
+    textarea.remove();
+    if (!copied) throw new Error("Copy is unavailable in this browser.");
   };
 
   const maskEmail = (value) => {
@@ -81,13 +106,16 @@
 
   const showLicense = (data) => {
     const license = data.license || data;
-    activeLicenseKey = license.licenseKey || "";
+    activeLicenseKey = String(license.licenseKey || "").trim();
     activeGiftCode = "";
+    licenseRequiresSecureReveal = !activeLicenseKey;
     title.textContent = "Your license is ready.";
-    message.textContent = "Copy this key and keep it safe. Your download is unlocked from this page.";
-    licenseKeyNode.textContent = activeLicenseKey;
+    message.textContent = licenseRequiresSecureReveal
+      ? "Your payment is linked to your account. Open My Products to securely reveal and copy your license key."
+      : "Copy this key and keep it safe. Your download is unlocked from this page.";
+    licenseKeyNode.textContent = activeLicenseKey || license.licenseKeyMasked || "Securely available in My Products";
     licenseBox.hidden = false;
-    if (copyButton) copyButton.textContent = "Copy License Key";
+    if (copyButton) copyButton.textContent = licenseRequiresSecureReveal ? "Open My Products" : "Copy License Key";
     meta.innerHTML = `
       <div><span>Plan</span><strong>${formatPlan(license.plan)}</strong></div>
       <div><span>Expires</span><strong>${license.lifetime ? "Never expires" : new Date(license.expiresAt).toLocaleString()}</strong></div>
@@ -101,6 +129,7 @@
     const gift = data.giftCode || {};
     activeLicenseKey = "";
     activeGiftCode = gift.giftCode || "";
+    licenseRequiresSecureReveal = false;
     title.textContent = "Gift Code Created";
     message.textContent = activeGiftCode
       ? "Your gift code is ready. Give this code to the person you want. The license time starts only when the code is redeemed."
@@ -122,6 +151,7 @@
     const purchase = data.purchase || {};
     activeLicenseKey = "";
     activeGiftCode = "";
+    licenseRequiresSecureReveal = false;
     title.textContent = "Your purchase is ready.";
     message.textContent = "This order was added to your account. Open My Products to view it and download from the official GitHub release.";
     licenseBox.hidden = true;
@@ -181,10 +211,21 @@
   };
 
   copyButton?.addEventListener("click", async () => {
+    if (licenseRequiresSecureReveal) {
+      window.location.assign("/dashboard/products");
+      return;
+    }
     const value = activeGiftCode || activeLicenseKey;
-    if (!value) return;
-    await navigator.clipboard?.writeText(value);
-    showToast(activeGiftCode ? "Gift code copied." : "License key copied.");
+    if (!value) {
+      showToast("Open My Products to securely copy your license key.");
+      return;
+    }
+    try {
+      await copyWithFallback(value);
+      showToast(activeGiftCode ? "Gift code copied." : "License key copied.");
+    } catch (error) {
+      showToast(error.message || "Could not copy the key. Please try My Products.");
+    }
   });
 
   downloadButton?.addEventListener("click", async (event) => {
