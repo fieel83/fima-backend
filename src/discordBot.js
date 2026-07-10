@@ -1576,6 +1576,30 @@ function isStaffInteraction(interaction) {
   );
 }
 
+function memberHasRole(member, { id, names = [] } = {}) {
+  const roleCache = member?.roles?.cache;
+  if (id && roleCache?.has?.(id)) return true;
+  if (names.length && roleCache?.some?.((role) => names.includes(String(role?.name || "")))) return true;
+  // Guild interaction payloads can contain role IDs without a populated cache.
+  return Boolean(id && Array.isArray(member?.roles) && member.roles.includes(id));
+}
+
+function isFimaSupportInteraction(interaction) {
+  if (isStaffInteraction(interaction)) return true;
+  const supportRoleId = env("DISCORD_FIMA_SUPPORT_ROLE_ID") || env("DISCORD_SUPPORT_ROLE_ID");
+  return memberHasRole(interaction?.member, {
+    id: supportRoleId,
+    names: ["Fima Support", "Support Staff"]
+  });
+}
+
+function isLicenseRepairAdminInteraction(interaction) {
+  return Boolean(
+    (interaction?.user?.id && interaction?.guild?.ownerId === interaction.user.id)
+    || interaction?.memberPermissions?.has(PermissionsBitField.Flags.Administrator)
+  );
+}
+
 function maskDiscordId(value) {
   const id = String(value || "");
   if (id.length <= 8) return id ? "***" : null;
@@ -2194,7 +2218,7 @@ function licenseSupportEmbed({ query, discordUser, licenses }) {
   return embed;
 }
 
-function licenseSupportActionRows(license, actorId) {
+function licenseSupportActionRows(license, actorId, canCreateRepairTask = false) {
   if (!license) return [];
   const lookupKey = rememberLicenseSupportTarget(license.id, actorId);
   return [new ActionRowBuilder().addComponents(
@@ -2202,7 +2226,7 @@ function licenseSupportActionRows(license, actorId) {
       .setCustomId(`fima_license_repair_task:${lookupKey}`)
       .setLabel("Create license repair task")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(!supportLicenseRepairState(license).canCreateRepairTask),
+      .setDisabled(!canCreateRepairTask || !supportLicenseRepairState(license).canCreateRepairTask),
     new ButtonBuilder()
       .setCustomId(`fima_license_safe_instructions:${lookupKey}`)
       .setLabel("Send user safe instructions")
@@ -2211,7 +2235,7 @@ function licenseSupportActionRows(license, actorId) {
 }
 
 async function handleLicenseSupportCheck(interaction) {
-  if (!isStaffInteraction(interaction)) {
+  if (!isFimaSupportInteraction(interaction)) {
     return interaction.reply({ content: "Only support staff/admins can check purchases or licenses.", ephemeral: true });
   }
   const query = interaction.options.getString("query") || "";
@@ -2230,13 +2254,13 @@ async function handleLicenseSupportCheck(interaction) {
   const firstRepairCandidate = licenses.find((license) => supportLicenseRepairState(license).keyRepairNeeded) || licenses[0] || null;
   return interaction.reply({
     embeds: [licenseSupportEmbed({ query, discordUser, licenses })],
-    components: licenseSupportActionRows(firstRepairCandidate, interaction.user.id),
+    components: licenseSupportActionRows(firstRepairCandidate, interaction.user.id, isLicenseRepairAdminInteraction(interaction)),
     ephemeral: true
   });
 }
 
 async function handleLicenseSupportButton(interaction) {
-  if (!isStaffInteraction(interaction)) {
+  if (!isFimaSupportInteraction(interaction)) {
     return interaction.reply({ content: "Only support staff/admins can use license support actions.", ephemeral: true });
   }
   const [action, lookupKey] = String(interaction.customId || "").split(":");
@@ -2244,11 +2268,17 @@ async function handleLicenseSupportButton(interaction) {
   if (!entry || entry.expiresAt < Date.now()) {
     return interaction.reply({ content: "This license support action expired. Run `/fima_license_check` again.", ephemeral: true });
   }
+  if (entry.actorId !== interaction.user.id) {
+    return interaction.reply({ content: "This license support action belongs to the staff member who ran the lookup.", ephemeral: true });
+  }
   const license = await prisma.license.findUnique({ where: { id: entry.licenseId } }).catch(() => null);
   if (!license) return interaction.reply({ content: "License record was not found anymore.", ephemeral: true });
   const state = supportLicenseRepairState(license);
 
   if (action === "fima_license_repair_task") {
+    if (!isLicenseRepairAdminInteraction(interaction)) {
+      return interaction.reply({ content: "Only the server owner or an administrator can create a license repair task.", ephemeral: true });
+    }
     await auditDiscordBotAction("discord_license_repair_task_requested", "license", license.id, {
       actorId: interaction.user.id,
       licenseIdMasked: maskDiscordId(license.id),
