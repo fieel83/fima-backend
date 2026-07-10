@@ -11,7 +11,7 @@ import {
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
-const PARADISE_AUTO_SMOKE_REVISION = "3a67-blacklist-permission-smoke-v3";
+const PARADISE_AUTO_SMOKE_REVISION = "3a68-dashboard-application-ticket-leaderboard-v6";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -23,8 +23,335 @@ const APPLICATION_TYPES = Object.freeze([
   ["referee", "Referee"], ["event_staff", "Event Staff"],
   ["giveaway_staff", "Giveaway Staff"], ["content_creator", "Content Creator"],
   ["partnership", "Partnership / Ally"], ["clan_mainer", "Clan Member / Mainer"],
-  ["fima_support", "Fima Support Helper"]
+  ["fima_support", "Fima Support Helper"], ["macro_staff", "Macro Staff"],
+  ["fflag_staff", "FFlag Staff"], ["war_hoster", "War Hoster"],
+  ["reseller", "Reseller / Affiliate"]
 ]);
+const COMMUNITY_BLOCKED_APPLICATION_TYPES = new Set(["clan_mainer", "tryout_hoster", "referee", "war_hoster"]);
+const CLAN_ONLY_APPLICATION_TYPES = new Set(["clan_mainer", "war_hoster"]);
+const COMMUNITY_ONLY_APPLICATION_TYPES = new Set(["fima_support", "macro_staff", "fflag_staff", "reseller"]);
+const TSBTR_BLOCKED_APPLICATION_TYPES = new Set(["clan_mainer", "fima_support", "macro_staff", "fflag_staff", "war_hoster", "reseller"]);
+const DISCORD_APPLICATION_MODAL_LIMIT = 5;
+const APPLICATION_DRAFT_TTL_MS = 30 * 60_000;
+const APPLICATION_QUESTION_BANK = Object.freeze({
+  staff: [
+    ["activity", "Haftalık aktiflik", "Haftada kaç gün ve hangi saatlerde aktif olabilirsin?", TextInputStyle.Short, 3, 180],
+    ["judgement", "Yetki kullanımı", "Spam/toxic/haksızlık durumunda ilk ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["teamwork", "Ekip uyumu", "Diğer stafflarla anlaşmazlık yaşarsan nasıl çözersin?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Daha önce staff oldun mu? Nerede, hangi görevlerde?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Bu rol için seni öne çıkaran özellik nedir?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  moderator: [
+    ["activity", "Haftalık aktiflik", "Haftada kaç gün moderasyon yapabilirsin?", TextInputStyle.Short, 3, 180],
+    ["mute_policy", "Mute kararı", "Bir kullanıcı spam yaparsa kaç saat mute önerirsin ve neden?", TextInputStyle.Paragraph, 20, 700],
+    ["approval", "Üst onay", "Kick/ban yetkin yoksa üst yetkiliye nasıl rapor açarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["evidence", "Kanıt yönetimi", "Haksızlık iddiasını hangi kanıtlarla incelersin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Moderator rolü için neden uygun olduğunu yaz.", TextInputStyle.Paragraph, 20, 700]
+  ],
+  training_hoster: [
+    ["availability", "Aktiflik", "Haftada kaç training açabilirsin?", TextInputStyle.Short, 3, 180],
+    ["teams", "Takım dengesi", "Sunucuda 10 kişi var, takımları nasıl dengeli kurarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["rules", "Disiplin", "Training disiplinini ve sırayı nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["result", "Sonuç kaydı", "Training bitince sonuç ve MVP bilgisini nasıl kaydedersin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Training Hoster rolünü neden almalısın?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  tryout_hoster: [
+    ["criteria", "Değerlendirme", "Oyuncuyu değerlendirirken ilk baktığın kriter nedir?", TextInputStyle.Paragraph, 20, 700],
+    ["stage", "Stage kararı", "Stage belirlerken skill dışı hangi özellikleri incelersin?", TextInputStyle.Paragraph, 20, 700],
+    ["objectivity", "Tarafsızlık", "Arkadaşını test ederken objektif kalabilir misin? Nasıl?", TextInputStyle.Paragraph, 20, 700],
+    ["appeal", "İtiraz", "Kararına itiraz edilirse nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Tryout Hoster rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  referee: [
+    ["neutrality", "Tarafsızlık", "Tarafsızlığını nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["ticket", "Ticket kontrol", "Challenge ticket geçerli mi diye neleri kontrol edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["score", "Skor postu", "/post atarken score/note/ticket ID kısmını nasıl doldurursun?", TextInputStyle.Paragraph, 20, 700],
+    ["exploit", "Hile iddiası", "Hile iddiası olursa nasıl hareket edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Referee rolü için neden uygun olduğunu yaz.", TextInputStyle.Paragraph, 20, 700]
+  ],
+  giveaway_staff: [
+    ["activity", "Aktiflik", "Haftada kaç çekiliş veya etkinlik yönetebilirsin?", TextInputStyle.Short, 3, 180],
+    ["fairness", "Adalet", "Adil bir çekiliş sistemini nasıl kurarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["alts", "Fake hesaplar", "Fake hesapları ve tekrar katılımları nasıl engellersin?", TextInputStyle.Paragraph, 20, 700],
+    ["delay", "Ödül gecikmesi", "Ödül gecikirse kullanıcıya nasıl açıklarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rol için seni öne çıkaran özellik nedir?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  event_staff: [
+    ["activity", "Aktiflik", "Haftada kaç etkinlik/game night yapabilirsin?", TextInputStyle.Short, 3, 180],
+    ["idea", "Etkinlik fikri", "Örnek bir etkinlik veya game night fikri yaz.", TextInputStyle.Paragraph, 20, 700],
+    ["flow", "Akış yönetimi", "Katılımı ve düzeni yüksek tutmak için ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["conflict", "Tartışma", "Etkinlikte tartışma çıkarsa nasıl müdahale edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Etkinlik ekibi için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  macro_staff: [
+    ["knowledge", "Macro bilgisi", "Hangi macro/hotkey araçlarını ve kullanım mantığını biliyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["safety", "Güvenlik", "Kullanıcıdan token/cookie istemeden nasıl destek verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["support", "Destek akışı", "Bir kullanıcı macro çalışmıyor derse hangi adımlarla incelersin?", TextInputStyle.Paragraph, 20, 700],
+    ["limits", "Yetki sınırı", "Bilmediğin veya riskli bir konuda nasıl eskalasyon yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Macro Staff rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  fflag_staff: [
+    ["knowledge", "FFlag bilgisi", "FFlag nedir ve kullanıcıya güvenli şekilde nasıl anlatırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["risk", "Risk yönetimi", "Hatalı ayar/performans sorunu olursa nasıl geri aldırırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["support", "Destek akışı", "Bir kullanıcının cihazına göre doğru öneriyi nasıl belirlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Kullanıcı dosya/log paylaşırken hangi bilgileri gizletirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "FFlag Staff rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  reseller: [
+    ["channels", "Satış kanalları", "Satışı hangi kanallarda yapacaksın ve kime ulaşacaksın?", TextInputStyle.Paragraph, 20, 700],
+    ["anti_scam", "Dolandırıcılık önlemi", "Chargeback/dolandırıcılık riskini nasıl azaltırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["terms", "Şartlar", "Teslimat, iade ve komisyon şartlarını nasıl takip edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Daha önce reseller/affiliate deneyimin var mı?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Neden Paradise/Fima reseller olmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  default: [
+    ["motivation", "Motivasyon", "Bu pozisyonu neden istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Bu rolle alakalı deneyimini yaz.", TextInputStyle.Paragraph, 5, 700],
+    ["availability", "Aktiflik", "Saat dilimin ve haftalık aktifliğin nedir?", TextInputStyle.Short, 3, 180],
+    ["situation", "Durum sorusu", "Zor bir durumda nasıl sakin ve adil karar verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rol için neden seni seçmeliyiz?", TextInputStyle.Paragraph, 20, 700]
+  ]
+});
+const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
+  staff: [
+    ["activity", "Haftalık aktiflik", "Haftada kaç gün ve hangi saatlerde aktif olabilirsin?", TextInputStyle.Short, 3, 180],
+    ["judgement", "Yetki kullanımı", "Spam, toxiclik veya haksızlık durumunda ilk nasıl hareket edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["teamwork", "Ekip uyumu", "Diğer stafflarla anlaşmazlık yaşarsan nasıl çözersin?", TextInputStyle.Paragraph, 20, 700],
+    ["evidence", "Kanıt yönetimi", "Bir işlem yapmadan önce hangi kanıtları toplarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["policy", "Kural anlatımı", "Kuralları yeni üyelere nasıl netleştirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["pressure", "Baskı altında karar", "Baskı altında doğru ve tarafsız karar verebilir misin? Örnekle açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["toxicity", "Toxic kullanıcı", "Toxic oyuncuya nasıl yaklaşırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["coordination", "Koordinasyon", "Diğer yöneticilerle nasıl koordineli çalışırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["abuse", "Yetki sınırı", "Yetkini kötüye kullanmamak için kendine hangi sınırları koyarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["availability_plan", "Aktiflik planı", "Yoğun olduğun dönemlerde görevlerini nasıl aksatmazsın?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Daha önce staff oldun mu? Nerede, hangi görevlerde?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Bu rol için seni öne çıkaran özellik nedir?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  moderator: [
+    ["activity", "Haftalık aktiflik", "Haftada kaç gün moderasyon yapabilirsin?", TextInputStyle.Short, 3, 180],
+    ["warn", "Uyarı kararı", "Bir kullanıcı kuralı ilk kez bozarsa nasıl uyarırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["mute_policy", "Mute kararı", "Bir kullanıcı spam yaparsa kaç saat mute önerirsin ve neden?", TextInputStyle.Paragraph, 20, 700],
+    ["custom_reason", "Özel sebep", "Preset sebep yetmezse özel sebebi nasıl açık yazarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["approval", "Üst onay", "Kick/ban yetkin yoksa üst yetkiliye nasıl rapor açarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["evidence", "Kanıt yönetimi", "Haksızlık iddiasını hangi kanıtlarla incelersin?", TextInputStyle.Paragraph, 20, 700],
+    ["quarantine", "Karantina", "Şüpheli bir kullanıcıyı ne zaman karantinaya alırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["raid", "Raid/spam", "Raid veya toplu spam görürsen ilk 3 adımın ne olur?", TextInputStyle.Paragraph, 20, 700],
+    ["appeal", "İtiraz", "Bir kullanıcı cezasına itiraz ederse nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["staff_strike", "Staff hatası", "Başka bir staff yanlış işlem yaptıysa ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["language", "Üslup", "Ceza verirken mesaj dilini nasıl profesyonel tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Moderator rolü için neden uygun olduğunu yaz.", TextInputStyle.Paragraph, 20, 700]
+  ],
+  support: [
+    ["activity", "Aktiflik", "Haftada kaç gün ticket bakabilirsin?", TextInputStyle.Short, 3, 180],
+    ["first_reply", "İlk cevap", "Bir ticket açıldığında kullanıcıya ilk nasıl yanıt verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Kullanıcıdan hangi bilgileri asla istemezsin?", TextInputStyle.Paragraph, 20, 700],
+    ["triage", "Önceliklendirme", "Acil ve normal ticketları nasıl ayırırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["handoff", "Eskalasyon", "Çözemediğin konuyu kime ve nasıl aktarırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["refund", "Ödeme/iade", "Ödeme veya iade sorusunda nasıl güvenli ilerlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["bug", "Hata raporu", "Bir bug bildirimi aldığında hangi bilgileri toplarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["tone", "Üslup", "Kızgın bir kullanıcıya nasıl sakin cevap verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["transcript", "Transcript", "Ticket kapanırken transcript neden önemlidir?", TextInputStyle.Paragraph, 20, 700],
+    ["anti_scam", "Güvenlik", "Sahte satıcı/dolandırıcılık şüphesinde ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Daha önce support yaptın mı?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Support ekibi için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  training_hoster: [
+    ["availability", "Aktiflik", "Haftada kaç training açabilirsin?", TextInputStyle.Short, 3, 180],
+    ["teams", "Takım dengesi", "Sunucuda 10 kişi var, takımları nasıl dengeli kurarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["queue", "Sıra düzeni", "Oyuncu sıralamasını nasıl belirlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["discipline", "Disiplin", "Training disiplinini nasıl sağlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["losing_player", "Kaybeden oyuncu", "Sürekli kaybeden oyuncuya nasıl yaklaşırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["afk", "AFK oyuncu", "AFK olan oyuncuya nasıl müdahale edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["conflict", "Tartışma", "Tartışma çıkarsa nasıl çözersin?", TextInputStyle.Paragraph, 20, 700],
+    ["time", "Süre", "Training süresini nasıl planlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["performance", "Performans", "Performansı nasıl değerlendirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["teamwork", "Takım uyumu", "Takım içi uyumu nasıl gözlemlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["log_system", "Kayıt sistemi", "Training kayıt/sonuç sistemini nasıl düzenli tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Training Hoster rolünü neden almalısın?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  tryout_hoster: [
+    ["criteria", "İlk kriter", "Oyuncuyu değerlendirirken ilk baktığın kriter nedir?", TextInputStyle.Paragraph, 20, 700],
+    ["non_skill", "Skill dışı kriter", "Skill dışında hangi özellikler önemlidir?", TextInputStyle.Paragraph, 20, 700],
+    ["stage", "Stage kararı", "Stage belirlerken hangi kriterleri baz alırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["rounds", "Maç sayısı", "Tek maç mı çoklu maç mı yaparsın? Neden?", TextInputStyle.Paragraph, 20, 700],
+    ["objectivity", "Tarafsızlık", "Tarafsızlığı nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["friend", "Arkadaşını test", "Arkadaşını test ederken objektif olabilir misin? Nasıl?", TextInputStyle.Paragraph, 20, 700],
+    ["appeal", "İtiraz", "Kararına itiraz edilirse nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["toxic", "Toxic oyuncu", "Toxic oyuncuyu nasıl değerlendirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["unfair_claim", "Haksızlık iddiası", "Haksızlık iddiasını nasıl incelersin?", TextInputStyle.Paragraph, 20, 700],
+    ["standard", "Standart sistem", "Tryout sistemini nasıl standart hale getirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["pressure", "Baskı", "Baskı altında doğru karar verebilir misin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rol için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  referee: [
+    ["neutrality", "Tarafsızlık", "Tarafsızlığını nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["ticket", "Ticket kontrol", "Challenge ticket geçerli mi diye neleri kontrol edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["range", "Range kontrol", "Oyuncuların challenge range içinde olup olmadığını nasıl anlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["cooldown", "Cooldown/immunity", "Cooldown veya immunity varsa nasıl işlem yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["score", "Skor postu", "/post atarken score/note/ticket ID kısmını nasıl doldurursun?", TextInputStyle.Paragraph, 20, 700],
+    ["auto", "Auto win", "Auto/ff/no-show durumunda notu nasıl yazarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["co_ref", "Co-ref", "Co-referee ne zaman eklenmeli?", TextInputStyle.Paragraph, 20, 700],
+    ["recording", "Kayıt", "Set kaydı yoksa nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["exploit", "Hile iddiası", "Hile iddiası olursa nasıl hareket edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["closed_ticket", "Kapalı ticket", "Ticket kapandıysa bilgiyi nasıl kurtarırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["escalation", "Eskalasyon", "Yanlış post veya tartışmada hangi role haber verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Referee rolü için neden uygun olduğunu yaz.", TextInputStyle.Paragraph, 20, 700]
+  ],
+  event_staff: [
+    ["activity", "Aktiflik", "Haftada kaç etkinlik/gamenight yapabilirsin?", TextInputStyle.Short, 3, 180],
+    ["idea", "Etkinlik fikri", "Örnek bir etkinlik fikri yaz.", TextInputStyle.Paragraph, 20, 700],
+    ["games", "Oyun önerisi", "Gamenight için farklı oyun önerilerin var mı?", TextInputStyle.Paragraph, 20, 700],
+    ["participation", "Katılım", "Katılımı nasıl yüksek tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["matches", "Eşleşme", "Turnuva veya eşleşmeleri nasıl belirlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["voice", "Voice düzeni", "Voice kanallarındaki karmaşayı nasıl kontrol edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["fun_discipline", "Eğlence/disiplin", "Eğlence ile disiplini nasıl dengelersin?", TextInputStyle.Paragraph, 20, 700],
+    ["missing", "Gelmeyenler", "Etkinliğe gelmeyen oyuncularla nasıl ilgilenirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["conflict", "Tartışma", "Tartışma çıkarsa nasıl müdahale edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["time", "Süre", "Süre yönetimini nasıl sağlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["revive", "Düşük katılım", "Katılım düşerse sistemi nasıl canlandırırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rolü neden sen yönetmelisin?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  giveaway_staff: [
+    ["activity", "Aktiflik", "Haftada kaç gün aktif olabilirsin?", TextInputStyle.Short, 3, 180],
+    ["experience", "Deneyim", "Daha önce çekiliş yönettin mi?", TextInputStyle.Paragraph, 5, 700],
+    ["fairness", "Adil sistem", "Adil bir çekiliş sistemini nasıl kurarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["alts", "Fake hesaplar", "Fake hesapları nasıl engellersin?", TextInputStyle.Paragraph, 20, 700],
+    ["duration", "Süre", "Çekiliş süresini neye göre belirlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["low_join", "Düşük katılım", "Katılım düşük olursa ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["cheat", "Hile iddiası", "Hile iddiası olursa nasıl araştırırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["delay", "Ödül gecikmesi", "Ödül gecikirse nasıl çözersin?", TextInputStyle.Paragraph, 20, 700],
+    ["rules", "Kural netliği", "Çekiliş kurallarını nasıl netleştirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["repeat_winners", "Tekrar kazananlar", "Sürekli aynı kişilerin kazanmasını nasıl önlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["coordination", "Koordinasyon", "Diğer yöneticilerle nasıl koordineli çalışırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rol için seni öne çıkaran özellik nedir?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  war_hoster: [
+    ["official_friendly", "War türü", "Official ve friendly war farkını açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["lineup", "War kadrosu", "War kadrosunu nasıl seçersin?", TextInputStyle.Paragraph, 20, 700],
+    ["backup", "Yedek sistemi", "Yedek sistemi kurar mısın? Nasıl?", TextInputStyle.Paragraph, 20, 700],
+    ["prep", "Hazırlık", "War öncesi hazırlık sürecini nasıl planlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["contact", "Rakip iletişimi", "Rakip klanla iletişimi nasıl yürütürsün?", TextInputStyle.Paragraph, 20, 700],
+    ["missing_player", "Eksik oyuncu", "Son dakika oyuncu eksilirse ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["toxic_enemy", "Toxic rakip", "Toxic rakiplere karşı nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["motivation", "Motivasyon", "War sırasında motivasyonu nasıl yüksek tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["rules", "Kural netliği", "Kuralları nasıl netleştirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["cheat", "Hile iddiası", "Hile iddiası olursa nasıl hareket edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["review", "War analizi", "War sonrası analiz yapar mısın? Nasıl?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rolü neden sen almalısın?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  macro_staff: [
+    ["knowledge", "Macro bilgisi", "Hangi macro/hotkey araçlarını ve kullanım mantığını biliyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["safe_support", "Güvenli destek", "Kullanıcıdan token/cookie istemeden nasıl destek verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["diagnosis", "Sorun analizi", "Macro çalışmıyor diyen kullanıcıda hangi adımları kontrol edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["device", "Cihaz farkı", "Kullanıcının cihazına göre doğru yönlendirmeyi nasıl yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Ekran görüntüsü/log isterken hangi bilgileri gizletirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["false_claim", "Yanlış iddia", "Macro zararlı/virüs iddiası gelirse nasıl açıklarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["escalation", "Eskalasyon", "Bilmediğin veya riskli konuda nasıl üst ekibe aktarırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["documentation", "Rehber", "Kısa ve anlaşılır bir macro rehberini nasıl hazırlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["anti_scam", "Anti-scam", "Sahte macro linklerini nasıl tespit edip raporlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["availability", "Aktiflik", "Haftada kaç gün destek verebilirsin?", TextInputStyle.Short, 3, 180],
+    ["experience", "Deneyim", "Daha önce teknik destek verdin mi?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Macro Staff rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  fflag_staff: [
+    ["knowledge", "FFlag bilgisi", "FFlag nedir ve kullanıcıya güvenli şekilde nasıl anlatırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["risk", "Risk yönetimi", "Hatalı ayar/performans sorunu olursa nasıl geri aldırırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["device", "Cihaz uyumu", "Kullanıcının cihazına göre doğru öneriyi nasıl belirlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Kullanıcı dosya/log paylaşırken hangi bilgileri gizletirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["testing", "Test", "Bir ayarın işe yarayıp yaramadığını nasıl test ettirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["rollback", "Geri dönüş", "Sorun çıkarsa güvenli geri dönüş planın ne olur?", TextInputStyle.Paragraph, 20, 700],
+    ["misinfo", "Yanlış bilgi", "Yanlış FFlag önerisi yayıldığında nasıl müdahale edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["support_flow", "Destek akışı", "FFlag ticketında ilk hangi soruları sorarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["documentation", "Rehber", "Yeni başlayan biri için FFlag rehberi nasıl olmalı?", TextInputStyle.Paragraph, 20, 700],
+    ["availability", "Aktiflik", "Haftada kaç gün destek verebilirsin?", TextInputStyle.Short, 3, 180],
+    ["experience", "Deneyim", "Daha önce performans/ayar desteği verdin mi?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "FFlag Staff rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  reseller: [
+    ["channels", "Satış kanalları", "Satışı hangi kanallarda yapacaksın ve kime ulaşacaksın?", TextInputStyle.Paragraph, 20, 700],
+    ["anti_scam", "Dolandırıcılık önlemi", "Chargeback/dolandırıcılık riskini nasıl azaltırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["official_payment", "Ödeme güvenliği", "Satışı sadece onaylı ödeme/checkout akışıyla nasıl yürütürsün?", TextInputStyle.Paragraph, 20, 700],
+    ["delivery", "Teslimat", "Teslimat, iade ve komisyon şartlarını nasıl takip edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["no_secrets", "Gizli bilgi", "Müşteriden hangi bilgileri asla istemezsin?", TextInputStyle.Paragraph, 20, 700],
+    ["evidence", "Kanıt", "Satış kanıtlarını ve müşteri konuşmalarını nasıl düzenli tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["refund", "İade/itiraz", "İade veya ödeme itirazı olursa nasıl hareket edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["promises", "Yanıltıcı vaat", "Müşteriye hangi vaatleri kesinlikle vermezsin?", TextInputStyle.Paragraph, 20, 700],
+    ["pricing", "Fiyat/komisyon", "Karlı ama güvenli bir reseller ilişkisi için komisyon nasıl olmalı?", TextInputStyle.Paragraph, 20, 700],
+    ["reporting", "Raporlama", "Haftalık satış raporunu nasıl hazırlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Daha önce reseller/affiliate deneyimin var mı?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Neden Paradise/Fima reseller olmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  content_creator: [
+    ["platforms", "Platformlar", "Hangi platformlarda içerik üretiyorsun?", TextInputStyle.Short, 3, 180],
+    ["portfolio", "Örnek iş", "Örnek video/link veya portfolyo açıklaması yaz.", TextInputStyle.Paragraph, 20, 700],
+    ["schedule", "Plan", "Haftada kaç içerik çıkarabilirsin?", TextInputStyle.Short, 3, 180],
+    ["style", "Stil", "İçerik tarzın nasıl?", TextInputStyle.Paragraph, 20, 700],
+    ["brand", "Marka", "Paradise/Fima markasını nasıl doğru temsil edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["rules", "Kural", "Yanıltıcı başlık veya sahte vaat kullanmamak için ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["community", "Topluluk", "Yorumlarda toxiclik çıkarsa nasıl yönetirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["collab", "İşbirliği", "Diğer içerik üreticileriyle nasıl çalışırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["analytics", "Analiz", "İçeriğin performansını nasıl ölçersin?", TextInputStyle.Paragraph, 20, 700],
+    ["assets", "Görsel", "Banner/thumbnail hazırlama deneyimin var mı?", TextInputStyle.Paragraph, 5, 700],
+    ["availability", "Aktiflik", "Haftalık aktifliğin nedir?", TextInputStyle.Short, 3, 180],
+    ["why", "Neden sen?", "Content Creator rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  partnership: [
+    ["clan", "Klan/topluluk", "Hangi klan/topluluk adına başvuruyorsun?", TextInputStyle.Short, 3, 180],
+    ["purpose", "Amaç", "Partnership/ally amacı nedir?", TextInputStyle.Paragraph, 20, 700],
+    ["benefit", "Karşılıklı fayda", "İki taraf için nasıl fayda sağlayacak?", TextInputStyle.Paragraph, 20, 700],
+    ["invite", "Davet", "Sunucu davetini ve temsilci bilgisini yaz.", TextInputStyle.Paragraph, 10, 700],
+    ["rules", "Kurallar", "Ortak etkinliklerde kuralları nasıl net tutarsınız?", TextInputStyle.Paragraph, 20, 700],
+    ["activity", "Aktiflik", "Topluluğun aktifliği ve üye kitlesi nedir?", TextInputStyle.Paragraph, 20, 700],
+    ["reputation", "Güven", "Daha önce sorun/blacklist geçmişiniz var mı?", TextInputStyle.Paragraph, 10, 700],
+    ["events", "Etkinlik", "Beraber hangi etkinlikleri yapabiliriz?", TextInputStyle.Paragraph, 20, 700],
+    ["contact", "İletişim", "İletişim ve anlaşmazlık durumunda kim yetkili olacak?", TextInputStyle.Paragraph, 20, 700],
+    ["duration", "Süre", "Bu ilişki sürekli mi, dönemsel mi?", TextInputStyle.Short, 3, 180],
+    ["notes", "Not", "Eklemek istediğin bir detay var mı?", TextInputStyle.Paragraph, 0, 700],
+    ["why", "Neden biz?", "Neden Paradise/Fima ile çalışmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  clan_mainer: [
+    ["roblox", "Roblox", "Roblox kullanıcı adın nedir?", TextInputStyle.Short, 3, 80],
+    ["discord", "Discord", "Discord kullanıcı adın/ID'n nedir?", TextInputStyle.Short, 3, 120],
+    ["experience", "Deneyim", "Daha önce hangi klanlarda bulundun?", TextInputStyle.Paragraph, 5, 700],
+    ["stage", "Seviye", "Kendini hangi Stage/Level/Strength seviyesinde görüyorsun?", TextInputStyle.Short, 3, 80],
+    ["main_code", "Mainer kodu", "Mainer kodunu nasıl kullanacağını biliyor musun?", TextInputStyle.Paragraph, 20, 700],
+    ["activity", "Aktiflik", "Haftalık aktifliğin nedir?", TextInputStyle.Short, 3, 180],
+    ["wars", "War", "War/roster etkinliklerine katılabilir misin?", TextInputStyle.Paragraph, 20, 700],
+    ["training", "Training", "Training/tryoutlara katılma durumun nedir?", TextInputStyle.Paragraph, 20, 700],
+    ["toxicity", "Davranış", "Toxiclik veya tartışma olursa nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["loyalty", "Bağlılık", "Neden Paradise mainlemek istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["proof", "Kanıt", "Mainer proof atmayı kabul ediyor musun?", TextInputStyle.Short, 2, 80],
+    ["why", "Neden sen?", "Klanda seni öne çıkaran özellik nedir?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  fima_support: [
+    ["product", "Ürün bilgisi", "Fima/Paradise ürünleri hakkında neleri biliyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["support", "Destek", "Bir kullanıcı lisans veya giriş sorunu yaşarsa nasıl yönlendirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Kullanıcıdan hangi bilgileri asla istemezsin?", TextInputStyle.Paragraph, 20, 700],
+    ["trial", "Trial", "Ücretsiz deneme/Roblox verify akışını nasıl anlatırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["refund", "Ödeme", "Ödeme/iade sorularında nasıl güvenli konuşursun?", TextInputStyle.Paragraph, 20, 700],
+    ["scam", "Anti-scam", "Sahte Fima linklerini nasıl tespit edip raporlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["tickets", "Ticket", "Ticket kapatmadan önce neleri kontrol edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["tone", "Üslup", "Kızgın kullanıcıya nasıl cevap verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["escalation", "Eskalasyon", "Çözemediğin konuyu nasıl üst ekibe aktarırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["activity", "Aktiflik", "Haftada kaç gün destek verebilirsin?", TextInputStyle.Short, 3, 180],
+    ["experience", "Deneyim", "Daha önce support yaptın mı?", TextInputStyle.Paragraph, 5, 700],
+    ["why", "Neden sen?", "Fima Support Helper rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  default: [
+    ["motivation", "Motivasyon", "Bu pozisyonu neden istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Bu rolle alakalı deneyimini yaz.", TextInputStyle.Paragraph, 5, 700],
+    ["availability", "Aktiflik", "Saat dilimin ve haftalık aktifliğin nedir?", TextInputStyle.Short, 3, 180],
+    ["situation", "Durum sorusu", "Zor bir durumda nasıl sakin ve adil karar verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["teamwork", "Ekip", "Ekip arkadaşlarınla nasıl çalışırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["rules", "Kurallar", "Kuralları nasıl net ve anlaşılır uygularsın?", TextInputStyle.Paragraph, 20, 700],
+    ["evidence", "Kanıt", "Karar verirken kanıtı nasıl değerlendirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["conflict", "Tartışma", "Bir tartışmada nasıl arabuluculuk yaparsın?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Kullanıcı gizliliğini nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["improvement", "Gelişim", "Bu sistemi daha iyi yapmak için ne önerirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["limits", "Sınır", "Yetkinin sınırlarını nasıl bilirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["why", "Neden sen?", "Bu rol için neden seni seçmeliyiz?", TextInputStyle.Paragraph, 20, 700]
+  ]
+});
 const verificationChallenges = new Map();
 const verifiedProfiles = new Map();
 const pendingTryouts = new Map();
@@ -45,7 +372,7 @@ const EMPTY_STATE = Object.freeze({
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
-  applications: {}, moderationCases: {}, securityState: {}, supportTickets: {}
+  applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}
 });
 let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_PARADISE_FOOTER_BRAND } });
 
@@ -137,6 +464,51 @@ function paradiseFooter(context = "", guildId = paradiseGuildContext.getStore())
   return { text: `${context ? `${context} • ` : ""}${footerBrand}` };
 }
 
+function guildLanguage(config = {}) {
+  const raw = String(config.language || config.locale || config.dashboardLanguage || "tr").toLowerCase();
+  return raw.startsWith("en") ? "en" : "tr";
+}
+
+function compactText(value, max = 90) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > max ? `${text.slice(0, Math.max(0, max - 1)).trim()}…` : text;
+}
+
+function rankedStatusText(row = {}, activeTicket = null, language = "tr") {
+  const now = Date.now();
+  const availability = row.availability || {};
+  if (activeTicket) {
+    const label = activeTicket.ticketId || activeTicket.channelId || "open";
+    return language === "tr" ? `Meydan okunuyor — Ticket #${label}` : `Being challenged — Ticket #${label}`;
+  }
+  if (Number(availability.loaUntil || 0) > now) {
+    const stamp = Math.floor(Number(availability.loaUntil) / 1000);
+    return language === "tr" ? `LOA bitiyor: <t:${stamp}:R>` : `LOA ends: <t:${stamp}:R>`;
+  }
+  if (Number(availability.immunityUntil || 0) > now) {
+    const stamp = Math.floor(Number(availability.immunityUntil) / 1000);
+    return language === "tr" ? `Bağışıklık bitiyor: <t:${stamp}:R>` : `Immunity ends: <t:${stamp}:R>`;
+  }
+  if (Number(availability.cooldownUntil || 0) > now) {
+    const stamp = Math.floor(Number(availability.cooldownUntil) / 1000);
+    return language === "tr" ? `Bekleme süresi bitiyor: <t:${stamp}:R>` : `Cooldown ends: <t:${stamp}:R>`;
+  }
+  if (String(row.status || "").trim()) return compactText(row.status, 80);
+  return language === "tr" ? "Challenge atılabilir" : "Challengeable";
+}
+
+function vacantLeaderboardDescription(rank, language = "tr") {
+  return language === "tr"
+    ? ["**Bu sıra şu an boş.**", "Yeni oyuncu atanınca kart otomatik güncellenir."].join("\n")
+    : ["**This position is currently open.**", "The card updates automatically when a fighter is assigned."].join("\n");
+}
+
+function leaderboardBoardIntro(label, language = "tr") {
+  return language === "tr"
+    ? [`# ♛ ${label}`, "### Rank kartları", "Bu sıralama otomatik güncellenir. Oyuncunun tüm detayları için `/profile view` kullan.", "-# Made By Fieel"].join("\n")
+    : [`# ♛ ${label}`, "### Rank cards", "This board updates automatically. Use `/profile view` for full fighter details.", "-# Made By Fieel"].join("\n");
+}
+
 export const PARADISE_CLAN_ROLES = [
   "✦・OWNER RANK",
   "Owner",
@@ -147,12 +519,12 @@ export const PARADISE_CLAN_ROLES = [
   "━━━━━ HOSTERS ━━━━━",
   "Trial Training Manager", "Training Supervisor", "Experienced Training Hoster",
   "Training Hoster", "Trial Training Hoster", "Tryout Manager",
-  "Experienced Tryout Hoster", "Tryout Hoster",
+  "Experienced Tryout Hoster", "Tryout Hoster", "Trial Tryout Hoster",
   "Tournament Manager", "Event Manager", "Event Hoster", "Giveaway Manager", "Giveaway Hoster",
   "Game Night Manager", "War Hoster",
   "━━━━━ REFEREES ━━━━━",
   "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee",
-  "Tryout Staff", "Trial Tryout Staff", "Coach / Helper",
+  "Coach / Helper",
   "━━━━━ COMMUNITY ━━━━━",
   "Verified Fighter", "Media & Links Approved",
   "━━━━━ PING ROLES ━━━━━",
@@ -162,6 +534,7 @@ export const PARADISE_CLAN_ROLES = [
   "Turkish", "English", "Activity Whitelist", "LOA", "BLACKLISTED", "Muted / Quarantined",
   "━━━━━ REGION ROLES ━━━━━",
   "Frankfurt, Germany", "Paris, France", "London, United Kingdom", "Amsterdam, Netherlands",
+  "Europe", "Asia", "North America", "South America", "Oceania",
   "━━━━━ CHARACTERS ━━━━━",
   "The Strongest Hero", "Hero Hunter", "Monster Form", "Destructive Cyborg",
   "Deadly Ninja", "Brutal Demon", "Blade Master", "Wild Psychic", "Martial Artist", "Tech Prodigy",
@@ -180,14 +553,16 @@ export const PARADISE_COMMUNITY_ROLES = [
   "✦・OWNER RANK",
   "Owner",
   "━━━━━ STAFF ━━━━━", "Admin", "Manager", "Moderator", "Support Staff", "Trial Support",
-  "Bot Manager", "Developer", "Security Staff",
+  "Bot Manager", "Developer", "Security Staff", "Macro Staff", "FFlag Staff",
   "━━━━━ PRODUCT ACCESS ━━━━━", "Buyer", "Trial User", "Lifetime Buyer",
-  "━━━━━ COMMUNITY ━━━━━", "Creator", "Partner / Reseller", "Media & Links Approved", "Verified",
+  "━━━━━ COMMUNITY ━━━━━", "Creator", "Partner / Reseller", "Reseller", "Media & Links Approved", "Verified",
   "━━━━━ PING ROLES ━━━━━",
   "Update Ping", "Training Ping", "Tournament Ping", "Giveaway Ping",
   "Event Ping", "Game Night Ping", "Security Alert Ping", "Robux Payment Ping",
   "━━━━━ LANGUAGE ━━━━━",
-  "Turkish", "English", "LOA", "BLACKLISTED", "Muted / Quarantined"
+  "Turkish", "English", "LOA", "BLACKLISTED", "Muted / Quarantined",
+  "━━━━━ REGION ROLES ━━━━━",
+  "Europe", "Asia", "North America", "South America", "Oceania"
 ];
 
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
@@ -238,9 +613,9 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
 ]);
 
 export const PARADISE_COMMUNITY_SCHEMA = [
-  ["START HERE", ["welcome", "farewell", "rules", "fieel-info", "choose-language", "choose-pings", "role-selection", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
+  ["START HERE", ["welcome", "farewell", "rules", "fieel-info", "choose-language", "choose-pings", "choose-region", "role-selection", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
   ["IMPORTANT", ["announcements", "updates", "status", "faq", "pricing", "trial-info", "giveaways"], false],
-  ["SUPPORT", ["open-ticket", "support-info", "application-ticket", "application-guide"], false],
+  ["SUPPORT", ["open-ticket", "support-info", "application-ticket", "application-guide", "report-guide"], false],
   ["SUPPORT STAFF", ["ticket-logs", "transcripts", "staff-notes", "application-reviews"], true],
   ["FIMA APP", ["fima-macro", "macro-help", "update-help", "license-help", "hwid-help", "payment-help", "robux-payments", "bug-reports", "suggestions"], false],
   ["COMMUNITY", ["general", "media", "uploads", "clips", "outfits", "capes", "macro-discussion", "success-results", "creator-resources", "partnerships", "media-approval", "bot-commands"], false],
@@ -252,9 +627,9 @@ export const PARADISE_COMMUNITY_SCHEMA = [
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
-  ["START", ["welcome", "farewell", "rules", "verify", "profile-guide", "choose-language", "choose-pings", "command-guide", "role-guide", "maining-guide"], false],
+  ["START", ["welcome", "farewell", "rules", "verify", "profile-guide", "choose-language", "choose-pings", "choose-region", "command-guide", "role-guide", "maining-guide"], false],
   ["CLAN", ["announcements", "clan-relations", "ally-requests", "advertisement", "outfits", "capes", "main-line", "roster-lineup", "war-lineup", "eu-rosters", "region-rosters", "branch-support", "roster-logs", "war-logs", "mainer-proof", "find-a-fcw"], false],
-  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "tryout-hoster-rules", "training-hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "giveaway-event-guide", "hoster-guide", "hoster-works"], false],
+  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "tryout-hoster-rules", "training-hoster-rules", "hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "giveaway-event-guide", "hoster-guide", "hoster-works"], false],
   ["CHALLENGES", ["challenge-ticket", "challenge-rules", "availability", "challenges", "challenge-results", "challenge-ticket-transcripts", "referee-rules", "referee-guide", "referee-post", "referee-works"], false],
   ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night", "question-of-the-day", "level-leaderboard"], false],
   ["SUPPORT", ["support-ticket", "application-ticket", "application-guide", "ticket-guide", "report-staff", "report-guide"], false],
@@ -268,13 +643,13 @@ export const PARADISE_CLAN_SCHEMA = [
 export const PARADISE_TSBTR_SCHEMA = [
   ["LOGS", ["challenge-ticket-transcripts", "support-ticket-transcripts", "message-logs", "role-logs", "channel-logs", "nick-logs", "ban-unban-logs", "kick-logs", "mod-logs", "member-logs", "other-logs", "guide"], true],
   ["ADMIN", ["staff-annc", "staff-chat", "staff-works", "staff-rules", "staff-updates", "staff-strikes", "proofs", "referee-logs", "activity-review"], true],
-  ["CENTER", ["welcome", "farewell", "blacklist", "ban-appeal", "unblacklist", "bail-review", "staff-team", "role-guide", "command-guide", "overview", "report-guide"], false],
+  ["CENTER", ["welcome", "farewell", "blacklist", "ban-appeal", "unblacklist", "bail-review", "staff-team", "role-guide", "command-guide", "overview", "choose-language", "choose-pings", "choose-region", "report-guide"], false],
   ["IMPORTANT", ["rules", "announcements", "sub-announcements", "content-channel", "server-logs", "staff-logs", "applications", "boosts", "giveaways", "polls", "hall-of-shame", "hall-of-fame"], false],
   ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "training-hoster-announcements", "training-hoster-rules", "trainer-annc", "activity-check"], false],
   ["TICKET", ["challenge-ticket", "support-ticket", "payment-ticket", "bug-ticket", "macro-ticket", "application-ticket", "application-guide", "report-staff"], false],
   ["GENERAL", ["tr-chat", "chat", "media", "bot-commands", "teamer-help", "spar-request"], false],
   ["LEADERBOARD", ["top-10", "top-20", "top-30", "level-leaderboard", "challenge-rules", "set-rules", "availability", "challenges", "challenge-results"], false],
-  ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports", "loa"], true],
+  ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports", "loa"], true],
   ["REFEREES", ["referee-annc", "referee-chat", "referee-rules", "referee-post", "referee-updates", "referee-works", "referee-guide", "referee-strikes", "referee-activity-check"], true],
   ["STAFF OPERATIONS", ["staff-command-guide", "mod-command-guide", "giveaway-event-guide", "ticket-guide", "dashboard-guide", "moderation-policy", "moderation-requests", "quarantine-review", "application-reviews"], true],
   ["CLAN OPERATIONS", ["maining-guide", "mainer-proof", "war-announcements", "war-line-chat", "war-scores", "eu-rosters", "roster-logs", "find-a-fcw"], true],
@@ -457,6 +832,13 @@ export function paradiseCommands() {
       .addStringOption(option => option.setName("query").setDescription("Optional command or system to search for").setRequired(false)),
     new SlashCommandBuilder().setName("sendlanguagequestion").setDescription("Post English/Turkish language buttons."),
     new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post Paradise notification-role selector."),
+    new SlashCommandBuilder().setName("sendregionroleselector").setDescription("Post Paradise region-role selector."),
+    new SlashCommandBuilder().setName("welcome").setDescription("Preview the configured Paradise welcome message.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+      .addSubcommand(s => s.setName("preview").setDescription("Post a safe welcome preview in this channel")),
+    new SlashCommandBuilder().setName("leave").setDescription("Preview the configured Paradise leave message.")
+      .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+      .addSubcommand(s => s.setName("preview").setDescription("Post a safe leave preview in this channel")),
     new SlashCommandBuilder().setName("backupserverstructure").setDescription("Back up channels, roles and permission overwrites.")
       .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     new SlashCommandBuilder().setName("previewserversetup").setDescription("Preview the full Clan/Training rebuild.")
@@ -769,8 +1151,16 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
       .addSubcommand(s => s.setName("mute").setDescription("Timeout a member within your authority")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
-        .addIntegerOption(o => o.setName("minutes").setDescription("Timeout minutes").setRequired(true).setMinValue(1).setMaxValue(40320))
-        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
+        .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500))
+        .addStringOption(o => o.setName("preset").setDescription("Optional policy preset with a recommended duration")
+          .addChoices(
+            { name: "Spam · 10 minutes", value: "spam" },
+            { name: "Toxicity · 60 minutes", value: "toxicity" },
+            { name: "Harassment · 180 minutes", value: "harassment" },
+            { name: "Scam attempt · 1440 minutes", value: "scam" },
+            { name: "Raid disruption · 10080 minutes", value: "raid" }
+          ))
+        .addIntegerOption(o => o.setName("minutes").setDescription("Custom timeout minutes; required without a preset").setMinValue(1).setMaxValue(40320)))
       .addSubcommand(s => s.setName("kick-request").setDescription("Request a senior-approved kick")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Reason and evidence summary").setRequired(true).setMaxLength(750)))
@@ -793,6 +1183,14 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true)))
       .addSubcommand(s => s.setName("deny").setDescription("Senior: deny a pending kick/ban request")
         .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true))),
+    new SlashCommandBuilder().setName("modcase").setDescription("Review Paradise moderation case history")
+      .addSubcommand(s => s.setName("user").setDescription("Show recent cases for a member")
+        .addUserOption(o => o.setName("user").setDescription("Moderated member").setRequired(true)))
+      .addSubcommand(s => s.setName("staff").setDescription("Show recent cases created by a staff member")
+        .addUserOption(o => o.setName("staff").setDescription("Staff member").setRequired(true)))
+      .addSubcommand(s => s.setName("weekly").setDescription("Show this server's seven-day moderation summary")),
+    new SlashCommandBuilder().setName("moderation").setDescription("Paradise moderation statistics")
+      .addSubcommand(s => s.setName("stats").setDescription("Show seven-day and all-time moderation counts")),
     new SlashCommandBuilder().setName("security").setDescription("Paradise security and quarantine controls")
       .addSubcommand(s => s.setName("panel").setDescription("Post the security status panel"))
       .addSubcommand(s => s.setName("quarantine").setDescription("Show quarantine status"))
@@ -1047,7 +1445,7 @@ const PRIVATE_ACCESS_ROLES = new Set([
   "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
   "Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee",
   "Training Supervisor", "Experienced Training Hoster", "Training Hoster", "Trial Training Hoster",
-  "Tryout Manager", "Experienced Tryout Hoster", "Tryout Hoster", "Tryout Staff", "Trial Tryout Staff",
+  "Tryout Manager", "Experienced Tryout Hoster", "Tryout Hoster", "Trial Tryout Hoster",
   "War Hoster"
 ]);
 
@@ -2142,7 +2540,7 @@ function roleRank(member) {
     const match = /^Stage ([0-4]) (Low|Mid|High) (Weak|Stable|Strong)$/.exec(role.name);
     if (match) return { stage: Number(match[1]), level: match[2], strength: match[3] };
   }
-  if (member.roles.cache.some(r => ["Tryout Staff", "Trial Tryout Staff"].includes(r.name))) {
+  if (member.roles.cache.some(r => ["Tryout Hoster", "Trial Tryout Hoster", "Tryout Staff", "Trial Tryout Staff"].includes(r.name))) {
     return { stage: 3, level: "Low", strength: "Weak" };
   }
   return null;
@@ -2163,7 +2561,7 @@ async function assignRankRole(guild, member, rank) {
 async function handleTryout(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "start") {
-    if (!roleRank(interaction.member)) return interaction.reply({ content: "Tryout Staff role required.", ephemeral: true });
+    if (!roleRank(interaction.member)) return interaction.reply({ content: "Tryout Hoster role required.", ephemeral: true });
     const link = interaction.options.getString("link");
     const sessionId = crypto.randomUUID();
     const session = { id: sessionId, guildId: interaction.guildId, type: "tryout", hosterId: interaction.user.id, link, status: "open", startedAt: new Date().toISOString() };
@@ -2172,35 +2570,45 @@ async function handleTryout(interaction) {
       new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRYOUT").setStyle(ButtonStyle.Danger)
     );
+    const tryoutConfig = configForGuild(await loadState(), interaction.guildId).tryout || {};
+    const tryoutPing = interaction.guild.roles.cache.find(role => ["Tryout Ping", "Re/Tryout Ping"].includes(role.name) || role.id === tryoutConfig.pingRoleId);
     const payload = {
       content: [
+        tryoutPing ? `<@&${tryoutPing.id}>` : null,
         "# TRYOUT OPEN",
         "## Tryout Time",
         "",
-        "◆ **Server**",
-        link,
+        "◇ Server:",
+        tryoutConfig.defaultServer || "Frankfurt, Germany",
         "",
-        "◆ **Format**",
-        "- **FT2** — one aggressive round",
-        "- **FT2** — one passive round",
+        "◇ Format:",
+        "• FT2 — 1 agresif round",
+        "• FT2 — 1 pasif round",
         "",
-        "Winning alone does not guarantee a higher stage.",
-        "",
-        "◆ **Hoster**",
+        "◇ Hoster:",
         `${interaction.user}`,
         "",
-        "◆ **Evaluation**",
-        "RC timing, catches, dash reactions, movement, pressure, adaptation and game sense.",
+        "◇ Değerlendirme:",
+        "RC timing, catch, dash tepkisi, movement, pressure, adaptasyon ve game sense.",
         "",
-        "◆ **Rules**",
-        "- No LH / 3M1 reset / TDS",
-        "- No 2 RC / wall / overpassive",
-        "- No alts, queue hitting or leaving",
+        "◇ Kurallar:",
+        "• LH yok",
+        "• 3M1 Reset yok",
+        "• True Downslam yok",
+        "• 2 RC yok",
+        "• Wall yok",
+        "• Overpassive yok",
+        "• Alt hesap yok",
+        "• Sırada vurmak yok",
+        "• Sırayı terk etmek yok",
+        "",
+        "◇ Link:",
+        link,
         "",
         "-# Lock after 1–5 minutes • Hoster-only controls • Made By Fieel"
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
       components: [controls],
-      allowedMentions: { users: [interaction.user.id], parse: [] }
+      allowedMentions: { users: [interaction.user.id], roles: tryoutPing ? [tryoutPing.id] : [], parse: [] }
     };
     await interaction.deferReply({ ephemeral: true });
     const target = await configuredChannel(interaction.guild, "tryout_channel", "tryout") || interaction.channel;
@@ -2706,30 +3114,39 @@ async function handleTraining(interaction) {
       new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRAINING").setStyle(ButtonStyle.Danger)
     );
+    const trainingConfig = configForGuild(await loadState(), interaction.guildId).training || {};
+    const defaultServer = String(trainingConfig.defaultServer || "Frankfurt, Germany").trim();
+    const trainingPing = interaction.guild.roles.cache.find(role => role.name === "Training Ping" || role.id === trainingConfig.pingRoleId);
+    const rulesLines = String(rules).split(/\r?\n/)
+      .map(line => line.trim().replace(/^[-•◆◇]\s*/, ""))
+      .filter(Boolean);
     const payload = {
       content: [
-        "# TRAINING",
-        "## Competitive Practice",
+        trainingPing ? `<@&${trainingPing.id}>` : null,
+        "# Training",
         "",
-        "◆ **Rules**",
-        ...String(rules).split(/\r?\n/).map(line => line.startsWith("-") ? line : `- ${line}`),
+        "◇ Server:",
+        defaultServer,
         "",
-        "◆ **Playable Characters**",
-        "Saitama, Garou, Metal Bat",
+        "◇ Format:",
+        trainingConfig.defaultFormat || "First To 3",
         "",
-        "◆ **Server**",
+        "◇ Karakterler:",
+        trainingConfig.characters || "Saitama, Garou, Metal Bat",
+        "",
+        "◇ Kurallar:",
+        ...rulesLines.map(line => `• ${line}`),
+        "",
+        "◇ Link:",
         link,
         "",
-        "◆ **Hoster**",
+        "◇ Hoster:",
         `<@${selectedHost.id}>${cohost ? ` • Co-hoster: ${cohost}` : ""}`,
         "",
-        "◆ **Format**",
-        "FT3 • FT5 optional",
-        "",
-        `-# Session ${sessionId.slice(0, 8)} • Hoster-only controls • Made By Fieel`
-      ].join("\n"),
+        "-# Hoster-only controls • Made By Fieel"
+      ].filter(Boolean).join("\n"),
       components: [controls],
-      allowedMentions: { users: [selectedHost.id, ...(cohost ? [cohost.id] : [])], roles: [] }
+      allowedMentions: { users: [selectedHost.id, ...(cohost ? [cohost.id] : [])], roles: trainingPing ? [trainingPing.id] : [] }
     };
     await interaction.deferReply({ ephemeral: true });
     const target = await configuredChannel(interaction.guild, "training_channel", "training") || interaction.channel;
@@ -2810,22 +3227,25 @@ async function handleSessionButton(interaction) {
       state.trainings[sessionId] = { ...state.trainings[sessionId], status: "locked", lockedAt: new Date().toISOString() };
       return state;
     });
-    return interaction.reply({ content: "# SERVER LOCKED", allowedMentions: { parse: [] } });
+    await interaction.deferUpdate();
+    return interaction.message.reply({ content: "# SERVER LOCKED\n-# Made By Fieel", allowedMentions: { parse: [] } });
   }
   if (action === "unlocked") {
     await saveState(state => {
       state.trainings[sessionId] = { ...state.trainings[sessionId], status: "open", unlockedAt: new Date().toISOString() };
       return state;
     });
-    return interaction.reply({ content: "# SERVER UNLOCKED", allowedMentions: { parse: [] } });
+    await interaction.deferUpdate();
+    return interaction.message.reply({ content: "# SERVER UNLOCKED\n-# Made By Fieel", allowedMentions: { parse: [] } });
   }
   await finishSession(sessionId, session.hosterId);
   const ending = session.type === "tryout" ? "# ENDED" : "# TRAINING ENDED";
-  return interaction.update({
-    content: `${interaction.message.content || ""}\n\n${ending}`.trim(),
+  await interaction.update({
+    content: interaction.message.content || "",
     embeds: [],
     components: []
   });
+  return interaction.message.reply({ content: `${ending}\n-# Made By Fieel`, allowedMentions: { parse: [] } });
 }
 
 function hasEventAuthority(interaction, roles) {
@@ -3246,6 +3666,25 @@ export function paradiseSupportTicketControls(ticketId, status = "open") {
   )];
 }
 
+function supportTicketStatusLabel(status = "open") {
+  return String(status || "open").toLowerCase() === "closed" ? "CLOSED" : "OPEN";
+}
+
+function paradiseSupportTicketDescription(record) {
+  const status = supportTicketStatusLabel(record.status);
+  const lines = [
+    `Member: <@${record.userId}>`,
+    `Ticket: \`${record.id.slice(0, 8)}\``,
+    `Status: **${status}**`
+  ];
+  if (record.claimedBy) lines.push(`Claimed by: <@${record.claimedBy}>`);
+  lines.push("");
+  lines.push(status === "OPEN"
+    ? "Use the controls below. Closing this ticket automatically saves a transcript and removes member access."
+    : "This ticket is closed. A transcript was requested automatically; staff can reopen it if more information is needed.");
+  return lines.join("\n");
+}
+
 async function createParadiseSupportTicket(guild, user, sourceChannel, { test = false } = {}) {
   const state = await loadState();
   const existing = Object.values(state.supportTickets?.[guild.id] || {}).find(item => item.userId === user.id && item.status === "open");
@@ -3281,8 +3720,8 @@ async function createParadiseSupportTicket(guild, user, sourceChannel, { test = 
   });
   const header = await channel.send({
     content: `<@${user.id}>`,
-    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("SUPPORT TICKET")
-      .setDescription(`Member: <@${user.id}>\nTicket: \`${ticketId.slice(0, 8)}\`\nStatus: **OPEN**\n\nUse the controls below. Close first; save a transcript before deletion.`)
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("SUPPORT TICKET - OPEN")
+      .setDescription(paradiseSupportTicketDescription(record))
       .setFooter(paradiseFooter(test ? "Live smoke ticket" : "Private support"))],
     components: paradiseSupportTicketControls(ticketId),
     allowedMentions: { users: [user.id], roles: [], parse: [] }
@@ -3305,10 +3744,21 @@ async function saveParadiseSupportTranscript(guild, channel, record, trigger) {
     return `[${timestamp}] ${author}: ${String(message.cleanContent || message.content || "[embed / attachment]").replace(/\r?\n/g, " ")}`;
   });
   const sent = await destination.send({
-    content: `Support transcript · Ticket **${record.id.slice(0, 8)}** · ${trigger}`,
+    content: `Support transcript - Ticket **${record.id.slice(0, 8)}** - ${trigger}`,
     files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `paradise-support-${record.id.slice(0, 8)}.txt` }]
   });
   return sent;
+}
+
+function transcriptMetadataFromMessage(message, trigger) {
+  if (!message) return {};
+  return {
+    transcriptChannelId: message.channelId,
+    transcriptMessageId: message.id,
+    transcriptUrl: message.url,
+    transcriptSavedAt: new Date().toISOString(),
+    transcriptTrigger: trigger
+  };
 }
 
 async function handleParadiseSupportButton(interaction) {
@@ -3323,26 +3773,64 @@ async function handleParadiseSupportButton(interaction) {
   const isStaff = canModerate(interaction.member) || canApproveModeration(interaction.member);
   if (action !== "close" && !isStaff) return interaction.reply({ content: "Staff authority required.", ephemeral: true });
   if (action === "claim") {
+    const claimed = { ...record, claimedBy: interaction.user.id, updatedAt: new Date().toISOString() };
     await saveState(next => {
-      next.supportTickets[interaction.guildId][ticketId] = { ...record, claimedBy: interaction.user.id, updatedAt: new Date().toISOString() };
+      next.supportTickets[interaction.guildId][ticketId] = claimed;
       return next;
     });
-    return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setFooter(paradiseFooter(`Claimed by ${interaction.user.username}`))], components: paradiseSupportTicketControls(ticketId, "open") });
+    return interaction.update({
+      embeds: [EmbedBuilder.from(interaction.message.embeds[0])
+        .setDescription(paradiseSupportTicketDescription(claimed))
+        .setFooter(paradiseFooter(`Claimed by ${interaction.user.username}`))],
+      components: paradiseSupportTicketControls(ticketId, "open")
+    });
   }
   if (action === "transcript") {
     const transcript = await saveParadiseSupportTranscript(interaction.guild, interaction.channel, record, "manual");
+    if (transcript) {
+      const updatedRecord = { ...record, ...transcriptMetadataFromMessage(transcript, "manual"), updatedAt: new Date().toISOString(), updatedBy: interaction.user.id };
+      await saveState(next => {
+        next.supportTickets[interaction.guildId][ticketId] = updatedRecord;
+        return next;
+      });
+    }
     return interaction.reply({ content: transcript ? "Transcript saved to the private transcript channel." : "No transcript channel is configured.", ephemeral: true });
   }
   const status = action === "reopen" ? "open" : "closed";
+  let transcriptMeta = {};
+  if (status === "closed") {
+    const transcript = await saveParadiseSupportTranscript(interaction.guild, interaction.channel, { ...record, status }, "closed").catch(() => null);
+    if (!transcript) {
+      return interaction.reply({
+        content: "Transcript kaydedilemedi; ticket kapatılmadı. Transcript/log kanalını ayarlayıp tekrar dene.",
+        ephemeral: true
+      });
+    }
+    transcriptMeta = transcriptMetadataFromMessage(transcript, "closed");
+  }
   await interaction.channel.permissionOverwrites.edit(record.userId, { ViewChannel: status === "open" }).catch(() => {});
   await interaction.channel.setName(status === "open" ? interaction.channel.name.replace(/^closed-/, "") : `closed-${interaction.channel.name}`.slice(0, 90)).catch(() => {});
-  if (status === "closed") await saveParadiseSupportTranscript(interaction.guild, interaction.channel, record, "closed").catch(() => {});
+  const updatedRecord = { ...record, status, ...transcriptMeta, updatedAt: new Date().toISOString(), updatedBy: interaction.user.id };
   await saveState(next => {
-    next.supportTickets[interaction.guildId][ticketId] = { ...record, status, updatedAt: new Date().toISOString(), updatedBy: interaction.user.id };
+    next.supportTickets[interaction.guildId][ticketId] = updatedRecord;
     return next;
   });
+  if (!interaction.message) {
+    const message = record.reviewChannelId && record.reviewMessageId
+      ? await interaction.guild.channels.fetch(record.reviewChannelId)
+        .then(channel => channel?.messages.fetch(record.reviewMessageId)).catch(() => null)
+      : null;
+    const payload = {
+      embeds: [applicationReviewedEmbed(message?.embeds?.[0], updatedRecord, status, interaction.user, reviewReason, grantedRole)],
+      components: []
+    };
+    if (message) await message.edit(payload).catch(() => null);
+    return interaction.reply({ content: `Application marked **${status.replace("_", " ")}**.`, ephemeral: true });
+  }
   return interaction.update({
-    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`SUPPORT TICKET · ${status.toUpperCase()}`)],
+    embeds: [EmbedBuilder.from(interaction.message.embeds[0])
+      .setTitle(`SUPPORT TICKET - ${supportTicketStatusLabel(status)}`)
+      .setDescription(paradiseSupportTicketDescription(updatedRecord))],
     components: paradiseSupportTicketControls(ticketId, status)
   });
 }
@@ -3351,20 +3839,209 @@ function applicationLabel(type) {
   return APPLICATION_TYPES.find(([value]) => value === type)?.[1] || type;
 }
 
-function applicationModal(type) {
-  const modal = new ModalBuilder().setCustomId(`paradise_application_modal:${type}`).setTitle(`${applicationLabel(type)} Application`);
-  const inputs = [
-    ["motivation", "Why do you want this position?", TextInputStyle.Paragraph, 30, 900],
-    ["experience", "Relevant experience", TextInputStyle.Paragraph, 10, 900],
-    ["availability", "Timezone and weekly availability", TextInputStyle.Short, 3, 150],
-    ["additional", "Anything else? (write N/A if none)", TextInputStyle.Paragraph, 2, 600]
-  ];
-  modal.addComponents(...inputs.map(([id, label, style, min, max]) =>
+function applicationTypeAllowedForMode(type, mode) {
+  if (mode === "community") return !COMMUNITY_BLOCKED_APPLICATION_TYPES.has(type);
+  if (mode === "tsbtr") return !TSBTR_BLOCKED_APPLICATION_TYPES.has(type);
+  if (mode === "clan") return !COMMUNITY_ONLY_APPLICATION_TYPES.has(type);
+  return true;
+}
+
+function applicationQuestions(type) {
+  return APPLICATION_QUESTION_BANK_V2[type] || APPLICATION_QUESTION_BANK_V2.default
+    || APPLICATION_QUESTION_BANK[type] || APPLICATION_QUESTION_BANK.default;
+}
+
+function applicationQuestionChunks(type) {
+  const questions = applicationQuestions(type);
+  const chunks = [];
+  for (let index = 0; index < questions.length; index += DISCORD_APPLICATION_MODAL_LIMIT) {
+    chunks.push(questions.slice(index, index + DISCORD_APPLICATION_MODAL_LIMIT));
+  }
+  return chunks.length ? chunks : [[]];
+}
+
+function applicationModal(type, step = 0, draftId = "new") {
+  const chunks = applicationQuestionChunks(type);
+  const safeStep = Math.min(Math.max(Number(step) || 0, 0), chunks.length - 1);
+  const modal = new ModalBuilder()
+    .setCustomId(`paradise_application_modal:${type}:${safeStep}:${draftId}`)
+    .setTitle(`${applicationLabel(type)} ${safeStep + 1}/${chunks.length}`);
+  modal.addComponents(...chunks[safeStep].map(([id, label, placeholder, style, min, max]) =>
     new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(style)
-        .setMinLength(min).setMaxLength(max).setRequired(true)
+        .setPlaceholder(placeholder).setMinLength(min).setMaxLength(max).setRequired(true)
     )));
   return modal;
+}
+
+function collectApplicationAnswers(interaction, type, step) {
+  const chunk = applicationQuestionChunks(type)[step] || [];
+  return Object.fromEntries(chunk.map(([key, label]) => [
+    label,
+    interaction.fields.getTextInputValue(key).trim()
+  ]));
+}
+
+function applicationContinueComponents(draftId) {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`paradise_application_continue:${draftId}`)
+      .setLabel("Devam et / Continue")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`paradise_application_cancel:${draftId}`)
+      .setLabel("Iptal / Cancel")
+      .setStyle(ButtonStyle.Secondary)
+  )];
+}
+
+function maskApplicationReviewText(value, max = 700) {
+  return compactText(String(value || "")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/\b(?:mfa\.[\w-]{20,}|[\w-]{24}\.[\w-]{6}\.[\w-]{27,})\b/g, "[token]")
+    .replace(/\b[A-Fa-f0-9]{24,}\b/g, "[id]")
+    .replace(/@everyone/g, "@\u200beveryone")
+    .replace(/@here/g, "@\u200bhere"), max);
+}
+
+function applicationReviewStatus(action) {
+  return action === "approve" ? "approved" : action === "deny" ? "denied" : "more_info";
+}
+
+function applicationReviewReasonModal(action, id) {
+  const isMoreInfo = action === "more";
+  return new ModalBuilder()
+    .setCustomId(`paradise_application_review_reason:${action}:${id}`)
+    .setTitle(isMoreInfo ? "Ask More Info" : "Deny Application")
+    .addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("review_reason")
+        .setLabel(isMoreInfo ? "What should the applicant clarify?" : "Why is this application denied?")
+        .setStyle(TextInputStyle.Paragraph)
+        .setMinLength(5)
+        .setMaxLength(700)
+        .setPlaceholder(isMoreInfo
+          ? "Example: Please explain your weekly availability and provide one previous staff example."
+          : "Example: Not enough detail in moderation scenarios. Please apply again after improving your answers.")
+        .setRequired(true)
+    ));
+}
+
+function applicationReviewedEmbed(baseEmbed, record, status, reviewer, reviewReason = "", grantedRole = null) {
+  const embed = baseEmbed
+    ? EmbedBuilder.from(baseEmbed)
+    : new EmbedBuilder().setColor(0x2f3136).setTitle(`Application · ${applicationLabel(record.type)}`);
+  embed
+    .setTitle(`Application · ${applicationLabel(record.type)} · ${status.toUpperCase().replace("_", " ")}`)
+    .setFooter(paradiseFooter(`Reviewed by ${reviewer.username}`))
+    .setTimestamp();
+  if (reviewReason) embed.addFields({ name: status === "more_info" ? "Staff request" : "Review reason", value: reviewReason, inline: false });
+  if (grantedRole) embed.addFields({ name: "Role granted", value: `<@&${grantedRole}>`, inline: false });
+  return embed;
+}
+
+function applicationCooldownUntil(records, applicationSettings) {
+  const latest = [...records].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  return (latest ? Date.parse(latest.createdAt) : 0)
+    + Number(applicationSettings.cooldownDays ?? 7) * 86_400_000;
+}
+
+export async function paradiseWebsiteApplicationContext(guild, userId) {
+  const member = await guild.members.fetch(userId).catch(() => null);
+  const state = await loadState();
+  const guildConfig = configForGuild(state, guild.id);
+  const applicationSettings = guildConfig.applicationSettings || {};
+  const records = Object.values(state.applications?.[guild.id] || {}).filter(item => item.userId === userId);
+  const active = records.find(item => ["pending", "more_info"].includes(item.status));
+  const cooldownUntil = applicationCooldownUntil(records, applicationSettings);
+  return {
+    guildId: guild.id,
+    guildName: guild.name,
+    member: Boolean(member),
+    applicationsOpen: applicationSettings.enabled !== false,
+    activeSetupMode: guildConfig.activeSetupMode || "community",
+    blacklisted: state.blacklists?.[guild.id]?.[userId]?.status === "active",
+    activeApplication: active ? {
+      id: active.id.slice(0, 8), type: active.type, label: applicationLabel(active.type), status: active.status,
+      createdAt: active.createdAt
+    } : null,
+    cooldownUntil: cooldownUntil > Date.now() ? new Date(cooldownUntil).toISOString() : null,
+    types: APPLICATION_TYPES.filter(([type]) => applicationTypeAllowedForMode(type, guildConfig.activeSetupMode)).map(([type, label]) => ({
+      type,
+      label,
+      questions: applicationQuestions(type).map(([key, questionLabel, placeholder, style, min, max]) => ({
+        key, label: questionLabel, placeholder, multiline: style === TextInputStyle.Paragraph, min, max
+      }))
+    }))
+  };
+}
+
+export async function submitParadiseWebsiteApplication(guild, { userId, type, answers, siteUserId = null }) {
+  const context = await paradiseWebsiteApplicationContext(guild, userId);
+  if (!context.member) throw Object.assign(new Error("discord_membership_required"), { code: "discord_membership_required", statusCode: 403 });
+  if (!context.applicationsOpen) throw Object.assign(new Error("applications_closed"), { code: "applications_closed", statusCode: 409 });
+  if (context.blacklisted) throw Object.assign(new Error("blacklisted_users_cannot_apply"), { code: "blacklisted_users_cannot_apply", statusCode: 403 });
+  if (context.activeApplication) throw Object.assign(new Error("active_application_exists"), { code: "active_application_exists", statusCode: 409 });
+  if (context.cooldownUntil) throw Object.assign(new Error("application_cooldown_active"), {
+    code: "application_cooldown_active", statusCode: 429, cooldownUntil: context.cooldownUntil
+  });
+  const selected = context.types.find(item => item.type === type);
+  if (!selected) throw Object.assign(new Error("application_type_unavailable"), { code: "application_type_unavailable", statusCode: 400 });
+  const normalizedAnswers = {};
+  for (const question of selected.questions) {
+    const value = String(answers?.[question.key] || "").trim();
+    if (value.length < question.min || value.length > question.max) {
+      throw Object.assign(new Error("invalid_application_answer"), {
+        code: "invalid_application_answer", statusCode: 400, question: question.key
+      });
+    }
+    normalizedAnswers[question.label] = value;
+  }
+  const id = crypto.randomUUID();
+  const record = {
+    id, guildId: guild.id, userId, type, answers: normalizedAnswers, source: "fima_website",
+    siteUserId, status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  };
+  await saveState(next => {
+    next.applications = next.applications || {};
+    next.applications[guild.id] = next.applications[guild.id] || {};
+    next.applications[guild.id][id] = record;
+    return next;
+  });
+  const review = await configuredChannel(guild, "application_review_channel", "application-reviews");
+  let reviewMessage = null;
+  if (review) {
+    reviewMessage = await review.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(type)}`)
+        .setDescription(`Applicant: <@${userId}>\nApplication ID: \`${id.slice(0, 8)}\`\nSource: **Fima website**`)
+        .addFields(Object.entries(normalizedAnswers).map(([label, value]) => ({ name: label, value: value.slice(0, 1024), inline: false })))
+        .setFooter(paradiseFooter("Pending private review")).setTimestamp()],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_application_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_application_more:${id}`).setLabel("Ask More Info").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`paradise_application_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+      )]
+    }).catch(() => null);
+    if (reviewMessage) {
+      await saveState(next => {
+        next.applications = next.applications || {};
+        next.applications[guild.id] = next.applications[guild.id] || {};
+        next.applications[guild.id][id] = {
+          ...(next.applications[guild.id][id] || record),
+          reviewChannelId: review.id,
+          reviewMessageId: reviewMessage.id,
+          updatedAt: new Date().toISOString()
+        };
+        return next;
+      });
+    }
+  }
+  await logParadiseAction(guild, "application_logs_channel", "application-logs", "Website application submitted",
+    `<@${userId}> submitted **${applicationLabel(type)}** from the Fima website · \`${id.slice(0, 8)}\`.`);
+  return {
+    id: id.slice(0, 8), status: "pending", type, label: applicationLabel(type),
+    reviewQueued: Boolean(reviewMessage), createdAt: record.createdAt
+  };
 }
 
 async function handleApplicationCommand(interaction) {
@@ -3398,19 +4075,21 @@ async function handleApplicationCommand(interaction) {
   if (cooldownUntil > Date.now()) {
     return interaction.reply({ content: `Application cooldown ends <t:${Math.floor(cooldownUntil / 1000)}:R>.`, ephemeral: true });
   }
-  return interaction.showModal(applicationModal(interaction.options.getString("type")));
+  return interaction.showModal(applicationModal(interaction.options.getString("type"), 0, "new"));
 }
 
 async function handleApplicationModal(interaction) {
-  const type = interaction.customId.split(":")[1];
+  const [, type, rawStep = "0", draftId = "new"] = interaction.customId.split(":");
+  const chunks = applicationQuestionChunks(type);
+  const step = Math.min(Math.max(Number(rawStep) || 0, 0), chunks.length - 1);
   if (!APPLICATION_TYPES.some(([value]) => value === type)) {
     return interaction.reply({ content: "Unknown application type.", ephemeral: true });
   }
+  const submittedAnswers = collectApplicationAnswers(interaction, type, step);
   const state = await loadState();
   const guildConfig = configForGuild(state, interaction.guildId);
   const applicationSettings = guildConfig.applicationSettings || {};
-  if ((guildConfig.activeSetupMode === "community" && type === "clan_mainer")
-    || (guildConfig.activeSetupMode !== "community" && type === "fima_support")) {
+  if (!applicationTypeAllowedForMode(type, guildConfig.activeSetupMode)) {
     return interaction.reply({ content: "This application type is not available for the active server template.", ephemeral: true });
   }
   if (applicationSettings.enabled === false) return interaction.reply({ content: "Applications are currently closed.", ephemeral: true });
@@ -3427,25 +4106,75 @@ async function handleApplicationModal(interaction) {
   if (cooldownUntil > Date.now()) {
     return interaction.reply({ content: `Application cooldown ends <t:${Math.floor(cooldownUntil / 1000)}:R>.`, ephemeral: true });
   }
+  const existingDraft = draftId !== "new" ? state.applicationDrafts?.[interaction.guildId]?.[draftId] : null;
+  if (draftId !== "new") {
+    if (!existingDraft || existingDraft.userId !== interaction.user.id || existingDraft.type !== type) {
+      return interaction.reply({ content: "This application draft is no longer available. Please start again.", ephemeral: true });
+    }
+    if (Date.parse(existingDraft.expiresAt || 0) < Date.now()) {
+      await saveState(next => {
+        if (next.applicationDrafts?.[interaction.guildId]) delete next.applicationDrafts[interaction.guildId][draftId];
+        return next;
+      });
+      return interaction.reply({ content: "This application draft expired. Please start again.", ephemeral: true });
+    }
+    if (Number(existingDraft.nextStep) !== step) {
+      return interaction.reply({
+        content: `This application is waiting for step ${Number(existingDraft.nextStep) + 1}/${chunks.length}.`,
+        components: applicationContinueComponents(draftId),
+        ephemeral: true
+      });
+    }
+  }
+  const mergedAnswers = { ...(existingDraft?.answers || {}), ...submittedAnswers };
+  if (step < chunks.length - 1) {
+    const activeDraftId = draftId === "new" ? crypto.randomUUID() : draftId;
+    const now = new Date().toISOString();
+    await saveState(next => {
+      next.applicationDrafts = next.applicationDrafts || {};
+      next.applicationDrafts[interaction.guildId] = next.applicationDrafts[interaction.guildId] || {};
+      next.applicationDrafts[interaction.guildId][activeDraftId] = {
+        id: activeDraftId,
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        type,
+        answers: mergedAnswers,
+        nextStep: step + 1,
+        totalSteps: chunks.length,
+        createdAt: existingDraft?.createdAt || now,
+        updatedAt: now,
+        expiresAt: new Date(Date.now() + APPLICATION_DRAFT_TTL_MS).toISOString()
+      };
+      return next;
+    });
+    return interaction.reply({
+      content: `Basvuru bolumu kaydedildi: **${step + 1}/${chunks.length}**. Sonraki bolumu doldurmak icin devam et.`,
+      components: applicationContinueComponents(activeDraftId),
+      ephemeral: true
+    });
+  }
   const id = crypto.randomUUID();
-  const answers = Object.fromEntries(["motivation", "experience", "availability", "additional"]
-    .map(key => [key, interaction.fields.getTextInputValue(key).trim()]));
   const record = {
-    id, guildId: interaction.guildId, userId: interaction.user.id, type, answers,
+    id, guildId: interaction.guildId, userId: interaction.user.id, type, answers: mergedAnswers,
     status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   await saveState(next => {
+    next.applications = next.applications || {};
     next.applications[interaction.guildId] = next.applications[interaction.guildId] || {};
     next.applications[interaction.guildId][id] = record;
+    if (draftId !== "new" && next.applicationDrafts?.[interaction.guildId]) {
+      delete next.applicationDrafts[interaction.guildId][draftId];
+    }
     return next;
   });
   const review = await configuredChannel(interaction.guild, "application_review_channel", "application-reviews");
+  let reviewMessage = null;
   if (review) {
-    const fields = Object.entries(answers).map(([key, value]) => ({
-      name: key[0].toUpperCase() + key.slice(1), value: value.slice(0, 1024), inline: false
+    const fields = Object.entries(mergedAnswers).map(([key, value]) => ({
+      name: key[0].toUpperCase() + key.slice(1), value: maskApplicationReviewText(value, 1024), inline: false
     }));
-    await review.send({
-      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(type)}`)
+    reviewMessage = await review.send({
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application - ${applicationLabel(type)}`)
         .setDescription(`Applicant: ${interaction.user}\nApplication ID: \`${id.slice(0, 8)}\``)
         .addFields(fields).setFooter(paradiseFooter("Pending review")).setTimestamp()],
       components: [new ActionRowBuilder().addComponents(
@@ -3454,10 +4183,56 @@ async function handleApplicationModal(interaction) {
         new ButtonBuilder().setCustomId(`paradise_application_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
       )]
     });
+    await saveState(next => {
+      next.applications = next.applications || {};
+      next.applications[interaction.guildId] = next.applications[interaction.guildId] || {};
+      next.applications[interaction.guildId][id] = {
+        ...(next.applications[interaction.guildId][id] || record),
+        reviewChannelId: review.id,
+        reviewMessageId: reviewMessage.id,
+        updatedAt: new Date().toISOString()
+      };
+      return next;
+    });
   }
   await logParadiseAction(interaction.guild, "application_logs_channel", "application-logs", "Application submitted",
-    `${interaction.user} submitted **${applicationLabel(type)}** · \`${id.slice(0, 8)}\`.`);
+    `${interaction.user} submitted **${applicationLabel(type)}** - \`${id.slice(0, 8)}\`.`);
   return interaction.reply({ content: review ? "Application submitted for private staff review." : "Application saved. Staff must map an application review channel.", ephemeral: true });
+}
+
+async function handleApplicationContinueButton(interaction) {
+  const draftId = interaction.customId.split(":")[1];
+  const state = await loadState();
+  const draft = state.applicationDrafts?.[interaction.guildId]?.[draftId];
+  if (!draft || draft.userId !== interaction.user.id) {
+    return interaction.reply({ content: "This application step is no longer available. Start the application again.", ephemeral: true });
+  }
+  if (Date.parse(draft.expiresAt || 0) < Date.now()) {
+    await saveState(next => {
+      if (next.applicationDrafts?.[interaction.guildId]) delete next.applicationDrafts[interaction.guildId][draftId];
+      return next;
+    });
+    return interaction.reply({ content: "This application draft expired. Start the application again.", ephemeral: true });
+  }
+  return interaction.showModal(applicationModal(draft.type, draft.nextStep, draftId));
+}
+
+async function handleApplicationCancelButton(interaction) {
+  const draftId = interaction.customId.split(":")[1];
+  const state = await loadState();
+  const draft = state.applicationDrafts?.[interaction.guildId]?.[draftId];
+  if (!draft || draft.userId !== interaction.user.id) {
+    return interaction.reply({ content: "This application draft is already gone. You can start a new application anytime.", ephemeral: true });
+  }
+  await saveState(next => {
+    if (next.applicationDrafts?.[interaction.guildId]) delete next.applicationDrafts[interaction.guildId][draftId];
+    return next;
+  });
+  return interaction.update({
+    content: "Basvuru taslagi iptal edildi. Istersen panelden tekrar baslayabilirsin. / Application draft cancelled.",
+    embeds: [],
+    components: []
+  });
 }
 
 function canReviewApplications(member) {
@@ -3468,17 +4243,35 @@ function canReviewApplications(member) {
 async function handleApplicationReview(interaction) {
   if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
   const [action, id] = interaction.customId.replace("paradise_application_", "").split(":");
+  if (["deny", "more"].includes(action)) {
+    return interaction.showModal(applicationReviewReasonModal(action, id));
+  }
+  return finalizeApplicationReview(interaction, action, id);
+}
+
+async function handleApplicationReviewReasonModal(interaction) {
+  if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
+  const [, action, id] = interaction.customId.split(":");
+  return finalizeApplicationReview(interaction, action, id, interaction.fields.getTextInputValue("review_reason"));
+}
+
+async function finalizeApplicationReview(interaction, action, id, rawReason = "") {
+  if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
   const state = await loadState();
   const record = state.applications?.[interaction.guildId]?.[id];
   if (!record || record.status !== "pending") return interaction.reply({ content: "This application is no longer pending.", ephemeral: true });
-  const status = action === "approve" ? "approved" : action === "deny" ? "denied" : "more_info";
+  const status = applicationReviewStatus(action);
+  const reviewReason = ["denied", "more_info"].includes(status) ? maskApplicationReviewText(rawReason, 700) : "";
   let grantedRole = null;
   if (status === "approved" && configForGuild(state, interaction.guildId).applicationSettings?.autoGrantRole === true) {
     const guildConfig = configForGuild(state, interaction.guildId);
     const applicationRoleKeys = {
+      staff: "staff_role",
       moderator: "moderator_role", support: "support_role", training_hoster: "training_hoster_role",
       tryout_hoster: "tryout_hoster_role", referee: "referee_role", event_staff: "event_staff_role",
-      giveaway_staff: "giveaway_staff_role", content_creator: "content_creator_role"
+      giveaway_staff: "giveaway_staff_role", content_creator: "content_creator_role",
+      partnership: "partner_role", clan_mainer: "clan_mainer_role", fima_support: "fima_support_role",
+      macro_staff: "macro_staff_role", fflag_staff: "fflag_staff_role", reseller: "reseller_role"
     };
     const roleName = guildConfig.applicationSettings?.roleMappings?.[record.type]
       || guildConfig.roleMappings?.[applicationRoleKeys[record.type]];
@@ -3492,20 +4285,23 @@ async function handleApplicationReview(interaction) {
       grantedRole = role.id;
     }
   }
+  const updatedRecord = {
+    ...record, status, reviewedBy: interaction.user.id, reviewedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(), grantedRole, reviewReason: reviewReason || null
+  };
   await saveState(next => {
-    next.applications[interaction.guildId][id] = {
-      ...record, status, reviewedBy: interaction.user.id, reviewedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(), grantedRole
-    };
+    next.applications[interaction.guildId][id] = updatedRecord;
     return next;
   });
   const applicant = await interaction.client.users.fetch(record.userId).catch(() => null);
-  await applicant?.send(`Your **${applicationLabel(record.type)}** application in **${interaction.guild.name}** is now **${status.replace("_", " ")}**.`).catch(() => {});
+  await applicant?.send([
+    `Your **${applicationLabel(record.type)}** application in **${interaction.guild.name}** is now **${status.replace("_", " ")}**.`,
+    reviewReason ? `Staff note: ${reviewReason}` : ""
+  ].filter(Boolean).join("\n")).catch(() => {});
   await logParadiseAction(interaction.guild, "application_logs_channel", "application-logs", "Application reviewed",
-    `<@${record.userId}> · **${applicationLabel(record.type)}** · **${status}** by ${interaction.user}.${grantedRole ? ` Role <@&${grantedRole}> granted.` : ""}`);
+    `<@${record.userId}> · **${applicationLabel(record.type)}** · **${status}** by ${interaction.user}.${grantedRole ? ` Role <@&${grantedRole}> granted.` : ""}${reviewReason ? ` Reason: ${reviewReason}` : ""}`);
   return interaction.update({
-    embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`Application · ${applicationLabel(record.type)} · ${status.toUpperCase()}`)
-      .setFooter(paradiseFooter(`Reviewed by ${interaction.user.username}`))],
+    embeds: [applicationReviewedEmbed(interaction.message.embeds?.[0], updatedRecord, status, interaction.user, reviewReason, grantedRole)],
     components: []
   });
 }
@@ -3525,6 +4321,14 @@ function moderationTargetAllowed(actor, target) {
   return target && !target.user.bot && target.id !== actor.id
     && (actor.guild.ownerId === actor.id || actor.roles.highest.comparePositionTo(target.roles.highest) > 0);
 }
+
+const MODERATION_TIMEOUT_PRESETS = Object.freeze({
+  spam: 10,
+  toxicity: 60,
+  harassment: 180,
+  scam: 1440,
+  raid: 10080
+});
 
 async function recordModerationCase(interaction, action, target, reason, extra = {}) {
   const id = crypto.randomUUID();
@@ -3587,12 +4391,25 @@ async function handleModCommand(interaction) {
     return interaction.reply({ content: `Warning recorded as \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
   }
   if (sub === "mute") {
-    const minutes = interaction.options.getInteger("minutes");
+    const preset = interaction.options.getString("preset");
+    const customMinutes = interaction.options.getInteger("minutes");
+    const minutes = customMinutes || MODERATION_TIMEOUT_PRESETS[preset] || null;
+    if (!minutes) return interaction.reply({ content: "Choose a policy preset or provide a custom timeout duration.", ephemeral: true });
     if (!target.moderatable) return interaction.reply({ content: "Paradise cannot timeout this member because of Discord role hierarchy.", ephemeral: true });
     await target.timeout(minutes * 60_000, reason);
-    const record = await recordModerationCase(interaction, "timeout", target, reason, { minutes });
+    const record = await recordModerationCase(interaction, "timeout", target, reason, { minutes, preset: preset || null });
+    const state = await loadState();
+    let warning = null;
+    if (configForGuild(state, interaction.guildId).moderationSettings?.autoWarnOnMute !== false) {
+      warning = await recordModerationCase(interaction, "warn", target, reason, {
+        automatic: true,
+        linkedCaseId: record.id,
+        source: "timeout"
+      });
+      await target.send(`You were timed out in **${interaction.guild.name}** for **${minutes} minutes** and received an automatic warning.\nReason: ${reason}\nCases: ${record.id.slice(0, 8)} / ${warning.id.slice(0, 8)}`).catch(() => {});
+    }
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Timeout applied", `${target} timed out for **${minutes} minutes** by ${interaction.user}.\n**Reason:** ${reason}`);
-    return interaction.reply({ content: `Timeout applied · case \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
+    return interaction.reply({ content: `Timeout applied · case \`${record.id.slice(0, 8)}\`${warning ? ` · automatic warning \`${warning.id.slice(0, 8)}\`` : ""}.`, ephemeral: true });
   }
   if (sub === "quarantine" || sub === "unquarantine") {
     const role = await ensureRole(interaction.guild, "Muted / Quarantined");
@@ -3617,6 +4434,67 @@ async function handleModCommand(interaction) {
     });
   }
   return interaction.reply({ content: queue ? `${action} request queued as \`${record.id.slice(0, 8)}\`.` : `Request saved as \`${record.id.slice(0, 8)}\`; map moderation-requests for review.`, ephemeral: true });
+}
+
+function moderationCaseLines(records, limit = 10) {
+  return records.slice(0, limit).map(record => {
+    const timestamp = Math.floor(Date.parse(record.createdAt) / 1000);
+    return `- \`${record.id.slice(0, 8)}\` **${record.action}** · <@${record.targetId}> · **${record.status}** · <t:${timestamp}:R>`;
+  });
+}
+
+async function handleModCaseCommand(interaction) {
+  if (!canModerate(interaction.member)) return interaction.reply({ content: "Moderation authority required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  const state = await loadState();
+  const records = Object.values(state.moderationCases?.[interaction.guildId] || {})
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  let filtered = records;
+  let title = "Seven-day moderation cases";
+  if (sub === "user") {
+    const user = interaction.options.getUser("user");
+    filtered = records.filter(record => record.targetId === user.id);
+    title = `Cases for ${user.username}`;
+  } else if (sub === "staff") {
+    const staff = interaction.options.getUser("staff");
+    filtered = records.filter(record => record.requestedBy === staff.id || record.reviewedBy === staff.id);
+    title = `Cases handled by ${staff.username}`;
+  } else {
+    const since = Date.now() - 7 * 86_400_000;
+    filtered = records.filter(record => Date.parse(record.createdAt) >= since);
+  }
+  const lines = moderationCaseLines(filtered);
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ ${title}`)
+      .setDescription(lines.length ? lines.join("\n") : "No matching moderation cases were found.")
+      .setFooter(paradiseFooter(`${filtered.length} matching case(s) · private staff view`)).setTimestamp()],
+    ephemeral: true
+  });
+}
+
+async function handleModerationStatsCommand(interaction) {
+  if (!canModerate(interaction.member)) return interaction.reply({ content: "Moderation authority required.", ephemeral: true });
+  const state = await loadState();
+  const records = Object.values(state.moderationCases?.[interaction.guildId] || {});
+  const since = Date.now() - 7 * 86_400_000;
+  const weekly = records.filter(record => Date.parse(record.createdAt) >= since);
+  const count = (list, action) => list.filter(record => record.action === action).length;
+  const pending = records.filter(record => record.status === "pending").length;
+  const description = [
+    `## Last 7 days · ${weekly.length}`,
+    `Warnings: **${count(weekly, "warn")}** · Timeouts: **${count(weekly, "timeout")}** · Quarantines: **${count(weekly, "quarantine")}**`,
+    `Kick requests: **${count(weekly, "kick")}** · Ban requests: **${count(weekly, "ban")}**`,
+    "",
+    `## All time · ${records.length}`,
+    `Pending senior review: **${pending}**`,
+    "",
+    "-# Use /modcase user, /modcase staff or /modcase weekly for the private case list."
+  ].join("\n");
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ MODERATION STATS")
+      .setDescription(description).setFooter(paradiseFooter("Private staff analytics")).setTimestamp()],
+    ephemeral: true
+  });
 }
 
 async function decideModerationCase(interaction, decision, idOrPrefix) {
@@ -3975,23 +4853,27 @@ async function handleRankCommand(interaction) {
 
 async function updateRankedLeaderboardBoards(guild) {
   const state = await loadState();
+  const guildConfig = configForGuild(state, guild.id);
+  const language = guildLanguage(guildConfig);
+  const color = await paradiseBrandColor();
   const leaderboard = leaderboardForGuild(state, guild.id);
-  const topSize = Math.min(100, Math.max(2, Number(configForGuild(state, guild.id).challenge?.topSize) || 30));
+  const topSize = Math.min(100, Math.max(2, Number(guildConfig.challenge?.topSize) || 30));
   const entries = Object.entries(leaderboard)
     .filter(([, row]) => Number.isInteger(Number(row.spot)) && Number(row.spot) >= 1 && Number(row.spot) <= topSize)
     .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
   const groups = [];
   for (let min = 1; min <= topSize; min += 10) {
     const max = Math.min(min + 9, topSize);
+    const channelName = min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30";
     groups.push({
-      channel: min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30",
+      channel: channelName,
       min,
       max,
-      label: `TOP ${min}–${max}`,
-      messageKey: `${min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30"}:${min}-${max}`
+      label: `TOP ${min}-${max}`,
+      messageKey: `${channelName}:${min}-${max}`
     });
   }
-  const messageIds = configForGuild(state, guild.id).rankedLeaderboardMessageIds || {};
+  const messageIds = guildConfig.rankedLeaderboardMessageIds || {};
   const posted = [];
   for (const group of groups) {
     const channel = guild.channels.cache.find(item => item.name === group.channel && item.isTextBased?.());
@@ -4001,15 +4883,10 @@ async function updateRankedLeaderboardBoards(guild) {
       const entry = entries.find(([, row]) => Number(row.spot) === rank);
       if (!entry) {
         cards.push(new EmbedBuilder()
-          .setColor(await paradiseBrandColor())
-          .setTitle(`✦ #${rank} — Vacant`)
-          .setDescription([
-            "◆ **Status:** Challengeable opening",
-            "◆ **Profile:** _No fighter assigned yet._",
-            "◆ **Use:** `/leaderboard add user:@fighter rank:" + rank + "`",
-            "",
-            "-# This slot is intentionally empty and can be assigned by leaderboard staff."
-          ].join("\n")));
+          .setColor(color)
+          .setTitle(language === "tr" ? `✦ #${rank} — Boş` : `✦ #${rank} — Vacant`)
+          .setDescription(vacantLeaderboardDescription(rank, language))
+          .setImage(PARADISE_LEADERBOARD_SEPARATOR_ASSET));
         continue;
       }
       const [userId, row] = entry;
@@ -4020,54 +4897,52 @@ async function updateRankedLeaderboardBoards(guild) {
         : member ? fighterRank(member)
           : row.stage || profile?.stage || "Unranked";
       const activeTicket = openChallengeFor(state, userId, guild.id);
-      const status = activeTicket ? "Being Challenged"
-        : Number(row.availability?.loaUntil || 0) > Date.now() ? `LOA <t:${Math.floor(row.availability.loaUntil / 1000)}:R>`
-        : Number(row.availability?.immunityUntil || 0) > Date.now() ? `Immune <t:${Math.floor(row.availability.immunityUntil / 1000)}:R>`
-          : Number(row.availability?.cooldownUntil || 0) > Date.now() ? `Cooldown <t:${Math.floor(row.availability.cooldownUntil / 1000)}:R>`
-            : "Challengeable";
+      const status = rankedStatusText(row, activeTicket, language);
+      const displayName = compactText(row.displayName || row.nickname || member?.displayName || profile?.robloxUsername || "Fighter", 60);
+      const robloxName = compactText(profile?.robloxUsername || row.robloxName || row.robloxUsername || (language === "tr" ? "Bağlı değil" : "Not linked"), 60);
+      const region = compactText(profile?.region || row.region || (language === "tr" ? "Ayarlanmadı" : "Not set"), 60);
+      const wins = Number(row.wins || 0);
+      const losses = Number(row.losses || 0);
+      const shortNote = compactText(row.publicNote || row.shortNote || row.boardNote || "", 80);
+      const description = language === "tr"
+        ? [
+          `◆ ${member ? `${member}` : `<@${userId}>`}`,
+          `◆ Roblox: **${robloxName}**`,
+          `◆ Seviye: **${stage}**`,
+          `◆ Bölge: **${region}**`,
+          `◆ Durum: **${status}**`,
+          `◆ W/L: **${wins} / ${losses}**`,
+          ...(shortNote ? [`◆ Not: _${shortNote}_`] : [])
+        ].join("\n")
+        : [
+          `◆ ${member ? `${member}` : `<@${userId}>`}`,
+          `◆ Roblox: **${robloxName}**`,
+          `◆ Rank: **${stage}**`,
+          `◆ Region: **${region}**`,
+          `◆ Status: **${status}**`,
+          `◆ W/L: **${wins} / ${losses}**`,
+          ...(shortNote ? [`◆ Note: _${shortNote}_`] : [])
+        ].join("\n");
       const card = new EmbedBuilder()
-        .setColor(await paradiseBrandColor())
-        .setTitle(`✦ #${rank} — ${member?.displayName || profile?.robloxUsername || "Fighter"}`)
-        .setDescription([
-          `◆ **Discord:** <@${userId}>`,
-          `◆ **Roblox:** **${profile?.robloxUsername || "Not linked"}**`,
-          `◆ **Rank:** **${stage}**`
-        ].join("\n"))
-        .addFields(
-          { name: "Profile ID", value: `**#${profile?.profileId || "—"}**`, inline: true },
-          { name: "Discord ID", value: `\`${userId}\``, inline: true },
-          { name: "Region", value: `**${profile?.region || row.region || "Not set"}**`, inline: true },
-          { name: "Stage / Level / Strength", value: `**${stage}**`, inline: false },
-          { name: "Status", value: `**${status}**`, inline: true },
-          { name: "Wins / Losses", value: `**${Number(row.wins || 0)} / ${Number(row.losses || 0)}**`, inline: true }
-        );
-      if (activeTicket) {
-        card.addFields({
-          name: "Active challenge",
-          value: `Ticket **#${activeTicket.ticketId || activeTicket.channelId || "open"}**`,
-          inline: true
-        });
-      }
-      const notes = String(row.notes || row.feats || profile?.notes || profile?.feats || "").trim();
-      if (notes) card.addFields({ name: "Notes / Feats", value: notes.slice(0, 900), inline: false });
+        .setColor(color)
+        .setTitle(`✦ #${rank} — ${displayName}`)
+        .setDescription(description)
+        .setImage(PARADISE_LEADERBOARD_SEPARATOR_ASSET);
       const thumbnail = profile?.thumbnailUrl || profile?.avatarUrl || (profile?.robloxId ? await robloxHeadshot(profile.robloxId) : null);
       if (thumbnail) card.setThumbnail(thumbnail);
       cards.push(card);
     }
     if (cards.length) {
-      cards[0].setImage(PARADISE_LEADERBOARD_SEPARATOR_ASSET);
-      cards[cards.length - 1].setFooter(paradiseFooter(`${group.label} • Full Stage/Level/Strength • Updated in place`)).setTimestamp();
+      cards[cards.length - 1].setFooter(paradiseFooter(language === "tr"
+        ? `${group.label} • /profile view detayları gösterir`
+        : `${group.label} • /profile view shows details`)).setTimestamp();
     }
     const storedMessageId = messageIds[group.messageKey]
       || (group.min <= 21 ? messageIds[group.channel] : null);
     let message = storedMessageId
       ? await channel.messages.fetch(storedMessageId).catch(() => null)
       : null;
-    const boardContent = [
-      `# ♛ ${group.label}`,
-      "### Ranked fighter cards",
-      "-# Full stage text is shown as Stage / Level / Strength. Cooldowns, immunity and active tickets are refreshed in place."
-    ].join("\n");
+    const boardContent = leaderboardBoardIntro(group.label, language);
     if (message) await message.edit({ content: boardContent, embeds: cards.slice(0, 10) });
     else message = await channel.send({ content: boardContent, embeds: cards.slice(0, 10) });
     messageIds[group.messageKey] = message.id;
@@ -4156,14 +5031,15 @@ async function handleLeaderboardCommand(interaction) {
   return interaction.reply({ content: `Leaderboard updated. Refreshed **${posted.length}** board(s).`, ephemeral: true });
 }
 
-async function sendMemberLifecycleMessage(member, kind) {
+async function sendMemberLifecycleMessage(member, kind, options = {}) {
   const state = await loadState();
   const config = configForGuild(state, member.guild.id);
-  if (!config.activeSetupMode) return false;
+  const preview = options.preview === true;
+  if (!config.activeSetupMode && !preview) return false;
   const joined = kind === "join";
-  const publicChannel = joined
+  const publicChannel = options.channel || (joined
     ? await configuredChannel(member.guild, "welcome_channel", "welcome")
-    : await configuredChannel(member.guild, "leave_channel", "farewell");
+    : await configuredChannel(member.guild, "leave_channel", "farewell"));
   const log = member.guild.channels.cache.find(channel => channel.name === (joined ? "welcome-logs" : "leave-logs") && channel.isTextBased?.());
   if (publicChannel) {
     const mentionIfFound = (mappingKey, fallback) => {
@@ -4171,18 +5047,26 @@ async function sendMemberLifecycleMessage(member, kind) {
       const channel = id ? member.guild.channels.cache.get(id) : member.guild.channels.cache.find(item => item.name === fallback);
       return channel?.isTextBased?.() ? `${channel}` : null;
     };
-    const mode = config.activeSetupMode;
+    const mode = config.activeSetupMode || "community";
+    const tr = guildLanguage(config) === "tr";
+    const channelRef = (mappingKey, fallback) => mentionIfFound(mappingKey, fallback);
     const destinations = [
-      mentionIfFound("rules_channel", "rules") ? `- Read the rules in ${mentionIfFound("rules_channel", "rules")}.` : null,
-      mode === "community" && mentionIfFound("faq_channel", "security-and-trust") ? `- Learn how Fima stays safe in ${mentionIfFound("faq_channel", "security-and-trust")}.` : null,
-      mentionIfFound("role_guide_channel", "role-guide") ? `- Choose your language, pings and roles from ${mentionIfFound("role_guide_channel", "role-guide")}.` : null,
-      mode !== "community" && mentionIfFound("challenge_channel", "challenge-ticket") ? `- Complete your profile before using ${mentionIfFound("challenge_channel", "challenge-ticket")}.` : null,
-      mode === "community" && mentionIfFound("support_ticket_channel", "open-ticket") ? `- Get private help in ${mentionIfFound("support_ticket_channel", "open-ticket")}.` : null
+      channelRef("rules_channel", "rules") ? (tr ? `- Kuralları ${channelRef("rules_channel", "rules")} kanalında oku.` : `- Read the rules in ${channelRef("rules_channel", "rules")}.`) : null,
+      mode === "community" && channelRef("faq_channel", "security-and-trust") ? (tr ? `- Fima ve sunucu güvenliği için ${channelRef("faq_channel", "security-and-trust")} kanalına bak.` : `- Learn how Fima and this server stay safe in ${channelRef("faq_channel", "security-and-trust")}.`) : null,
+      channelRef("role_guide_channel", "role-guide") ? (tr ? `- Dilini, bildirimlerini ve rollerini ${channelRef("role_guide_channel", "role-guide")} kanalından seç.` : `- Choose your language, pings and roles in ${channelRef("role_guide_channel", "role-guide")}.`) : null,
+      mode !== "community" && channelRef("challenge_channel", "challenge-ticket") ? (tr ? `- ${channelRef("challenge_channel", "challenge-ticket")} kullanmadan önce profilini tamamla.` : `- Complete your profile before using ${channelRef("challenge_channel", "challenge-ticket")}.`) : null,
+      mode === "community" && channelRef("support_ticket_channel", "open-ticket") ? (tr ? `- Özel yardım için ${channelRef("support_ticket_channel", "open-ticket")} kanalından ticket aç.` : `- Open a private support ticket in ${channelRef("support_ticket_channel", "open-ticket")}.`) : null
     ].filter(Boolean);
-    const title = joined ? `Welcome, ${member.displayName}!` : `${member.displayName} left the server`;
+    const title = joined
+      ? (tr ? `Hoş geldin, ${member.displayName}!` : `Welcome, ${member.displayName}!`)
+      : (tr ? `${member.displayName} sunucudan ayrıldı` : `${member.displayName} left the server`);
     const description = joined
-      ? `# ${member.user.username}\nWelcome to **${member.guild.name}**!\n\n${destinations.join("\n") || "- Explore the server and choose your roles."}\n\n## Member #${member.guild.memberCount}\n\n-# Never share passwords, cookies or tokens • Made By Fieel`
-      : `${member.user.username} is no longer in **${member.guild.name}**.\n\n-# Member count: ${member.guild.memberCount} • Made By Fieel`;
+      ? (tr
+        ? `# ${member.user.username}\n**${member.guild.name}** sunucusuna hoş geldin!\n\n${destinations.join("\n") || "- Sunucuyu keşfet ve sana uygun rolleri seç."}\n\n## ${member.guild.memberCount}. üyemizsin!\n\n-# Şifreni, çerezlerini veya tokenlerini kimseyle paylaşma • Made By Fieel${preview ? " • Önizleme" : ""}`
+        : `# ${member.user.username}\nWelcome to **${member.guild.name}**!\n\n${destinations.join("\n") || "- Explore the server and choose the roles that fit you."}\n\n## You are member #${member.guild.memberCount}!\n\n-# Never share passwords, cookies or tokens • Made By Fieel${preview ? " • Preview" : ""}`)
+      : (tr
+        ? `${member.user.username}, **${member.guild.name}** sunucusundan ayrıldı.\n\n-# Güncel üye sayısı: ${member.guild.memberCount} • Made By Fieel${preview ? " • Önizleme" : ""}`
+        : `${member.user.username} is no longer in **${member.guild.name}**.\n\n-# Current member count: ${member.guild.memberCount} • Made By Fieel${preview ? " • Preview" : ""}`);
     const embed = new EmbedBuilder().setColor(await paradiseBrandColor())
       .setTitle(title)
       .setDescription(description)
@@ -4190,14 +5074,29 @@ async function sendMemberLifecycleMessage(member, kind) {
       .setTimestamp();
     const banner = joined ? config.welcomeSettings?.bannerUrl : config.welcomeSettings?.leaveBannerUrl;
     if (banner && /^https:\/\//i.test(banner)) embed.setImage(banner);
-    await publicChannel.send({
+    const sent = await publicChannel.send({
       content: joined ? `${member}` : undefined,
       embeds: [embed],
       allowedMentions: { users: joined ? [member.id] : [], parse: [] }
-    }).catch(() => {});
+    }).catch(() => null);
+    if (!sent) return false;
   }
-  if (log) await log.send(`${joined ? "Joined" : "Left"}: ${member.user.tag} (${member.id}) · <t:${Math.floor(Date.now() / 1000)}:F>`).catch(() => {});
-  return true;
+  if (!preview && log) await log.send(`${joined ? "Joined" : "Left"}: ${member.user.tag} (${member.id}) · <t:${Math.floor(Date.now() / 1000)}:F>`).catch(() => {});
+  return Boolean(publicChannel);
+}
+
+async function handleLifecyclePreview(interaction, kind) {
+  if (!interaction.inGuild?.() || !interaction.channel?.isTextBased?.()) {
+    return interaction.reply({ content: "This preview can only be used in a server text channel.", ephemeral: true });
+  }
+  await interaction.deferReply({ ephemeral: true });
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => interaction.member);
+  const sent = member ? await sendMemberLifecycleMessage(member, kind, { preview: true, channel: interaction.channel }) : false;
+  const state = await loadState();
+  const tr = guildLanguage(configForGuild(state, interaction.guildId)) === "tr";
+  return interaction.editReply(sent
+    ? (tr ? `${kind === "join" ? "Hoş geldin" : "Ayrılma"} önizlemesi bu kanala gönderildi.` : `${kind === "join" ? "Welcome" : "Leave"} preview posted in this channel.`)
+    : (tr ? "Önizleme gönderilemedi. Botun bu kanalda mesaj ve embed gönderme yetkisini kontrol et." : "Preview could not be posted. Check the bot's Send Messages and Embed Links permissions here."));
 }
 
 export async function handleParadiseGuildMemberAdd(member) {
@@ -4241,7 +5140,7 @@ const WEEKLY_QUOTAS = Object.freeze({
 
 const ACTIVITY_GROUP_ROLES = Object.freeze({
   Referee: ["Referee", "Trial Referee", "Experienced Referee"],
-  Tryout: ["Tryout Hoster", "Experienced Tryout Hoster", "Tryout Manager", "Tryout Staff", "Trial Tryout Staff"],
+  Tryout: ["Tryout Hoster", "Trial Tryout Hoster", "Experienced Tryout Hoster", "Tryout Manager", "Tryout Staff", "Trial Tryout Staff"],
   Training: ["Training Hoster", "Trial Training Hoster", "Experienced Training Hoster", "Training Manager", "Trial Training Manager"],
   Event: ["Event Manager"], Tournament: ["Tournament Manager"],
   Giveaway: ["Giveaway Manager"], "Game Night": ["Game Night Manager"]
@@ -4646,6 +5545,31 @@ const HELP_CATEGORIES = Object.freeze({
     label: "Music / Audio",
     en: "# Music / Audio\n**Status:** blocked until a licensed/legal provider is configured. Paradise will not rip YouTube or Spotify audio and will not use circumvention tools.",
     tr: "# Müzik / Ses\n**Durum:** lisanslı/yasal sağlayıcı ayarlanana kadar kapalı. Paradise YouTube veya Spotify sesi rip etmeyecek ve bypass aracı kullanmayacak."
+  },
+  welcome: {
+    label: "Welcome / Leave",
+    en: "# Welcome & Leave\n- `/welcome preview` — staff: preview the configured welcome card\n- `/leave preview` — staff: preview the leave message\n\nWelcome cards should mention the user, show the server name, useful channels, member count and configured banner. Missing channels are hidden instead of showing broken placeholders.\n\n-# Dashboard: Welcome / Leave + Branding",
+    tr: "# Welcome & Leave\n- `/welcome preview` — staff: ayarlı welcome kartını önizler\n- `/leave preview` — staff: ayrılma mesajını önizler\n\nWelcome kartları kullanıcıyı etiketler, sunucu adını, önemli kanalları, üye sayısını ve ayarlı bannerı gösterir. Eksik kanallar bozuk placeholder yerine gizlenir.\n\n-# Dashboard: Welcome / Leave + Branding"
+  },
+  availability: {
+    label: "Availability / LOA",
+    en: "# Availability & LOA\n- `/availability panel` — repost the live cooldown/immunity/open-ticket board\n- `/loa request start:<date> end:<date> reason:<text>`\n- `/loa approve`, `/loa deny`\n\nChallenge cooldown, immunity, LOA and active tickets are separate states. Timed states use Discord timestamps so everyone sees local time.",
+    tr: "# Availability & LOA\n- `/availability panel` — canlı cooldown/immunity/open-ticket panosunu tekrar postlar\n- `/loa request start:<tarih> end:<tarih> reason:<neden>`\n- `/loa approve`, `/loa deny`\n\nChallenge cooldown, immunity, LOA ve aktif ticket ayrı durumlardır. Süreler Discord timestamp ile herkesin yerel saatine göre görünür."
+  },
+  blacklist: {
+    label: "Blacklist / Appeal / Bail",
+    en: "# Blacklist, Appeal & Bail\n- `/blacklist add user:@user reason:<reason>`\n- `/blacklist remove user:@user reason:<reason>`\n- `/appeal panel`\n- `/bail panel`\n\nBlacklisted users should only see the configured appeal information area. Bail is never guaranteed; staff review proof and reason before any decision.",
+    tr: "# Blacklist, Appeal & Bail\n- `/blacklist add user:@user reason:<neden>`\n- `/blacklist remove user:@user reason:<neden>`\n- `/appeal panel`\n- `/bail panel`\n\nBlacklist kullanıcı yalnızca ayarlı appeal bilgi alanını görmelidir. Bail garanti değildir; staff karar öncesi kanıtı ve nedeni inceler."
+  },
+  relations: {
+    label: "Relations",
+    en: "# Allies & Enemy Clans\n- `/relation panel`\n- `/relation add type:ally name:<clan> invite:<optional>`\n- `/relation add type:enemy name:<clan> note:<optional>`\n- `/relation edit`, `/relation remove`, `/relation repost`\n\nThe board keeps Current Allies and Enemy Clans separate and edits the same message in place.",
+    tr: "# Ally ve Enemy Clanlar\n- `/relation panel`\n- `/relation add type:ally name:<klan> invite:<opsiyonel>`\n- `/relation add type:enemy name:<klan> note:<opsiyonel>`\n- `/relation edit`, `/relation remove`, `/relation repost`\n\nPano Current Allies ve Enemy Clans alanlarını ayrı tutar ve aynı mesajı yerinde günceller."
+  },
+  admin: {
+    label: "Admin / Owner",
+    en: "# Admin / Owner\n- `/setupfieelsclan preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelscommunity preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelstsbtr preview|create-missing|repost-guides|repair|rebuild`\n\nDestructive rebuild requires backup, preview and typed confirmation. Do not run production rebuild without owner approval.",
+    tr: "# Admin / Owner\n- `/setupfieelsclan preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelscommunity preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelstsbtr preview|create-missing|repost-guides|repair|rebuild`\n\nYıkıcı rebuild için yedek, preview ve yazılı onay gerekir. Owner onayı olmadan production rebuild çalıştırmayın."
   }
 });
 
@@ -4659,19 +5583,24 @@ function helpEmbed(scope, locale = "en") {
 }
 
 function helpComponents(scope = "clan") {
-  const categoryMenu = new StringSelectMenuBuilder()
-    .setCustomId("paradise_help_category")
-    .setPlaceholder("Choose a guide category / Rehber kategorisi seç")
-    .addOptions(Object.entries(HELP_CATEGORIES).map(([value, item]) => ({
+  const entries = Object.entries(HELP_CATEGORIES);
+  const menuRows = [];
+  const buildMenu = (chunk, index) => new StringSelectMenuBuilder()
+    .setCustomId(`paradise_help_category:${index}`)
+    .setPlaceholder(index === 0 ? "Main guide categories / Ana rehber" : "More guides / Diğer rehberler")
+    .addOptions(chunk.map(([value, item]) => ({
       label: item.label,
       value,
       default: value === scope
     })));
+  for (let index = 0; index < entries.length; index += 25) {
+    menuRows.push(new ActionRowBuilder().addComponents(buildMenu(entries.slice(index, index + 25), index / 25)));
+  }
   const languageRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`paradise_help_lang:en:${scope}`).setLabel("English").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`paradise_help_lang:tr:${scope}`).setLabel("Türkçe").setStyle(ButtonStyle.Secondary)
   );
-  return [new ActionRowBuilder().addComponents(categoryMenu), languageRow];
+  return [...menuRows, languageRow];
 }
 
 async function handleHelp(interaction) {
@@ -4903,6 +5832,12 @@ const GUIDE_POSTS = Object.freeze([
     body: "# Giveaways\n`/giveaway create prize:<text> minutes:<n> winners:<n> requirements:<optional>`\n\n# Events and game nights\n- `/event create title:<text> time:<timestamp> image:<file>`\n- `/gamenight start game:<name> link:<url> image:<file>`\n\nImages are required for events/game nights. Use configured ping roles, keep requirements clear and record rerolls/results in logs.\n\n-# Do not promise rewards that staff cannot safely deliver."
   },
   {
+    key: "hoster_rules",
+    channel: "hoster-rules",
+    title: "◆ HOSTER RULES",
+    body: "# Hoster kuralları\n## ◆ Temel beklenti\n- Duyuruları bot komutlarıyla aç; manuel karışık mesaj atma.\n- Hoster olduğun etkinliği yarıda bırakma; sorun çıkarsa üst staffı etiketle.\n- Kanıt, sonuç ve katılımcı bilgisini düzgün gir.\n- Katılımcılara saygılı ol; toxic davranış hoster yetkisinin incelenmesine sebep olur.\n\n## ◆ Aktivite\n- Training hoster: varsayılan minimum **haftada 2** etkinlik.\n- Tryout hoster: varsayılan minimum **haftada 1** etkinlik.\n- Referee work ve event/giveaway/game night aktiviteleri ayrı loglanır.\n- LOA/whitelist varsa kota değerlendirmesi duraklatılır.\n\n## ◆ Komutlar\n- `/training start` ve `/tryout start` aktif duyuruları düz Markdown atar.\n- **SERVER LOCKED**, **UNLOCK**, **END** düğmeleri sadece hoster/owner tarafından kullanılır.\n- Sonuçlar `/training result`, `/tryout result`, `/activity log` gibi yapılandırılmış komutlarla girilir.\n\n-# Kurallar ve kotalar dashboard üzerinden değiştirilebilir • Made By Fieel"
+  },
+  {
     key: "dashboard_guide",
     channel: "dashboard-guide",
     title: "⚙ PARADISE DASHBOARD GUIDE",
@@ -4919,6 +5854,12 @@ const GUIDE_POSTS = Object.freeze([
     channel: "ticket-guide",
     title: "▣ TICKET & TRANSCRIPT GUIDE",
     body: "# Choose the correct ticket\nSupport, application, challenge, staff report, mod report, blacklist appeal and bail are separate workflows.\n\n## Ticket lifecycle\n- Claim and work privately.\n- Close first; do not immediately delete.\n- Remove member access after closure while configured staff retain access.\n- Save a transcript and audit every reopen, note, escalation and deletion.\n\n-# Never post passwords, cookies, tokens, full license keys or private payment data."
+  },
+  {
+    key: "report_guide",
+    channel: "report-guide",
+    title: "◆ REPORT GUIDE",
+    body: "# Staff / hoster nasıl reportlanır?\nBir staffın yetkisini kötüye kullandığını, taraf tuttuğunu, yanlış ceza verdiğini veya etkinliği bozduğunu düşünüyorsan **report ticket** aç.\n\n## Ticket açarken ekle\n- Olayın kısa özeti\n- Kanıt görseli/video/link\n- Tarih ve kanal bilgisi\n- İlgili kullanıcı veya staff\n\n## Kurallar\n- Sahte kanıt veya intikam reportu cezalandırılır.\n- Ticket kapatılmadan önce transcript alınır.\n- Normal üyeler staff-only notları göremez.\n- Düşük yetkili staff kick/ban talebi açabilir; üst staff onaylamadan uygulanmaz.\n\n-# Acil scam/raid durumlarında moderatorleri etiketle, fakat kişisel verileri public kanala atma."
   }
 ]);
 
@@ -5420,6 +6361,15 @@ function canManageCompetitiveBoards(member) {
     ].includes(role.name));
 }
 
+function canManageBlacklist(member) {
+  return member.permissions.has(PermissionsBitField.Flags.Administrator)
+    || member.permissions.has(PermissionsBitField.Flags.ManageGuild)
+    || member.roles.cache.some(role => [
+      "Owner", "Admin", "Overseer", "Administration Manager", "Head Admin",
+      "Moderator Manager", "Head Moderator", "Security Staff"
+    ].includes(role.name));
+}
+
 function normalizeLineupEntries(entries = []) {
   return entries.map(entry => typeof entry === "string" ? { userId: entry } : entry)
     .filter(entry => entry?.userId);
@@ -5599,6 +6549,33 @@ async function updateBlacklistPanel(guild) {
   return message;
 }
 
+async function updateBlacklistAppealPanel(guild) {
+  const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  const channel = await configuredChannel(guild, "blacklist_appeal_channel", "blacklist-appeal")
+    || guild.channels.cache.find(item => item.name === "ban-appeal" && item.isTextBased?.());
+  if (!channel?.isTextBased?.()) return null;
+  const tr = guildLanguage(config) === "tr";
+  const embed = new EmbedBuilder()
+    .setColor(await paradiseBrandColor())
+    .setTitle(tr ? "◇ BLACKLIST İTİRAZI" : "◇ BLACKLIST APPEAL")
+    .setDescription(tr
+      ? "# Kaydının yeniden incelenmesini iste\n`/appeal open` komutunu kullan; nedenini açıkça yaz ve varsa kanıt bağlantını ekle. İtirazın özel bir inceleme alanında değerlendirilir.\n\n> Bail garanti değildir ve blacklist kaydını otomatik kaldırmaz. Son karar yetkili incelemesinden sonra verilir.\n\n-# Şifre, cookie, token veya özel hesap bilgisi gönderme."
+      : "# Ask staff to review your record\nUse `/appeal open`, explain clearly why the record should be reviewed and attach an evidence link if you have one. Your appeal is handled in a private review area.\n\n> Bail is never guaranteed and never removes a blacklist automatically. A qualified reviewer makes the final decision.\n\n-# Never send passwords, cookies, tokens or private account data.")
+    .setFooter(paradiseFooter(tr ? "Özel ve kanıta dayalı inceleme" : "Private, evidence-based review"));
+  let message = config.blacklistAppealPanelMessageId
+    ? await channel.messages.fetch(config.blacklistAppealPanelMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ embeds: [embed] });
+  else message = await channel.send({ embeds: [embed] });
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].blacklistAppealPanelMessageId = message.id;
+    return next;
+  });
+  return message;
+}
+
 async function handleBlacklist(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "status") {
@@ -5609,18 +6586,14 @@ async function handleBlacklist(interaction) {
       : `${user} does not have an active Paradise blacklist record in this server.`;
     return interaction.reply({ content: summary, ephemeral: true });
   }
-  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Blacklist manager authority required.", ephemeral: true });
+  if (!canManageBlacklist(interaction.member)) return interaction.reply({ content: "Blacklist manager or security authority required.", ephemeral: true });
   if (sub === "panel") {
     const panel = await updateBlacklistPanel(interaction.guild);
     return interaction.reply({ content: panel ? "Blacklist board refreshed." : "Map the blacklist channel first.", ephemeral: true });
   }
   if (sub === "appeal-panel") {
-    const channel = await configuredChannel(interaction.guild, "blacklist_appeal_channel", "blacklist-appeal");
-    if (!channel) return interaction.reply({ content: "Map or create the blacklist-appeal channel first.", ephemeral: true });
-    await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◇ BLACKLIST APPEALS")
-      .setDescription("# Appeal safely\nOpen a private support ticket and include the blacklist date, reason you are appealing and any relevant evidence.\n\n> Bail is never guaranteed and never auto-removes a blacklist. Final resolution requires owner approval.\n\n-# Türkçe destek aynı ticket içinde seçilebilir.")
-      .setFooter(paradiseFooter("Private review only"))] });
-    return interaction.reply({ content: "Appeal information panel posted.", ephemeral: true });
+    const panel = await updateBlacklistAppealPanel(interaction.guild);
+    return interaction.reply({ content: panel ? "Appeal information panel updated in place." : "Map or create the blacklist-appeal / ban-appeal channel first.", ephemeral: true });
   }
   const user = interaction.options.getUser("user");
   const reason = interaction.options.getString("reason");
@@ -5642,17 +6615,21 @@ async function handleBlacklist(interaction) {
   });
   const blacklistedRole = await ensureRole(interaction.guild, "BLACKLISTED").catch(() => null);
   const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
+  let roleChanged = !targetMember;
   if (blacklistedRole && targetMember) {
     if (sub === "remove") {
-      await targetMember.roles.remove(blacklistedRole, "Paradise blacklist resolved").catch(() => {});
+      roleChanged = await targetMember.roles.remove(blacklistedRole, "Paradise blacklist resolved").then(() => true).catch(() => false);
     } else {
-      await targetMember.roles.add(blacklistedRole, "Paradise blacklist active").catch(() => {});
+      roleChanged = await targetMember.roles.add(blacklistedRole, "Paradise blacklist active").then(() => true).catch(() => false);
     }
   }
   await updateBlacklistPanel(interaction.guild).catch(() => {});
   await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", "Blacklist record updated",
     `${user} record was **${sub === "remove" ? "resolved" : "created"}** by <@${interaction.user.id}>.\n**Reason:** ${reason}`);
-  return interaction.reply({ content: `${user} blacklist record ${sub === "remove" ? "resolved" : "created"}.`, ephemeral: true });
+  return interaction.reply({
+    content: `${user} blacklist record ${sub === "remove" ? "resolved" : "created"}.${roleChanged ? "" : " Warning: the record was saved, but the BLACKLISTED role could not be changed. Move Paradise above that role and repair permissions."}`,
+    ephemeral: true
+  });
 }
 
 async function handleAppeal(interaction) {
@@ -5703,7 +6680,7 @@ async function handleAppeal(interaction) {
       ? `Your private appeal was created: ${thread}`
       : "Your appeal was recorded. Staff will review it privately; the mapped channel could not create a private thread.");
   }
-  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Blacklist manager authority required.", ephemeral: true });
+  if (!canManageBlacklist(interaction.member)) return interaction.reply({ content: "Blacklist manager or security authority required.", ephemeral: true });
   const user = interaction.options.getUser("user");
   const reason = interaction.options.getString("reason");
   let found = true;
@@ -5733,19 +6710,25 @@ async function handleAppeal(interaction) {
     return state;
   });
   if (!found) return interaction.reply({ content: "No pending appeal was found for that user.", ephemeral: true });
+  let roleRemoved = true;
   if (sub === "approve") {
     const blacklistedRole = interaction.guild.roles.cache.find(role => role.name === "BLACKLISTED");
     const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
-    if (blacklistedRole && targetMember) await targetMember.roles.remove(blacklistedRole, "Paradise appeal approved").catch(() => {});
+    if (blacklistedRole && targetMember) {
+      roleRemoved = await targetMember.roles.remove(blacklistedRole, "Paradise appeal approved").then(() => true).catch(() => false);
+    }
   }
   await updateBlacklistPanel(interaction.guild).catch(() => {});
   await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", `Appeal ${sub === "approve" ? "approved" : "denied"}`,
     `${user} appeal was decided by <@${interaction.user.id}>.\n**Decision:** ${reason}`);
-  return interaction.reply({ content: `${user} appeal ${sub === "approve" ? "approved and blacklist record resolved" : "denied"}.`, ephemeral: true });
+  return interaction.reply({
+    content: `${user} appeal ${sub === "approve" ? "approved and blacklist record resolved" : "denied"}.${sub === "approve" && !roleRemoved ? " Warning: the BLACKLISTED role could not be removed; fix the bot role hierarchy and remove it manually." : ""}`,
+    ephemeral: true
+  });
 }
 
 async function handleBail(interaction) {
-  if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Owner or blacklist manager authority required.", ephemeral: true });
+  if (!canManageBlacklist(interaction.member)) return interaction.reply({ content: "Owner, blacklist manager or security authority required.", ephemeral: true });
   const state = await loadState();
   if (configForGuild(state, interaction.guildId).blacklist?.bailEnabled !== true) {
     return interaction.reply({ content: "Bail review is disabled for this server in the Paradise dashboard.", ephemeral: true });
@@ -5908,59 +6891,66 @@ async function updateStaffTeamEmbed(guild) {
   await guild.members.fetch().catch(() => {});
   const state = await loadState();
   const guildConfig = configForGuild(state, guild.id);
+  const language = guildLanguage(guildConfig);
+  const color = await paradiseBrandColor();
   const groups = [
-    {
-      title: "👑 Kurucular / Owners",
-      names: ["Owner"]
-    },
-    {
-      title: "🛡️ Adminler / Administration",
-      names: ["Admin", "Overseer", "Community Manager", "Training Manager", "Administration Manager", "Head Admin", "Senior Admin"]
-    },
-    {
-      title: "⚔️ Hosterlar / Operations",
-      names: [
-        "Training Supervisor", "Experienced Training Hoster", "Training Hoster", "Trial Training Hoster",
-        "Tryout Manager", "Experienced Tryout Hoster", "Tryout Hoster",
-        "Tournament Manager", "Event Manager", "Event Hoster", "Giveaway Manager", "Giveaway Hoster",
-        "Game Night Manager", "War Hoster"
-      ]
-    },
-    {
-      title: "🎓 Hakemler / Referees",
-      names: ["Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee"]
-    },
-    {
-      title: "🧰 Moderasyon & Destek",
-      names: ["Moderator Manager", "Head Moderator", "Senior Moderator", "Moderator", "Helper", "Security Staff", "Support Staff", "Trial Support"]
-    }
+    { title: language === "tr" ? "👑 Kurucular / Owners" : "👑 Founders / Owners", names: ["Founder", "Founders", "Owner", "Co-Owner"] },
+    { title: language === "tr" ? "◆ Adminler" : "◆ Admins", names: ["Admin", "Administration Manager", "Head Admin", "Senior Admin", "Junior Admin"] },
+    { title: language === "tr" ? "✦ Overseer / Manager Ekibi" : "✦ Overseers / Managers", names: ["Overseer", "Community Manager", "Training Manager", "Training Supervisor", "Tryout Manager", "Tournament Manager"] },
+    { title: language === "tr" ? "🛡️ Moderation Team" : "🛡️ Moderation Team", names: ["Moderator Manager", "Head Moderator", "Senior Moderator", "Moderator", "Helper"] },
+    { title: language === "tr" ? "💬 Community / Support / Security" : "💬 Community / Support / Security", names: ["Support Staff", "Support Lead", "Senior Support", "Trial Support", "Community Staff", "Security Staff"] },
+    { title: language === "tr" ? "⚖️ Referee Team" : "⚖️ Referee Team", names: ["Referee Manager", "Head Referee", "Experienced Referee", "Referee", "Trial Referee"] },
+    { title: language === "tr" ? "🏹 Training Hosters" : "🏹 Training Hosters", names: ["Experienced Training Hoster", "Training Hoster", "Trial Training Hoster"] },
+    { title: language === "tr" ? "🗝️ Tryout Hosters" : "🗝️ Tryout Hosters", names: ["Experienced Tryout Hoster", "Tryout Hoster", "Trial Tryout Hoster"] },
+    { title: language === "tr" ? "🎉 Event / Giveaway / Specialist Staff" : "🎉 Event / Giveaway / Specialist Staff", names: ["Event Manager", "Event Hoster", "Giveaway Manager", "Giveaway Hoster", "Game Night Manager", "War Hoster", "Macro Staff", "FFlag Staff", "Fima Support Staff", "Reseller", "Partner"] }
   ];
-  const lineForRole = name => {
+  const roleLine = name => {
     const role = guild.roles.cache.find(item => item.name === name);
-    if (!role) return `◆ **${name}** → _not configured_`;
+    if (!role) return null;
     const members = [...role.members.values()].filter(member => !member.user.bot);
-    return `◆ **${name}** → ${members.length ? members.map(member => `${member}`).join(", ") : "_Vacant_"}`;
+    if (!members.length) return `◆ **${name}** → _${language === "tr" ? "Boş" : "Vacant"}_`;
+    const shown = members.slice(0, 8).map(member => `${member}`).join(", ");
+    const extra = members.length > 8 ? ` +${members.length - 8}` : "";
+    return `◆ **${name}** → ${shown}${extra}`;
   };
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE STAFF TEAM")
-    .setDescription([
-      "# Staff Directory",
-      "Her staff rolü kendi başlığı altında görünür. Boş roller **Vacant** olarak kalır; biri role katıldığında bu panel otomatik güncellenir.",
-      "",
-      "-# Owner / Admin / Hoster / Referee / Moderation ayrımı karışıklığı azaltmak için ayrı tutulur."
-    ].join("\n"))
-    .addFields(groups.map(group => ({
-      name: group.title,
-      value: group.names.map(lineForRole).join("\n").slice(0, 1024) || "_No roles configured._",
-      inline: false
-    })))
-    .setFooter(paradiseFooter("Live role directory"))
-    .setTimestamp();
+  const intro = new EmbedBuilder()
+    .setColor(color)
+    .setTitle("✦ PARADISE STAFF TEAM")
+    .setDescription(language === "tr"
+      ? [
+        "# Staff Directory",
+        "Staff rolleri burada bölümlere ayrılmış şekilde görünür. Biri role girince panel kendini yeniler; boş roller temizce **Boş** olarak kalır.",
+        "",
+        "-# Daha fazla bilgi için staff-command-guide ve mod-command-guide kanallarına bak."
+      ].join("\n")
+      : [
+        "# Staff Directory",
+        "Staff roles are grouped here so members can quickly see who handles what. Empty roles stay as **Vacant** and the board refreshes when roles change.",
+        "",
+        "-# Check staff-command-guide and mod-command-guide for command details."
+      ].join("\n"));
   const banner = String(guildConfig.staffTeamBannerUrl || guildConfig.banners?.staffTeam || "").trim();
-  if (/^https?:\/\//i.test(banner)) embed.setImage(banner);
+  if (/^https?:\/\//i.test(banner)) intro.setImage(banner);
+  intro.setFooter(paradiseFooter(language === "tr" ? "Staff dizini" : "Staff directory")).setTimestamp();
+  const embeds = [intro];
+  for (const group of groups) {
+    const lines = group.names.map(roleLine).filter(Boolean);
+    if (!lines.length) {
+      lines.push(language === "tr"
+        ? "_Bu bölüm için henüz rol bağlanmadı._"
+        : "_No role is mapped for this section yet._");
+    }
+    embeds.push(new EmbedBuilder()
+      .setColor(color)
+      .setTitle(group.title)
+      .setDescription(lines.join("\n").slice(0, 3900))
+      .setFooter(paradiseFooter(language === "tr" ? "Canlı staff dizini" : "Live role directory"))
+      .setTimestamp());
+  }
   let message = guildConfig.staffTeamMessageId
     ? await channel.messages.fetch(guildConfig.staffTeamMessageId).catch(() => null)
     : null;
-  if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
+  if (message) await message.edit({ embeds: embeds.slice(0, 10) }); else message = await channel.send({ embeds: embeds.slice(0, 10) });
   await saveState(next => {
     next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
     next.guildConfigs[guild.id].staffTeamMessageId = message.id;
@@ -5988,6 +6978,120 @@ function localizedHelp(locale) {
     : "Commands: `/verifyroblox`, `/tryout start`, `/tryout result`, `/paradisetraining start`, `/challenge create`. Results pass verification and authority checks.";
 }
 
+const ROLE_PANEL_OPTIONS = Object.freeze({
+  language: [
+    { id: "tr", role: "Turkish", labelTr: "Türkçe", labelEn: "Turkish", emoji: "🇹🇷" },
+    { id: "en", role: "English", labelTr: "English", labelEn: "English", emoji: "🇬🇧" }
+  ],
+  ping: [
+    { id: "training", role: "Training Ping", labelTr: "Training", labelEn: "Training", emoji: "🏹" },
+    { id: "tryout", role: "Tryout Ping", labelTr: "Tryout", labelEn: "Tryout", emoji: "🗝️" },
+    { id: "spar", role: "Spar Ping", labelTr: "Spar", labelEn: "Spar", emoji: "⚔️" },
+    { id: "tournament", role: "Tournament Ping", labelTr: "Tournament", labelEn: "Tournament", emoji: "🏆" },
+    { id: "event", role: "Event Ping", labelTr: "Event", labelEn: "Event", emoji: "🎉" },
+    { id: "giveaway", role: "Giveaway Ping", labelTr: "Giveaway", labelEn: "Giveaway", emoji: "🎁" },
+    { id: "game_night", role: "Game Night Ping", labelTr: "Game Night", labelEn: "Game Night", emoji: "🎮" },
+    { id: "updates", role: "Update Ping", labelTr: "Updates", labelEn: "Updates", emoji: "📢" }
+  ],
+  region: [
+    { id: "eu", role: "Europe", labelTr: "Europe", labelEn: "Europe", emoji: "🌍" },
+    { id: "as", role: "Asia", labelTr: "Asia", labelEn: "Asia", emoji: "🌏" },
+    { id: "na", role: "North America", labelTr: "North America", labelEn: "North America", emoji: "🌎" },
+    { id: "sa", role: "South America", labelTr: "South America", labelEn: "South America", emoji: "🧭" },
+    { id: "oce", role: "Oceania", labelTr: "Oceania", labelEn: "Oceania", emoji: "🌊" }
+  ]
+});
+
+function rolePanelCopy(kind, language = "tr") {
+  const tr = language === "tr";
+  if (kind === "language") {
+    return {
+      title: tr ? "◆ Dil Rolleri" : "◆ Language Roles",
+      description: tr
+        ? "Sunucuda hangi dilde yönlendirme görmek istediğini seç. Dil rolleri birbirinin yerine geçer; yeni seçim eski dili kaldırır."
+        : "Choose the language you want for server guidance. Language roles are exclusive; choosing one removes the other."
+    };
+  }
+  if (kind === "region") {
+    return {
+      title: tr ? "◆ Bölge Rolleri" : "◆ Region Roles",
+      description: tr
+        ? "Kendi bölgeni seç. Bölge rolleri matchmaking, etkinlik ve duyuru filtrelerinde kullanılır."
+        : "Pick your region. Region roles are used for matchmaking, events and announcement filters."
+    };
+  }
+  return {
+    title: tr ? "◆ Bildirim Rolleri" : "◆ Notification Roles",
+    description: tr
+      ? "Sadece almak istediğin pingleri seç. Butona tekrar basarsan rol kaldırılır; spam ping yok, kontrol sende."
+      : "Pick only the pings you want. Press a button again to remove the role; no spam pings, you stay in control."
+  };
+}
+
+function rolePanelRows(kind, language = "tr") {
+  const options = ROLE_PANEL_OPTIONS[kind] || [];
+  const rows = [];
+  for (let index = 0; index < options.length; index += 5) {
+    rows.push(new ActionRowBuilder().addComponents(
+      options.slice(index, index + 5).map(option =>
+        new ButtonBuilder()
+          .setCustomId(`paradise_role_${kind}:${option.id}`)
+          .setLabel(language === "tr" ? option.labelTr : option.labelEn)
+          .setEmoji(option.emoji)
+          .setStyle(kind === "ping" ? ButtonStyle.Secondary : ButtonStyle.Primary)
+      )
+    ));
+  }
+  return rows;
+}
+
+async function sendRolePanel(interaction, kind) {
+  const state = await loadState();
+  const language = guildLanguage(configForGuild(state, interaction.guildId));
+  const copy = rolePanelCopy(kind, language);
+  const embed = new EmbedBuilder()
+    .setColor(await paradiseBrandColor())
+    .setTitle(copy.title)
+    .setDescription(`${copy.description}\n\n-# ${language === "tr" ? "Rol panelleri Paradise tarafından yerinde güncellenir." : "Role panels are updated in place by Paradise."}`)
+    .setFooter(paradiseFooter("Made By Fieel"));
+  await interaction.reply({ embeds: [embed], components: rolePanelRows(kind, language) });
+}
+
+async function handleRolePanelButton(interaction, kind, optionId) {
+  const options = ROLE_PANEL_OPTIONS[kind] || [];
+  const option = options.find(item => item.id === optionId);
+  if (!option) {
+    await interaction.reply({ content: "This role option is no longer configured.", ephemeral: true });
+    return;
+  }
+  const role = await ensureRole(interaction.guild, option.role);
+  const exclusive = kind === "language" || kind === "region";
+  try {
+    if (exclusive) {
+      for (const other of options) {
+        if (other.role === option.role) continue;
+        const otherRole = interaction.guild.roles.cache.find(item => item.name === other.role);
+        if (otherRole && interaction.member.roles.cache.has(otherRole.id)) {
+          await interaction.member.roles.remove(otherRole);
+        }
+      }
+    }
+    const hadRole = interaction.member.roles.cache.has(role.id);
+    if (hadRole && !exclusive) {
+      await interaction.member.roles.remove(role);
+      await interaction.reply({ content: `Removed ${role.name}.`, ephemeral: true });
+    } else {
+      if (!hadRole) await interaction.member.roles.add(role);
+      await interaction.reply({ content: `Selected ${role.name}.`, ephemeral: true });
+    }
+  } catch {
+    await interaction.reply({
+      content: "Paradise could not update that role. Check bot role position and Manage Roles permission.",
+      ephemeral: true
+    });
+  }
+}
+
 async function handleParadiseInteractionInner(interaction) {
   if (interaction.isModalSubmit?.() && interaction.customId === "paradise_verify_modal") {
     await handleVerifyModal(interaction);
@@ -5999,6 +7103,10 @@ async function handleParadiseInteractionInner(interaction) {
   }
   if (interaction.isModalSubmit?.() && /^paradise_voice_(permit|reject|transfer)_modal:/.test(interaction.customId)) {
     await handleTemporaryVoiceMemberModal(interaction);
+    return true;
+  }
+  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_review_reason:")) {
+    await handleApplicationReviewReasonModal(interaction);
     return true;
   }
   if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_modal:")) {
@@ -6076,22 +7184,29 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_support_")) { await handleParadiseSupportButton(interaction); return true; }
     if (interaction.customId === "paradise_application_open") {
       const mode = configForGuild(await loadState(), interaction.guildId).activeSetupMode;
-      const types = APPLICATION_TYPES.filter(([value]) =>
-        !(mode === "community" && value === "clan_mainer")
-        && !(mode !== "community" && value === "fima_support"));
+      const types = APPLICATION_TYPES.filter(([value]) => applicationTypeAllowedForMode(value, mode));
       const menu = new StringSelectMenuBuilder().setCustomId("paradise_application_type")
-        .setPlaceholder("Choose application type / Başvuru türü").addOptions(
+        .setPlaceholder("Choose application type / Basvuru turu").addOptions(
           types.map(([value, label]) => ({ value, label }))
         );
       await interaction.reply({ content: "Choose the form you want to open.", components: [new ActionRowBuilder().addComponents(menu)], ephemeral: true });
       return true;
     }
+    if (interaction.customId.startsWith("paradise_application_continue:")) { await handleApplicationContinueButton(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_application_cancel:")) { await handleApplicationCancelButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_application_")) { await handleApplicationReview(interaction); return true; }
     if (interaction.customId.startsWith("paradise_mod_")) { await handleModerationReview(interaction); return true; }
     if (interaction.customId.startsWith("paradise_payout_")) { await handleQotdPayoutReview(interaction); return true; }
     if (interaction.customId.startsWith("paradise_voice_")) { await handleTemporaryVoiceButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_qotd_")) { await handleQotdButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_giveaway_enter:") || interaction.customId.startsWith("paradise_rsvp_")) { await handleOptInButton(interaction); return true; }
+    if (interaction.customId.startsWith("paradise_role_")) {
+      const match = interaction.customId.match(/^paradise_role_(language|ping|region):(.+)$/);
+      if (match) {
+        await handleRolePanelButton(interaction, match[1], match[2]);
+        return true;
+      }
+    }
     if (["paradise_lang_en", "paradise_lang_tr"].includes(interaction.customId)) {
       const chosen = interaction.customId.endsWith("_tr") ? "Turkish" : "English";
       const other = chosen === "Turkish" ? "English" : "Turkish";
@@ -6107,7 +7222,7 @@ async function handleParadiseInteractionInner(interaction) {
     await handleProfileRegion(interaction);
     return true;
   }
-  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_help_category") {
+  if (interaction.isStringSelectMenu?.() && interaction.customId.startsWith("paradise_help_category")) {
     const scope = interaction.values[0];
     await interaction.update({
       embeds: [helpEmbed(scope, interaction.locale).setColor(await paradiseBrandColor())],
@@ -6120,7 +7235,7 @@ async function handleParadiseInteractionInner(interaction) {
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_application_type") {
-    await interaction.showModal(applicationModal(interaction.values[0]));
+    await interaction.showModal(applicationModal(interaction.values[0], 0, "new"));
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_challenge_target") {
@@ -6159,17 +7274,16 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "profile") { await handleProfile(interaction); return true; }
   if (interaction.commandName === "paradisehelp") { await interaction.reply({ content: localizedHelp(interaction.locale), ephemeral: true }); return true; }
   if (interaction.commandName === "sendlanguagequestion") {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("paradise_lang_en").setLabel("English").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("paradise_lang_tr").setLabel("Türkçe").setStyle(ButtonStyle.Primary)
-    );
-    await interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Choose your language / Dilini seç")], components: [row] }); return true;
+    await sendRolePanel(interaction, "language"); return true;
   }
   if (interaction.commandName === "sendpingroleselector") {
-    const menu = new StringSelectMenuBuilder().setCustomId("paradise_ping_roles").setPlaceholder("Choose pings").setMinValues(0).setMaxValues(5)
-      .addOptions(["Training", "Tournament", "Event", "Giveaway", "Game Night"].map(label => ({ label, value: label })));
-    await interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Choose your Paradise pings")], components: [new ActionRowBuilder().addComponents(menu)] }); return true;
+    await sendRolePanel(interaction, "ping"); return true;
   }
+  if (interaction.commandName === "sendregionroleselector") {
+    await sendRolePanel(interaction, "region"); return true;
+  }
+  if (interaction.commandName === "welcome") { await handleLifecyclePreview(interaction, "join"); return true; }
+  if (interaction.commandName === "leave") { await handleLifecyclePreview(interaction, "leave"); return true; }
   if (interaction.commandName === "tryout") { await handleTryout(interaction); return true; }
   if (interaction.commandName === "challenge") { await handleChallenge(interaction); return true; }
   if (interaction.commandName === "paradisetraining" || interaction.commandName === "training") { await handleTraining(interaction); return true; }
@@ -6198,6 +7312,8 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "answer") { await handleQotdSlashAnswer(interaction); return true; }
   if (interaction.commandName === "application") { await handleApplicationCommand(interaction); return true; }
   if (interaction.commandName === "mod") { await handleModCommand(interaction); return true; }
+  if (interaction.commandName === "modcase") { await handleModCaseCommand(interaction); return true; }
+  if (interaction.commandName === "moderation") { await handleModerationStatsCommand(interaction); return true; }
   if (interaction.commandName === "security") { await handleSecurityCommand(interaction); return true; }
   if (interaction.commandName === "rank") { await handleRankCommand(interaction); return true; }
   if (interaction.commandName === "leaderboard") { await handleLeaderboardCommand(interaction); return true; }

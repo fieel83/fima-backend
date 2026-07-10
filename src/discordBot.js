@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
 import {
@@ -16,6 +16,8 @@ import {
   PARADISE_SETUP_SCHEMAS,
   paradiseCommandAllowedForMode,
   paradiseCommands,
+  paradiseWebsiteApplicationContext,
+  submitParadiseWebsiteApplication,
   paradiseTestLabStatus,
   publishParadiseGuidesFromDashboard,
   rebuildParadiseTestTemplate,
@@ -295,6 +297,8 @@ let lastCommandSyncAt = null;
 let lastCommandSyncError = null;
 let lastCommandSyncCount = 0;
 const lastCommandSyncCountsByGuild = new Map();
+const licenseSupportLookup = new Map();
+const supportHintCooldowns = new Map();
 let lastDeepAuditStartedAt = null;
 let lastDeepAuditCompletedAt = null;
 let lastDeepAuditGuildCount = 0;
@@ -393,6 +397,10 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Paradise sticky message handler failed", { message: error.message, channelId: message?.channelId || null });
     });
+    handleFimaSupportTicketHint(message).catch((error) => {
+      lastError = error.message;
+      console.warn("Fima support hint handler failed", { message: error.message, channelId: message?.channelId || null });
+    });
   });
 
   client.on("guildMemberUpdate", (oldMember, newMember) => {
@@ -478,6 +486,17 @@ async function registerDiscordCommands() {
     new SlashCommandBuilder()
       .setName("fima_ticket")
       .setDescription("Open the Fima support ticket menu."),
+    new SlashCommandBuilder()
+      .setName("fima_license_check")
+      .setDescription("Staff-only safe purchase/license lookup for support tickets.")
+      .addStringOption((option) => option
+        .setName("query")
+        .setDescription("Discord ID, Roblox name, email, license id, masked fragment or payment hint")
+        .setRequired(false))
+      .addUserOption((option) => option
+        .setName("user")
+        .setDescription("Discord user to check")
+        .setRequired(false)),
     new SlashCommandBuilder()
       .setName("fima_ticket_setup")
       .setDescription("Send the Fima support ticket panel.")
@@ -692,6 +711,14 @@ async function handleDiscordInteraction(interaction) {
     return handleTicketButton(interaction);
   }
 
+  if (interaction?.isButton?.() && String(interaction.customId || "").startsWith("fima_license_")) {
+    return handleLicenseSupportButton(interaction);
+  }
+
+  if (interaction?.isButton?.() && String(interaction.customId || "").startsWith("fima_training_lifecycle_")) {
+    return handleFimaTrainingLifecycleButton(interaction);
+  }
+
   if (!interaction?.isChatInputCommand?.()) return;
 
   if (interaction.commandName === "fima_help") {
@@ -758,6 +785,10 @@ async function handleDiscordInteraction(interaction) {
 
   if (interaction.commandName === "fima_ticket") {
     return interaction.reply({ ...fimaTicketMenuPayload(), ephemeral: true });
+  }
+
+  if (interaction.commandName === "fima_license_check") {
+    return handleLicenseSupportCheck(interaction);
   }
 
   if (interaction.commandName === "fima_ticket_setup") {
@@ -956,7 +987,12 @@ async function handleDiscordInteraction(interaction) {
       region: region.slice(0, 40),
       hasLink: Boolean(link)
     });
-    return interaction.reply({ embeds: [trainingSessionEmbed(interaction.user.id, { mode, region, ruleset, link })], ephemeral: false });
+    return interaction.reply({
+      content: trainingSessionMessage(interaction.user.id, { mode, region, ruleset, link }),
+      components: trainingLifecycleRows("training"),
+      allowedMentions: { parse: ["roles", "users"] },
+      ephemeral: false
+    });
   }
 
   if (interaction.commandName === "training_end") {
@@ -1399,24 +1435,68 @@ function trainingResultEmbed(userId, mode, result, notes) {
   return embed;
 }
 
-function trainingSessionEmbed(userId, { mode, region, ruleset, link }) {
+function trainingLifecycleRows(type = "training") {
+  const prefix = `fima_training_lifecycle_${type}`;
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`${prefix}_locked`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`${prefix}_unlocked`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`${prefix}_ended`).setLabel(type === "tryout" ? "END TRYOUT" : "END TRAINING").setStyle(ButtonStyle.Danger)
+  )];
+}
+
+function trainingSessionMessage(userId, { mode, region, ruleset, link }) {
   const cleanMode = sanitizeDiscordText(mode, 80) || TRAINING_MODES[0];
   const cleanRegion = sanitizeDiscordText(region, 40) || "mixed";
-  const cleanRuleset = sanitizeDiscordText(ruleset, 180) || "friendly practice";
-  const cleanLink = sanitizeDiscordText(link, 180);
-  const embed = new EmbedBuilder()
-    .setColor(0x40d6ff)
-    .setTitle("Fima training session")
-    .setDescription("Practice queue created. This is a community support/training flow, not a clan requirement.")
-    .addFields(
-      { name: "Hoster", value: `<@${userId}>`, inline: true },
-      { name: "Mode", value: cleanMode, inline: true },
-      { name: "Region", value: cleanRegion, inline: true },
-      { name: "Ruleset", value: cleanRuleset, inline: false },
-      { name: "Proof/results", value: "After the session, use `/training_end` or `/fima_training_result` and keep proof in approved result/media channels.", inline: false }
-    );
-  if (cleanLink) embed.addFields({ name: "Private link/code", value: "Provided by hoster. Do not repost suspicious links.", inline: false });
-  return embed;
+  const cleanRuleset = sanitizeDiscordText(ruleset, 320) || "First To 3";
+  const cleanLink = sanitizeDiscordText(link, 220) || "Hoster linki birazdan paylaşacak.";
+  return [
+    "# Training",
+    "",
+    "◇ **Hoster:**",
+    `<@${userId}>`,
+    "",
+    "◇ **Server:**",
+    cleanRegion,
+    "",
+    "◇ **Format:**",
+    cleanMode,
+    "",
+    "◇ **Karakterler:**",
+    "Saitama, Garou, Metal Bat",
+    "",
+    "◇ **Kurallar:**",
+    "• LH yok",
+    "• 3M1 Reset yok",
+    "• True Downslam yok",
+    "• 2 RC yok",
+    "• Wall yok",
+    "• Overpassive yok",
+    "• Aura / Aura Emote / M1 Effect yok",
+    "• Sırada vurmak yok",
+    "• Sırayı terk etmek yok",
+    cleanRuleset && !/friendly practice/i.test(cleanRuleset) ? `• Ek kural: ${cleanRuleset}` : "",
+    "",
+    "◇ **Link:**",
+    cleanLink,
+    "",
+    "-# Hoster-only controls • Made By Fieel"
+  ].filter(Boolean).join("\n");
+}
+
+async function handleFimaTrainingLifecycleButton(interaction) {
+  const customId = String(interaction.customId || "");
+  const state = customId.endsWith("_locked") ? "SERVER LOCKED" : customId.endsWith("_unlocked") ? "SERVER UNLOCKED" : "TRAINING ENDED";
+  await auditDiscordBotAction("discord_training_lifecycle_button", "discord_channel", interaction.channelId, {
+    actorId: interaction.user.id,
+    state,
+    messageIdMasked: maskDiscordId(interaction.message?.id)
+  });
+  const reply = [`# ${state}`, "", "-# Paradise lifecycle rendering test • Made By Fieel"].join("\n");
+  if (interaction.message?.reply) {
+    await interaction.message.reply({ content: reply, allowedMentions: { parse: [] } });
+    return interaction.reply({ content: `${state} posted as a reply to the original training message.`, ephemeral: true });
+  }
+  return interaction.reply({ content: reply, ephemeral: false });
 }
 
 function eventCardEmbed(userId, { title, format, time }) {
@@ -1469,13 +1549,14 @@ function staffSummaryEmbed(commandName, period) {
 function applicationPanelPayload() {
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
-    .setTitle("Fima applications")
-    .setDescription("Use tickets/forms for staff, referee, hoster, coach/helper and reseller applications. Staff reviews every application manually.")
+    .setTitle("Paradise Applications")
+    .setDescription("Choose the right application path. Long forms continue in safe steps, and staff reviews every submission manually.")
     .addFields(
-      { name: "Hoster / Referee", value: "Useful for training queues, result approvals and event support.", inline: false },
-      { name: "Support Staff", value: "Helps license/HWID, payment, macro setup and safety tickets.", inline: false },
-      { name: "Reseller / Partner", value: "Requires owner review. No one gets secret keys or admin access by default.", inline: false }
-    );
+      { name: "Community staff", value: "Fima Support, Macro Staff, FFlag Staff, Event/Giveaway Hoster and Moderator applications.", inline: false },
+      { name: "Clan / ranking staff", value: "Training Hoster, Tryout Hoster, Referee, Leaderboard, Roster and War Hoster applications.", inline: false },
+      { name: "Reseller / Partner", value: "Owner-reviewed only. Resellers receive referral tracking, never raw license keys or secret customer data.", inline: false }
+    )
+    .setFooter({ text: "Made By Fieel" });
   return { embeds: [embed] };
 }
 
@@ -1623,14 +1704,14 @@ function ticketCategoryRow() {
   );
 }
 
-function ticketActionRows({ claimed = false } = {}) {
+function ticketActionRows({ claimed = false, closed = false } = {}) {
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("fima_ticket_close").setLabel("Close").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId("fima_ticket_claim").setLabel(claimed ? "Claimed" : "Claim").setStyle(ButtonStyle.Primary).setDisabled(claimed),
-      new ButtonBuilder().setCustomId("fima_ticket_reopen").setLabel("Reopen").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("fima_ticket_note").setLabel("Add note").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("fima_ticket_escalate").setLabel("Escalate").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId("fima_ticket_claim").setLabel(claimed ? "Claimed" : "Claim").setStyle(ButtonStyle.Primary).setDisabled(claimed || closed),
+      new ButtonBuilder().setCustomId("fima_ticket_close").setLabel("Close").setStyle(ButtonStyle.Danger).setDisabled(closed),
+      new ButtonBuilder().setCustomId("fima_ticket_reopen").setLabel("Reopen").setStyle(ButtonStyle.Success).setDisabled(!closed),
+      new ButtonBuilder().setCustomId("fima_ticket_note").setLabel("Add note").setStyle(ButtonStyle.Secondary).setDisabled(closed),
+      new ButtonBuilder().setCustomId("fima_ticket_escalate").setLabel("Escalate").setStyle(ButtonStyle.Secondary).setDisabled(closed)
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("fima_ticket_transcript").setLabel("Transcript").setStyle(ButtonStyle.Secondary)
@@ -1744,7 +1825,7 @@ async function createTicketChannel(guild, user, category) {
     type: ChannelType.GuildText,
     parent,
     permissionOverwrites: overwrites,
-    topic: `Fima ticket: ${category.label}. Keep keys, emails and payment details masked.`,
+    topic: `Fima ticket: ${category.label}. openedBy:${user.id}. Keep keys, emails and payment details masked.`,
     reason: `Fima ticket opened: ${category.id}`
   });
 }
@@ -1755,22 +1836,141 @@ function ticketCreatedEmbed(category, userId) {
     : "Tell us what happened. Staff will help from here.";
   return new EmbedBuilder()
     .setColor(0x9b5cff)
-    .setTitle(category.label)
+    .setTitle(`${category.label} · OPEN`)
     .setDescription([
       guidance,
       "",
-      "Please mask license keys, gift codes, emails and payment details unless staff asks in private."
+      "Please mask license keys, gift codes, emails and payment details unless staff asks in private.",
+      "",
+      "Close first; Paradise saves a transcript before access is removed."
     ].join("\n"))
     .addFields(
       { name: "Opened by", value: `<@${userId}>`, inline: true },
-      { name: "Category", value: category.label, inline: true }
-    );
+      { name: "Category", value: category.label, inline: true },
+      { name: "Status", value: "OPEN", inline: true }
+    )
+    .setFooter({ text: "Made By Fieel" });
+}
+
+function getTicketCategoryLabel(interaction) {
+  const embedCategory = interaction.message?.embeds?.[0]?.fields?.find((field) => /category/i.test(String(field.name || "")));
+  if (embedCategory?.value) return sanitizeDiscordText(embedCategory.value, 80);
+  const topicMatch = String(interaction.channel?.topic || "").match(/Fima ticket:\s*([^.]*)\./i);
+  if (topicMatch?.[1]) return sanitizeDiscordText(topicMatch[1], 80);
+  return "Ticket";
+}
+
+function ticketLifecycleEmbed({ status = "OPEN", actorId, transcriptMessageId, claimedBy, categoryLabel = "Ticket", openedBy } = {}) {
+  const closed = status === "CLOSED";
+  const color = closed ? 0xffc857 : 0x9b5cff;
+  const fields = [
+    { name: "Category", value: sanitizeDiscordText(categoryLabel, 80), inline: true },
+    { name: "Status", value: status, inline: true },
+    { name: closed ? "Closed by" : "Updated by", value: actorId ? `<@${actorId}>` : "Staff", inline: true }
+  ];
+  if (openedBy) fields.push({ name: "Opened by", value: `<@${openedBy}>`, inline: true });
+  if (claimedBy) fields.push({ name: "Claimed by", value: `<@${claimedBy}>`, inline: true });
+  if (transcriptMessageId) fields.push({ name: "Transcript", value: `Saved · ${maskDiscordId(transcriptMessageId)}`, inline: false });
+  return new EmbedBuilder()
+    .setColor(color)
+    .setTitle(`${sanitizeDiscordText(categoryLabel, 80)} · ${status}`)
+    .setDescription(closed
+      ? "This ticket is closed. A transcript was saved before closing. Staff can reopen it if more follow-up is needed."
+      : "This ticket is open again. Staff can claim it, add notes, escalate, or close it after a transcript is saved.")
+    .addFields(fields)
+    .setFooter({ text: "Made By Fieel" });
+}
+
+function maskTicketTranscriptText(value) {
+  return String(value || "")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[masked-email]")
+    .replace(/\b(?:[A-F0-9]{8}[-:]){3,}[A-F0-9]{4,}\b/gi, "[masked-id]")
+    .replace(/\b[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{20,}\b/g, "[masked-token]")
+    .replace(/\b(?:FIMA|TG|KEY|LIC)[A-Z0-9_-]{8,}\b/gi, "[masked-key]")
+    .replace(/@everyone|@here/gi, "@ blocked");
+}
+
+async function createFimaTicketTranscript(interaction, trigger = "manual") {
+  const channel = interaction.channel;
+  if (!channel?.messages?.fetch) {
+    const error = new Error("ticket_channel_unavailable");
+    error.code = "ticket_channel_unavailable";
+    throw error;
+  }
+  const fetched = await channel.messages.fetch({ limit: 100 });
+  const rows = [...fetched.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+  const lines = rows.map((message) => {
+    const author = `${message.author?.username || "unknown"} (${maskDiscordId(message.author?.id) || "no-id"})`;
+    const text = maskTicketTranscriptText(message.content || "");
+    const attachmentNote = message.attachments?.size ? ` [attachments:${message.attachments.size}]` : "";
+    const componentNote = message.components?.length ? " [components]" : "";
+    return `[${new Date(message.createdTimestamp).toISOString()}] ${author}: ${text || "(no text)"}${attachmentNote}${componentNote}`;
+  });
+  const body = [
+    `Paradise/Fima support ticket transcript`,
+    `Channel: ${channel.name || channel.id}`,
+    `Channel ID: ${maskDiscordId(channel.id)}`,
+    `Trigger: ${trigger}`,
+    `Created: ${new Date().toISOString()}`,
+    `Messages: ${rows.length}`,
+    "",
+    ...lines
+  ].join("\n").slice(0, 900000);
+  const attachment = new AttachmentBuilder(Buffer.from(body, "utf8"), {
+    name: `ticket-${String(channel.id).slice(-8)}-${Date.now()}.txt`
+  });
+  const transcriptChannelId = env("DISCORD_TICKET_TRANSCRIPT_CHANNEL_ID") || env("DISCORD_TRANSCRIPT_CHANNEL_ID");
+  const destination = transcriptChannelId
+    ? await channel.guild.channels.fetch(transcriptChannelId).catch(() => null)
+    : channel;
+  if (!destination?.send) {
+    const error = new Error("transcript_destination_unavailable");
+    error.code = "transcript_destination_unavailable";
+    throw error;
+  }
+  const transcriptMessage = await destination.send({
+    content: `Ticket transcript saved · <#${channel.id}> · ${trigger}`,
+    files: [attachment],
+    allowedMentions: { parse: [] }
+  });
+  await auditDiscordBotAction("discord_ticket_transcript_saved", "discord_channel", channel.id, {
+    actorId: interaction.user.id,
+    channelId: channel.id,
+    destinationChannelId: destination.id,
+    transcriptMessageId: transcriptMessage.id,
+    messageCount: rows.length,
+    contentStoredInDiscord: true,
+    artifactContentStored: false,
+    fullKeysMasked: true,
+    fullEmailsMasked: true
+  });
+  return { transcriptMessage, messageCount: rows.length, destinationChannelId: destination.id };
+}
+
+function getTicketOpenedUserId(interaction) {
+  const topicMatch = String(interaction.channel?.topic || "").match(/openedBy:(\d{15,25})/);
+  if (topicMatch) return topicMatch[1];
+  const embedField = interaction.message?.embeds?.[0]?.fields?.find((field) => /opened by/i.test(String(field.name || "")));
+  const embedMatch = String(embedField?.value || "").match(/<@!?(\d{15,25})>/);
+  return embedMatch?.[1] || null;
+}
+
+async function setClosedTicketParticipantAccess(interaction, closed) {
+  const userId = getTicketOpenedUserId(interaction);
+  if (!userId || !interaction.channel?.permissionOverwrites?.edit) return { userId: null, changed: false };
+  const overwrite = closed
+    ? { ViewChannel: false, SendMessages: false, ReadMessageHistory: false }
+    : { ViewChannel: true, SendMessages: true, ReadMessageHistory: true };
+  await interaction.channel.permissionOverwrites.edit(userId, overwrite, {
+    reason: closed ? "Ticket closed after transcript save" : "Ticket reopened by staff"
+  });
+  return { userId, changed: true };
 }
 
 async function handleTicketButton(interaction) {
   const action = String(interaction.customId || "").replace("fima_ticket_", "");
   const isStaff = interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageChannels) || interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator);
-  if (!isStaff && !["transcript"].includes(action)) {
+  if (!isStaff) {
     return interaction.reply({ content: "Staff will handle that button.", ephemeral: true });
   }
 
@@ -1783,15 +1983,31 @@ async function handleTicketButton(interaction) {
   });
 
   if (action === "claim") {
-    await interaction.message.edit({ components: ticketActionRows({ claimed: true }) }).catch(() => {});
+    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, claimedBy: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: true }) }).catch(() => {});
     return interaction.reply({ content: `Claimed by ${interaction.user}.`, ephemeral: false });
   }
   if (action === "close") {
+    let transcript;
+    try {
+      transcript = await createFimaTicketTranscript(interaction, "close");
+    } catch (error) {
+      return interaction.reply({
+        content: `Transcript could not be saved, so the ticket was not closed. Reason: ${sanitizeDiscordText(error?.code || error?.message || "unknown", 120)}`,
+        ephemeral: true
+      });
+    }
     await interaction.channel?.setName?.(`closed-${String(interaction.channel?.name || "ticket").replace(/^closed-/, "").slice(0, 80)}`).catch(() => {});
-    return interaction.reply({ content: "Ticket marked closed. Staff can archive or delete it after review.", ephemeral: false });
+    await interaction.message.edit({
+      embeds: [ticketLifecycleEmbed({ status: "CLOSED", actorId: interaction.user.id, transcriptMessageId: transcript?.transcriptMessage?.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })],
+      components: ticketActionRows({ closed: true })
+    }).catch(() => {});
+    await setClosedTicketParticipantAccess(interaction, true).catch(() => {});
+    return interaction.reply({ content: `Ticket closed. Transcript saved (${transcript.messageCount} messages).`, ephemeral: false });
   }
   if (action === "reopen") {
     await interaction.channel?.setName?.(String(interaction.channel?.name || "ticket").replace(/^closed-/, "").slice(0, 90)).catch(() => {});
+    await setClosedTicketParticipantAccess(interaction, false).catch(() => {});
+    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows() }).catch(() => {});
     return interaction.reply({ content: "Ticket reopened for follow-up.", ephemeral: false });
   }
   if (action === "note") {
@@ -1801,9 +2017,309 @@ async function handleTicketButton(interaction) {
     return interaction.reply({ content: "Escalated for senior staff review.", ephemeral: false });
   }
   if (action === "transcript") {
-    return interaction.reply({ content: "Transcript marker saved. Full message export is intentionally manual until safe storage is configured.", ephemeral: true });
+    try {
+      const transcript = await createFimaTicketTranscript(interaction, "manual");
+      return interaction.reply({ content: `Transcript saved (${transcript.messageCount} messages).`, ephemeral: true });
+    } catch (error) {
+      return interaction.reply({ content: `Transcript failed: ${sanitizeDiscordText(error?.code || error?.message || "unknown", 120)}`, ephemeral: true });
+    }
   }
   return interaction.reply({ content: "Ticket action saved.", ephemeral: true });
+}
+
+function maskSupportEmail(value) {
+  const email = String(value || "").trim();
+  if (!email) return "unknown";
+  const [name, domain = ""] = email.split("@");
+  if (domain.endsWith("username.fimamacro.local")) return `${name.slice(0, 2)}***@local`;
+  return `${name.slice(0, 2)}***@${domain || "masked"}`;
+}
+
+function maskSupportLicenseKey(value) {
+  const key = String(value || "").trim().toUpperCase();
+  if (!key) return "missing";
+  const parts = key.split("-");
+  if (parts.length >= 5) return `${parts[0]}-${parts[1]}-****-****-${parts.at(-1)}`;
+  return `${key.slice(0, 4)}***${key.slice(-4)}`;
+}
+
+function isSupportLicenseKeyUsable(value) {
+  return /^FIMA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(String(value || "").trim().toUpperCase());
+}
+
+function isSupportLicenseActive(license) {
+  if (license?.status !== "active") return false;
+  if (license?.lifetime) return true;
+  return !license?.expiresAt || new Date(license.expiresAt).getTime() > Date.now();
+}
+
+function isSupportTrialLicense(license) {
+  const haystack = `${license?.plan || ""} ${license?.notes || ""}`.toLowerCase();
+  return /trial|free|1day/.test(haystack);
+}
+
+function supportLicenseSource(license) {
+  if (license?.stripeSessionId || license?.stripePaymentIntentId || license?.orders?.length) return "Stripe/Website";
+  if (/manual|admin|gift/i.test(String(license?.notes || ""))) return "Manual/Admin";
+  return "Website/Unknown";
+}
+
+function supportLicenseRepairState(license) {
+  const usable = isSupportLicenseKeyUsable(license?.licenseKey);
+  const active = isSupportLicenseActive(license);
+  const paid = active && !isSupportTrialLicense(license);
+  const linkedPayment = Boolean(license?.stripeSessionId || license?.stripePaymentIntentId || license?.orders?.length);
+  return {
+    usable,
+    active,
+    linkedPayment,
+    keyRepairNeeded: !usable,
+    canCreateRepairTask: paid && !usable
+  };
+}
+
+function normalizeSupportLicenseFragment(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  const compact = raw.replace(/[^A-Z0-9]/g, "");
+  if (!compact) return "";
+  if (compact.startsWith("FIMA") && compact.length >= 8) return compact.slice(-8);
+  return compact.length >= 4 ? compact.slice(-12) : "";
+}
+
+function maskSupportLookupQuery(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.includes("@")) return maskSupportEmail(raw);
+  if (/^FIMA[-\sA-Z0-9]+$/i.test(raw)) return maskSupportLicenseKey(raw);
+  if (/^(cs_|pi_)/i.test(raw)) return `${raw.slice(0, 3)}***${raw.slice(-4)}`;
+  if (/^[a-z0-9]{18,}$/i.test(raw)) return `${raw.slice(0, 3)}***${raw.slice(-3)}`;
+  return sanitizeDiscordText(raw, 120);
+}
+
+function rememberLicenseSupportTarget(licenseId, actorId) {
+  const now = Date.now();
+  for (const [key, entry] of licenseSupportLookup.entries()) {
+    if (!entry?.expiresAt || entry.expiresAt < now) licenseSupportLookup.delete(key);
+  }
+  const lookupKey = crypto.randomBytes(6).toString("hex");
+  licenseSupportLookup.set(lookupKey, {
+    licenseId,
+    actorId,
+    expiresAt: now + 15 * 60 * 1000
+  });
+  return lookupKey;
+}
+
+async function findSupportLicenseCandidates({ query, discordUserId }) {
+  const rawQuery = String(query || "").trim();
+  const emails = new Set();
+  const orUsers = [];
+  if (discordUserId) orUsers.push({ discordUserId });
+  if (rawQuery) {
+    if (/^\d{15,25}$/.test(rawQuery)) orUsers.push({ discordUserId: rawQuery });
+    orUsers.push(
+      { email: { contains: rawQuery, mode: "insensitive" } },
+      { discordUsername: { contains: rawQuery, mode: "insensitive" } },
+      { robloxUsername: { contains: rawQuery, mode: "insensitive" } }
+    );
+  }
+  if (orUsers.length) {
+    const users = await prisma.user.findMany({
+      where: { OR: orUsers },
+      select: { email: true },
+      take: 6
+    }).catch(() => []);
+    for (const user of users) if (user?.email) emails.add(user.email);
+  }
+  if (rawQuery.includes("@")) emails.add(rawQuery.toLowerCase());
+
+  const orLicenses = [];
+  if (rawQuery) {
+    orLicenses.push({ id: rawQuery });
+    if (/^cs_|^pi_/i.test(rawQuery)) {
+      orLicenses.push({ stripeSessionId: rawQuery }, { stripePaymentIntentId: rawQuery });
+    }
+    const fragment = normalizeSupportLicenseFragment(rawQuery);
+    if (fragment.length >= 4) orLicenses.push({ licenseKey: { contains: fragment } });
+  }
+  for (const email of emails) {
+    orLicenses.push({ customerEmail: email }, { orders: { some: { customerEmail: email } } });
+  }
+  if (!orLicenses.length) return [];
+
+  return prisma.license.findMany({
+    where: { OR: orLicenses },
+    orderBy: { updatedAt: "desc" },
+    take: 5,
+    include: {
+      orders: {
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: { status: true, mode: true, amount: true, currency: true, createdAt: true }
+      }
+    }
+  });
+}
+
+function licenseSupportEmbed({ query, discordUser, licenses }) {
+  const embed = new EmbedBuilder()
+    .setColor(licenses.length ? 0x40d6ff : 0xffc857)
+    .setTitle("Safe license support check")
+    .setDescription(licenses.length
+      ? "Masked support result only. Full keys, full emails, HWIDs and payment secrets are never shown here."
+      : "No matching license was found from the safe lookup. Try Discord user, Roblox name, license id, masked fragment, or the account email in the private ticket.");
+  if (discordUser) embed.addFields({ name: "Discord user", value: `${discordUser} (${maskDiscordId(discordUser.id)})`, inline: false });
+  if (query) embed.addFields({ name: "Query", value: maskSupportLookupQuery(query), inline: false });
+
+  licenses.slice(0, 3).forEach((license, index) => {
+    const state = supportLicenseRepairState(license);
+    const statusLine = [
+      `Plan: ${sanitizeDiscordText(license.plan, 40)}${license.lifetime ? " / Lifetime" : ""}`,
+      `Status: ${sanitizeDiscordText(license.status, 40)}`,
+      `Source: ${supportLicenseSource(license)}`,
+      `Active license: ${state.active ? "yes" : "no"}`,
+      `Checkout linked: ${state.linkedPayment ? "yes" : "no"}`,
+      `Key repair needed: ${state.keyRepairNeeded ? "yes" : "no"}`,
+      `Downloads: ${license.downloadCount || 0}`,
+      `Last validation: ${license.lastValidatedAt ? `<t:${Math.floor(new Date(license.lastValidatedAt).getTime() / 1000)}:R>` : "none"}`
+    ].join("\n");
+    embed.addFields({
+      name: `Result ${index + 1} · ${maskDiscordId(license.id)} · ${maskSupportLicenseKey(license.licenseKey)}`,
+      value: `${statusLine}\nCustomer: ${maskSupportEmail(license.customerEmail)}`,
+      inline: false
+    });
+  });
+  if (licenses.length > 3) embed.setFooter({ text: `Showing 3 of ${licenses.length} matches · Made By Fieel` });
+  else embed.setFooter({ text: "Made By Fieel" });
+  return embed;
+}
+
+function licenseSupportActionRows(license, actorId) {
+  if (!license) return [];
+  const lookupKey = rememberLicenseSupportTarget(license.id, actorId);
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`fima_license_repair_task:${lookupKey}`)
+      .setLabel("Create license repair task")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!supportLicenseRepairState(license).canCreateRepairTask),
+    new ButtonBuilder()
+      .setCustomId(`fima_license_safe_instructions:${lookupKey}`)
+      .setLabel("Send user safe instructions")
+      .setStyle(ButtonStyle.Secondary)
+  )];
+}
+
+async function handleLicenseSupportCheck(interaction) {
+  if (!isStaffInteraction(interaction)) {
+    return interaction.reply({ content: "Only support staff/admins can check purchases or licenses.", ephemeral: true });
+  }
+  const query = interaction.options.getString("query") || "";
+  const discordUser = interaction.options.getUser("user") || null;
+  if (!query && !discordUser) {
+    return interaction.reply({ content: "Add a Discord user, Roblox name, license id, masked fragment, or account email.", ephemeral: true });
+  }
+  const licenses = await findSupportLicenseCandidates({ query, discordUserId: discordUser?.id });
+  await auditDiscordBotAction("discord_license_support_check", "discord_user", interaction.user.id, {
+    queryProvided: Boolean(query),
+    discordUserIdMasked: maskDiscordId(discordUser?.id),
+    matches: licenses.length,
+    fullKeysMasked: true,
+    fullEmailsMasked: true
+  });
+  const firstRepairCandidate = licenses.find((license) => supportLicenseRepairState(license).keyRepairNeeded) || licenses[0] || null;
+  return interaction.reply({
+    embeds: [licenseSupportEmbed({ query, discordUser, licenses })],
+    components: licenseSupportActionRows(firstRepairCandidate, interaction.user.id),
+    ephemeral: true
+  });
+}
+
+async function handleLicenseSupportButton(interaction) {
+  if (!isStaffInteraction(interaction)) {
+    return interaction.reply({ content: "Only support staff/admins can use license support actions.", ephemeral: true });
+  }
+  const [action, lookupKey] = String(interaction.customId || "").split(":");
+  const entry = licenseSupportLookup.get(lookupKey);
+  if (!entry || entry.expiresAt < Date.now()) {
+    return interaction.reply({ content: "This license support action expired. Run `/fima_license_check` again.", ephemeral: true });
+  }
+  const license = await prisma.license.findUnique({ where: { id: entry.licenseId } }).catch(() => null);
+  if (!license) return interaction.reply({ content: "License record was not found anymore.", ephemeral: true });
+  const state = supportLicenseRepairState(license);
+
+  if (action === "fima_license_repair_task") {
+    await auditDiscordBotAction("discord_license_repair_task_requested", "license", license.id, {
+      actorId: interaction.user.id,
+      licenseIdMasked: maskDiscordId(license.id),
+      keyRepairNeeded: state.keyRepairNeeded,
+      canCreateRepairTask: state.canCreateRepairTask,
+      fullKeysMasked: true,
+      fullEmailsMasked: true
+    });
+    return interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(state.canCreateRepairTask ? 0xffc857 : 0xff4d6d)
+        .setTitle(state.canCreateRepairTask ? "URGENT LICENSE BUG · repair task created" : "License repair is blocked")
+        .setDescription(state.canCreateRepairTask
+          ? "Owner/admin should repair this paid active license from the secure dashboard or the repair endpoint. Do not paste a full key into Discord."
+          : "This record is not eligible for staff-triggered repair. Escalate to owner/admin with the masked license id only.")
+        .addFields(
+          { name: "License", value: `${maskDiscordId(license.id)} · ${maskSupportLicenseKey(license.licenseKey)}`, inline: true },
+          { name: "Customer", value: maskSupportEmail(license.customerEmail), inline: true }
+        )
+        .setFooter({ text: "Made By Fieel" })],
+      ephemeral: false
+    });
+  }
+
+  if (action === "fima_license_safe_instructions") {
+    await auditDiscordBotAction("discord_license_safe_instructions_sent", "license", license.id, {
+      actorId: interaction.user.id,
+      licenseIdMasked: maskDiscordId(license.id),
+      fullKeysMasked: true,
+      fullEmailsMasked: true
+    });
+    return interaction.reply({
+      content: [
+        "Thanks for waiting — we can see this is a license/payment support case.",
+        "Please refresh **My Products** on fimamacro.com and use the **Copy License Key** button again after staff confirms the repair.",
+        "Your lifetime access will not be lost. Please do not post full license keys, full emails, HWIDs or payment details in the ticket."
+      ].join("\n"),
+      allowedMentions: { parse: [] },
+      ephemeral: false
+    });
+  }
+
+  return interaction.reply({ content: "Unknown license support action.", ephemeral: true });
+}
+
+async function handleFimaSupportTicketHint(message) {
+  if (!message?.guild || message.author?.bot) return;
+  const channelName = String(message.channel?.name || "");
+  const channelTopic = String(message.channel?.topic || "");
+  const isTicket = /ticket/i.test(channelName) || /Fima ticket:/i.test(channelTopic);
+  if (!isTicket) return;
+  const text = String(message.content || "");
+  const looksLikeLicenseProblem = /\b(paid|payment|lifetime|license|licence|key|copy|null|scam|stripe|bought|buy|sat[ıi]n|öde|odeme|lisans|anahtar|kopya)\b/i.test(text);
+  if (!looksLikeLicenseProblem) return;
+  const cooldownKey = `${message.guild.id}:${message.channel.id}`;
+  const last = supportHintCooldowns.get(cooldownKey) || 0;
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  supportHintCooldowns.set(cooldownKey, Date.now());
+  await message.channel.send({
+    embeds: [new EmbedBuilder()
+      .setColor(0xffc857)
+      .setTitle("License support checklist")
+      .setDescription("This looks like a payment/license issue. Staff can use `/fima_license_check` to run a safe masked lookup.")
+      .addFields(
+        { name: "Safe lookup", value: "Use Discord user, Roblox name, license id, account email, or a masked key fragment. The bot will not reveal full keys or full emails.", inline: false },
+        { name: "If key copy is broken", value: "If an active paid license needs key repair, create a repair task and tell the user to refresh My Products after owner/admin confirms.", inline: false },
+        { name: "Never ask for", value: "Full license key, HWID, cookies, tokens, passwords, or raw payment secrets.", inline: false }
+      )
+      .setFooter({ text: "Made By Fieel" })],
+    allowedMentions: { parse: [] }
+  });
 }
 
 async function createDiscordResetToken(userId) {
@@ -2560,4 +3076,14 @@ async function getGuild(requestedGuildId = null) {
   }
   if (!guild.members.me) await guild.members.fetchMe().catch(() => null);
   return guild;
+}
+
+export async function paradiseWebsiteApplicationFormContext(guildId, discordUserId) {
+  const guild = await getGuild(guildId);
+  return paradiseWebsiteApplicationContext(guild, discordUserId);
+}
+
+export async function submitParadiseWebsiteApplicationForm(guildId, payload) {
+  const guild = await getGuild(guildId);
+  return submitParadiseWebsiteApplication(guild, payload);
 }
