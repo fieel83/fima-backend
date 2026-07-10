@@ -2557,6 +2557,147 @@ function licenseKeyRepairState(license) {
   };
 }
 
+function licenseKeyRepairClass(license) {
+  const state = licenseKeyRepairState(license);
+  const source = licenseSource(license);
+  const active = licenseAccessState(license).valid;
+  const paidStripeWebsite = source === "Stripe/Website" && !licenseLooksLikeTrial(license);
+  let bucket = "manual_or_other";
+  if (licenseLooksLikeTrial(license)) bucket = "trial";
+  else if (/gift/i.test(source)) bucket = "gift";
+  else if (paidStripeWebsite) bucket = "paid_stripe_website";
+  return {
+    ...state,
+    source,
+    active,
+    paidStripeWebsite,
+    bucket,
+    issueType: state.needsRepair ? state.reason : null
+  };
+}
+
+function safeLicenseKeyRepairRow(license, state = licenseKeyRepairClass(license)) {
+  return {
+    idMasked: maskExternalId(license.id),
+    plan: license.plan,
+    source: state.source,
+    status: license.status,
+    createdAt: license.createdAt ? license.createdAt.toISOString() : null,
+    customerEmailMasked: maskEmail(license.customerEmail),
+    issueType: state.issueType,
+    canRepair: state.canRepair,
+    repairAction: state.needsRepair
+      ? (state.canRepair ? "repair_same_license_record" : "manual_review_required")
+      : "none"
+  };
+}
+
+async function scanProductionLicenseKeyRepairs() {
+  const licenses = await prisma.license.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 2000
+  });
+  const rows = licenses.map((license) => ({ license, state: licenseKeyRepairClass(license) }));
+  const paidActive = rows.filter(({ state }) => state.active && state.paidStripeWebsite);
+  const paidAffected = paidActive.filter(({ state }) => state.needsRepair);
+  const trialAffected = rows.filter(({ state }) => state.bucket === "trial" && state.needsRepair);
+  const giftAffected = rows.filter(({ state }) => state.bucket === "gift" && state.needsRepair);
+  const manualAffected = rows.filter(({ state }) => state.bucket === "manual_or_other" && state.needsRepair);
+  const expiredOrDisabled = rows.filter(({ state }) => !state.active && state.needsRepair);
+  const keyCounts = new Map();
+  for (const license of licenses) {
+    const key = String(license.licenseKey || "").trim();
+    if (!key) continue;
+    keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
+  }
+  const duplicateKeyConflicts = [...keyCounts.values()].filter((count) => count > 1).length;
+  const result = {
+    success: true,
+    dryRun: true,
+    scannedAt: new Date().toISOString(),
+    paidActiveScanned: paidActive.length,
+    paidAffectedCount: paidAffected.length,
+    duplicateKeyConflicts,
+    paidActiveIssues: paidAffected.slice(0, 100).map(({ license, state }) => safeLicenseKeyRepairRow(license, state)),
+    separateNonPaidIssueCounts: {
+      trial: trialAffected.length,
+      gift: giftAffected.length,
+      manualOrOther: manualAffected.length,
+      expiredOrDisabled: expiredOrDisabled.length
+    }
+  };
+  await createAuditLog("paid_license_key_repair_scan", "license", null, {
+    paidActiveScanned: result.paidActiveScanned,
+    paidAffectedCount: result.paidAffectedCount,
+    duplicateKeyConflicts: result.duplicateKeyConflicts,
+    dryRun: true
+  });
+  return result;
+}
+
+async function repairPaidLicenseKey(licenseId, { actorType = "admin", actorId = null } = {}) {
+  const initial = await prisma.license.findUnique({ where: { id: licenseId } });
+  if (!initial) {
+    const error = new Error("not_found");
+    error.statusCode = 404;
+    throw error;
+  }
+  const initialState = licenseKeyRepairClass(initial);
+  if (!initialState.needsRepair) {
+    return { license: initial, repaired: false, state: initialState };
+  }
+  if (!initialState.active || !initialState.paidStripeWebsite || !initialState.canRepair) {
+    const error = new Error("license_key_repair_blocked");
+    error.statusCode = 409;
+    error.reason = initialState.issueType || "manual_review_required";
+    throw error;
+  }
+  const updated = await prisma.$transaction(async (tx) => {
+    const current = await tx.license.findUnique({ where: { id: licenseId } });
+    if (!current) {
+      const error = new Error("not_found");
+      error.statusCode = 404;
+      throw error;
+    }
+    const currentState = licenseKeyRepairClass(current);
+    if (!currentState.needsRepair) return current;
+    if (!currentState.active || !currentState.paidStripeWebsite || !currentState.canRepair) {
+      const error = new Error("license_key_repair_blocked");
+      error.statusCode = 409;
+      error.reason = currentState.issueType || "manual_review_required";
+      throw error;
+    }
+    const replacementKey = await generateUniqueLicenseKey(tx);
+    const note = `[${new Date().toISOString()}] paid_license_key_repair reason:null_or_malformed_paid_license_key previous:${maskCode(current.licenseKey) || "none"}`;
+    const next = await tx.license.update({
+      where: { id: current.id },
+      data: { licenseKey: replacementKey, notes: appendNote(current.notes, note) }
+    });
+    await tx.auditLog.create({
+      data: {
+        action: "paid_license_key_repair",
+        targetType: "license",
+        targetId: next.id,
+        metadata: {
+          actor: actorType,
+          actorId: actorId || null,
+          reason: "null_or_malformed_paid_license_key",
+          oldState: currentState.issueType,
+          oldKeyMasked: maskCode(current.licenseKey),
+          newKeyMasked: maskCode(replacementKey),
+          source: licenseSource(next)
+        }
+      }
+    });
+    return next;
+  });
+  return {
+    license: updated,
+    repaired: updated.licenseKey !== initial.licenseKey,
+    state: licenseKeyRepairClass(updated)
+  };
+}
+
 app.get("/api/me/license-records/:licenseId/key", downloadLimiter, requireUser, async (req, res) => {
   try {
     let license = await findOwnedLicenseById(req.user, req.params.licenseId);
@@ -3424,102 +3565,59 @@ async function adminLicensesHandler(req, res) {
 
 app.get(["/admin/api/licenses", "/api/admin/licenses"], requireAdmin, adminLicensesHandler);
 
-app.get(["/admin/api/licenses/key-repair-scan", "/api/admin/licenses/key-repair-scan"], requireAdmin, async (_req, res) => {
-  const now = new Date();
-  const licenses = await prisma.license.findMany({
-    where: {
-      status: "active",
-      OR: [{ lifetime: true }, { expiresAt: null }, { expiresAt: { gt: now } }]
-    },
-    orderBy: { createdAt: "desc" },
-    take: 1000
-  });
-  const affected = licenses
-    .map((license) => ({ license, state: licenseKeyRepairState(license) }))
-    .filter((row) => row.state.needsRepair);
-  await createAuditLog("license_key_repair_scan", "license", null, {
-    count: affected.length,
-    dryRun: true
-  });
-  return res.json({
-    success: true,
-    dryRun: true,
-    count: affected.length,
-    licenses: affected.slice(0, 100).map(({ license, state }) => ({
-      idMasked: maskExternalId(license.id),
-      plan: license.plan,
-      status: license.status,
-      source: licenseSource(license),
-      reason: state.reason,
-      canRepair: state.canRepair,
-      licenseKeyMasked: maskCode(license.licenseKey)
-    }))
-  });
-});
+async function adminLicenseKeyRepairScanHandler(_req, res) {
+  try {
+    return res.json(await scanProductionLicenseKeyRepairs());
+  } catch (error) {
+    console.error("Paid license key scan failed", publicError(error));
+    return res.status(500).json({ success: false, error: "license_key_scan_failed" });
+  }
+}
 
-app.post(["/admin/api/licenses/:id/repair-key", "/api/admin/licenses/:id/repair-key"], requireAdmin, async (req, res) => {
-  const license = await prisma.license.findUnique({ where: { id: req.params.id } });
-  if (!license) return res.status(404).json({ error: "not_found" });
-  const state = licenseKeyRepairState(license);
-  if (!state.needsRepair) {
+async function licenseKeyRepairHandler(req, res, actor = {}) {
+  try {
+    const result = await repairPaidLicenseKey(req.params.id, actor);
     return res.json({
       success: true,
-      repaired: false,
-      licenseKeyMasked: maskCode(license.licenseKey),
-      message: "license_key_already_usable"
+      repaired: result.repaired,
+      licenseIdMasked: maskExternalId(result.license.id),
+      plan: result.license.plan,
+      status: result.license.status,
+      lifetime: result.license.lifetime,
+      licenseKeyMasked: maskCode(result.license.licenseKey),
+      keyRepairNeeded: result.state.needsRepair
     });
+  } catch (error) {
+    if (error?.statusCode) return res.status(error.statusCode).json({ error: error.message, reason: error.reason || null });
+    console.error("Paid license key repair failed", publicError(error));
+    return res.status(500).json({ error: "license_key_repair_failed" });
   }
-  const force = req.body?.force === true;
-  if (!state.canRepair && !force) {
-    await createAuditLog("admin_license_key_repair_blocked", "license", license.id, {
-      reason: state.reason,
-      status: license.status,
-      source: licenseSource(license)
+}
+
+app.get(["/admin/api/licenses/key-repair-scan", "/api/admin/licenses/key-repair-scan"], requireAdmin, adminLicenseKeyRepairScanHandler);
+app.post(["/admin/api/licenses/:id/repair-key", "/api/admin/licenses/:id/repair-key"], requireAdmin, (req, res) => {
+  return licenseKeyRepairHandler(req, res, { actorType: "admin" });
+});
+
+// This route is intentionally narrower than the admin panel: it requires a Fima
+// account plus the exact linked Paradise owner Discord identity. It returns masked
+// production diagnostics only and never returns a raw license key.
+app.get("/api/owner/license-key-repair-scan", requireUser, requireParadiseOwner, async (req, res) => {
+  try {
+    const result = await scanProductionLicenseKeyRepairs();
+    await createAuditLog("owner_paid_license_key_scan", "user", req.user.id, {
+      ownerDiscordIdMasked: maskDiscordId(PARADISE_OWNER_DISCORD_ID),
+      paidAffectedCount: result.paidAffectedCount
     });
-    return res.status(409).json({ error: "license_key_repair_blocked", reason: state.reason });
+    return res.json(result);
+  } catch (error) {
+    console.error("Owner paid license key scan failed", publicError(error));
+    return res.status(500).json({ success: false, error: "license_key_scan_failed" });
   }
+});
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const current = await tx.license.findUnique({ where: { id: license.id } });
-    if (!current) {
-      const error = new Error("not_found");
-      error.statusCode = 404;
-      throw error;
-    }
-    const currentState = licenseKeyRepairState(current);
-    if (!currentState.needsRepair) return current;
-    const replacementKey = await generateUniqueLicenseKey(tx);
-    const note = `[${new Date().toISOString()}] admin_license_key_reissued reason:${currentState.reason} previous:${maskCode(current.licenseKey) || "none"}`;
-    const next = await tx.license.update({
-      where: { id: current.id },
-      data: {
-        licenseKey: replacementKey,
-        notes: appendNote(current.notes, note)
-      }
-    });
-    await tx.auditLog.create({
-      data: {
-        action: "admin_license_key_reissued",
-        targetType: "license",
-        targetId: next.id,
-        metadata: {
-          reason: currentState.reason,
-          force,
-          oldKeyMasked: maskCode(current.licenseKey),
-          newKeyMasked: maskCode(replacementKey),
-          source: licenseSource(next)
-        }
-      }
-    }).catch(() => {});
-    return next;
-  });
-
-  return res.json({
-    success: true,
-    repaired: updated.licenseKey !== license.licenseKey,
-    licenseKeyMasked: maskCode(updated.licenseKey),
-    keyRepairNeeded: licenseKeyRepairState(updated).needsRepair
-  });
+app.post("/api/owner/licenses/:id/repair-key", requireUser, requireParadiseOwner, async (req, res) => {
+  return licenseKeyRepairHandler(req, res, { actorType: "owner", actorId: req.user.id });
 });
 
 app.post(["/admin/api/licenses/validate", "/api/admin/licenses/validate"], requireAdmin, async (req, res) => {
