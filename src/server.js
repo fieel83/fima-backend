@@ -3620,6 +3620,71 @@ app.post("/api/owner/licenses/:id/repair-key", requireUser, requireParadiseOwner
   return licenseKeyRepairHandler(req, res, { actorType: "owner", actorId: req.user.id });
 });
 
+function escapeLicenseRepairHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function ownerLicenseRepairConsoleHtml({ scan, csrfToken, notice = null, noticeKind = "info" }) {
+  const rows = (scan?.paidActiveIssues || []).map((row) => `
+    <tr>
+      <td>${escapeLicenseRepairHtml(row.idMasked)}</td>
+      <td>${escapeLicenseRepairHtml(row.plan)}</td>
+      <td>${escapeLicenseRepairHtml(row.status)}</td>
+      <td>${escapeLicenseRepairHtml(row.customerEmailMasked)}</td>
+      <td>${escapeLicenseRepairHtml(row.issueType)}</td>
+      <td>${escapeLicenseRepairHtml(row.repairAction)}</td>
+    </tr>`).join("") || `<tr><td colspan="6">No active paid Stripe/Website key issue was found.</td></tr>`;
+  const noticeHtml = notice ? `<p class="notice ${noticeKind === "error" ? "error" : "ok"}">${escapeLicenseRepairHtml(notice)}</p>` : "";
+  return `<!doctype html>
+  <html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Owner License Repair</title><style>
+  :root{color-scheme:dark}body{margin:0;background:#0c0a14;color:#f5f2ff;font:15px system-ui,sans-serif}.wrap{max-width:980px;margin:40px auto;padding:0 20px}.card{background:#171326;border:1px solid #4b326c;border-radius:18px;padding:24px;box-shadow:0 16px 60px #0007}h1{margin:0 0 8px}.muted{color:#bcb4cf}.notice{padding:12px;border-radius:10px}.notice.ok{background:#123b2c}.notice.error{background:#48202a}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{padding:10px;border-bottom:1px solid #382b50;text-align:left;word-break:break-word}form{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:24px}label{display:grid;gap:6px;font-weight:700}input{min-width:280px;background:#0d0b16;border:1px solid #694ba0;color:#fff;border-radius:9px;padding:10px}button{border:0;border-radius:9px;padding:11px 15px;background:#7a4ddd;color:#fff;font-weight:800;cursor:pointer}.foot{margin-top:16px;color:#a59bb9;font-size:13px}</style></head>
+  <body><main class="wrap"><section class="card"><h1>Paid license key repair</h1><p class="muted">Owner-only, masked diagnostics. This tool never displays raw license keys or full customer email addresses.</p>${noticeHtml}
+  <p><strong>Paid active licenses scanned:</strong> ${Number(scan?.paidActiveScanned || 0)} &nbsp; <strong>Repairable issues:</strong> ${Number(scan?.paidAffectedCount || 0)} &nbsp; <strong>Duplicate-key conflicts:</strong> ${Number(scan?.duplicateKeyConflicts || 0)}</p>
+  <table><thead><tr><th>License</th><th>Plan</th><th>Status</th><th>Customer</th><th>Issue</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>
+  <form method="post" action="/owner-license-repair"><input type="hidden" name="_csrf" value="${escapeLicenseRepairHtml(csrfToken)}"><label>Specific license ID (owner repair only)<input name="licenseId" autocomplete="off" spellcheck="false" required></label><button type="submit">Repair active paid key</button></form>
+  <p class="foot">Repairs stay on the same license record, preserve entitlement, and write masked audit metadata. Trial, gift, inactive, expired, and refunded-style licenses are blocked.</p></section></main></body></html>`;
+}
+
+app.get("/owner-license-repair", requireUser, requireParadiseOwner, async (req, res) => {
+  try {
+    const scan = await scanProductionLicenseKeyRepairs();
+    const session = req.cookies?.[USER_SESSION_COOKIE];
+    res.setHeader("Cache-Control", "no-store");
+    return res.type("html").send(ownerLicenseRepairConsoleHtml({ scan, csrfToken: csrfTokenPayload("user", session).csrfToken }));
+  } catch (error) {
+    console.error("Owner license repair console failed", publicError(error));
+    return res.status(500).type("html").send("<h1>License repair console unavailable</h1>");
+  }
+});
+
+app.post("/owner-license-repair", requireUser, requireParadiseOwner, async (req, res) => {
+  let notice = null;
+  let noticeKind = "info";
+  try {
+    const licenseId = String(req.body?.licenseId || "").trim();
+    const result = await repairPaidLicenseKey(licenseId, { actorType: "owner", actorId: req.user.id });
+    notice = result.repaired ? "The paid license key was repaired safely on its existing license record." : "This license key is already usable; no entitlement was changed.";
+  } catch (error) {
+    noticeKind = "error";
+    notice = error?.statusCode === 404 ? "License record was not found." : "This record is not eligible for automatic paid-key repair.";
+  }
+  try {
+    const scan = await scanProductionLicenseKeyRepairs();
+    const session = req.cookies?.[USER_SESSION_COOKIE];
+    res.setHeader("Cache-Control", "no-store");
+    return res.type("html").send(ownerLicenseRepairConsoleHtml({ scan, csrfToken: csrfTokenPayload("user", session).csrfToken, notice, noticeKind }));
+  } catch (error) {
+    console.error("Owner license repair response failed", publicError(error));
+    return res.status(500).type("html").send("<h1>License repair console unavailable</h1>");
+  }
+});
+
 app.post(["/admin/api/licenses/validate", "/api/admin/licenses/validate"], requireAdmin, async (req, res) => {
   const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
   const hwid = normalizeHwid(req.body?.hwid);
