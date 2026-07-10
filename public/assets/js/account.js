@@ -38,6 +38,8 @@
         "noStoreProducts": "No account-store products are active yet. Use the pricing page for license plans.",
         "buyPricing": "Buy Now",
         "copied": "Copied.",
+        "licenseKeyReadyCopied": "Your license key is ready and copied.",
+        "licenseRepairBlocked": "This license key needs staff help. Open a support ticket and we will repair it safely.",
         "downloadReady": "Opening download...",
         "extend": "Extend",
         "renew": "Renew",
@@ -300,6 +302,8 @@
         "noStoreProducts": "Hesap ma\u011fazas\u0131nda aktif \u00fcr\u00fcn yok. Lisans planlar\u0131 i\u00e7in fiyatlar sayfas\u0131n\u0131 kullan.",
         "buyPricing": "Sat\u0131n al",
         "copied": "Kopyaland\u0131.",
+        "licenseKeyReadyCopied": "Lisans anahtar\u0131n haz\u0131rland\u0131 ve kopyaland\u0131.",
+        "licenseRepairBlocked": "Bu lisans keyi i\u00e7in staff kontrol\u00fc gerekiyor. Destek ticket\u0131 a\u00e7, g\u00fcvenli \u015fekilde onaral\u0131m.",
         "downloadReady": "\u0130ndirme a\u00e7\u0131l\u0131yor...",
         "extend": "Uzat",
         "renew": "Yenile",
@@ -1203,6 +1207,26 @@
     return id;
   };
   const readLicenseSecret = (id) => licenseSecretStore.get(String(id || "")) || "";
+  const copyTextToClipboard = async (value) => {
+    const text = String(value || "").trim();
+    if (!text) throw new Error(t("licenseNotFound"));
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "readonly");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand?.("copy");
+    textarea.remove();
+    if (!ok) throw new Error(t("networkError"));
+  };
   const setText = (selector, value, root = document) => {
     const node = $(selector, root);
     if (node) node.textContent = value;
@@ -1548,6 +1572,8 @@
     unauthorized: t("unauthorized"),
     checkout_disabled: t("checkoutDisabled"),
     license_not_found: t("licenseNotFound"),
+    license_key_repair_blocked: t("licenseRepairBlocked"),
+    license_key_unavailable: t("licenseRepairBlocked"),
     license_banned: t("licenseBanned"),
     not_logged_in: t("unauthorized"),
     discord_not_connected: t("discordNotConnected"),
@@ -2905,7 +2931,7 @@
 
       const copyRobloxCodeButton = event.target.closest("[data-copy-roblox-code]");
       if (copyRobloxCodeButton) {
-        await navigator.clipboard?.writeText(copyRobloxCodeButton.dataset.copyRobloxCode || "");
+        await copyTextToClipboard(copyRobloxCodeButton.dataset.copyRobloxCode || "");
         setMessage(t("copied"), "good");
         return;
       }
@@ -2939,14 +2965,14 @@
           setMessage(t("licenseNotFound"), "error");
           return;
         }
-        await navigator.clipboard?.writeText(secret);
+        await copyTextToClipboard(secret);
         setMessage(t("copied"), "good");
         return;
       }
 
       const copyButton = event.target.closest("[data-copy]");
       if (copyButton) {
-        await navigator.clipboard?.writeText(copyButton.dataset.copy || "");
+        await copyTextToClipboard(copyButton.dataset.copy || "");
         setMessage(t("copied"), "good");
         return;
       }
@@ -2957,8 +2983,8 @@
         try {
           const data = await api(`/api/me/license-records/${encodeURIComponent(copyLicenseIdButton.dataset.copyLicenseId)}/key`);
           if (!data.licenseKey) throw new Error(t("licenseNotFound"));
-          await navigator.clipboard?.writeText(data.licenseKey);
-          setMessage(t("copied"), "good");
+          await copyTextToClipboard(data.licenseKey);
+          setMessage(data.repaired ? t("licenseKeyReadyCopied") : t("copied"), "good");
         } catch (error) {
           setMessage(error.message, "error");
         } finally {
@@ -2974,7 +3000,7 @@
           setMessage(t("licenseNotFound"), "error");
           return;
         }
-        await navigator.clipboard?.writeText(key);
+        await copyTextToClipboard(key);
         setMessage(t("copied"), "good");
         return;
       }

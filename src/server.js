@@ -53,6 +53,7 @@ import {
   paradiseDiscordRuntimeSnapshot,
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
+  paradiseWebsiteApplicationFormContext,
   paradiseTestLabPublicStatus,
   rebuildParadiseTestTemplateFromDashboard,
   runParadiseTestSmokeSuiteFromDashboard,
@@ -61,6 +62,7 @@ import {
   removeDiscordRole,
   sendPasswordResetDm,
   sendPaymentSubmissionLog,
+  submitParadiseWebsiteApplicationForm,
   startDiscordBot
 } from "./discordBot.js";
 import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeKeyMode, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
@@ -121,6 +123,7 @@ const giftRedeemLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 12, stand
 const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const adminRuntimeLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
+const paradiseApplicationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const adminFailedLoginState = new Map();
 const USER_SESSION_COOKIE = "fima_user_session";
 const PARADISE_OWNER_DISCORD_ID = "762858334440521739";
@@ -634,6 +637,67 @@ app.get(["/paradise/invite", "/bot/invite"], (_req, res) => {
 app.get(["/paradise/commands", "/bot/commands"], (_req, res) => res.redirect(302, "/paradise-bot#commands"));
 app.get(["/paradise/premium", "/bot/premium"], (_req, res) => res.redirect(302, "/paradise-bot#premium"));
 app.get(["/paradise/feedback", "/bot/feedback"], (_req, res) => res.redirect(302, "/paradise-bot#feedback"));
+app.get(["/paradise/apply", "/bot/apply"], (_req, res) => res.redirect(302, "/paradise-apply"));
+app.get(["/paradise/reseller", "/bot/reseller"], (_req, res) => res.redirect(302, "/paradise-apply?type=reseller"));
+
+app.get("/api/paradise/applications/context", paradiseApplicationLimiter, requireUser, async (req, res) => {
+  try {
+    const access = await paradiseLinkedDiscordAccess(req.user);
+    if (!access.discordLinked) return res.status(409).json({ error: "discord_link_required" });
+    const requestedGuildId = String(req.query?.guildId || "").trim();
+    const guilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+    const candidates = requestedGuildId ? guilds.filter(guild => guild.id === requestedGuildId) : guilds;
+    if (requestedGuildId && candidates.length === 0) return res.status(404).json({ error: "guild_not_managed" });
+    const contexts = [];
+    for (const guild of candidates.slice(0, 20)) {
+      const context = await paradiseWebsiteApplicationFormContext(guild.id, access.discordUserId).catch(() => null);
+      if (context?.member) contexts.push(context);
+    }
+    return res.json({
+      success: true,
+      discordLinked: true,
+      memberOfManagedServer: contexts.length > 0,
+      contexts
+    });
+  } catch (error) {
+    console.error("Paradise application context failed", publicError(error));
+    return res.status(500).json({ error: "application_context_failed" });
+  }
+});
+
+app.post("/api/paradise/applications/submit", paradiseApplicationLimiter, requireUser, async (req, res) => {
+  try {
+    const access = await paradiseLinkedDiscordAccess(req.user);
+    if (!access.discordLinked) return res.status(409).json({ error: "discord_link_required" });
+    const guildId = String(req.body?.guildId || "").trim();
+    const type = String(req.body?.type || "").trim();
+    const answers = req.body?.answers && typeof req.body.answers === "object" ? req.body.answers : {};
+    const guilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+    if (!guilds.some(guild => guild.id === guildId)) return res.status(404).json({ error: "guild_not_managed" });
+    const result = await submitParadiseWebsiteApplicationForm(guildId, {
+      userId: access.discordUserId,
+      type,
+      answers,
+      siteUserId: req.user.id
+    });
+    await createAuditLog("paradise_website_application_submitted", "discord_guild", guildId, {
+      userId: req.user.id,
+      discordIdMasked: maskExternalId(access.discordUserId),
+      type,
+      applicationId: result.id,
+      reviewQueued: result.reviewQueued
+    });
+    return res.status(201).json({ success: true, application: result });
+  } catch (error) {
+    const status = Number(error?.statusCode || 500);
+    if (status >= 500) console.error("Paradise website application failed", publicError(error));
+    return res.status(status).json({
+      error: error?.code || "application_submit_failed",
+      cooldownUntil: error?.cooldownUntil || null,
+      question: error?.question || null
+    });
+  }
+});
 
 app.get("/api/paradise/session-status", async (req, res) => {
   res.set("Cache-Control", "no-store");
@@ -2423,30 +2487,163 @@ app.post("/api/billing/portal", storeCheckoutLimiter, requireUser, async (req, r
   }
 });
 
-async function findOwnedLicenseById(user, licenseId) {
+function accountEmailCandidates(user) {
+  const candidates = [
+    user?.email,
+    user?.emailNormalized,
+    normalizeEmail(user?.email),
+    normalizeAccountEmail(user?.email)
+  ]
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean);
+  return [...new Set(candidates)];
+}
+
+function ownedLicenseWhere(user, licenseId) {
   const id = String(licenseId || "").trim();
-  if (!id || !user?.email) return null;
-  return prisma.license.findFirst({
-    where: { id, customerEmail: user.email }
-  });
+  const emails = accountEmailCandidates(user);
+  if (!id || emails.length === 0) return null;
+  return {
+    id,
+    OR: [
+      { customerEmail: { in: emails } },
+      { orders: { some: { customerEmail: { in: emails } } } }
+    ]
+  };
+}
+
+async function findOwnedLicenseById(user, licenseId, tx = prisma) {
+  const where = ownedLicenseWhere(user, licenseId);
+  if (!where) return null;
+  return tx.license.findFirst({ where });
+}
+
+function licenseLooksLikeTrial(license) {
+  const notes = String(license?.notes || "").toLowerCase();
+  return notes.includes("monthly_trial") ||
+    notes.includes("trial_promo") ||
+    notes.includes("free_trial") ||
+    notes.includes("trial");
+}
+
+function paidLicenseCanSelfRepairKey(license) {
+  const access = licenseAccessState(license);
+  if (!access.valid) return false;
+  if (licenseLooksLikeTrial(license)) return false;
+  const notes = String(license?.notes || "").toLowerCase();
+  return Boolean(
+    license?.lifetime ||
+    license?.stripeSessionId ||
+    license?.stripePaymentIntentId ||
+    notes.includes("gift_purchase") ||
+    notes.includes("direct_gift_package") ||
+    notes.includes("robux_manual") ||
+    notes.includes("stripe_subscription")
+  );
+}
+
+function licenseKeyRepairState(license) {
+  const key = String(license?.licenseKey || "").trim();
+  const hasKey = Boolean(key);
+  const validFormat = hasKey && isNormalizedCloudLicenseKey(key);
+  const reason = !hasKey ? "missing_key" : validFormat ? null : "malformed_key";
+  const needsRepair = Boolean(reason);
+  return {
+    hasKey,
+    validFormat,
+    needsRepair,
+    reason,
+    canRepair: needsRepair ? paidLicenseCanSelfRepairKey(license) : false
+  };
 }
 
 app.get("/api/me/license-records/:licenseId/key", downloadLimiter, requireUser, async (req, res) => {
   try {
-    const license = await findOwnedLicenseById(req.user, req.params.licenseId);
+    let license = await findOwnedLicenseById(req.user, req.params.licenseId);
     if (!license) return res.status(404).json({ error: "license_not_found" });
     const access = licenseAccessState(license);
     if (!access.valid) return res.status(403).json({ error: access.reason || "license_unavailable" });
+    let repairState = licenseKeyRepairState(license);
+    let repaired = false;
+    if (repairState.needsRepair) {
+      if (!repairState.canRepair) {
+        await createAuditLog("license_key_repair_blocked", "license", license.id, {
+          userId: req.user.id,
+          reason: repairState.reason,
+          status: license.status,
+          source: licenseSource(license)
+        });
+        return res.status(409).json({ error: "license_key_repair_blocked", reason: repairState.reason });
+      }
+
+      const repairedLicense = await prisma.$transaction(async (tx) => {
+        const current = await findOwnedLicenseById(req.user, license.id, tx);
+        if (!current) {
+          const error = new Error("license_not_found");
+          error.statusCode = 404;
+          throw error;
+        }
+        const currentAccess = licenseAccessState(current);
+        if (!currentAccess.valid) {
+          const error = new Error(currentAccess.reason || "license_unavailable");
+          error.statusCode = 403;
+          throw error;
+        }
+        const currentRepairState = licenseKeyRepairState(current);
+        if (!currentRepairState.needsRepair) return current;
+        if (!currentRepairState.canRepair) {
+          const error = new Error("license_key_repair_blocked");
+          error.statusCode = 409;
+          error.reason = currentRepairState.reason;
+          throw error;
+        }
+        const replacementKey = await generateUniqueLicenseKey(tx);
+        const note = `[${new Date().toISOString()}] license_key_reissued reason:${currentRepairState.reason} previous:${maskCode(current.licenseKey) || "none"}`;
+        const updated = await tx.license.update({
+          where: { id: current.id },
+          data: {
+            licenseKey: replacementKey,
+            notes: appendNote(current.notes, note)
+          }
+        });
+        await tx.auditLog.create({
+          data: {
+            action: "license_key_reissued",
+            targetType: "license",
+            targetId: updated.id,
+            metadata: {
+              userId: req.user.id,
+              reason: currentRepairState.reason,
+              oldKeyMasked: maskCode(current.licenseKey),
+              newKeyMasked: maskCode(replacementKey),
+              source: licenseSource(updated)
+            }
+          }
+        }).catch(() => {});
+        return updated;
+      });
+
+      repaired = repairedLicense.id === license.id && repairedLicense.licenseKey !== license.licenseKey;
+      license = repairedLicense;
+      repairState = licenseKeyRepairState(license);
+    }
+    if (repairState.needsRepair || !license.licenseKey) {
+      return res.status(409).json({ error: "license_key_unavailable", reason: repairState.reason || "missing_key" });
+    }
     await createAuditLog("license_key_copied", "license", license.id, {
       userId: req.user.id,
-      licenseKeyMasked: maskCode(license.licenseKey)
+      licenseKeyMasked: maskCode(license.licenseKey),
+      repaired
     });
     return res.json({
       success: true,
       licenseKey: license.licenseKey,
-      licenseKeyMasked: maskCode(license.licenseKey)
+      licenseKeyMasked: maskCode(license.licenseKey),
+      repaired,
+      keyRepairNeeded: false
     });
   } catch (error) {
+    if (error?.statusCode) return res.status(error.statusCode).json({ error: error.message, reason: error.reason || null });
     console.error("License key copy failed", publicError(error));
     return res.status(500).json({ error: "license_key_copy_failed" });
   }
@@ -3226,6 +3423,104 @@ async function adminLicensesHandler(req, res) {
 }
 
 app.get(["/admin/api/licenses", "/api/admin/licenses"], requireAdmin, adminLicensesHandler);
+
+app.get(["/admin/api/licenses/key-repair-scan", "/api/admin/licenses/key-repair-scan"], requireAdmin, async (_req, res) => {
+  const now = new Date();
+  const licenses = await prisma.license.findMany({
+    where: {
+      status: "active",
+      OR: [{ lifetime: true }, { expiresAt: null }, { expiresAt: { gt: now } }]
+    },
+    orderBy: { createdAt: "desc" },
+    take: 1000
+  });
+  const affected = licenses
+    .map((license) => ({ license, state: licenseKeyRepairState(license) }))
+    .filter((row) => row.state.needsRepair);
+  await createAuditLog("license_key_repair_scan", "license", null, {
+    count: affected.length,
+    dryRun: true
+  });
+  return res.json({
+    success: true,
+    dryRun: true,
+    count: affected.length,
+    licenses: affected.slice(0, 100).map(({ license, state }) => ({
+      idMasked: maskExternalId(license.id),
+      plan: license.plan,
+      status: license.status,
+      source: licenseSource(license),
+      reason: state.reason,
+      canRepair: state.canRepair,
+      licenseKeyMasked: maskCode(license.licenseKey)
+    }))
+  });
+});
+
+app.post(["/admin/api/licenses/:id/repair-key", "/api/admin/licenses/:id/repair-key"], requireAdmin, async (req, res) => {
+  const license = await prisma.license.findUnique({ where: { id: req.params.id } });
+  if (!license) return res.status(404).json({ error: "not_found" });
+  const state = licenseKeyRepairState(license);
+  if (!state.needsRepair) {
+    return res.json({
+      success: true,
+      repaired: false,
+      licenseKeyMasked: maskCode(license.licenseKey),
+      message: "license_key_already_usable"
+    });
+  }
+  const force = req.body?.force === true;
+  if (!state.canRepair && !force) {
+    await createAuditLog("admin_license_key_repair_blocked", "license", license.id, {
+      reason: state.reason,
+      status: license.status,
+      source: licenseSource(license)
+    });
+    return res.status(409).json({ error: "license_key_repair_blocked", reason: state.reason });
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const current = await tx.license.findUnique({ where: { id: license.id } });
+    if (!current) {
+      const error = new Error("not_found");
+      error.statusCode = 404;
+      throw error;
+    }
+    const currentState = licenseKeyRepairState(current);
+    if (!currentState.needsRepair) return current;
+    const replacementKey = await generateUniqueLicenseKey(tx);
+    const note = `[${new Date().toISOString()}] admin_license_key_reissued reason:${currentState.reason} previous:${maskCode(current.licenseKey) || "none"}`;
+    const next = await tx.license.update({
+      where: { id: current.id },
+      data: {
+        licenseKey: replacementKey,
+        notes: appendNote(current.notes, note)
+      }
+    });
+    await tx.auditLog.create({
+      data: {
+        action: "admin_license_key_reissued",
+        targetType: "license",
+        targetId: next.id,
+        metadata: {
+          reason: currentState.reason,
+          force,
+          oldKeyMasked: maskCode(current.licenseKey),
+          newKeyMasked: maskCode(replacementKey),
+          source: licenseSource(next)
+        }
+      }
+    }).catch(() => {});
+    return next;
+  });
+
+  return res.json({
+    success: true,
+    repaired: updated.licenseKey !== license.licenseKey,
+    licenseKeyMasked: maskCode(updated.licenseKey),
+    keyRepairNeeded: licenseKeyRepairState(updated).needsRepair
+  });
+});
 
 app.post(["/admin/api/licenses/validate", "/api/admin/licenses/validate"], requireAdmin, async (req, res) => {
   const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
@@ -7617,19 +7912,28 @@ async function requireParadiseOwner(req, res, next) {
 }
 
 async function paradiseOwnerAccess(user) {
+  const access = await paradiseLinkedDiscordAccess(user);
+  const ownerAuthorized = access.discordUserId === PARADISE_OWNER_DISCORD_ID;
+  return {
+    ...access,
+    ownerAuthorized,
+    reasonCode: ownerAuthorized ? "ok" : access.discordLinked ? "not_owner" : "discord_link_required"
+  };
+}
+
+async function paradiseLinkedDiscordAccess(user) {
   const link = await prisma.oAuthLink.findFirst({
     where: { userId: user.id, provider: "discord" },
     select: { id: true, providerSubject: true, providerUsername: true }
   });
   const discordUserId = String(link?.providerSubject || user.discordUserId || "");
   const discordLinked = Boolean(discordUserId);
-  const ownerAuthorized = discordUserId === PARADISE_OWNER_DISCORD_ID;
   return {
     authenticated: true,
     discordLinked,
-    ownerAuthorized,
+    ownerAuthorized: false,
     discordUserId: discordUserId || null,
-    reasonCode: ownerAuthorized ? "ok" : discordLinked ? "not_owner" : "discord_link_required",
+    reasonCode: discordLinked ? "ok" : "discord_link_required",
     link
   };
 }
@@ -9011,13 +9315,16 @@ function publicLicense(license) {
     ? null
     : Math.max(0, Math.floor(((license.expiresAt?.getTime() || Date.now()) - Date.now()) / 1000));
   const { licenseKey: _licenseKey, customerEmail: _customerEmail, ...safePayload } = licensePayload(license);
+  const keyState = licenseKeyRepairState(license);
 
   return {
     ...safePayload,
     id: license.id,
-    hasLicenseKey: Boolean(license.licenseKey),
+    hasLicenseKey: keyState.hasKey,
     licenseKey: null,
     licenseKeyMasked: maskCode(license.licenseKey),
+    keyRepairNeeded: keyState.needsRepair,
+    canRepairLicenseKey: keyState.needsRepair && keyState.canRepair,
     customerEmail: maskEmail(license.customerEmail),
     customerEmailMasked: maskEmail(license.customerEmail),
     status: license.status,
