@@ -90,6 +90,8 @@ test("compact lab rebuild remains hard-guarded to the disposable test guild", as
   assert.match(source, /rebuildParadiseTestTemplate\(guild, "tsbtr", "REBUILD TEST TSBTR"\)/);
   assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "rebuild" \}\)/);
   assert.match(source, /3a65-test-server-pre-rebuild-backup\.json/);
+  assert.match(source, /buildParadiseRestoreDryRun\(\{ backup, currentSnapshot: snapshot \}\)/);
+  assert.match(source, /backup_restore_dry_run_failed/);
 });
 
 test("application panel follows the selected server language and defaults to Turkish", async () => {

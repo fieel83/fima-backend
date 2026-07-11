@@ -46,3 +46,32 @@ export function validateParadiseBackupEnvelope(backup) {
   if (expected !== integrity.digest) return { valid: false, code: "backup_checksum_mismatch" };
   return { valid: true, code: "backup_valid", counts: integrity.counts };
 }
+
+export function buildParadiseRestoreDryRun({ backup, currentSnapshot = null } = {}) {
+  const validation = validateParadiseBackupEnvelope(backup);
+  if (!validation.valid) {
+    return {
+      status: "blocked",
+      canRestore: false,
+      code: validation.code,
+      mutationsPlanned: 0,
+      reason: "Backup integrity must validate before any restore or rebuild operation."
+    };
+  }
+  const current = currentSnapshot ? createParadiseBackupEnvelope(currentSnapshot) : null;
+  const currentCounts = current?.integrity?.counts || null;
+  const countDelta = Object.fromEntries(Object.keys(validation.counts).map(key => [
+    key,
+    Number(validation.counts[key] || 0) - Number(currentCounts?.[key] || 0)
+  ]));
+  return {
+    status: "preview_only",
+    canRestore: false,
+    code: "restore_dry_run_valid",
+    mutationsPlanned: 0,
+    backupCounts: validation.counts,
+    currentCounts,
+    countDelta,
+    requiredBeforeRestore: ["owner confirmation", "authorized restore path", "schema compatibility", "audit event"]
+  };
+}

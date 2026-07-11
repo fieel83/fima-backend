@@ -11,6 +11,7 @@ import {
 import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
 import { hasParadisePermission, PARADISE_PERMISSIONS, paradiseRoleKeysForMember } from "./paradiseRbac.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "./paradiseComponentProtocol.js";
+import { buildParadiseRestoreDryRun, createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
@@ -1909,9 +1910,17 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
   }
 
   const snapshot = await snapshotGuild(guild);
+  const backup = createParadiseBackupEnvelope(snapshot);
+  const restoreDryRun = buildParadiseRestoreDryRun({ backup, currentSnapshot: snapshot });
+  if (restoreDryRun.code !== "restore_dry_run_valid") {
+    const error = new Error("backup_restore_dry_run_failed");
+    error.code = "backup_restore_dry_run_failed";
+    throw error;
+  }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  await writeArtifact(`3a65-test-server-backup-${mode}-${stamp}.json`, snapshot);
-  await writeArtifact("3a65-test-server-pre-rebuild-backup.json", snapshot);
+  await writeArtifact(`3a65-test-server-backup-${mode}-${stamp}.json`, backup);
+  await writeArtifact("3a65-test-server-pre-rebuild-backup.json", backup);
+  await writeArtifact("3a73-test-server-restore-dry-run.json", restoreDryRun);
 
   const deleted = { channels: 0, roles: 0 };
   const channels = [...guild.channels.cache.values()]
@@ -1944,7 +1953,8 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
     deleted,
     preservedDesiredRoles: [...guild.roles.cache.values()]
       .filter(role => desiredRoleNames.has(role.name)).length,
-    backup: `artifacts/post-security-backlog/3a65-test-server-backup-${mode}-${stamp}.json`
+    backup: `artifacts/post-security-backlog/3a65-test-server-backup-${mode}-${stamp}.json`,
+    restoreDryRun: restoreDryRun.code
   };
   await writeArtifact(`3a65-test-server-full-rebuild-${mode}.json`, result);
   return result;

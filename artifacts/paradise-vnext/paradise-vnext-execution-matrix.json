@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:40:09.879Z",
+  "generatedAt": "2026-07-11T15:41:56.532Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -369,10 +369,11 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "test/paradiseBackupIntegrity.test.js"
+        "test/paradiseBackupIntegrity.test.js",
+        "test/paradise3a59.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Add restore dry-run validation and encrypted storage policy before any destructive rebuild path can consume backups.",
+      "nextExactAction": "Define encrypted backup storage and perform an authorized restore drill in staging before any production rebuild path can consume backups.",
       "affectedFiles": [
         "src/paradiseBackupIntegrity.js",
         "src/paradise3a59.js",
