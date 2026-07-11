@@ -15,6 +15,7 @@ import {
   handleParadiseVoiceStateUpdate,
   initializeParadise,
   PARADISE_SETUP_SCHEMAS,
+  paradiseSetupChannelType,
   paradiseCommandAllowedForMode,
   paradiseCommands,
   paradiseWebsiteApplicationContext,
@@ -2787,9 +2788,12 @@ export async function paradiseDiscordSetupPreview(guildId, mode) {
     throw error;
   }
   await Promise.all([guild.channels.fetch(), guild.roles.fetch()]);
-  const desiredResources = new Set(selected.schema.flatMap(([category, channelNames]) => [category, ...channelNames]));
   const currentResources = [...guild.channels.cache.values()].filter(channel => !channel.isThread?.());
-  const currentNames = new Set(currentResources.map(channel => channel.name));
+  const desiredCategories = selected.schema.map(([category]) => category);
+  const desiredChannels = selected.schema.flatMap(([category, channelNames]) => channelNames.map(name => ({ category, name, type: paradiseSetupChannelType(category, name) })));
+  const wrongChannelTypes = desiredChannels.flatMap(spec => currentResources
+    .filter(channel => channel.name === spec.name && channel.type !== spec.type)
+    .map(channel => ({ idMasked: maskDiscordId(channel.id), name: spec.name, actualType: channel.type, expectedType: spec.type })));
   const desiredRoles = new Set(selected.roles);
   return {
     status: "LIVE DISCORD VERIFIED",
@@ -2798,12 +2802,16 @@ export async function paradiseDiscordSetupPreview(guildId, mode) {
     guildName: guild.name,
     mode,
     templateLabel: selected.label,
-    createResources: [...desiredResources].filter(name => !currentNames.has(name)),
-    keepResources: currentResources.filter(channel => desiredResources.has(channel.name)).map(channel => ({ id: channel.id, name: channel.name })),
-    extraResources: currentResources.filter(channel => !desiredResources.has(channel.name)).map(channel => ({ id: channel.id, name: channel.name })),
+    createResources: [
+      ...desiredCategories.filter(name => !currentResources.some(channel => channel.type === ChannelType.GuildCategory && channel.name === name)),
+      ...desiredChannels.filter(spec => !currentResources.some(channel => channel.name === spec.name && channel.type === spec.type)).map(spec => spec.name)
+    ],
+    keepResources: currentResources.filter(channel => desiredCategories.includes(channel.name) || desiredChannels.some(spec => spec.name === channel.name && spec.type === channel.type)).map(channel => ({ idMasked: maskDiscordId(channel.id), name: channel.name, type: channel.type })),
+    extraResources: currentResources.filter(channel => !desiredCategories.includes(channel.name) && !desiredChannels.some(spec => spec.name === channel.name && spec.type === channel.type)).map(channel => ({ idMasked: maskDiscordId(channel.id), name: channel.name, type: channel.type })),
+    wrongChannelTypes,
     createRoles: [...desiredRoles].filter(name => !guild.roles.cache.some(role => role.name === name)),
     keepRoles: [...desiredRoles].filter(name => guild.roles.cache.some(role => role.name === name)),
-    warning: "Extra resources are preview-only. No archive or deletion occurs without the exact per-server typed confirmation."
+    warning: "Extra resources and wrong channel types are preview-only. Repair creates the correct type first; a wrong text/voice channel is never silently treated as valid. No deletion occurs without the exact per-server typed confirmation."
   };
 }
 

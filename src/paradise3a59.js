@@ -710,6 +710,41 @@ export const PARADISE_COMMUNITY_ROLES = [
 
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
 
+export const PARADISE_VOICE_CHANNEL_NAMES = Object.freeze([
+  "Join to Create",
+  "Community Voice",
+  "War VC",
+  "AFK"
+]);
+
+export function paradiseSetupChannelType(categoryName, channelName) {
+  return PARADISE_VOICE_CHANNEL_NAMES.includes(String(channelName || ""))
+    ? ChannelType.GuildVoice
+    : ChannelType.GuildText;
+}
+
+export function paradiseSetupChannelTypeMismatch(channel, categoryName, channelName) {
+  if (!channel) return false;
+  return channel.type !== paradiseSetupChannelType(categoryName, channelName);
+}
+
+function paradiseVoiceSetupIds(guild) {
+  const find = name => guild.channels.cache.find(channel => channel.name === name && channel.type === ChannelType.GuildVoice)?.id || null;
+  return {
+    joinToCreateChannelId: find("Join to Create"),
+    communityVoiceChannelId: find("Community Voice"),
+    warVoiceChannelId: find("War VC"),
+    afkChannelId: find("AFK"),
+    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE VOICE")?.id || null
+  };
+}
+
+async function configureParadiseAfkChannel(guild, voiceIds) {
+  if (!voiceIds?.afkChannelId || typeof guild?.setAFKChannel !== "function") return false;
+  await guild.setAFKChannel(voiceIds.afkChannelId, "Paradise configured AFK voice channel").catch(() => null);
+  return true;
+}
+
 export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
   ["welcome_channel", "Public welcome messages"],
   ["leave_channel", "Public leave messages"],
@@ -1732,6 +1767,8 @@ async function applyServerSetup(interaction, mode, destructive = true) {
   await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
   for (const name of selected.roles) await ensureRole(interaction.guild, name, true);
   const desiredNames = new Set(selected.schema.flatMap(([category, channels]) => [category, ...channels]));
+  const wrongTypeChannelIds = new Set();
+  const wrongTypeChannels = [];
   for (const [categoryName, channelNames, privateCategory] of selected.schema) {
     let category = interaction.guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && c.name === categoryName);
     if (!category) category = await interaction.guild.channels.create({ name: categoryName, type: ChannelType.GuildCategory, reason: "3A59 Paradise setup" });
@@ -1753,11 +1790,16 @@ async function applyServerSetup(interaction, mode, destructive = true) {
       }).catch(() => {});
     }
     for (const channelName of channelNames) {
-      let channel = interaction.guild.channels.cache.find(c => c.name === channelName);
+      const expectedType = paradiseSetupChannelType(categoryName, channelName);
+      let channel = interaction.guild.channels.cache.find(c => c.name === channelName && c.type === expectedType);
+      const wrongType = interaction.guild.channels.cache.find(c => c.name === channelName && paradiseSetupChannelTypeMismatch(c, categoryName, channelName));
+      if (wrongType) {
+        wrongTypeChannelIds.add(wrongType.id);
+        wrongTypeChannels.push({ name: channelName, actualType: wrongType.type, expectedType });
+      }
       if (!channel) {
-        const voice = categoryName === "VOICE" && channelName !== "war-vc-text";
         channel = await interaction.guild.channels.create({
-          name: channelName, type: voice ? ChannelType.GuildVoice : ChannelType.GuildText,
+          name: channelName, type: expectedType,
           parent: category.id, reason: "3A59 Paradise setup"
         });
       } else if (channel.parentId !== category.id) await channel.setParent(category.id, { lockPermissions: privateCategory });
@@ -1765,7 +1807,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
     }
   }
   const removableChannels = [...interaction.guild.channels.cache.values()]
-    .filter(c => !desiredNames.has(c.name) && !c.isThread?.() && c.id !== interaction.channelId);
+    .filter(c => (!desiredNames.has(c.name) || wrongTypeChannelIds.has(c.id)) && !c.isThread?.() && c.id !== interaction.channelId);
   const removableRoles = [...interaction.guild.roles.cache.values()]
     .filter(r => !r.managed && r.id !== interaction.guild.id && !selected.roles.includes(r.name));
   if (destructive) {
@@ -1781,6 +1823,8 @@ async function applyServerSetup(interaction, mode, destructive = true) {
     await updateLoaPanel(interaction.guild).catch(() => {});
   }
   await updateStaffTeamEmbed(interaction.guild).catch(() => {});
+  const voiceIds = paradiseVoiceSetupIds(interaction.guild);
+  await configureParadiseAfkChannel(interaction.guild, voiceIds);
   await saveState(state => {
     state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
     const config = state.guildConfigs[interaction.guildId];
@@ -1791,11 +1835,13 @@ async function applyServerSetup(interaction, mode, destructive = true) {
       completedAt: new Date().toISOString(),
       createdOrRepairedChannels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0),
       preservedExtraChannels: destructive ? 0 : removableChannels.length,
-      preservedExtraRoles: destructive ? 0 : removableRoles.length
+      preservedExtraRoles: destructive ? 0 : removableRoles.length,
+      wrongChannelTypes: wrongTypeChannels
     };
     config.autoActivityChecks = true;
     config.autoActivityRoleRemoval = true;
     config.weeklyQuotas = config.weeklyQuotas || WEEKLY_QUOTAS;
+    config.voiceSettings = { ...(config.voiceSettings || {}), ...voiceIds };
     if (interaction.guildId === PARADISE_TEST_GUILD_ID) state.config = structuredClone(config);
     return state;
   });
@@ -1803,6 +1849,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
     status: "LIVE VERIFIED", completedAt: new Date().toISOString(), operation: destructive ? "rebuild" : "repair",
     guildId: interaction.guildId, template: selected.label, categories: selected.schema.length,
     channels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0), roles: selected.roles.length,
+    wrongChannelTypes: wrongTypeChannels.map(item => ({ name: item.name, actualType: item.actualType, expectedType: item.expectedType })),
     autoMod
   });
   return interaction.editReply(destructive
@@ -1823,6 +1870,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
   await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
   const beforeChannelIds = new Set(guild.channels.cache.keys());
   const beforeRoleIds = new Set(guild.roles.cache.keys());
+  const wrongTypeChannels = [];
 
   for (const [categoryName, channelNames, privateCategory] of selected.schema) {
     let category = guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === categoryName);
@@ -1845,12 +1893,14 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
       }
     }
     for (const channelName of channelNames) {
-      let channel = guild.channels.cache.find(item => item.name === channelName);
+      const expectedType = paradiseSetupChannelType(categoryName, channelName);
+      let channel = guild.channels.cache.find(item => item.name === channelName && item.type === expectedType);
+      const wrongType = guild.channels.cache.find(item => item.name === channelName && paradiseSetupChannelTypeMismatch(item, categoryName, channelName));
+      if (wrongType) wrongTypeChannels.push({ name: channelName, actualType: wrongType.type, expectedType });
       if (!channel) {
-        const voice = categoryName === "VOICE" && channelName !== "war-vc-text";
         channel = await guild.channels.create({
           name: channelName,
-          type: voice ? ChannelType.GuildVoice : ChannelType.GuildText,
+          type: expectedType,
           parent: category.id,
           reason: "Paradise dashboard create-missing test"
         });
@@ -1884,6 +1934,8 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     await updateRankedLeaderboardBoards(guild).catch(() => {});
   }
   await updateStaffTeamEmbed(guild).catch(() => {});
+  const voiceIds = paradiseVoiceSetupIds(guild);
+  await configureParadiseAfkChannel(guild, voiceIds);
 
   const createdChannels = [...guild.channels.cache.keys()].filter(id => !beforeChannelIds.has(id)).length;
   const createdRoles = [...guild.roles.cache.keys()].filter(id => !beforeRoleIds.has(id)).length;
@@ -1898,12 +1950,14 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     createdRoles,
     pendingRoleCreates,
     guidePosts: Number(guideResult.posted || 0),
+    wrongChannelTypes: wrongTypeChannels,
     autoMod
   };
   await saveState(state => {
     state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
     const config = state.guildConfigs[guild.id];
     config.activeSetupMode = mode;
+    config.voiceSettings = { ...(config.voiceSettings || {}), ...voiceIds };
     config.lastSetupRun = result;
     if (guild.id === PARADISE_TEST_GUILD_ID) state.config = structuredClone(config);
     return state;
@@ -5118,9 +5172,27 @@ async function handleTemporaryVoiceMemberModal(interaction) {
   }
   if (action === "permit") {
     await channel.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true }, { reason: "Paradise private voice permit" });
+    await saveState(next => {
+      const current = next.temporaryVoices[channelId] || record;
+      next.temporaryVoices[channelId] = {
+        ...current,
+        permittedUserIds: [...new Set([...(current.permittedUserIds || []), member.id])],
+        rejectedUserIds: (current.rejectedUserIds || []).filter(id => id !== member.id)
+      };
+      return next;
+    });
   } else if (action === "reject") {
     if (member.voice.channelId === channel.id) await member.voice.disconnect("Paradise private voice owner rejected member").catch(() => {});
     await channel.permissionOverwrites.edit(member, { Connect: false }, { reason: "Paradise private voice reject" });
+    await saveState(next => {
+      const current = next.temporaryVoices[channelId] || record;
+      next.temporaryVoices[channelId] = {
+        ...current,
+        rejectedUserIds: [...new Set([...(current.rejectedUserIds || []), member.id])],
+        permittedUserIds: (current.permittedUserIds || []).filter(id => id !== member.id)
+      };
+      return next;
+    });
   } else {
     await channel.permissionOverwrites.edit(interaction.user.id, { ManageChannels: null, MoveMembers: null }, { reason: "Paradise voice ownership transfer" });
     await channel.permissionOverwrites.edit(member, {
@@ -5141,9 +5213,12 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   const voiceConfig = guildConfig.voiceSettings || {};
   if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
-  if (joined?.name === "Join to Create") {
+  const isJoinToCreate = joined?.type === ChannelType.GuildVoice
+    && (joined.id === voiceConfig.joinToCreateChannelId || joined.name === "Join to Create");
+  if (isJoinToCreate) {
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
-    const privateCategory = guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE VOICE");
+    const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
+      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE VOICE");
     const channel = await guild.channels.create({
       name: sanitizeTemporaryVoiceName(fallbackName, "Private Room"),
       type: ChannelType.GuildVoice,
@@ -5157,7 +5232,17 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
     });
     await saveState(state => {
       state.temporaryVoices[channel.id] = {
-        guildId: guild.id, ownerId: newState.member.id, createdAt: new Date().toISOString(), locked: false
+        guildId: guild.id,
+        channelId: channel.id,
+        ownerId: newState.member.id,
+        template: activeMode,
+        currentName: channel.name,
+        createdAt: new Date().toISOString(),
+        userLimit: channel.userLimit,
+        locked: false,
+        hidden: false,
+        permittedUserIds: [],
+        rejectedUserIds: []
       };
       return state;
     });

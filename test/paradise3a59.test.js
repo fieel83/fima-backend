@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { ChannelType } from "discord.js";
 import {
   canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls,
   sanitizeTemporaryVoiceName,
   timedAvailabilityLines
@@ -286,6 +287,20 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("application-ticket"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("Join to Create"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("moderation-requests"), true);
+});
+
+test("voice-purpose setup entries are real voice channels and wrong text mappings are detectable", async () => {
+  for (const name of ["Join to Create", "Community Voice", "War VC", "AFK"]) {
+    assert.equal(PARADISE_VOICE_CHANNEL_NAMES.includes(name), true);
+    assert.equal(paradiseSetupChannelType("SES", name), ChannelType.GuildVoice);
+    assert.equal(paradiseSetupChannelTypeMismatch({ type: ChannelType.GuildText }, "SES", name), true);
+    assert.equal(paradiseSetupChannelTypeMismatch({ type: ChannelType.GuildVoice }, "SES", name), false);
+  }
+  assert.equal(paradiseSetupChannelType("BAŞLANGIÇ", "rules"), ChannelType.GuildText);
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /const wrongTypeChannelIds = new Set\(\)/);
+  assert.match(source, /wrongChannelTypes/);
+  assert.match(source, /joined\?\.type === ChannelType\.GuildVoice/);
 });
 
 test("compact templates keep the critical panels without flooding the channel list", () => {
