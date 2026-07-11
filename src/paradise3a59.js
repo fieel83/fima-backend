@@ -10,6 +10,15 @@ import {
 } from "discord.js";
 import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
 import { hasParadisePermission, PARADISE_PERMISSIONS, paradiseRoleKeysForMember } from "./paradiseRbac.js";
+import {
+  commandRegistryEntry,
+  enabledParadiseModules,
+  inferParadiseTemplate,
+  paradiseCommandAccess,
+  paradiseCommandChannelContext,
+  paradiseCommandRegistrationAllowed,
+  visibleParadiseCommands
+} from "./paradiseCommandRegistry.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "./paradiseComponentProtocol.js";
 import { buildParadiseRestoreDryRun, createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
 
@@ -786,6 +795,8 @@ const COMMUNITY_HIDDEN_COMMANDS = new Set([
 
 export function paradiseCommandAllowedForMode(commandName, mode) {
   const name = String(commandName || "");
+  const registryRule = paradiseCommandRegistrationAllowed({ command: name, template: mode });
+  if (registryRule.known) return registryRule.allowed;
   if (mode === "community") return !COMMUNITY_HIDDEN_COMMANDS.has(name);
   if (mode === "clan" || mode === "tsbtr") return !name.startsWith("fima_");
   return true;
@@ -5904,6 +5915,72 @@ function helpComponents(scope = "clan") {
   return [...menuRows, languageRow];
 }
 
+function registryCommandLabel(entry) {
+  return `/${entry.command}${entry.subcommand ? ` ${entry.subcommand}` : ""}`;
+}
+
+function memberHelpEntries(context) {
+  return visibleParadiseCommands({ ...context, channelConstraintConfigured: false })
+    .filter(entry => entry.memberSafe);
+}
+
+function memberHelpPayload(entries, locale = "en", selectedId = null) {
+  const tr = String(locale || "").toLowerCase().startsWith("tr");
+  const selected = entries.find(entry => entry.id === selectedId) || null;
+  const description = selected
+    ? [
+      `## ${registryCommandLabel(selected)}`,
+      selected.description,
+      selected.examples?.length ? `\n**${tr ? "Örnek" : "Example"}:** \`${selected.examples[0]}\`` : null,
+      selected.allowedChannels?.includes("any") ? null : `**${tr ? "Kanal" : "Channel"}:** ${tr ? "Yapılandırılmış ilgili kanalda kullan." : "Use it in its configured channel."}`,
+      selected.relatedDashboardPage ? `**Dashboard:** ${selected.relatedDashboardPage}` : null,
+      `\n-# ${tr ? "Bu yardım yalnızca sana açık üye komutlarını gösterir." : "This help shows only member commands currently available to you."}`
+    ].filter(Boolean).join("\n")
+    : [
+      tr ? "Kullanabileceğin üye komutları aşağıda listelenir. Detay için bir komut seç." : "Your currently available member commands are listed below. Select one for details.",
+      "",
+      ...(entries.length
+        ? entries.map(entry => `- **${registryCommandLabel(entry)}** — ${entry.description}`)
+        : [tr ? "- Bu sunucuda sana açık bir Paradise üye komutu yok." : "- No Paradise member command is currently available to you in this server."])
+    ].join("\n");
+  const components = [];
+  if (entries.length) {
+    components.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId("paradise_member_help")
+        .setPlaceholder(tr ? "Komut detayı seç" : "Choose a command detail")
+        .addOptions(entries.slice(0, 25).map(entry => ({
+          label: registryCommandLabel(entry).slice(0, 100),
+          description: entry.description.slice(0, 100),
+          value: entry.id,
+          default: entry.id === selected?.id
+        })))
+    ));
+  }
+  components.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_member_help_lang:en:${selected?.id || "overview"}`).setLabel("English").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_member_help_lang:tr:${selected?.id || "overview"}`).setLabel("Türkçe").setStyle(ButtonStyle.Secondary)
+  ));
+  return {
+    embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR)
+      .setTitle(tr ? "✦ PARADISE ÜYE YARDIMI" : "✦ PARADISE MEMBER HELP")
+      .setDescription(description)],
+    components
+  };
+}
+
+async function handleRegistryHelp(interaction) {
+  const state = await loadState();
+  const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
+  const query = interaction.options.getString("query")?.trim().toLowerCase();
+  const matches = query
+    ? entries.filter(entry => `${entry.id} ${entry.command} ${entry.subcommand || ""} ${entry.description} ${entry.examples.join(" ")}`.toLowerCase().includes(query))
+    : entries;
+  const payload = memberHelpPayload(matches, interaction.locale, matches.length === 1 ? matches[0].id : null);
+  payload.embeds[0].setColor(await paradiseBrandColor());
+  return interaction.reply({ ...payload, ephemeral: true });
+}
+
 async function handleHelp(interaction) {
   const turkish = String(interaction.locale || "").toLowerCase().startsWith("tr");
   const query = interaction.options.getString("query")?.trim().toLowerCase();
@@ -5940,10 +6017,11 @@ async function publishSetupGuides(guild, mode) {
   const state = await loadState();
   const storedMessageId = configForGuild(state, guild.id).commandGuideMessageIds?.[mode];
   let message = storedMessageId ? await channel.messages.fetch(storedMessageId).catch(() => null) : null;
-  const payload = {
-    embeds: [helpEmbed(mode).setColor(await paradiseBrandColor())],
-    components: helpComponents(mode)
-  };
+  const payload = memberHelpPayload(
+    memberHelpEntries({ template: mode, enabledModules: null, roleKeys: [], plan: "free", isOwner: false }),
+    guild.preferredLocale || "tr"
+  );
+  payload.embeds[0].setColor(await paradiseBrandColor());
   if (message) await message.edit(payload);
   else message = await channel.send(payload);
   await saveState(state => {
@@ -7103,6 +7181,71 @@ async function enforceCommandChannel(interaction) {
   return false;
 }
 
+function interactionSubcommand(interaction) {
+  return interaction.options?.getSubcommand?.(false) || null;
+}
+
+function paradiseRegistryContextForInteraction(interaction, state) {
+  const config = configForGuild(state, interaction.guildId);
+  const roles = [...(interaction.member?.roles?.cache?.values?.() || [])];
+  const subcommand = interactionSubcommand(interaction);
+  const channel = paradiseCommandChannelContext({
+    config,
+    command: interaction.commandName,
+    subcommand,
+    channelId: interaction.channelId
+  });
+  return {
+    config,
+    command: interaction.commandName,
+    subcommand,
+    template: inferParadiseTemplate({ configuredTemplate: config.activeSetupMode, guildName: interaction.guild?.name }),
+    enabledModules: enabledParadiseModules(config),
+    plan: config.subscriptionPlan || config.plan || "free",
+    roleKeys: paradiseRoleKeysForMember({
+      roleIds: roles.map(role => role.id),
+      roleNames: roles.map(role => role.name),
+      mappings: config.roleMappings
+    }),
+    isOwner: isOwner(interaction),
+    channelKeys: channel.channelKeys,
+    channelConstraintConfigured: channel.channelConstraintConfigured
+  };
+}
+
+function paradiseRegistryDenialMessage(code, locale) {
+  const tr = String(locale || "").toLowerCase().startsWith("tr");
+  const copy = {
+    command_not_registered_for_template: tr ? "Bu komut seçili sunucu şablonunda etkin değil." : "This command is not enabled for this server template.",
+    command_not_available_for_template: tr ? "Bu komut seçili sunucu şablonunda etkin değil." : "This command is not enabled for this server template.",
+    command_module_disabled: tr ? "Bu modül bu sunucuda kapalı." : "This module is disabled for this server.",
+    command_plan_required: tr ? "Bu komut seçili Paradise planını gerektiriyor." : "This command requires the selected Paradise plan.",
+    command_wrong_channel: tr ? "Bu komutu yapılandırılmış kanalda kullan." : "Use this command in its configured channel.",
+    command_permission_denied: tr ? "Bu komut için gerekli rol veya yetki sende yok." : "You do not have the required role or permission for this command."
+  };
+  return copy[code] || (tr ? "Bu komut şu anda kullanılamıyor." : "This command is not available right now.");
+}
+
+export function paradiseRuntimeCommandAccess(context = {}) {
+  const registration = paradiseCommandRegistrationAllowed({ command: context.command, template: context.template });
+  if (!registration.allowed) return Object.freeze({ allowed: false, code: registration.code, entry: null });
+  if (!commandRegistryEntry(context.command, context.subcommand)) {
+    return Object.freeze({ allowed: true, code: registration.code, entry: null });
+  }
+  return paradiseCommandAccess(context);
+}
+
+async function enforceParadiseCommandRegistry(interaction) {
+  const state = await loadState();
+  const context = paradiseRegistryContextForInteraction(interaction, state);
+  const access = paradiseRuntimeCommandAccess(context);
+  if (!access.allowed) {
+    await interaction.reply({ content: paradiseRegistryDenialMessage(access.code, interaction.locale), ephemeral: true });
+    return { allowed: false, context, code: access.code };
+  }
+  return { allowed: true, context, code: access.code };
+}
+
 async function handleSticky(interaction) {
   if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages) && !isOwner(interaction)) {
     return interaction.reply({ content: "Manage Messages permission required.", ephemeral: true });
@@ -7425,6 +7568,15 @@ async function handleParadiseInteractionInner(interaction) {
     return true;
   }
   if (interaction.isButton?.()) {
+    if (interaction.customId.startsWith("paradise_member_help_lang:")) {
+      const [, locale, selectedId] = interaction.customId.split(":");
+      const state = await loadState();
+      const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
+      const payload = memberHelpPayload(entries, locale, selectedId === "overview" ? null : selectedId);
+      payload.embeds[0].setColor(await paradiseBrandColor());
+      await interaction.update(payload);
+      return true;
+    }
     if (String(interaction.customId || "").startsWith("pv:")) {
       const component = parseParadiseComponentId(interaction.customId, { guildId: interaction.guildId });
       if (!component.ok) {
@@ -7539,6 +7691,19 @@ async function handleParadiseInteractionInner(interaction) {
     await handleProfileRegion(interaction);
     return true;
   }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_member_help") {
+    const state = await loadState();
+    const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
+    const selectedId = interaction.values[0];
+    if (!entries.some(entry => entry.id === selectedId)) {
+      await interaction.reply({ content: "This help entry is no longer available to you.", ephemeral: true });
+      return true;
+    }
+    const payload = memberHelpPayload(entries, interaction.locale, selectedId);
+    payload.embeds[0].setColor(await paradiseBrandColor());
+    await interaction.update(payload);
+    return true;
+  }
   if (interaction.isStringSelectMenu?.() && interaction.customId.startsWith("paradise_help_category")) {
     const scope = interaction.values[0];
     await interaction.update({
@@ -7578,6 +7743,7 @@ async function handleParadiseInteractionInner(interaction) {
     await interaction.reply({ content: "Paradise ping roles updated.", ephemeral: true }); return true;
   }
   if (!interaction.isChatInputCommand?.()) return false;
+  if (!(await enforceParadiseCommandRegistry(interaction)).allowed) return true;
   if (!await enforceCommandChannel(interaction)) return true;
   if (interaction.commandName === "setupfieels" || interaction.commandName === "previewserversetup") { await setupChooser(interaction); return true; }
   if (interaction.commandName === "backupserverstructure") { await setupPreview(interaction, "clan"); return true; }
@@ -7585,7 +7751,7 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "setupfieelsclan") { await handleSetupAction(interaction, "clan"); return true; }
   if (interaction.commandName === "setupfieelstsbtr") { await handleSetupAction(interaction, "tsbtr"); return true; }
   if (interaction.commandName === "setup") { await handleSetupAction(interaction, interaction.options.getString("mode") || "community"); return true; }
-  if (interaction.commandName === "help") { await handleHelp(interaction); return true; }
+  if (interaction.commandName === "help") { await handleRegistryHelp(interaction); return true; }
   if (interaction.commandName === "verifyroblox") { await verifyStart(interaction); return true; }
   if (interaction.commandName === "verifyrobloxcheck") { await verifyCheck(interaction); return true; }
   if (interaction.commandName === "profile") { await handleProfile(interaction); return true; }

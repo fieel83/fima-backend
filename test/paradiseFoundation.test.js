@@ -4,7 +4,7 @@ import { buildParadiseConfigRollbackPreview, canRollbackParadiseConfig, createPa
 import { assertParadiseFeatureEnabled, normalizeParadiseFeatureFlags, resolveParadiseFeatureFlag } from "../src/paradiseFeatureFlags.js";
 import { assertParadiseGuildWorkspaceAccess, paradiseGuildWorkspaceAccess } from "../src/paradiseGuildScope.js";
 import { PARADISE_PERMISSIONS, assertParadisePermission, hasParadisePermission, paradiseRoleKeysForMember } from "../src/paradiseRbac.js";
-import { paradiseCommandAccess, visibleParadiseCommands } from "../src/paradiseCommandRegistry.js";
+import { paradiseCommandAccess, paradiseCommandChannelContext, paradiseCommandRegistrationAllowed, visibleParadiseCommands } from "../src/paradiseCommandRegistry.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "../src/paradiseComponentProtocol.js";
 import { PARADISE_TEST_GUILD_ID } from "../src/runtimeEnvironment.js";
 
@@ -71,8 +71,25 @@ test("central command registry filters help and runtime access by template, modu
   assert.equal(communityMember.some(item => item.command === "challenge"), false);
   assert.equal(communityMember.some(item => item.command === "lineup"), false);
   assert.equal(paradiseCommandAccess({ command: "challenge", subcommand: "create", template: "community", enabledModules: ["challenge"] }).code, "command_not_available_for_template");
-  assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], channelKey: "sessions" }).allowed, true);
-  assert.equal(paradiseCommandAccess({ command: "post", subcommand: "approve", template: "tsbtr", enabledModules: ["referee"], roleKeys: ["Trial Referee"], channelKey: "challenge_ticket" }).code, "command_permission_denied");
+  assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], channelKey: "training_channel" }).allowed, true);
+  assert.equal(paradiseCommandAccess({ command: "challenge", subcommand: "close", template: "tsbtr", enabledModules: ["challenge"], roleKeys: ["Trial Referee"], channelKey: "challenge_ticket" }).code, "command_permission_denied");
+});
+
+test("registry controls guild command scope, channel mappings and plan denial without hiding legacy commands", () => {
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "challenge", template: "community" }).allowed, false);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "roster", template: "community" }).allowed, false);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "fima_help", template: "community" }).code, "legacy_command");
+  const rightChannel = paradiseCommandChannelContext({
+    config: { channelMappings: { training_channel: "training-1" } }, command: "training", subcommand: "start", channelId: "training-1"
+  });
+  const wrongChannel = paradiseCommandChannelContext({
+    config: { channelMappings: { training_channel: "training-1" } }, command: "training", subcommand: "start", channelId: "general-1"
+  });
+  assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], ...rightChannel }).allowed, true);
+  assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], ...wrongChannel }).code, "command_wrong_channel");
+  assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], channelConstraintConfigured: false }).allowed, true);
+  assert.equal(paradiseCommandAccess({ command: "fima_license_repair", template: "community", enabledModules: ["fima_support"], plan: "free", roleKeys: ["owner"] }).code, "command_plan_required");
+  assert.equal(paradiseCommandAccess({ command: "fima_license_repair", template: "community", enabledModules: ["fima_support"], plan: "premium", roleKeys: ["owner"] }).allowed, true);
 });
 
 test("versioned persistent component IDs are guild-scoped and reject stale or malformed replay", () => {

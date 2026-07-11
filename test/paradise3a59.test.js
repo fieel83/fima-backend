@@ -5,7 +5,7 @@ import {
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
-  paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
+  paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls,
   sanitizeTemporaryVoiceName,
   timedAvailabilityLines
@@ -108,6 +108,18 @@ test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "clan"), true);
   assert.equal(paradiseCommandAllowedForMode("fima_ticket", "clan"), false);
   assert.equal(paradiseCommandAllowedForMode("fima_update", "tsbtr"), false);
+});
+
+test("runtime command access uses the registry even when a command is still registered", () => {
+  assert.equal(paradiseRuntimeCommandAccess({
+    command: "challenge", subcommand: "create", template: "community", enabledModules: ["challenge"], channelConstraintConfigured: false
+  }).code, "command_not_registered_for_template");
+  assert.equal(paradiseRuntimeCommandAccess({
+    command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Trial Referee"], channelConstraintConfigured: false
+  }).code, "command_permission_denied");
+  assert.equal(paradiseRuntimeCommandAccess({
+    command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], channelConstraintConfigured: false
+  }).allowed, true);
 });
 
 test("rank progression follows Weak -> Stable -> Strong -> next level", () => {
