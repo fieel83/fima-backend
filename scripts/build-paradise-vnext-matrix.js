@@ -10,6 +10,13 @@ const localCommit = (() => {
   if (String(process.env.PARADISE_LOCAL_COMMIT || "").trim()) return String(process.env.PARADISE_LOCAL_COMMIT).trim();
   try { return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(); } catch { return "unavailable"; }
 })();
+const observedProductionVersion = (() => {
+  const commit = String(process.env.PARADISE_PRODUCTION_COMMIT || "").trim();
+  const version = String(process.env.PARADISE_PRODUCTION_VERSION || "").trim();
+  return commit || version
+    ? { status: "LIVE VERIFIED", commit: commit || null, version: version || null, source: "read-only /api/version" }
+    : { status: "SOURCE ONLY", commit: null, version: null, source: "not re-read during this matrix generation" };
+})();
 
 const requirement = (requirementId, title, description, {
   module, priority = "P2", milestone = "Milestone 2", dependencies = [], templateScope = ["all"],
@@ -228,18 +235,18 @@ const inventory = {
   capturedAt: now,
   status: "LOCAL VERIFIED",
   repository: { localCommit, dirtyWorktree: true, note: "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work." },
-  runtimeEvidence: { deployedLicenseHotfix: "DEPLOYED", deployedLicenseHotfixCommitFromEvidence: "77fb4e7ceee322ae135b570602a7cdd86fae2ea3", productionScan: "BLOCKED", browserCopyReveal: "BLOCKED", testGuildSmoke: "LIVE DISCORD VERIFIED", currentLocalTestCount: 87 },
+  runtimeEvidence: { deployedLicenseHotfix: "DEPLOYED", deployedLicenseHotfixCommitFromEvidence: "77fb4e7ceee322ae135b570602a7cdd86fae2ea3", observedProductionVersion, productionScan: "BLOCKED", browserCopyReveal: "BLOCKED", testGuildSmoke: "LIVE DISCORD VERIFIED", currentLocalTestCount: 104 },
   database: { provider: "PostgreSQL via Prisma", migrationState: "not queried in this local inventory", paradiseState: "Stored primarily in Setting key paradise_3a59_state_v1 with artifact JSON fallback", risk: "Critical Paradise state remains partly opaque JSON/fallback-based." },
-  commandRegistration: { status: "partially implemented", evidence: ["src/paradise3a59.js exports paradiseCommands", "src/discordBot.js has separate command handling"], gap: "No central command manifest governs registration/help/RBAC/dashboard together." },
-  rbac: { status: "partially implemented", evidence: ["role checks and Discord permission checks exist", "src/paradiseRbac.js"], gap: "Existing handlers are not yet fully migrated to the central vocabulary." },
+  commandRegistration: { status: "LOCAL VERIFIED", evidence: ["src/paradiseCommandRegistry.js", "registry-backed guild command filtering", "registry-backed member /help and runtime denial"], gap: "Staging/test-guild command re-registration and real interaction proof remain BLOCKED until a safe deployment path exists." },
+  rbac: { status: "LOCAL VERIFIED", evidence: ["src/paradiseRbac.js", "challenge autowin and approval now use shared referee permissions"], gap: "Role-persona proof in the exact test guild remains BLOCKED until a safe deployment path exists." },
   environment: { status: "partially implemented", evidence: ["src/env.js helpers", "NODE_ENV guards", "src/runtimeEnvironment.js", "exact test-guild assertions for setup/create-missing/rebuild/smoke"], gap: "Staging/production configuration separation and Render readiness evidence are not yet available." },
   configurationVersioning: { status: "partially implemented", evidence: ["src/paradiseConfigVersioning.js", "versioned Paradise dashboard config save"], gap: "History browsing and rollback UI are not implemented." },
   dashboard: { status: "partially implemented", evidence: ["Paradise dashboard route and APIs exist", "local dashboard tests exist"], gap: "Owner authenticated save/reload/CSRF browser proof is blocked; visual architecture still needs milestone work." },
   components: { status: "partially implemented", evidence: ["custom ID family dispatch exists in src/paradise3a59.js", "src/paradiseComponentProtocol.js"], gap: "Existing component families are not yet migrated to the versioned protocol." },
-  backup: { status: "partially implemented", evidence: ["structure snapshot and backup endpoints exist"], gap: "No integrity envelope/SHA256/restore drill contract implemented." },
-  reconciliation: { status: "missing", evidence: [], gap: "No centralized recurring invariant/reconciliation service found." },
-  featureFlags: { status: "partially implemented", evidence: ["src/paradiseFeatureFlags.js", "versioned guild configuration envelope"], gap: "No high-risk runtime handler has been migrated to a persisted feature flag yet." },
-  testGuildGuard: { status: "partially implemented", evidence: ["PARADISE_TEST_GUILD_ID is fixed to the accepted guild", "guarded smoke/rebuild code exists"], gap: "Guard must be centralized with environment policy and negative live proof." },
+  backup: { status: "LOCAL VERIFIED", evidence: ["src/paradiseBackupIntegrity.js", "SHA256 backup envelope", "non-mutating restore dry-run"], gap: "Encrypted storage and an authorized staging restore drill remain BLOCKED." },
+  reconciliation: { status: "LOCAL VERIFIED", evidence: ["src/paradiseReconciliation.js", "safe classifications without automatic mutation"], gap: "Scheduled runtime reconciliation with Discord existence checks remains SOURCE ONLY." },
+  featureFlags: { status: "LOCAL VERIFIED", evidence: ["src/paradiseFeatureFlags.js", "test-guild-only command registry canary", "persisted guild featureFlags configuration"], gap: "Canary enable/disable proof after deploy remains BLOCKED." },
+  testGuildGuard: { status: "LOCAL VERIFIED", evidence: ["PARADISE_TEST_GUILD_ID is fixed to the accepted guild", "centralized guarded setup/create-missing/rebuild/smoke"], gap: "Negative live proof for a non-allowed guild remains BLOCKED until a safe test deployment." },
   currentMilestoneClassification: executionRows.map(row => ({ requirementId: row.requirementId, status: included.includes(row.requirementId) ? row.sourceStatus : "DEFERRED" }))
 };
 
