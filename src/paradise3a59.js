@@ -493,7 +493,7 @@ function guildLanguage(config = {}) {
   return raw.startsWith("en") ? "en" : "tr";
 }
 
-function sessionLanguageCopy(language = "tr", type = "training") {
+export function sessionLanguageCopy(language = "tr", type = "training") {
   const tr = language !== "en";
   const isTryout = type === "tryout";
   return tr
@@ -513,7 +513,7 @@ function sessionLanguageCopy(language = "tr", type = "training") {
       lockedReply: "# SUNUCU K\u0130L\u0130TLEND\u0130",
       unlockedReply: "# SUNUCU A\u00c7ILDI",
       endedReply: isTryout ? "# DENEME B\u0130TT\u0130" : "# ANTRENMAN B\u0130TT\u0130",
-      controlsFooter: "-# Sadece hoster kontrolleri \u2022 Made By Fieel",
+      controlsFooter: "",
       started: isTryout ? "Deneme ba\u015flat\u0131ld\u0131" : "Antrenman ba\u015flat\u0131ld\u0131"
     }
     : {
@@ -532,7 +532,7 @@ function sessionLanguageCopy(language = "tr", type = "training") {
       lockedReply: "# SERVER LOCKED",
       unlockedReply: "# SERVER UNLOCKED",
       endedReply: isTryout ? "# TRYOUT ENDED" : "# TRAINING ENDED",
-      controlsFooter: "-# Hoster-only controls \u2022 Made By Fieel",
+      controlsFooter: "",
       started: isTryout ? "Tryout started" : "Training started"
     };
 }
@@ -546,7 +546,7 @@ function sessionControls(sessionId, type, language = "tr") {
   );
 }
 
-function trainingAnnouncementMarkdown({ language, pingRoleId, server, format, characters, rules, link, hoster, cohost }) {
+export function trainingAnnouncementMarkdown({ language, pingRoleId, server, format, characters, rules, link, hoster, cohost }) {
   const copy = sessionLanguageCopy(language, "training");
   const cleanRules = (Array.isArray(rules) ? rules : String(rules || "").split(/\r?\n/))
     .map(value => String(value).trim().replace(/^[-•◆◇]\s*/, ""))
@@ -578,7 +578,7 @@ function trainingAnnouncementMarkdown({ language, pingRoleId, server, format, ch
   ].filter(Boolean).join("\n");
 }
 
-function tryoutAnnouncementMarkdown({ language, pingRoleId, server, link, hoster }) {
+export function tryoutAnnouncementMarkdown({ language, pingRoleId, server, link, hoster }) {
   const copy = sessionLanguageCopy(language, "tryout");
   const tr = language !== "en";
   return [
@@ -608,7 +608,7 @@ function tryoutAnnouncementMarkdown({ language, pingRoleId, server, link, hoster
     `◇ ${copy.link}:`,
     link,
     "",
-    tr ? "-# 1–5 dakika sonra kilitle • Sadece hoster kontrolleri • Made By Fieel" : copy.controlsFooter
+    null
   ].filter(Boolean).join("\n");
 }
 
@@ -2157,7 +2157,7 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   }, "smoke_tryout_send_failed");
 
   smokeStep = "lifecycle_send";
-  const smokeFooter = smokeLanguage === "tr" ? "-# Paradise yaşam döngüsü testi • Made By Fieel" : "-# Paradise lifecycle rendering test • Made By Fieel";
+  const smokeFooter = smokeLanguage === "tr" ? "-# Paradise yaşam döngüsü testi" : "-# Paradise lifecycle rendering test";
   await smokeReply(training, `${trainingCopy.lockedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
   await smokeReply(training, `${trainingCopy.unlockedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
   await smokeReply(training, `${trainingCopy.endedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
@@ -3533,7 +3533,7 @@ async function handleSessionButton(interaction) {
       return state;
     });
     await interaction.deferUpdate();
-    return interaction.message.reply({ content: `${copy.lockedReply}\n-# Made By Fieel`, allowedMentions: { parse: [] } });
+    return interaction.message.reply({ content: copy.lockedReply, allowedMentions: { parse: [] } });
   }
   if (action === "unlocked") {
     await saveState(state => {
@@ -3541,7 +3541,7 @@ async function handleSessionButton(interaction) {
       return state;
     });
     await interaction.deferUpdate();
-    return interaction.message.reply({ content: `${copy.unlockedReply}\n-# Made By Fieel`, allowedMentions: { parse: [] } });
+    return interaction.message.reply({ content: copy.unlockedReply, allowedMentions: { parse: [] } });
   }
   await finishSession(sessionId, session.hosterId);
   const ending = copy.endedReply;
@@ -3550,7 +3550,7 @@ async function handleSessionButton(interaction) {
     embeds: [],
     components: []
   });
-  return interaction.message.reply({ content: `${ending}\n-# Made By Fieel`, allowedMentions: { parse: [] } });
+  return interaction.message.reply({ content: ending, allowedMentions: { parse: [] } });
 }
 
 function hasEventAuthority(interaction, roles) {

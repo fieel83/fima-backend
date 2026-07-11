@@ -8,7 +8,7 @@ import {
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls,
-  sanitizeTemporaryVoiceName,
+  sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
@@ -86,6 +86,25 @@ test("test-guild session lifecycle replies to the original Markdown announcement
   assert.match(source, /function trainingAnnouncementMarkdown/);
   assert.match(source, /trainingPlainMarkdown/);
   assert.match(source, /tryoutPlainMarkdown/);
+});
+
+test("training and tryout announcements follow the selected language and have no branding footer", () => {
+  const trainingTr = trainingAnnouncementMarkdown({
+    language: "tr", server: "Frankfurt, Germany", format: "First To 3", characters: "Saitama, Garou, Metal Bat",
+    rules: ["LH yok", "Wall yok"], link: "https://example.test/private", hoster: "@hoster"
+  });
+  const tryoutTr = tryoutAnnouncementMarkdown({
+    language: "tr", server: "Frankfurt, Germany", link: "https://example.test/private", hoster: "@hoster"
+  });
+  const trainingEn = trainingAnnouncementMarkdown({
+    language: "en", server: "Frankfurt, Germany", format: "First To 3", characters: "Saitama", rules: ["No LH"], link: "https://example.test/private", hoster: "@hoster"
+  });
+  assert.match(trainingTr, /# ANTRENMAN[\s\S]*◇ Sunucu:[\s\S]*◇ Kurallar:[\s\S]*• LH yok/);
+  assert.match(tryoutTr, /# DENEME AÇIK[\s\S]*◇ Sunucu:[\s\S]*◇ Değerlendirme:[\s\S]*◇ Kurallar:/);
+  assert.match(trainingEn, /# TRAINING[\s\S]*◇ Server:[\s\S]*◇ Rules:/);
+  assert.doesNotMatch(`${trainingTr}\n${tryoutTr}\n${trainingEn}`, /Made By Fieel/);
+  assert.equal(sessionLanguageCopy("tr", "tryout").endButton, "DENEMEYİ BİTİR");
+  assert.equal(sessionLanguageCopy("en", "tryout").endButton, "END TRYOUT");
 });
 
 test("repeat smoke refreshes boards without replaying a full template repair", async () => {
