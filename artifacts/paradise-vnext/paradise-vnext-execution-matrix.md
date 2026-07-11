@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T20:34:02.755Z
+Generated: 2026-07-11T20:36:30.558Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -18,7 +18,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | BACKUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Define encrypted backup storage and perform an authorized restore drill in staging before any production rebuild path can consume backups. |
 | OPS-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add a scheduled, rate-limited reconciliation job and dashboard health card after runtime channel/message existence checks are safe to run in staging. |
 | CMD-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to staging/test guild, re-register scoped commands, then prove member /help and Community command denial without unregistering legacy commands. |
-| RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Migrate the next high-risk staff handler to shared RBAC without altering role assignments; then run role-persona proof in the test guild. |
+| RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to staging/test guild, then run Owner, Training Hoster, Trial Referee and normal-member persona proof against challenge controls without changing role assignments. |
 | COMP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy and test the non-destructive availability refresh panel across a bot restart in the exact test guild; retain old panel compatibility during the migration window. |
 | SETUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior. |
 | DASH-001 | P0 | Milestone 1 | SOURCE ONLY | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | BLOCKED | Map existing dashboard APIs to guild-scope auth; defer visual polish until baseline save/reload works. |

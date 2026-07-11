@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T20:34:02.755Z",
+  "generatedAt": "2026-07-11T20:36:30.558Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -487,11 +487,13 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
+        "src/paradiseRbac.js",
+        "src/paradise3a59.js",
         "test/paradiseFoundation.test.js",
         "test/paradise3a59.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Migrate the next high-risk staff handler to shared RBAC without altering role assignments; then run role-persona proof in the test guild.",
+      "nextExactAction": "Deploy only to staging/test guild, then run Owner, Training Hoster, Trial Referee and normal-member persona proof against challenge controls without changing role assignments.",
       "affectedFiles": [
         "src/paradiseRbac.js",
         "src/paradise3a59.js",
