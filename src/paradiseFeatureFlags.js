@@ -6,6 +6,8 @@ export const PARADISE_HIGH_RISK_FEATURES = Object.freeze([
   "template_repair", "scheduled_rewards", "automod_destructive_actions", "production_license_repair"
 ]);
 
+const SAFE_MILESTONE_ONE_STATES = new Set(["disabled", "owner_only", "test_guild", "allowlist"]);
+
 function normalizeState(value) {
   return PARADISE_FEATURE_STATES.includes(value) ? value : "disabled";
 }
@@ -30,4 +32,30 @@ export function assertParadiseFeatureEnabled(input = {}) {
   error.code = result.reason;
   error.feature = result.feature;
   throw error;
+}
+
+export function normalizeParadiseFeatureFlags(flags = {}) {
+  if (!flags || typeof flags !== "object" || Array.isArray(flags)) {
+    const error = new Error("invalid_feature_flags");
+    error.code = "invalid_feature_flags";
+    throw error;
+  }
+  const normalized = {};
+  for (const feature of PARADISE_HIGH_RISK_FEATURES) {
+    const input = flags[feature];
+    if (!input) continue;
+    const state = normalizeState(input.state);
+    if (!SAFE_MILESTONE_ONE_STATES.has(state)) {
+      const error = new Error("feature_global_enable_blocked");
+      error.code = "feature_global_enable_blocked";
+      error.feature = feature;
+      throw error;
+    }
+    const guildAllowlist = [...new Set((Array.isArray(input.guildAllowlist) ? input.guildAllowlist : [])
+      .map(value => String(value || "").trim()).filter(Boolean))].slice(0, 50);
+    const userAllowlist = [...new Set((Array.isArray(input.userAllowlist) ? input.userAllowlist : [])
+      .map(value => String(value || "").trim()).filter(Boolean))].slice(0, 50);
+    normalized[feature] = { state, guildAllowlist, userAllowlist };
+  }
+  return normalized;
 }

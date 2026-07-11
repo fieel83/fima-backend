@@ -29,6 +29,8 @@ test("Paradise config writes require owner action header and trusted official or
   assert.match(serverSource, /createParadiseConfigVersion/);
   assert.match(serverSource, /paradise_config_version_/);
   assert.match(serverSource, /changedPaths/);
+  assert.match(serverSource, /"featureFlags"/);
+  assert.match(serverSource, /normalizeParadiseFeatureFlags/);
   assert.match(serverSource, /\/api\/paradise\/config\/history/);
   assert.match(serverSource, /\/api\/paradise\/config\/rollback-preview/);
   assert.match(serverSource, /buildParadiseConfigRollbackPreview/);

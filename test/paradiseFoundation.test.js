@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildParadiseConfigRollbackPreview, canRollbackParadiseConfig, createParadiseConfigVersion } from "../src/paradiseConfigVersioning.js";
-import { assertParadiseFeatureEnabled, resolveParadiseFeatureFlag } from "../src/paradiseFeatureFlags.js";
+import { assertParadiseFeatureEnabled, normalizeParadiseFeatureFlags, resolveParadiseFeatureFlag } from "../src/paradiseFeatureFlags.js";
 import { assertParadiseGuildWorkspaceAccess, paradiseGuildWorkspaceAccess } from "../src/paradiseGuildScope.js";
 import { PARADISE_PERMISSIONS, assertParadisePermission, hasParadisePermission } from "../src/paradiseRbac.js";
 import { paradiseCommandAccess, visibleParadiseCommands } from "../src/paradiseCommandRegistry.js";
@@ -32,6 +32,10 @@ test("feature flags default to disabled and permit only selected rollout scopes"
   assert.equal(resolveParadiseFeatureFlag({ feature: "ticket_ai", guildId: "production-guild", flags: { ticket_ai: { state: "test_guild" } } }).allowed, false);
   assert.equal(resolveParadiseFeatureFlag({ feature: "ticket_ai", guildId: "guild-a", flags: { ticket_ai: { state: "allowlist", guildAllowlist: ["guild-a"] } } }).allowed, true);
   assert.throws(() => assertParadiseFeatureEnabled({ feature: "ticket_ai" }), { code: "feature_disabled" });
+  assert.deepEqual(normalizeParadiseFeatureFlags({ ticket_ai: { state: "test_guild", guildAllowlist: ["guild-a", "guild-a"] } }), {
+    ticket_ai: { state: "test_guild", guildAllowlist: ["guild-a"], userAllowlist: [] }
+  });
+  assert.throws(() => normalizeParadiseFeatureFlags({ ticket_ai: { state: "enabled" } }), { code: "feature_global_enable_blocked" });
 });
 
 test("guild workspace access never leaks a guild without owner, Administrator or Manage Guild", () => {

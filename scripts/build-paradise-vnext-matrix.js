@@ -73,7 +73,7 @@ const requirements = [
   requirement("FLAG-001", "Feature flags and kill switches", "High-risk modules use global/environment/guild/plan/role scoped flags with safe disable/re-enable behavior.", {
     module: "feature-flags", priority: "P0", milestone: "Milestone 1", dependencies: ["ENV-001", "CFG-001", "AUTH-001"], securityCritical: true,
     acceptanceCriteria: ["disabled module rejects new action safely", "existing state remains intact", "flag transition is audited", "test guild canary cannot affect production guild"],
-    testRequirements: [...commonTest, "enable/disable/re-enable test"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["test/paradiseFoundation.test.js"], nextExactAction: "Persist flags through the versioned guild configuration envelope after CFG-001 is integrated.", affectedFiles: ["src/paradiseFeatureFlags.js", "src/server.js", "src/paradise3a59.js"], affectedDatabaseTables: ["settings", "audit_logs"], securityRisk: "high"
+    testRequirements: [...commonTest, "enable/disable/re-enable test"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["test/paradiseFoundation.test.js", "test/paradise-dashboard.test.js"], nextExactAction: "Migrate one high-risk handler behind a persisted disabled-by-default flag; keep production global enable unavailable during Milestone 1.", affectedFiles: ["src/paradiseFeatureFlags.js", "src/server.js", "src/paradise3a59.js"], affectedDatabaseTables: ["settings", "audit_logs"], securityRisk: "high"
   }),
   requirement("DB-001", "PostgreSQL guild-scope data foundation", "Guild-local Paradise state moves from opaque state JSON toward scoped PostgreSQL records while global identity remains separate.", {
     module: "database", priority: "P0", milestone: "Milestone 1", dependencies: ["ENV-001", "CFG-001"], securityCritical: true,
@@ -238,7 +238,7 @@ const inventory = {
   components: { status: "partially implemented", evidence: ["custom ID family dispatch exists in src/paradise3a59.js", "src/paradiseComponentProtocol.js"], gap: "Existing component families are not yet migrated to the versioned protocol." },
   backup: { status: "partially implemented", evidence: ["structure snapshot and backup endpoints exist"], gap: "No integrity envelope/SHA256/restore drill contract implemented." },
   reconciliation: { status: "missing", evidence: [], gap: "No centralized recurring invariant/reconciliation service found." },
-  featureFlags: { status: "partially implemented", evidence: ["ad hoc environment flags", "src/paradiseFeatureFlags.js"], gap: "Flags are not yet persisted through the versioned guild configuration envelope." },
+  featureFlags: { status: "partially implemented", evidence: ["src/paradiseFeatureFlags.js", "versioned guild configuration envelope"], gap: "No high-risk runtime handler has been migrated to a persisted feature flag yet." },
   testGuildGuard: { status: "partially implemented", evidence: ["PARADISE_TEST_GUILD_ID is fixed to the accepted guild", "guarded smoke/rebuild code exists"], gap: "Guard must be centralized with environment policy and negative live proof." },
   currentMilestoneClassification: executionRows.map(row => ({ requirementId: row.requirementId, status: included.includes(row.requirementId) ? row.sourceStatus : "DEFERRED" }))
 };

@@ -38,6 +38,7 @@ import { adminPage, loginPage } from "./adminHtml.js";
 import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
+import { normalizeParadiseFeatureFlags } from "./paradiseFeatureFlags.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
@@ -960,7 +961,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
   const kind = String(req.body?.kind || "");
-  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations", "operations", "blacklist", "roster", "staffOperations", "applications", "moderation", "events", "voice", "xp"].includes(kind)) {
+  if (!["mainer", "quotas", "channels", "channelMappings", "roleMappings", "automation", "branding", "template", "challenge", "loa", "verification", "activity", "automod", "commandVisibility", "relations", "operations", "blacklist", "roster", "staffOperations", "applications", "moderation", "events", "voice", "xp", "featureFlags"].includes(kind)) {
     return res.status(400).json({ error: "invalid_config_kind" });
   }
   const guildId = String(req.body?.guildId || "");
@@ -1209,6 +1210,12 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
         ? value.excludedChannels.map(item => String(item)).filter(item => /^\d{16,22}$/.test(item)).slice(0, 100)
         : []
     };
+  } else if (kind === "featureFlags") {
+    try {
+      config.featureFlags = normalizeParadiseFeatureFlags(req.body?.value || {});
+    } catch (error) {
+      return res.status(400).json({ error: error.code || "invalid_feature_flags" });
+    }
   } else {
     config.autoActivityChecks = req.body?.value?.autoActivityChecks === true;
     config.autoActivityRoleRemoval = req.body?.value?.autoActivityRoleRemoval === true;

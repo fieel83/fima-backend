@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T15:33:23.959Z",
+  "capturedAt": "2026-07-11T15:36:11.528Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "500820bc0be8fc7c77f9021b88c85928a95e42b0",
+    "localCommit": "c4394b3e2ee4af9f65fdac66412b03a0bb53fc53",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -86,10 +86,10 @@
   "featureFlags": {
     "status": "partially implemented",
     "evidence": [
-      "ad hoc environment flags",
-      "src/paradiseFeatureFlags.js"
+      "src/paradiseFeatureFlags.js",
+      "versioned guild configuration envelope"
     ],
-    "gap": "Flags are not yet persisted through the versioned guild configuration envelope."
+    "gap": "No high-risk runtime handler has been migrated to a persisted feature flag yet."
   },
   "testGuildGuard": {
     "status": "partially implemented",
