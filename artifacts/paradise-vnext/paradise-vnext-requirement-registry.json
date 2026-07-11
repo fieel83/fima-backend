@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T20:41:31.850Z",
+  "generatedAt": "2026-07-11T20:42:33.589Z",
   "status": "LOCAL VERIFIED",
   "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
   "sourcePlans": [
@@ -465,7 +465,7 @@
         "test/paradiseFoundation.test.js",
         "test/paradise-dashboard.test.js"
       ],
-      "blocker": null,
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
       "nextExactAction": "Deploy only to staging/test guild and verify the command registry canary enables there while its kill switch leaves production command behavior unchanged.",
       "affectedFiles": [
         "src/paradiseFeatureFlags.js",
@@ -782,7 +782,7 @@
         "test/paradiseFoundation.test.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
       "nextExactAction": "Deploy only to staging/test guild, re-register scoped commands, then prove member /help and Community command denial without unregistering legacy commands.",
       "affectedFiles": [
         "src/paradiseCommandRegistry.js",
@@ -843,7 +843,7 @@
         "test/paradiseFoundation.test.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
       "nextExactAction": "Deploy only to staging/test guild, then run Owner, Training Hoster, Trial Referee and normal-member persona proof against challenge controls without changing role assignments.",
       "affectedFiles": [
         "src/paradiseRbac.js",
@@ -904,7 +904,7 @@
         "test/paradiseFoundation.test.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
       "nextExactAction": "Deploy and test the non-destructive availability refresh panel across a bot restart in the exact test guild; retain old panel compatibility during the migration window.",
       "affectedFiles": [
         "src/paradiseComponentProtocol.js",
