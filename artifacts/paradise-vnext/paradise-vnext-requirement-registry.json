@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:43:20.569Z",
+  "generatedAt": "2026-07-11T20:34:02.755Z",
   "status": "LOCAL VERIFIED",
   "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
   "sourcePlans": [
@@ -775,10 +775,13 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "test/paradiseFoundation.test.js"
+        "src/paradiseCommandRegistry.js",
+        "src/paradise3a59.js",
+        "test/paradiseFoundation.test.js",
+        "test/paradise3a59.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Map existing slash command builders, help rendering and handlers to this registry incrementally without unregistering commands prematurely.",
+      "nextExactAction": "Deploy only to staging/test guild, re-register scoped commands, then prove member /help and Community command denial without unregistering legacy commands.",
       "affectedFiles": [
         "src/paradiseCommandRegistry.js",
         "src/paradise3a59.js",
