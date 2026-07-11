@@ -3,7 +3,7 @@ import test from "node:test";
 import { buildParadiseConfigRollbackPreview, canRollbackParadiseConfig, createParadiseConfigVersion } from "../src/paradiseConfigVersioning.js";
 import { assertParadiseFeatureEnabled, normalizeParadiseFeatureFlags, resolveParadiseFeatureFlag } from "../src/paradiseFeatureFlags.js";
 import { assertParadiseGuildWorkspaceAccess, paradiseGuildWorkspaceAccess } from "../src/paradiseGuildScope.js";
-import { PARADISE_PERMISSIONS, assertParadisePermission, hasParadisePermission } from "../src/paradiseRbac.js";
+import { PARADISE_PERMISSIONS, assertParadisePermission, hasParadisePermission, paradiseRoleKeysForMember } from "../src/paradiseRbac.js";
 import { paradiseCommandAccess, visibleParadiseCommands } from "../src/paradiseCommandRegistry.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "../src/paradiseComponentProtocol.js";
 import { PARADISE_TEST_GUILD_ID } from "../src/runtimeEnvironment.js";
@@ -61,6 +61,9 @@ test("RBAC keeps Trial Referee and hoster authority narrower than managers", () 
   assert.equal(hasParadisePermission({ permission: PARADISE_PERMISSIONS.LICENSE_REPAIR, roleKeys: ["Fima Support"] }), false);
   assert.equal(hasParadisePermission({ permission: PARADISE_PERMISSIONS.LICENSE_REPAIR, isOwner: true }), true);
   assert.throws(() => assertParadisePermission({ permission: PARADISE_PERMISSIONS.REFEREE_APPROVE, roleKeys: ["Referee"] }), { code: "paradise_permission_denied" });
+  assert.deepEqual(paradiseRoleKeysForMember({
+    roleIds: ["role-ref"], roleNames: ["Unrelated Role"], mappings: { experienced_referee_role: "role-ref" }
+  }), ["experienced_referee", "unrelated_role"]);
 });
 
 test("central command registry filters help and runtime access by template, module and role", () => {

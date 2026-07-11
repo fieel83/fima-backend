@@ -9,6 +9,7 @@ import {
   AutoModerationActionType, AutoModerationRuleEventType, AutoModerationRuleTriggerType
 } from "discord.js";
 import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
+import { hasParadisePermission, PARADISE_PERMISSIONS, paradiseRoleKeysForMember } from "./paradiseRbac.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
@@ -3189,14 +3190,13 @@ async function canApproveReferee(member) {
   if (administrator) return true;
   const state = await loadState();
   const guildConfig = configForGuild(state, member.guild.id);
-  const mapped = new Set([
-    guildConfig.roleMappings?.owner_role,
-    guildConfig.roleMappings?.overseer_role,
-    guildConfig.roleMappings?.referee_manager_role,
-    guildConfig.roleMappings?.experienced_referee_role
-  ].filter(Boolean));
   const roles = [...member.roles.cache.values()];
-  return roles.some(role => mapped.has(role.id))
+  const roleKeys = paradiseRoleKeysForMember({
+    roleIds: roles.map(role => role.id),
+    roleNames: roles.map(role => role.name),
+    mappings: guildConfig.roleMappings
+  });
+  return hasParadisePermission({ permission: PARADISE_PERMISSIONS.REFEREE_APPROVE, roleKeys })
     || canRoleNamesApproveScore(roles.map(role => role.name), administrator);
 }
 

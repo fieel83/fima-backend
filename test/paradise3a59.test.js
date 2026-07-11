@@ -19,6 +19,13 @@ test("score approval excludes Trial Referee and Referee by default", () => {
   assert.equal(canRoleNamesApproveScore([], true), true);
 });
 
+test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /paradiseRoleKeysForMember/);
+  assert.match(source, /PARADISE_PERMISSIONS\.REFEREE_APPROVE/);
+  assert.match(source, /mappings: guildConfig\.roleMappings/);
+});
+
 test("Paradise support panel has a real audited ticket lifecycle", () => {
   const launcher = paradiseSupportPanelPayload(0).components[0].toJSON();
   assert.equal(launcher.components[0].custom_id, "paradise_support_open");

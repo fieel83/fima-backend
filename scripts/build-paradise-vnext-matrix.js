@@ -103,7 +103,7 @@ const requirements = [
   requirement("RBAC-001", "Paradise RBAC and role manifest foundation", "Discord role checks, Paradise permissions, hierarchy validation and role assignment authority are centralized.", {
     module: "rbac", priority: "P0", milestone: "Milestone 1", dependencies: ["AUTH-001", "CFG-001"], securityCritical: true,
     acceptanceCriteria: ["role/persona check is centralized", "bot hierarchy blocker is explicit", "hidden command remains runtime denied", "owner actions are audited"],
-    testRequirements: [...commonTest, "owner/admin/member/referee persona tests"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["test/paradiseFoundation.test.js"], nextExactAction: "Map current Discord role IDs and existing staff checks to this vocabulary without changing role assignments.", affectedFiles: ["src/paradiseRbac.js", "src/paradise3a59.js", "src/discordBot.js"], securityRisk: "critical"
+    testRequirements: [...commonTest, "owner/admin/member/referee persona tests"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["test/paradiseFoundation.test.js", "test/paradise3a59.test.js"], nextExactAction: "Migrate the next high-risk staff handler to shared RBAC without altering role assignments; then run role-persona proof in the test guild.", affectedFiles: ["src/paradiseRbac.js", "src/paradise3a59.js", "src/discordBot.js"], securityRisk: "critical"
   }),
   requirement("COMP-001", "Persistent Discord component protocol", "Versioned custom IDs are guild scoped, restart safe, authorization checked and repairable without collectors.", {
     module: "components", priority: "P0", milestone: "Milestone 1", dependencies: ["RBAC-001", "CFG-001"], securityCritical: true,

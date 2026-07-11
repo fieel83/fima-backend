@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T15:36:11.528Z",
+  "capturedAt": "2026-07-11T15:38:25.518Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "c4394b3e2ee4af9f65fdac66412b03a0bb53fc53",
+    "localCommit": "dfa163de02475dc22c11017e2adc7ccc3662e3e1",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },

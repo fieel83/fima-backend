@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T15:36:11.528Z
+Generated: 2026-07-11T15:38:25.518Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -18,7 +18,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | BACKUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add restore dry-run validation and encrypted storage policy before any destructive rebuild path can consume backups. |
 | OPS-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Implement read-only reconciliation result builder for state/config records. |
 | CMD-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Map existing slash command builders, help rendering and handlers to this registry incrementally without unregistering commands prematurely. |
-| RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Map current Discord role IDs and existing staff checks to this vocabulary without changing role assignments. |
+| RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Migrate the next high-risk staff handler to shared RBAC without altering role assignments; then run role-persona proof in the test guild. |
 | COMP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Migrate one non-destructive component family in the test guild and retain old-family repair messaging during the compatibility window. |
 | SETUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior. |
 | DASH-001 | P0 | Milestone 1 | SOURCE ONLY | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | BLOCKED | Map existing dashboard APIs to guild-scope auth; defer visual polish until baseline save/reload works. |

@@ -27,6 +27,7 @@ export const PARADISE_PERMISSIONS = Object.freeze({
 const ALL = "*";
 export const PARADISE_ROLE_PERMISSION_DEFAULTS = Object.freeze({
   owner: [ALL],
+  overseer: [PARADISE_PERMISSIONS.REFEREE_APPROVE, PARADISE_PERMISSIONS.AUDIT_VIEW],
   admin: [
     PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, PARADISE_PERMISSIONS.GUILD_SETUP_PREVIEW,
     PARADISE_PERMISSIONS.GUILD_SETUP_REPAIR, PARADISE_PERMISSIONS.AUDIT_VIEW,
@@ -46,14 +47,48 @@ export const PARADISE_ROLE_PERMISSION_DEFAULTS = Object.freeze({
   experienced_tryout_hoster: [PARADISE_PERMISSIONS.TRYOUT_HOST],
   tryout_hoster: [PARADISE_PERMISSIONS.TRYOUT_HOST],
   referee_manager: [PARADISE_PERMISSIONS.REFEREE_WORK, PARADISE_PERMISSIONS.REFEREE_APPROVE],
+  head_referee: [PARADISE_PERMISSIONS.REFEREE_WORK, PARADISE_PERMISSIONS.REFEREE_APPROVE],
   experienced_referee: [PARADISE_PERMISSIONS.REFEREE_WORK, PARADISE_PERMISSIONS.REFEREE_APPROVE],
   referee: [PARADISE_PERMISSIONS.REFEREE_WORK],
   trial_referee: [PARADISE_PERMISSIONS.REFEREE_WORK],
   application_reviewer: [PARADISE_PERMISSIONS.APPLICATION_REVIEW]
 });
 
+export const PARADISE_ROLE_MAPPING_KEYS = Object.freeze({
+  owner_role: "owner",
+  admin_role: "admin",
+  overseer_role: "overseer",
+  moderator_role: "moderator",
+  security_staff_role: "security_staff",
+  support_staff_role: "support_staff",
+  fima_support_role: "fima_support",
+  training_manager_role: "training_manager",
+  training_supervisor_role: "training_supervisor",
+  experienced_training_hoster_role: "experienced_training_hoster",
+  training_hoster_role: "training_hoster",
+  tryout_manager_role: "tryout_manager",
+  experienced_tryout_hoster_role: "experienced_tryout_hoster",
+  tryout_hoster_role: "tryout_hoster",
+  referee_manager_role: "referee_manager",
+  head_referee_role: "head_referee",
+  experienced_referee_role: "experienced_referee",
+  referee_role: "referee",
+  trial_referee_role: "trial_referee",
+  application_reviewer_role: "application_reviewer"
+});
+
 function normalizeRoleKey(value) {
   return String(value || "").trim().toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+export function paradiseRoleKeysForMember({ roleIds = [], roleNames = [], mappings = {} } = {}) {
+  const ids = new Set(roleIds.map(value => String(value || "")).filter(Boolean));
+  const mapped = Object.entries(mappings || {}).flatMap(([mappingKey, roleId]) =>
+    ids.has(String(roleId || "")) && PARADISE_ROLE_MAPPING_KEYS[mappingKey]
+      ? [PARADISE_ROLE_MAPPING_KEYS[mappingKey]]
+      : []
+  );
+  return [...new Set([...mapped, ...roleNames.map(normalizeRoleKey).filter(Boolean)])];
 }
 
 export function resolveParadisePermissions({ roleKeys = [], isOwner = false, overrides = {} } = {}) {
