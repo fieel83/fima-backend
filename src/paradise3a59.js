@@ -711,6 +711,16 @@ export const PARADISE_COMMUNITY_ROLES = [
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
 
 export const PARADISE_VOICE_CHANNEL_NAMES = Object.freeze([
+  "◜・oda-oluştur",
+  "◜・topluluk-sesi",
+  "◜・savaş-odası",
+  "◞・afk"
+]);
+
+// The old names are deliberately retained only as detection aliases.  A repair
+// can create/remap the premium compact layout without mistaking an old text
+// channel for a valid voice channel or silently deleting it.
+const PARADISE_LEGACY_VOICE_CHANNEL_NAMES = Object.freeze([
   "Join to Create",
   "Community Voice",
   "War VC",
@@ -718,7 +728,7 @@ export const PARADISE_VOICE_CHANNEL_NAMES = Object.freeze([
 ]);
 
 export function paradiseSetupChannelType(categoryName, channelName) {
-  return PARADISE_VOICE_CHANNEL_NAMES.includes(String(channelName || ""))
+  return [...PARADISE_VOICE_CHANNEL_NAMES, ...PARADISE_LEGACY_VOICE_CHANNEL_NAMES].includes(String(channelName || ""))
     ? ChannelType.GuildVoice
     : ChannelType.GuildText;
 }
@@ -729,13 +739,13 @@ export function paradiseSetupChannelTypeMismatch(channel, categoryName, channelN
 }
 
 function paradiseVoiceSetupIds(guild) {
-  const find = name => guild.channels.cache.find(channel => channel.name === name && channel.type === ChannelType.GuildVoice)?.id || null;
+  const find = names => guild.channels.cache.find(channel => names.includes(channel.name) && channel.type === ChannelType.GuildVoice)?.id || null;
   return {
-    joinToCreateChannelId: find("Join to Create"),
-    communityVoiceChannelId: find("Community Voice"),
-    warVoiceChannelId: find("War VC"),
-    afkChannelId: find("AFK"),
-    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE VOICE")?.id || null
+    joinToCreateChannelId: find(["◜・oda-oluştur", "Join to Create"]),
+    communityVoiceChannelId: find(["◜・topluluk-sesi", "Community Voice"]),
+    warVoiceChannelId: find(["◜・savaş-odası", "War VC"]),
+    afkChannelId: find(["◞・afk", "AFK"]),
+    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name))?.id || null
   };
 }
 
@@ -746,6 +756,12 @@ async function configureParadiseAfkChannel(guild, voiceIds) {
 }
 
 export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
+  ["start_here_channel", "Public getting-started handbook"],
+  ["rules_channel", "Public rules handbook"],
+  ["roles_channel", "Public language and ping role panel"],
+  ["member_help_channel", "Public member-safe bot help"],
+  ["staff_command_guide_channel", "Private role-aware staff command guide"],
+  ["staff_guides_channel", "Private indexed staff handbooks"],
   ["welcome_channel", "Public welcome messages"],
   ["leave_channel", "Public leave messages"],
   ["level_channel", "XP levels and leaderboard"],
@@ -791,37 +807,71 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
   ["payout_queue_channel", "Private reward payout queue"]
 ]);
 
+// Compact templates deliberately create only the channels needed by enabled
+// defaults.  Extra modules use existing mapped channels or are enabled later;
+// they never produce an empty channel by default.
 export const PARADISE_COMMUNITY_SCHEMA = [
-  ["BA\u015eLANGI\u00c7", ["welcome", "rules", "fieel-info", "role-selection", "choose-language", "choose-pings", "command-guide"], false],
-  ["DUYURULAR", ["announcements", "updates", "faq", "official-downloads"], false],
-  ["FIMA DESTEK", ["open-ticket", "support-info", "fima-macro", "fima-help", "license-help", "bug-reports", "application-ticket"], false],
-  ["TOPLULUK", ["general", "media", "bot-commands", "events-and-giveaways", "training-announcements"], false],
-  ["EK\u0130P VE KAYITLAR", ["staff-command-guide", "mod-command-guide", "ticket-guide", "application-guide", "application-reviews", "moderation-requests", "support-ticket-transcripts", "support-logs", "application-logs", "security-logs"], true],
-  ["SES", ["Join to Create", "Community Voice", "AFK"], false],
-  ["PRIVATE VOICE", [], false]
+  ["━━ BAŞLANGIÇ ━━", ["⌁・başlangıç", "⌁・kurallar", "⌁・hoş-geldin", "⌁・roller"], false],
+  ["━━ TOPLULUK ━━", ["┆・duyurular", "┆・genel", "┆・medya", "┆・etkinlikler", "┆・seviyeler"], false],
+  ["━━ DESTEK ━━", ["◇・destek"], false],
+  ["━━ PERSONEL ━━", ["〢・personel-merkezi", "〢・personel-komutları", "〢・personel-rehberleri", "〢・incelemeler", "〢・transcriptler", "〢・personel-logları"], true],
+  ["━━ SESLER ━━", ["◜・oda-oluştur", "◜・topluluk-sesi", "◞・afk"], false],
+  ["━━ ÖZEL SESLER ━━", [], false]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
-  ["BA\u015eLANGI\u00c7", ["welcome", "rules", "verify", "profile-guide", "role-selection", "choose-language", "choose-pings", "command-guide"], false],
-  ["CLAN PANOLARI", ["announcements", "main-line", "roster-lineup", "war-lineup", "mainer-proof", "clan-relations", "roster-logs", "war-logs"], false],
-  ["SIRALAMA VE MEYDAN OKUMA", ["top-10", "top-20", "top-30", "challenge-ticket", "challenge-rules", "availability", "challenge-results"], false],
-  ["TRYOUT VE TRAINING", ["tryout", "tryout-results", "training", "training-results", "events-and-giveaways", "question-of-the-day", "level-leaderboard"], false],
-  ["DESTEK", ["support-ticket", "application-ticket", "blacklist", "blacklist-appeal", "bail-review", "report-staff"], false],
-  ["PERSONEL", ["staff-team", "staff-command-guide", "mod-command-guide", "referee-rules", "referee-guide", "training-hoster-guide", "tryout-hoster-guide", "application-guide", "ticket-guide", "application-reviews", "moderation-requests", "activity-logs", "loa", "challenge-ticket-transcripts", "support-ticket-transcripts", "staff-logs"], true],
-  ["SES", ["Join to Create", "War VC", "Community Voice", "AFK"], false],
-  ["PRIVATE VOICE", [], false]
+  ["━━ BAŞLANGIÇ ━━", ["⌁・başlangıç", "⌁・kurallar", "⌁・hoş-geldin", "⌁・roller"], false],
+  ["━━ TOPLULUK ━━", ["┆・duyurular", "┆・genel", "┆・medya", "┆・seviyeler"], false],
+  ["━━ SIRALAMA ━━", ["⟡・top-10", "⟡・top-20", "⟡・top-30", "⟡・meydan-okuma", "⟡・müsaitlik-ve-loa"], false],
+  ["━━ KLAN OPERASYONLARI ━━", ["◆・aktif-oturumlar", "◆・sonuçlar", "◆・lineuplar", "◆・mainer-kanit"], false],
+  ["━━ DESTEK ━━", ["◇・destek"], false],
+  ["━━ PERSONEL ━━", ["〢・personel-merkezi", "〢・personel-komutları", "〢・personel-rehberleri", "〢・incelemeler", "〢・transcriptler", "〢・personel-logları"], true],
+  ["━━ SESLER ━━", ["◜・oda-oluştur", "◜・savaş-odası", "◜・topluluk-sesi", "◞・afk"], false],
+  ["━━ ÖZEL SESLER ━━", [], false]
 ];
 
 export const PARADISE_TSBTR_SCHEMA = [
-  ["BA\u015eLANGI\u00c7", ["welcome", "rules", "overview", "role-selection", "choose-language", "choose-pings", "choose-region", "command-guide"], false],
-  ["SIRALAMA", ["top-10", "top-20", "top-30", "challenge-ticket", "challenge-rules", "availability", "challenge-results", "set-rules"], false],
-  ["TRYOUT VE TRAINING", ["tryout", "tryout-results", "training", "training-results", "announcements", "general", "bot-commands"], false],
-  ["DESTEK", ["support-ticket", "application-ticket", "blacklist", "blacklist-appeal", "bail-review", "report-staff"], false],
-  ["PERSONEL", ["staff-team", "staff-command-guide", "mod-command-guide", "referee-rules", "referee-guide", "training-hoster-guide", "tryout-hoster-guide", "application-guide", "ticket-guide", "application-reviews", "moderation-requests", "activity-logs", "loa", "challenge-ticket-transcripts", "support-ticket-transcripts", "staff-logs"], true],
-  ["TOPLULUK", ["giveaways", "media", "level-leaderboard"], false],
-  ["SES", ["Join to Create", "Community Voice", "AFK"], false],
-  ["PRIVATE VOICE", [], false]
+  ["━━ BAŞLANGIÇ ━━", ["⌁・başlangıç", "⌁・kurallar", "⌁・hoş-geldin", "⌁・roller"], false],
+  ["━━ TOPLULUK ━━", ["┆・duyurular", "┆・genel", "┆・medya", "┆・seviyeler"], false],
+  ["━━ RANKED ARENA ━━", ["⟡・top-10", "⟡・top-20", "⟡・top-30", "⟡・meydan-okuma", "⟡・müsaitlik-ve-loa"], false],
+  ["━━ OTURUMLAR ━━", ["◆・aktif-oturumlar", "◆・sonuçlar"], false],
+  ["━━ DESTEK ━━", ["◇・destek"], false],
+  ["━━ PERSONEL ━━", ["〢・personel-merkezi", "〢・personel-komutları", "〢・personel-rehberleri", "〢・incelemeler", "〢・transcriptler", "〢・personel-logları"], true],
+  ["━━ SESLER ━━", ["◜・oda-oluştur", "◜・topluluk-sesi", "◞・afk"], false],
+  ["━━ ÖZEL SESLER ━━", [], false]
 ];
+
+const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
+  community: {
+    start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
+    member_help_channel: "┆・genel", level_channel: "┆・seviyeler", faq_channel: "⌁・başlangıç", role_guide_channel: "⌁・roller",
+    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
+    application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler",
+    support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
+    support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları"
+  },
+  clan: {
+    start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
+    member_help_channel: "┆・genel", level_channel: "┆・seviyeler", faq_channel: "⌁・başlangıç", role_guide_channel: "⌁・roller",
+    challenge_channel: "⟡・meydan-okuma", challenge_rules_channel: "⟡・meydan-okuma", challenge_results_channel: "◆・sonuçlar", availability_channel: "⟡・müsaitlik-ve-loa", loa_channel: "⟡・müsaitlik-ve-loa",
+    training_channel: "◆・aktif-oturumlar", tryout_channel: "◆・aktif-oturumlar", training_results_channel: "◆・sonuçlar", tryout_results_channel: "◆・sonuçlar",
+    main_lineup_channel: "◆・lineuplar", war_lineup_channel: "◆・lineuplar", roster_channel: "◆・lineuplar", mainer_proof_channel: "◆・mainer-kanit",
+    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
+    application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler", bail_appeal_channel: "〢・incelemeler",
+    support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
+    support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", activity_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları", roster_logs_channel: "〢・personel-logları", war_logs_channel: "〢・personel-logları"
+  },
+  tsbtr: {
+    start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
+    member_help_channel: "┆・genel", level_channel: "┆・seviyeler", faq_channel: "⌁・başlangıç", role_guide_channel: "⌁・roller",
+    challenge_channel: "⟡・meydan-okuma", challenge_rules_channel: "⟡・meydan-okuma", challenge_results_channel: "◆・sonuçlar", availability_channel: "⟡・müsaitlik-ve-loa", loa_channel: "⟡・müsaitlik-ve-loa",
+    training_channel: "◆・aktif-oturumlar", tryout_channel: "◆・aktif-oturumlar", training_results_channel: "◆・sonuçlar", tryout_results_channel: "◆・sonuçlar",
+    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
+    application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler", bail_appeal_channel: "〢・incelemeler",
+    support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
+    support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", activity_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları"
+  }
+});
 
 export const PARADISE_SETUP_SCHEMAS = Object.freeze({
   community: { label: "Fieel's Community", schema: PARADISE_COMMUNITY_SCHEMA, roles: PARADISE_COMMUNITY_ROLES },
@@ -1815,6 +1865,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
     for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
   }
   await organizeRoleHierarchy(interaction.guild, selected.roles);
+  await applyParadiseTemplateChannelMappings(interaction.guild, mode);
   const autoMod = await ensureParadiseAutoMod(interaction.guild).catch(error => ({ status: "failed", error: error.message }));
   await publishAllGuides(interaction.guild, mode).catch(() => {});
   if (mode !== "community") {
@@ -1926,6 +1977,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
   const autoMod = repairPermissions
     ? await ensureParadiseAutoMod(guild).catch(error => ({ status: "failed", error: error.message }))
     : { status: "not_requested" };
+  const mappedChannels = await applyParadiseTemplateChannelMappings(guild, mode);
   const guideResult = await publishAllGuides(guild, mode).catch(error => ({ posted: 0, error: error.message }));
   if (mode !== "community") {
     await updateRelationsPanel(guild).catch(() => {});
@@ -1949,6 +2001,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     createdChannels,
     createdRoles,
     pendingRoleCreates,
+    mappedChannelCount: Object.keys(mappedChannels).length,
     guidePosts: Number(guideResult.posted || 0),
     wrongChannelTypes: wrongTypeChannels,
     autoMod
@@ -5214,11 +5267,11 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
   const isJoinToCreate = joined?.type === ChannelType.GuildVoice
-    && (joined.id === voiceConfig.joinToCreateChannelId || joined.name === "Join to Create");
+    && (joined.id === voiceConfig.joinToCreateChannelId || ["◜・oda-oluştur", "Join to Create"].includes(joined.name));
   if (isJoinToCreate) {
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
     const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
-      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === "PRIVATE VOICE");
+      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name));
     const channel = await guild.channels.create({
       name: sanitizeTemporaryVoiceName(fallbackName, "Private Room"),
       type: ChannelType.GuildVoice,
@@ -6265,7 +6318,7 @@ async function handleHelp(interaction) {
 }
 
 async function publishSetupGuides(guild, mode) {
-  const channel = await configuredChannel(guild, "command_guide_channel", "command-guide");
+  const channel = await configuredChannel(guild, "member_help_channel", ["⌁・bot-komutları", "◇・bot-komutları", "bot-commands", "command-guide"]);
   if (!channel?.isTextBased?.()) return null;
   const state = await loadState();
   const storedMessageId = configForGuild(state, guild.id).commandGuideMessageIds?.[mode];
@@ -6293,7 +6346,25 @@ async function configuredChannel(guild, mappingKey, fallbackName) {
     const configured = guild.channels.cache.get(configuredId) || await guild.channels.fetch(configuredId).catch(() => null);
     if (configured?.isTextBased?.()) return configured;
   }
-  return guild.channels.cache.find(item => item.name === fallbackName && item.isTextBased?.()) || null;
+  const fallbackNames = Array.isArray(fallbackName) ? fallbackName : [fallbackName];
+  return guild.channels.cache.find(item => fallbackNames.includes(item.name) && item.isTextBased?.()) || null;
+}
+
+async function applyParadiseTemplateChannelMappings(guild, mode) {
+  const defaults = PARADISE_TEMPLATE_CHANNEL_DEFAULTS[mode] || {};
+  const mappings = Object.fromEntries(Object.entries(defaults)
+    .map(([key, name]) => [key, guild.channels.cache.find(channel => channel.name === name && channel.isTextBased?.())?.id || null])
+    .filter(([, id]) => Boolean(id)));
+  await saveState(state => {
+    state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
+    const config = state.guildConfigs[guild.id];
+    config.channelMappings = { ...(config.channelMappings || {}), ...mappings };
+    config.channelMappingsUpdatedAt = new Date().toISOString();
+    config.channelMappingLayout = "compact-v1";
+    if (guild.id === PARADISE_TEST_GUILD_ID) state.config = structuredClone(config);
+    return state;
+  });
+  return mappings;
 }
 
 async function saveChallengeTranscript(guild, channel, ticket, trigger) {
@@ -6496,19 +6567,31 @@ const GUIDE_POSTS = Object.freeze([
 ]);
 
 const GUIDE_MAPPING_KEYS = Object.freeze({
+  rules: "rules_channel",
   challenge_rules: "challenge_rules_channel",
   availability_guide: "availability_channel",
   loa_guide: "loa_channel",
-  referee_guide: "referee_guide_channel",
-  referee_rules: "referee_rules_channel",
-  referee_post_quick: "referee_post_channel",
-  referee_works: "referee_works_channel",
-  training_rules: "training_hoster_rules_channel",
-  tryout_rules: "tryout_hoster_rules_channel",
-  application_guide: "application_guide_channel",
-  ticket_guide: "support_ticket_channel",
+  referee_guide: "staff_guides_channel",
+  referee_rules: "staff_guides_channel",
+  referee_post_quick: "staff_guides_channel",
+  referee_works: "staff_guides_channel",
+  training_rules: "staff_guides_channel",
+  tryout_rules: "staff_guides_channel",
+  role_guide: "roles_channel",
+  faq_trust: "start_here_channel",
+  mainer_guide: "mainer_proof_channel",
+  profile_guide: "start_here_channel",
+  application_guide: "staff_guides_channel",
+  ticket_guide: "staff_guides_channel",
   staff_command_guide: "staff_command_guide_channel",
-  moderation_policy: "moderation_policy_channel"
+  mod_command_guide: "staff_guides_channel",
+  training_hoster_guide: "staff_guides_channel",
+  tryout_hoster_guide: "staff_guides_channel",
+  giveaway_event_guide: "staff_guides_channel",
+  hoster_rules: "staff_guides_channel",
+  dashboard_guide: "staff_guides_channel",
+  moderation_policy: "staff_guides_channel",
+  report_guide: "staff_guides_channel"
 });
 
 async function publishGuidePost(guild, definition) {

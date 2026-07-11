@@ -293,27 +293,27 @@ test("Paradise brand color accepts safe HEX and rejects malformed values", () =>
 
 test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.deepEqual(Object.keys(PARADISE_SETUP_SCHEMAS), ["community", "clan", "tsbtr"]);
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("fima-macro")));
-  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("clan-relations")));
-  assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.some(([, channels]) => channels.includes("top-30")));
-  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("loa")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("◇・destek")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("◆・lineuplar")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.some(([, channels]) => channels.includes("⟡・top-30")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("⟡・müsaitlik-ve-loa")));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Stage 2 High Strong"));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Top 30"));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.roles.includes("Frankfurt, Germany"));
   assert.ok(PARADISE_CLAN_ROLES.includes("BLACKLISTED"));
   assert.ok(PARADISE_COMMUNITY_ROLES.includes("BLACKLISTED"));
-  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("challenge-results"), false);
-  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("application-ticket"), true);
-  assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("Join to Create"), true);
-  assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("moderation-requests"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("⟡・sonuçlar"), false);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("◇・destek"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("◜・oda-oluştur"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("〢・incelemeler"), true);
 });
 
 test("voice-purpose setup entries are real voice channels and wrong text mappings are detectable", async () => {
-  for (const name of ["Join to Create", "Community Voice", "War VC", "AFK"]) {
+  for (const name of ["◜・oda-oluştur", "◜・topluluk-sesi", "◜・savaş-odası", "◞・afk"]) {
     assert.equal(PARADISE_VOICE_CHANNEL_NAMES.includes(name), true);
-    assert.equal(paradiseSetupChannelType("SES", name), ChannelType.GuildVoice);
-    assert.equal(paradiseSetupChannelTypeMismatch({ type: ChannelType.GuildText }, "SES", name), true);
-    assert.equal(paradiseSetupChannelTypeMismatch({ type: ChannelType.GuildVoice }, "SES", name), false);
+    assert.equal(paradiseSetupChannelType("━━ SESLER ━━", name), ChannelType.GuildVoice);
+    assert.equal(paradiseSetupChannelTypeMismatch({ type: ChannelType.GuildText }, "━━ SESLER ━━", name), true);
+    assert.equal(paradiseSetupChannelTypeMismatch({ type: ChannelType.GuildVoice }, "━━ SESLER ━━", name), false);
   }
   assert.equal(paradiseSetupChannelType("BAŞLANGIÇ", "rules"), ChannelType.GuildText);
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
@@ -324,11 +324,22 @@ test("voice-purpose setup entries are real voice channels and wrong text mapping
 
 test("compact templates keep the critical panels without flooding the channel list", () => {
   const count = mode => PARADISE_SETUP_SCHEMAS[mode].schema.flatMap(([, channels]) => channels).length;
-  assert.ok(count("community") <= 40);
-  assert.ok(count("clan") <= 60);
-  assert.ok(count("tsbtr") <= 55);
-  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("challenge-ticket-transcripts"));
-  assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("support-ticket-transcripts"));
+  const publicCount = mode => PARADISE_SETUP_SCHEMAS[mode].schema
+    .filter(([, , privateCategory]) => !privateCategory)
+    .flatMap(([, channels]) => channels)
+    .filter(name => !PARADISE_VOICE_CHANNEL_NAMES.includes(name)).length;
+  const privateCount = mode => PARADISE_SETUP_SCHEMAS[mode].schema
+    .filter(([, , privateCategory]) => privateCategory)
+    .flatMap(([, channels]) => channels).length;
+  assert.ok(count("community") <= 20);
+  assert.ok(count("clan") <= 28);
+  assert.ok(count("tsbtr") <= 25);
+  assert.ok(publicCount("community") >= 10 && publicCount("community") <= 12);
+  assert.ok(publicCount("clan") >= 15 && publicCount("clan") <= 18);
+  assert.ok(publicCount("tsbtr") >= 14 && publicCount("tsbtr") <= 17);
+  for (const mode of ["community", "clan", "tsbtr"]) assert.equal(privateCount(mode), 6);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("role-guide"), false);
+  assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("〢・personel-rehberleri"), true);
 });
 
 test("availability board separates timed entries and active tickets", () => {
