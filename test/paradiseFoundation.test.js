@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canRollbackParadiseConfig, createParadiseConfigVersion } from "../src/paradiseConfigVersioning.js";
+import { buildParadiseConfigRollbackPreview, canRollbackParadiseConfig, createParadiseConfigVersion } from "../src/paradiseConfigVersioning.js";
 import { assertParadiseFeatureEnabled, resolveParadiseFeatureFlag } from "../src/paradiseFeatureFlags.js";
 import { assertParadiseGuildWorkspaceAccess, paradiseGuildWorkspaceAccess } from "../src/paradiseGuildScope.js";
 import { PARADISE_PERMISSIONS, assertParadisePermission, hasParadisePermission } from "../src/paradiseRbac.js";
@@ -20,6 +20,10 @@ test("config version records a guild-scoped redacted diff and supports same-guil
   assert.deepEqual(version.diff.map(item => item.path), ["language"]);
   assert.equal(canRollbackParadiseConfig(version, "guild-a"), true);
   assert.equal(canRollbackParadiseConfig(version, "guild-b"), false);
+  const preview = buildParadiseConfigRollbackPreview(version, "guild-a");
+  assert.equal(preview.rollbackStatus, "preview_only");
+  assert.equal(preview.targetConfig.nested.token, "[REDACTED]");
+  assert.throws(() => buildParadiseConfigRollbackPreview(version, "guild-b"), { code: "config_rollback_preview_denied" });
 });
 
 test("feature flags default to disabled and permit only selected rollout scopes", () => {

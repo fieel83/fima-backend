@@ -54,3 +54,30 @@ export function createParadiseConfigVersion({ guildId, previous = {}, next = {},
 export function canRollbackParadiseConfig(version, currentGuildId) {
   return Boolean(version && version.schemaVersion === PARADISE_CONFIG_SCHEMA_VERSION && String(version.guildId) === String(currentGuildId) && plainObject(version.previous));
 }
+
+export function summarizeParadiseConfigVersion(version) {
+  if (!version || typeof version !== "object") return null;
+  return {
+    versionId: String(version.versionId || "") || null,
+    guildId: String(version.guildId || "") || null,
+    schemaVersion: Number(version.schemaVersion) || null,
+    createdAt: String(version.createdAt || "") || null,
+    source: String(version.source || "unknown"),
+    changedPaths: Array.isArray(version.diff) ? version.diff.map(item => item.path).filter(Boolean) : [],
+    diff: Array.isArray(version.diff) ? version.diff : []
+  };
+}
+
+export function buildParadiseConfigRollbackPreview(version, currentGuildId) {
+  if (!canRollbackParadiseConfig(version, currentGuildId)) {
+    const error = new Error("config_rollback_preview_denied");
+    error.code = "config_rollback_preview_denied";
+    throw error;
+  }
+  return {
+    ...summarizeParadiseConfigVersion(version),
+    rollbackAllowed: false,
+    rollbackStatus: "preview_only",
+    targetConfig: redactParadiseConfig(version.previous)
+  };
+}
