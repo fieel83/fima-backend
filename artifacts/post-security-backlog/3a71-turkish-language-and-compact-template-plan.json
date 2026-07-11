@@ -1,0 +1,48 @@
+{
+  "status": "LOCAL VERIFIED",
+  "createdAt": "2026-07-11T00:00:00.000Z",
+  "scope": "Paradise test-guild template preparation only",
+  "language": {
+    "default": "tr",
+    "rule": "guild language selects Turkish or English for active Training/Tryout announcements, controls and lifecycle replies",
+    "turkishDefault": true,
+    "verifiedBy": [
+      "sessionLanguageCopy",
+      "trainingAnnouncementMarkdown",
+      "tryoutAnnouncementMarkdown",
+      "handleSessionButton"
+    ]
+  },
+  "channelReduction": {
+    "previousIssue": "Many small categories and duplicate guide/log channels made it difficult to find the correct system.",
+    "community": { "channels": 36, "target": "community, Fima support, applications and events without clan/ranking channels" },
+    "clan": { "channels": 56, "target": "clan boards, challenge, training/tryout, support and one private staff area" },
+    "tsbtr": { "channels": 51, "target": "ranking, challenge, training/tryout, support and one private staff area" },
+    "preservedCriticalChannels": [
+      "training",
+      "tryout",
+      "top-10",
+      "top-20",
+      "top-30",
+      "application-ticket",
+      "application-reviews",
+      "support-ticket",
+      "support-ticket-transcripts",
+      "challenge-ticket-transcripts",
+      "moderation-requests",
+      "staff-team",
+      "Join to Create"
+    ]
+  },
+  "safety": {
+    "mainServersChanged": false,
+    "testGuildIdMasked": "1520***1257",
+    "existingTestLabDeleted": false,
+    "reason": "The compact schema is ready, but an existing lab must be backed up and rebuilt through the test-guild-only typed-confirmation gate before old channels are removed."
+  },
+  "tests": {
+    "syntax": "PASS",
+    "focusedNodeTests": "24/24 PASS"
+  },
+  "nextLiveStep": "Deploy the guarded v5 smoke to repost Turkish Training/Tryout panels and refresh the compact-board evidence. A physical test-lab channel cleanup remains gated by the test-guild rebuild confirmation."
+}

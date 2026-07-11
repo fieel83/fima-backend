@@ -13,7 +13,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-fast-panel-repost-live-smoke-v4";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v5";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -471,6 +471,125 @@ function guildLanguage(config = {}) {
   return raw.startsWith("en") ? "en" : "tr";
 }
 
+function sessionLanguageCopy(language = "tr", type = "training") {
+  const tr = language !== "en";
+  const isTryout = type === "tryout";
+  return tr
+    ? {
+      title: isTryout ? "# DENEME A\u00c7IK" : "# ANTRENMAN",
+      subtitle: isTryout ? "## Deneme Saati" : "## Rekabet\u00e7i Pratik",
+      server: "Sunucu",
+      format: "Format",
+      characters: "Karakterler",
+      hoster: "Hoster",
+      evaluation: "De\u011ferlendirme",
+      rules: "Kurallar",
+      link: "Ba\u011flant\u0131",
+      locked: "SUNUCU K\u0130L\u0130TL\u0130",
+      unlock: "A\u00c7",
+      endButton: isTryout ? "DENEMEY\u0130 B\u0130T\u0130R" : "ANTRENMANI B\u0130T\u0130R",
+      lockedReply: "# SUNUCU K\u0130L\u0130TLEND\u0130",
+      unlockedReply: "# SUNUCU A\u00c7ILDI",
+      endedReply: isTryout ? "# DENEME B\u0130TT\u0130" : "# ANTRENMAN B\u0130TT\u0130",
+      controlsFooter: "-# Sadece hoster kontrolleri \u2022 Made By Fieel",
+      started: isTryout ? "Deneme ba\u015flat\u0131ld\u0131" : "Antrenman ba\u015flat\u0131ld\u0131"
+    }
+    : {
+      title: isTryout ? "# TRYOUT OPEN" : "# TRAINING",
+      subtitle: isTryout ? "## Tryout Time" : "## Competitive Practice",
+      server: "Server",
+      format: "Format",
+      characters: "Playable Characters",
+      hoster: "Hoster",
+      evaluation: "Evaluation",
+      rules: "Rules",
+      link: "Link",
+      locked: "SERVER LOCKED",
+      unlock: "UNLOCK",
+      endButton: isTryout ? "END TRYOUT" : "END TRAINING",
+      lockedReply: "# SERVER LOCKED",
+      unlockedReply: "# SERVER UNLOCKED",
+      endedReply: isTryout ? "# TRYOUT ENDED" : "# TRAINING ENDED",
+      controlsFooter: "-# Hoster-only controls \u2022 Made By Fieel",
+      started: isTryout ? "Tryout started" : "Training started"
+    };
+}
+
+function sessionControls(sessionId, type, language = "tr") {
+  const copy = sessionLanguageCopy(language, type);
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel(copy.locked).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel(copy.unlock).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel(copy.endButton).setStyle(ButtonStyle.Danger)
+  );
+}
+
+function trainingAnnouncementMarkdown({ language, pingRoleId, server, format, characters, rules, link, hoster, cohost }) {
+  const copy = sessionLanguageCopy(language, "training");
+  const cleanRules = (Array.isArray(rules) ? rules : String(rules || "").split(/\r?\n/))
+    .map(value => String(value).trim().replace(/^[-•◆◇]\s*/, ""))
+    .filter(Boolean);
+  return [
+    pingRoleId ? `<@&${pingRoleId}>` : null,
+    copy.title,
+    copy.subtitle,
+    "",
+    `◇ ${copy.server}:`,
+    server,
+    "",
+    `◇ ${copy.format}:`,
+    format,
+    "",
+    `◇ ${copy.characters}:`,
+    characters,
+    "",
+    `◇ ${copy.rules}:`,
+    ...cleanRules.map(rule => `• ${rule}`),
+    "",
+    `◇ ${copy.link}:`,
+    link,
+    "",
+    `◇ ${copy.hoster}:`,
+    `${hoster}${cohost ? ` • ${language === "tr" ? "Yardımcı hoster" : "Co-hoster"}: ${cohost}` : ""}`,
+    "",
+    copy.controlsFooter
+  ].filter(Boolean).join("\n");
+}
+
+function tryoutAnnouncementMarkdown({ language, pingRoleId, server, link, hoster }) {
+  const copy = sessionLanguageCopy(language, "tryout");
+  const tr = language !== "en";
+  return [
+    pingRoleId ? `<@&${pingRoleId}>` : null,
+    copy.title,
+    copy.subtitle,
+    "",
+    `◇ ${copy.server}:`,
+    server,
+    "",
+    `◇ ${copy.format}:`,
+    tr ? "• FT2 — 1 agresif round\n• FT2 — 1 pasif round" : "• FT2 — one aggressive round\n• FT2 — one passive round",
+    "",
+    `◇ ${copy.hoster}:`,
+    hoster,
+    "",
+    `◇ ${copy.evaluation}:`,
+    tr
+      ? "RC timing, catch, dash tepkisi, hareket, baskı, adaptasyon ve game sense."
+      : "RC timing, catches, dash reactions, movement, pressure, adaptation and game sense.",
+    "",
+    `◇ ${copy.rules}:`,
+    ...(tr
+      ? ["• LH yok", "• 3M1 Reset yok", "• True Downslam yok", "• 2 RC yok", "• Wall yok", "• Overpassive yok", "• Alt hesap yok", "• Sırada vurmak yok", "• Sırayı terk etmek yok"]
+      : ["• No LH", "• No 3M1 reset", "• No True Downslam", "• No 2 RC", "• No wall abuse", "• No overpassive play", "• No alternate accounts", "• Do not hit people in queue", "• Do not leave the queue"]),
+    "",
+    `◇ ${copy.link}:`,
+    link,
+    "",
+    tr ? "-# 1–5 dakika sonra kilitle • Sadece hoster kontrolleri • Made By Fieel" : copy.controlsFooter
+  ].filter(Boolean).join("\n");
+}
+
 function compactText(value, max = 90) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   return text.length > max ? `${text.slice(0, Math.max(0, max - 1)).trim()}…` : text;
@@ -615,47 +734,34 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
 ]);
 
 export const PARADISE_COMMUNITY_SCHEMA = [
-  ["START HERE", ["welcome", "farewell", "rules", "fieel-info", "choose-language", "choose-pings", "choose-region", "role-selection", "command-guide", "how-to-get-key", "official-downloads", "security-and-trust"], false],
-  ["IMPORTANT", ["announcements", "updates", "status", "faq", "pricing", "trial-info", "giveaways"], false],
-  ["SUPPORT", ["open-ticket", "support-info", "application-ticket", "application-guide", "report-guide"], false],
-  ["SUPPORT STAFF", ["ticket-logs", "transcripts", "staff-notes", "application-reviews"], true],
-  ["FIMA APP", ["fima-macro", "macro-help", "update-help", "license-help", "hwid-help", "payment-help", "robux-payments", "bug-reports", "suggestions"], false],
-  ["COMMUNITY", ["general", "media", "uploads", "clips", "outfits", "capes", "macro-discussion", "success-results", "creator-resources", "partnerships", "media-approval", "bot-commands"], false],
-  ["TRAINING & EVENTS", ["training-announcements", "training-results", "event-announcements", "event-results", "tournament-announcements", "tournament-results", "game-night", "giveaway-results"], false],
-  ["STAFF", ["staff-chat", "staff-command-guide", "mod-command-guide", "giveaway-event-guide", "ticket-guide", "dashboard-guide", "moderation-policy", "moderation-requests", "staff-logs", "moderation-logs", "activity-logs", "security-alerts", "quarantine-review", "application-logs", "bot-logs"], true],
-  ["MEMBER LOGS", ["welcome-logs", "leave-logs", "level-logs"], true],
-  ["VOICE", ["Join to Create", "Community Voice 1", "Community Voice 2", "AFK"], false],
+  ["BA\u015eLANGI\u00c7", ["welcome", "rules", "fieel-info", "role-selection", "choose-language", "choose-pings", "command-guide"], false],
+  ["DUYURULAR", ["announcements", "updates", "faq", "official-downloads"], false],
+  ["FIMA DESTEK", ["open-ticket", "support-info", "fima-macro", "fima-help", "license-help", "bug-reports", "application-ticket"], false],
+  ["TOPLULUK", ["general", "media", "bot-commands", "events-and-giveaways", "training-announcements"], false],
+  ["EK\u0130P VE KAYITLAR", ["staff-command-guide", "mod-command-guide", "ticket-guide", "application-guide", "application-reviews", "moderation-requests", "support-ticket-transcripts", "support-logs", "application-logs", "security-logs"], true],
+  ["SES", ["Join to Create", "Community Voice", "AFK"], false],
   ["PRIVATE VOICE", [], false]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
-  ["START", ["welcome", "farewell", "rules", "verify", "profile-guide", "choose-language", "choose-pings", "choose-region", "command-guide", "role-guide", "maining-guide"], false],
-  ["CLAN", ["announcements", "clan-relations", "ally-requests", "advertisement", "outfits", "capes", "main-line", "roster-lineup", "war-lineup", "eu-rosters", "region-rosters", "branch-support", "roster-logs", "war-logs", "mainer-proof", "find-a-fcw"], false],
-  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "tryout-hoster-rules", "training-hoster-rules", "hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "giveaway-event-guide", "hoster-guide", "hoster-works"], false],
-  ["CHALLENGES", ["challenge-ticket", "challenge-rules", "availability", "challenges", "challenge-results", "challenge-ticket-transcripts", "referee-rules", "referee-guide", "referee-post", "referee-works"], false],
-  ["EVENTS", ["tournaments", "tournament-results", "events", "giveaways", "game-night", "question-of-the-day", "level-leaderboard"], false],
-  ["SUPPORT", ["support-ticket", "application-ticket", "application-guide", "ticket-guide", "report-staff", "report-guide"], false],
-  ["BLACKLIST & APPEALS", ["blacklist", "blacklist-appeal", "bail-review"], false],
-  ["STAFF", ["staff-annc", "staff-chat", "staff-command-guide", "mod-command-guide", "dashboard-guide", "moderation-policy", "moderation-requests", "activity-check", "activity-review", "application-reviews", "application-logs", "referee-logs", "hoster-reports", "quarantine-review", "payout-queue", "bot-logs", "loa"], true],
-  ["LOGS", ["welcome-logs", "leave-logs", "message-logs", "role-logs", "channel-logs", "member-logs", "mod-logs", "level-logs"], true],
-  ["VOICE", ["war-vc-text", "Stage", "Join to Create", "War VC", "Voice 1", "Voice 2", "Voice 3", "AFK"], false],
+  ["BA\u015eLANGI\u00c7", ["welcome", "rules", "verify", "profile-guide", "role-selection", "choose-language", "choose-pings", "command-guide"], false],
+  ["CLAN PANOLARI", ["announcements", "main-line", "roster-lineup", "war-lineup", "mainer-proof", "clan-relations", "roster-logs", "war-logs"], false],
+  ["SIRALAMA VE MEYDAN OKUMA", ["top-10", "top-20", "top-30", "challenge-ticket", "challenge-rules", "availability", "challenge-results"], false],
+  ["TRYOUT VE TRAINING", ["tryout", "tryout-results", "training", "training-results", "events-and-giveaways", "question-of-the-day", "level-leaderboard"], false],
+  ["DESTEK", ["support-ticket", "application-ticket", "blacklist", "blacklist-appeal", "bail-review", "report-staff"], false],
+  ["PERSONEL", ["staff-team", "staff-command-guide", "mod-command-guide", "referee-rules", "referee-guide", "training-hoster-guide", "tryout-hoster-guide", "application-guide", "ticket-guide", "application-reviews", "moderation-requests", "activity-logs", "loa", "challenge-ticket-transcripts", "support-ticket-transcripts", "staff-logs"], true],
+  ["SES", ["Join to Create", "War VC", "Community Voice", "AFK"], false],
   ["PRIVATE VOICE", [], false]
 ];
 
 export const PARADISE_TSBTR_SCHEMA = [
-  ["LOGS", ["challenge-ticket-transcripts", "support-ticket-transcripts", "message-logs", "role-logs", "channel-logs", "nick-logs", "ban-unban-logs", "kick-logs", "mod-logs", "member-logs", "other-logs", "guide"], true],
-  ["ADMIN", ["staff-annc", "staff-chat", "staff-works", "staff-rules", "staff-updates", "staff-strikes", "proofs", "referee-logs", "activity-review"], true],
-  ["CENTER", ["welcome", "farewell", "blacklist", "ban-appeal", "unblacklist", "bail-review", "staff-team", "role-guide", "command-guide", "overview", "choose-language", "choose-pings", "choose-region", "report-guide"], false],
-  ["IMPORTANT", ["rules", "announcements", "sub-announcements", "content-channel", "server-logs", "staff-logs", "applications", "boosts", "giveaways", "polls", "hall-of-shame", "hall-of-fame"], false],
-  ["TRYOUT & TRAINING", ["tryout", "tryout-results", "training", "training-results", "training-announcements", "training-hoster-announcements", "training-hoster-rules", "trainer-annc", "activity-check"], false],
-  ["TICKET", ["challenge-ticket", "support-ticket", "payment-ticket", "bug-ticket", "macro-ticket", "application-ticket", "application-guide", "report-staff"], false],
-  ["GENERAL", ["tr-chat", "chat", "media", "bot-commands", "teamer-help", "spar-request"], false],
-  ["LEADERBOARD", ["top-10", "top-20", "top-30", "level-leaderboard", "challenge-rules", "set-rules", "availability", "challenges", "challenge-results"], false],
-  ["HOSTER", ["global-hoster-annc", "hoster-activity-check", "tryouter-annc", "hoster-trainer-annc", "tryout-hoster-rules", "training-hoster-rules", "hoster-rules", "tryout-hoster-guide", "training-hoster-guide", "hoster-chat", "hoster-works", "hoster-strikes", "hoster-reports", "loa"], true],
-  ["REFEREES", ["referee-annc", "referee-chat", "referee-rules", "referee-post", "referee-updates", "referee-works", "referee-guide", "referee-strikes", "referee-activity-check"], true],
-  ["STAFF OPERATIONS", ["staff-command-guide", "mod-command-guide", "giveaway-event-guide", "ticket-guide", "dashboard-guide", "moderation-policy", "moderation-requests", "quarantine-review", "application-reviews"], true],
-  ["CLAN OPERATIONS", ["maining-guide", "mainer-proof", "war-announcements", "war-line-chat", "war-scores", "eu-rosters", "roster-logs", "find-a-fcw"], true],
-  ["VOICE", ["Stage", "Join to Create", "Voice 1", "Voice 2", "Voice 3", "Voice 4", "Voice 5", "AFK"], false],
+  ["BA\u015eLANGI\u00c7", ["welcome", "rules", "overview", "role-selection", "choose-language", "choose-pings", "choose-region", "command-guide"], false],
+  ["SIRALAMA", ["top-10", "top-20", "top-30", "challenge-ticket", "challenge-rules", "availability", "challenge-results", "set-rules"], false],
+  ["TRYOUT VE TRAINING", ["tryout", "tryout-results", "training", "training-results", "announcements", "general", "bot-commands"], false],
+  ["DESTEK", ["support-ticket", "application-ticket", "blacklist", "blacklist-appeal", "bail-review", "report-staff"], false],
+  ["PERSONEL", ["staff-team", "staff-command-guide", "mod-command-guide", "referee-rules", "referee-guide", "training-hoster-guide", "tryout-hoster-guide", "application-guide", "ticket-guide", "application-reviews", "moderation-requests", "activity-logs", "loa", "challenge-ticket-transcripts", "support-ticket-transcripts", "staff-logs"], true],
+  ["TOPLULUK", ["giveaways", "media", "level-leaderboard"], false],
+  ["SES", ["Join to Create", "Community Voice", "AFK"], false],
   ["PRIVATE VOICE", [], false]
 ];
 
@@ -1892,18 +1998,17 @@ export async function runParadiseTestSmokeSuite(guild) {
     return message;
   };
 
+  const smokeConfig = configForGuild(await loadState(), guild.id);
+  const smokeLanguage = guildLanguage(smokeConfig);
+  const trainingCopy = sessionLanguageCopy(smokeLanguage, "training");
+  const tryoutCopy = sessionLanguageCopy(smokeLanguage, "tryout");
   const trainingId = crypto.randomUUID();
   const tryoutId = crypto.randomUUID();
-  const controls = (id, ending) => new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`paradise_session_locked:${id}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`paradise_session_unlocked:${id}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`paradise_session_end:${id}`).setLabel(ending).setStyle(ButtonStyle.Danger)
-  );
   smokeStep = "training_send";
   const training = await smokeSend(trainingChannel, {
     content: [
-      "# TRAINING",
-      "## Competitive Practice",
+      trainingCopy.title,
+      trainingCopy.subtitle,
       "",
       "### Kurallar:",
       "- LH yok / 2M1 shove tech yok",
@@ -1926,14 +2031,23 @@ export async function runParadiseTestSmokeSuite(guild) {
       "",
       "-# Canlı test mesajı • Hoster-only controls • Made By Fieel"
     ].join("\n"),
-    components: [controls(trainingId, "END TRAINING")],
+    components: [sessionControls(trainingId, "training", smokeLanguage)],
+    content: trainingAnnouncementMarkdown({
+      language: smokeLanguage,
+      server: "Frankfurt, Germany",
+      format: "First To 3",
+      characters: "Saitama, Garou, Metal Bat",
+      rules: ["LH yok / 2M1 shove tech yok", "TDS yok / True Downslam yok", "Overpassive yok", "2 Ragdoll Cancel yok", "Wall abuse yok", "Sırada birbirinize vurmak yok", "Sırayı terk etmek yok"],
+      link: "https://www.roblox.com/share?code=PARADISE-TEST",
+      hoster: `<@${ownerId}>`
+    }),
     allowedMentions: { users: [], roles: [], parse: [] }
   }, "smoke_training_send_failed");
   smokeStep = "tryout_send";
   const tryout = await smokeSend(tryoutChannel, {
     content: [
-      "# TRYOUT OPEN",
-      "## Tryout Time",
+      tryoutCopy.title,
+      tryoutCopy.subtitle,
       "",
       "◆ **Server**",
       "https://www.roblox.com/share?code=PARADISE-TEST",
@@ -1955,17 +2069,24 @@ export async function runParadiseTestSmokeSuite(guild) {
       "",
       "-# Lock after 1–5 minutes • Canlı test mesajı • Made By Fieel"
     ].join("\n"),
-    components: [controls(tryoutId, "END TRYOUT")],
+    components: [sessionControls(tryoutId, "tryout", smokeLanguage)],
+    content: tryoutAnnouncementMarkdown({
+      language: smokeLanguage,
+      server: "Frankfurt, Germany",
+      link: "https://www.roblox.com/share?code=PARADISE-TEST",
+      hoster: `<@${ownerId}>`
+    }),
     allowedMentions: { users: [], roles: [], parse: [] }
   }, "smoke_tryout_send_failed");
 
   smokeStep = "lifecycle_send";
-  await smokeReply(training, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
-  await smokeReply(training, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
-  await smokeReply(training, "# TRAINING ENDED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
-  await smokeReply(tryout, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
-  await smokeReply(tryout, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
-  await smokeReply(tryout, "# ENDED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
+  const smokeFooter = smokeLanguage === "tr" ? "-# Paradise yaşam döngüsü testi • Made By Fieel" : "-# Paradise lifecycle rendering test • Made By Fieel";
+  await smokeReply(training, `${trainingCopy.lockedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
+  await smokeReply(training, `${trainingCopy.unlockedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
+  await smokeReply(training, `${trainingCopy.endedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
+  await smokeReply(tryout, `${tryoutCopy.lockedReply}\n${smokeFooter}`, "smoke_tryout_lifecycle_failed");
+  await smokeReply(tryout, `${tryoutCopy.unlockedReply}\n${smokeFooter}`, "smoke_tryout_lifecycle_failed");
+  await smokeReply(tryout, `${tryoutCopy.endedReply}\n${smokeFooter}`, "smoke_tryout_lifecycle_failed");
 
   const sessions = {
     [trainingId]: {
@@ -2629,18 +2750,18 @@ async function handleTryout(interaction) {
     const link = interaction.options.getString("link");
     const sessionId = crypto.randomUUID();
     const session = { id: sessionId, guildId: interaction.guildId, type: "tryout", hosterId: interaction.user.id, link, status: "open", startedAt: new Date().toISOString() };
-    const controls = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRYOUT").setStyle(ButtonStyle.Danger)
-    );
-    const tryoutConfig = configForGuild(await loadState(), interaction.guildId).tryout || {};
+    const state = await loadState();
+    const guildConfig = configForGuild(state, interaction.guildId);
+    const language = guildLanguage(guildConfig);
+    const copy = sessionLanguageCopy(language, "tryout");
+    const tryoutConfig = guildConfig.tryout || {};
+    const controls = sessionControls(sessionId, "tryout", language);
     const tryoutPing = interaction.guild.roles.cache.find(role => ["Tryout Ping", "Re/Tryout Ping"].includes(role.name) || role.id === tryoutConfig.pingRoleId);
     const payload = {
       content: [
         tryoutPing ? `<@&${tryoutPing.id}>` : null,
-        "# TRYOUT OPEN",
-        "## Tryout Time",
+        copy.title,
+        copy.subtitle,
         "",
         "◇ Server:",
         tryoutConfig.defaultServer || "Frankfurt, Germany",
@@ -2674,6 +2795,13 @@ async function handleTryout(interaction) {
       components: [controls],
       allowedMentions: { users: [interaction.user.id], roles: tryoutPing ? [tryoutPing.id] : [], parse: [] }
     };
+    payload.content = tryoutAnnouncementMarkdown({
+      language,
+      pingRoleId: tryoutPing?.id,
+      server: tryoutConfig.defaultServer || "Frankfurt, Germany",
+      link,
+      hoster: `${interaction.user}`
+    });
     await interaction.deferReply({ ephemeral: true });
     const target = await configuredChannel(interaction.guild, "tryout_channel", "tryout") || interaction.channel;
     const announcement = await target.send(payload);
@@ -2681,7 +2809,7 @@ async function handleTryout(interaction) {
     session.messageId = announcement.id;
     activeTrainings.set(sessionId, session);
     await saveState(state => { state.trainings[sessionId] = session; return state; });
-    return interaction.editReply(`Tryout started: ${announcement.url}`);
+    return interaction.editReply(`${copy.started}: ${announcement.url}`);
   }
   const target = interaction.options.getUser("user");
   if (!await completedProfile(target.id)) return interaction.reply({ content: "Target must complete `/profile create` first.", ephemeral: true });
@@ -3173,12 +3301,11 @@ async function handleTraining(interaction) {
       id: sessionId, guildId: interaction.guildId, type: "training", hosterId: selectedHost.id, createdBy: interaction.user.id,
       cohostId: cohost?.id || null, link, rules, status: "open", startedAt: new Date().toISOString()
     };
-    const controls = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`paradise_session_locked:${sessionId}`).setLabel("SERVER LOCKED").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`paradise_session_unlocked:${sessionId}`).setLabel("UNLOCK").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`paradise_session_end:${sessionId}`).setLabel("END TRAINING").setStyle(ButtonStyle.Danger)
-    );
-    const trainingConfig = configForGuild(await loadState(), interaction.guildId).training || {};
+    const state = await loadState();
+    const guildConfig = configForGuild(state, interaction.guildId);
+    const language = guildLanguage(guildConfig);
+    const trainingConfig = guildConfig.training || {};
+    const controls = sessionControls(sessionId, "training", language);
     const defaultServer = String(trainingConfig.defaultServer || "Frankfurt, Germany").trim();
     const trainingPing = interaction.guild.roles.cache.find(role => role.name === "Training Ping" || role.id === trainingConfig.pingRoleId);
     const rulesLines = String(rules).split(/\r?\n/)
@@ -3212,6 +3339,17 @@ async function handleTraining(interaction) {
       components: [controls],
       allowedMentions: { users: [selectedHost.id, ...(cohost ? [cohost.id] : [])], roles: trainingPing ? [trainingPing.id] : [] }
     };
+    payload.content = trainingAnnouncementMarkdown({
+      language,
+      pingRoleId: trainingPing?.id,
+      server: defaultServer,
+      format: trainingConfig.defaultFormat || "First To 3",
+      characters: trainingConfig.characters || "Saitama, Garou, Metal Bat",
+      rules: rulesLines,
+      link,
+      hoster: `<@${selectedHost.id}>`,
+      cohost: cohost ? `${cohost}` : null
+    });
     await interaction.deferReply({ ephemeral: true });
     const target = await configuredChannel(interaction.guild, "training_channel", "training") || interaction.channel;
     const announcement = await target.send(payload);
@@ -3219,7 +3357,7 @@ async function handleTraining(interaction) {
     session.messageId = announcement.id;
     activeTrainings.set(sessionId, session);
     await saveState(state => { state.trainings[sessionId] = session; return state; });
-    return interaction.editReply(`Training started: ${announcement.url}`);
+    return interaction.editReply(`${sessionLanguageCopy(language, "training").started}: ${announcement.url}`);
   }
   const owned = [...activeTrainings.values()].find(item => belongsToGuild(item, interaction.guildId) && item.hosterId === interaction.user.id && item.status !== "ended")
     || Object.values((await loadState()).trainings).find(item => belongsToGuild(item, interaction.guildId) && item.hosterId === interaction.user.id && item.status !== "ended");
@@ -3280,7 +3418,9 @@ async function finishSession(sessionId, hosterId, result = {}) {
 
 async function handleSessionButton(interaction) {
   const [action, sessionId] = interaction.customId.replace("paradise_session_", "").split(":");
-  const session = activeTrainings.get(sessionId) || (await loadState()).trainings[sessionId];
+  const state = await loadState();
+  const session = activeTrainings.get(sessionId) || state.trainings[sessionId];
+  const copy = sessionLanguageCopy(guildLanguage(configForGuild(state, interaction.guildId)), session?.type || "training");
   if (!session) return interaction.reply({ content: "Session not found.", ephemeral: true });
   if (!belongsToGuild(session, interaction.guildId)) return interaction.reply({ content: "This session belongs to another server.", ephemeral: true });
   if (session.hosterId !== interaction.user.id && !isOwner(interaction)) {
@@ -3292,7 +3432,7 @@ async function handleSessionButton(interaction) {
       return state;
     });
     await interaction.deferUpdate();
-    return interaction.message.reply({ content: "# SERVER LOCKED\n-# Made By Fieel", allowedMentions: { parse: [] } });
+    return interaction.message.reply({ content: `${copy.lockedReply}\n-# Made By Fieel`, allowedMentions: { parse: [] } });
   }
   if (action === "unlocked") {
     await saveState(state => {
@@ -3300,10 +3440,10 @@ async function handleSessionButton(interaction) {
       return state;
     });
     await interaction.deferUpdate();
-    return interaction.message.reply({ content: "# SERVER UNLOCKED\n-# Made By Fieel", allowedMentions: { parse: [] } });
+    return interaction.message.reply({ content: `${copy.unlockedReply}\n-# Made By Fieel`, allowedMentions: { parse: [] } });
   }
   await finishSession(sessionId, session.hosterId);
-  const ending = session.type === "tryout" ? "# ENDED" : "# TRAINING ENDED";
+  const ending = copy.endedReply;
   await interaction.update({
     content: interaction.message.content || "",
     embeds: [],
@@ -4150,7 +4290,7 @@ export async function submitParadiseWebsiteApplication(guild, { userId, type, an
     reviewMessage = await review.send({
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(type)}`)
         .setDescription(`Applicant: <@${userId}>\nApplication ID: \`${id.slice(0, 8)}\`\nSource: **Fima website**`)
-        .addFields(Object.entries(normalizedAnswers).map(([label, value]) => ({ name: label, value: value.slice(0, 1024), inline: false })))
+        .addFields(Object.entries(normalizedAnswers).map(([label, value]) => ({ name: label, value: maskApplicationReviewText(value, 1024), inline: false })))
         .setFooter(paradiseFooter("Pending private review")).setTimestamp()],
       components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`paradise_application_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),

@@ -53,8 +53,10 @@ test("test-guild smoke includes transcript-first close and reopen coverage", asy
 test("test-guild session lifecycle replies to the original Markdown announcement", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /const smokeReply = async \(message, content, code\)/);
-  assert.match(source, /await smokeReply\(training, "# SERVER LOCKED/);
-  assert.match(source, /await smokeReply\(tryout, "# SERVER LOCKED/);
+  assert.match(source, /await smokeReply\(training, `\$\{trainingCopy\.lockedReply\}/);
+  assert.match(source, /await smokeReply\(tryout, `\$\{tryoutCopy\.lockedReply\}/);
+  assert.match(source, /function tryoutAnnouncementMarkdown/);
+  assert.match(source, /function trainingAnnouncementMarkdown/);
   assert.match(source, /trainingPlainMarkdown/);
   assert.match(source, /tryoutPlainMarkdown/);
 });
@@ -211,6 +213,15 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("application-ticket"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("Join to Create"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("moderation-requests"), true);
+});
+
+test("compact templates keep the critical panels without flooding the channel list", () => {
+  const count = mode => PARADISE_SETUP_SCHEMAS[mode].schema.flatMap(([, channels]) => channels).length;
+  assert.ok(count("community") <= 40);
+  assert.ok(count("clan") <= 60);
+  assert.ok(count("tsbtr") <= 55);
+  assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("challenge-ticket-transcripts"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("support-ticket-transcripts"));
 });
 
 test("availability board separates timed entries and active tickets", () => {
