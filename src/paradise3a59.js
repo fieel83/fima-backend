@@ -13,7 +13,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-markdown-reply-live-smoke-v3";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-fast-panel-repost-live-smoke-v4";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -2042,6 +2042,8 @@ export async function runParadiseTestSmokeSuite(guild) {
     return next;
   });
   const leaderboardBoards = await updateRankedLeaderboardBoards(guild).catch(() => []);
+  smokeStep = "staff_team";
+  const staffTeam = await updateStaffTeamEmbed(guild).catch(() => null);
   smokeStep = "help_guide";
   const helpGuide = await publishSetupGuides(guild, "tsbtr").catch(() => null);
   smokeStep = "workflow_panels";
@@ -2127,6 +2129,7 @@ export async function runParadiseTestSmokeSuite(guild) {
     lifecycleMessages: 6,
     welcomeLeaveSimulation: Boolean(owner),
     leaderboardBoards,
+    staffTeam: staffTeam ? { channelId: staffTeam.channelId, messageId: staffTeam.id, url: staffTeam.url } : null,
     helpGuide: helpGuide ? { channelId: helpGuide.channelId, messageId: helpGuide.id, url: helpGuide.url } : null,
     workflowPanels: {
       application: applicationPanel ? { channelId: applicationPanel.channelId, messageId: applicationPanel.id, url: applicationPanel.url } : null,
@@ -2162,7 +2165,11 @@ export async function runParadiseAutoSmokeOnce(guild) {
     if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
       return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
     }
-    const repair = await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
+    // A full missing-only repair is needed for an empty lab, but repeating the
+    // whole template on every source revision delays panel smoke tests for minutes.
+    const repair = state.securityState?.[guild.id]?.lastAutoSmokeResult
+      ? { skipped: true, reason: "existing_test_lab" }
+      : await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
     const result = await runParadiseTestSmokeSuite(guild);
     const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
     const appealChannel = guild.channels.cache.find(channel =>
@@ -2199,6 +2206,8 @@ export async function runParadiseAutoSmokeOnce(guild) {
           tryoutPlainMarkdown: result.tryout?.plainMarkdown === true,
           trainingLifecycleReplies: Number(result.training?.lifecycleReplies || 0),
           tryoutLifecycleReplies: Number(result.tryout?.lifecycleReplies || 0),
+          leaderboardBoardCount: Number(result.leaderboardBoards?.length || 0),
+          staffTeamReady: Boolean(result.staffTeam?.messageId),
           supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
           supportTicketTranscriptReady: Boolean(result.workflowPanels?.supportTicket?.transcriptSaved),
           supportTicketReopenReady: Boolean(result.workflowPanels?.supportTicket?.closedThenReopened),
@@ -2257,6 +2266,8 @@ export async function paradiseTestLabStatus() {
     tryoutPlainMarkdown: result.tryoutPlainMarkdown === true,
     trainingLifecycleReplies: Number(result.trainingLifecycleReplies || 0),
     tryoutLifecycleReplies: Number(result.tryoutLifecycleReplies || 0),
+    leaderboardBoardCount: Number(result.leaderboardBoardCount || 0),
+    staffTeamReady: result.staffTeamReady === true,
     supportTicketReady: Boolean(result.supportTicketChannelId),
     supportTicketTranscriptReady: result.supportTicketTranscriptReady === true,
     supportTicketReopenReady: result.supportTicketReopenReady === true,

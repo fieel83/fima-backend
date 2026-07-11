@@ -59,6 +59,14 @@ test("test-guild session lifecycle replies to the original Markdown announcement
   assert.match(source, /tryoutPlainMarkdown/);
 });
 
+test("repeat smoke refreshes boards without replaying a full template repair", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /reason: "existing_test_lab"/);
+  assert.match(source, /const staffTeam = await updateStaffTeamEmbed\(guild\)/);
+  assert.match(source, /leaderboardBoardCount/);
+  assert.match(source, /staffTeamReady/);
+});
+
 test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);
