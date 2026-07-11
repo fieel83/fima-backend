@@ -34,6 +34,8 @@ test("Paradise config writes require owner action header and trusted official or
   assert.match(serverSource, /\/api\/paradise\/config\/history/);
   assert.match(serverSource, /\/api\/paradise\/config\/rollback-preview/);
   assert.match(serverSource, /buildParadiseConfigRollbackPreview/);
+  assert.match(serverSource, /\/api\/paradise\/reconciliation/);
+  assert.match(serverSource, /buildParadiseReconciliation/);
 });
 
 test("browser dashboard route is UI-first while API authorization remains JSON", () => {

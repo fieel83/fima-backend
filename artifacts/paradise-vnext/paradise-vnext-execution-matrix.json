@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:41:56.532Z",
+  "generatedAt": "2026-07-11T15:43:20.569Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -405,15 +405,20 @@
         "BACKUP-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
+      "evidencePath": [
+        "src/paradiseReconciliation.js",
+        "test/paradiseReconciliation.test.js",
+        "test/paradise-dashboard.test.js"
+      ],
       "blocker": null,
-      "nextExactAction": "Implement read-only reconciliation result builder for state/config records.",
+      "nextExactAction": "Add a scheduled, rate-limited reconciliation job and dashboard health card after runtime channel/message existence checks are safe to run in staging.",
       "affectedFiles": [
+        "src/paradiseReconciliation.js",
         "src/paradise3a59.js",
         "src/server.js"
       ],

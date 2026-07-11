@@ -39,6 +39,7 @@ import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
 import { normalizeParadiseFeatureFlags } from "./paradiseFeatureFlags.js";
+import { buildParadiseReconciliation } from "./paradiseReconciliation.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
@@ -844,6 +845,16 @@ app.get("/api/paradise/config/history", requireUser, requireParadiseOwner, async
   });
   const versions = rows.map(row => summarizeParadiseConfigVersion(row.value)).filter(Boolean);
   return res.json({ success: true, guildId, versions });
+});
+
+app.get("/api/paradise/reconciliation", requireUser, requireParadiseOwner, async (req, res) => {
+  const guildId = String(req.query?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+  const state = row?.value && typeof row.value === "object" ? row.value : {};
+  const result = buildParadiseReconciliation({ state, managedGuildIds: managedGuilds.map(guild => guild.id) });
+  return res.json({ success: true, guildId, reconciliation: result });
 });
 
 app.post("/api/paradise/config/rollback-preview", requireUser, requireParadiseOwner, async (req, res) => {

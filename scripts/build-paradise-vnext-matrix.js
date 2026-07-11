@@ -93,7 +93,7 @@ const requirements = [
   requirement("OPS-001", "Reconciliation health foundation", "Recurring safe checks discover orphaned channels, roles, panels, tickets, transcripts, component schemas, leaderboard duplicates and cross-guild references.", {
     module: "operations", priority: "P0", milestone: "Milestone 1", dependencies: ["CFG-001", "DB-001", "BACKUP-001"], securityCritical: true,
     acceptanceCriteria: ["health result distinguishes healthy/auto-repairable/owner-review/unsafe", "no destructive auto-repair", "overview can display last reconciliation safely"],
-    testRequirements: [...commonTest, "synthetic orphan detection test"], sourceStatus: "SOURCE ONLY", nextExactAction: "Implement read-only reconciliation result builder for state/config records.", affectedFiles: ["src/paradise3a59.js", "src/server.js"], securityRisk: "high"
+    testRequirements: [...commonTest, "synthetic orphan detection test"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["src/paradiseReconciliation.js", "test/paradiseReconciliation.test.js", "test/paradise-dashboard.test.js"], nextExactAction: "Add a scheduled, rate-limited reconciliation job and dashboard health card after runtime channel/message existence checks are safe to run in staging.", affectedFiles: ["src/paradiseReconciliation.js", "src/paradise3a59.js", "src/server.js"], securityRisk: "high"
   }),
   requirement("CMD-001", "Central command registry", "Every command/subcommand has one manifest for template, module, premium tier, channel, role, parameters, help text, audit and registration scope.", {
     module: "commands", priority: "P0", milestone: "Milestone 1", dependencies: ["RBAC-001", "FLAG-001", "AUTH-001"], securityCritical: true,

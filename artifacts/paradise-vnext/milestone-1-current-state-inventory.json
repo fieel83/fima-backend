@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T15:41:56.532Z",
+  "capturedAt": "2026-07-11T15:43:20.569Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "f0ecbb7bbe78f4c967fbec03cc384f226c338ea1",
+    "localCommit": "d26fb194cba2954c514258129d92a3b68a18bf36",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -142,7 +142,7 @@
     },
     {
       "requirementId": "OPS-001",
-      "status": "SOURCE ONLY"
+      "status": "LOCAL VERIFIED"
     },
     {
       "requirementId": "CMD-001",
