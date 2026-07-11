@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T20:42:33.589Z",
+  "capturedAt": "2026-07-11T21:29:02.463Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "1077711bf9636d0036bbf42089b2411be3fb46f5",
+    "localCommit": "7a4ad82253024e1a0ecc2ba72ccb4001e7946dcd",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -91,9 +91,10 @@
     "status": "LOCAL VERIFIED",
     "evidence": [
       "src/paradiseReconciliation.js",
-      "safe classifications without automatic mutation"
+      "test-guild-only scheduled reconciliation summary",
+      "no automatic Discord mutation"
     ],
-    "gap": "Scheduled runtime reconciliation with Discord existence checks remains SOURCE ONLY."
+    "gap": "A deployed test-guild canary run is BLOCKED until an isolated staging bot/runtime identity exists."
   },
   "featureFlags": {
     "status": "LOCAL VERIFIED",

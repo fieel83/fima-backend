@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T20:42:33.589Z",
+  "generatedAt": "2026-07-11T21:29:02.463Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -414,11 +414,14 @@
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
         "src/paradiseReconciliation.js",
+        "src/paradise3a59.js",
+        "src/server.js",
         "test/paradiseReconciliation.test.js",
+        "test/paradise3a59.test.js",
         "test/paradise-dashboard.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Add a scheduled, rate-limited reconciliation job and dashboard health card after runtime channel/message existence checks are safe to run in staging.",
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild; verify one scheduled run stores the safe summary and that a production guild cannot enable this canary.",
       "affectedFiles": [
         "src/paradiseReconciliation.js",
         "src/paradise3a59.js",
@@ -431,6 +434,7 @@
       "acceptanceCriteria": [
         "health result distinguishes healthy/auto-repairable/owner-review/unsafe",
         "no destructive auto-repair",
+        "test-guild canary persists only a redacted rate-limited summary",
         "overview can display last reconciliation safely"
       ]
     },
