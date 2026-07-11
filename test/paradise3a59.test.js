@@ -34,21 +34,32 @@ test("challenge autowin uses shared referee-work RBAC instead of a separate role
   assert.doesNotMatch(source, /const hasRefereeRole/);
 });
 
-test("Paradise support panel has a real audited ticket lifecycle", () => {
+test("Paradise support panel has state-aware transcript-first ticket controls", async () => {
   const launcher = paradiseSupportPanelPayload(0).components[0].toJSON();
   assert.equal(launcher.components[0].custom_id, "paradise_support_open");
   const open = paradiseSupportTicketControls("ticket-id", "open")[0].toJSON().components;
   assert.deepEqual(open.map(item => item.custom_id), [
     "paradise_support_claim:ticket-id",
-    "paradise_support_close:ticket-id",
-    "paradise_support_reopen:ticket-id",
-    "paradise_support_transcript:ticket-id"
+    "paradise_support_close:ticket-id"
   ]);
-  assert.equal(open[1].disabled, false);
-  assert.equal(open[2].disabled, true);
+  const claimed = paradiseSupportTicketControls("ticket-id", "claimed")[0].toJSON().components;
+  assert.deepEqual(claimed.map(item => item.custom_id), [
+    "paradise_support_unclaim:ticket-id",
+    "paradise_support_close:ticket-id"
+  ]);
   const closed = paradiseSupportTicketControls("ticket-id", "closed")[0].toJSON().components;
-  assert.equal(closed[1].disabled, true);
-  assert.equal(closed[2].disabled, false);
+  assert.deepEqual(closed.map(item => item.custom_id), [
+    "paradise_support_reopen:ticket-id",
+    "paradise_support_delete:ticket-id"
+  ]);
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /paradise_support_delete_confirm:/);
+  assert.match(source, /saveParadiseSupportTranscript\(interaction\.guild, interaction\.channel, locked, "delete"\)/);
+  assert.match(source, /deletionState: "transcript_failed"/);
+  assert.match(source, /await interaction\.channel\.delete\("Paradise transcript-first support ticket deletion"\)/);
+  assert.match(source, /const canDelete = canApproveModeration\(interaction\.member\)/);
+  assert.match(source, /\["support_logs_channel", "Private support ticket logs"\]/);
+  assert.doesNotMatch(source.slice(source.indexOf("export function paradiseSupportTicketControls"), source.indexOf("function supportTicketStatusLabel")), /paradise_support_transcript/);
 });
 
 test("Paradise support transcripts mask common secrets before staff storage", () => {
