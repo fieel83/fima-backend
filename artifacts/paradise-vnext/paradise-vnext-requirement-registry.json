@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T21:54:08.748Z",
+  "generatedAt": "2026-07-11T22:03:56.673Z",
   "status": "LOCAL VERIFIED",
   "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
   "sourcePlans": [
@@ -966,13 +966,14 @@
       "sourceStatus": "LOCAL VERIFIED",
       "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
-      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior.",
+      "blocker": "The current guarded setup code is not deployed to an isolated staging/test-guild runtime.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild; prove preview, create-missing, idempotent rerun and a production-guild guard denial using the current compact schema.",
       "affectedFiles": [
         "src/paradise3a59.js",
         "src/discordBot.js",
@@ -1087,15 +1088,16 @@
       "priority": "P0",
       "milestone": "Milestone 1",
       "sourceStatus": "LOCAL VERIFIED",
-      "localTestStatus": "SOURCE ONLY",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
-      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Repeat only after Milestone 1 guard/component/RBAC changes; do not rebuild the lab for artifact-only work.",
+      "blocker": "The current guarded code is not deployed to an isolated staging/test-guild runtime.",
+      "nextExactAction": "Deploy current code only to the exact test guild, then record guard denial, restart and no-duplicate proof; do not rebuild the lab for artifact-only work.",
       "affectedFiles": [
         "src/paradise3a59.js",
         "src/discordBot.js"
@@ -1134,27 +1136,34 @@
         "Community 10-12 public/4-6 private",
         "Clan 15-18 public/6-8 private",
         "TSBTR 14-17 public/6-8 private",
-        "no default role-guide"
+        "no default role-guide",
+        "welcome/leave and staff guides are consolidated"
       ],
       "testRequirements": [
         "node --check",
         "node --test",
         "secret scan",
         "matrix row update",
-        "three template install comparison"
+        "channel-budget unit test",
+        "three template install comparison",
+        "current-schema idempotency proof"
       ],
       "priority": "P1",
       "milestone": "Milestone 2",
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until Milestone 1 setup foundation is stable.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging bot/runtime identity is available to install the current compact schemas in the exact test guild.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild, install each compact template, verify channel type/count/mapping/role visibility, and capture no-duplicate repair proof before any production migration preview.",
       "affectedFiles": [
-        "src/paradise3a59.js"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T21:54:08.748Z",
+  "generatedAt": "2026-07-11T22:03:56.673Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -568,13 +568,14 @@
       "sourceStatus": "LOCAL VERIFIED",
       "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
-      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior.",
+      "blocker": "The current guarded setup code is not deployed to an isolated staging/test-guild runtime.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild; prove preview, create-missing, idempotent rerun and a production-guild guard denial using the current compact schema.",
       "affectedFiles": [
         "src/paradise3a59.js",
         "src/discordBot.js",
@@ -644,15 +645,16 @@
       ],
       "ownerDecision": null,
       "sourceStatus": "LOCAL VERIFIED",
-      "localTestStatus": "SOURCE ONLY",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
-      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Repeat only after Milestone 1 guard/component/RBAC changes; do not rebuild the lab for artifact-only work.",
+      "blocker": "The current guarded code is not deployed to an isolated staging/test-guild runtime.",
+      "nextExactAction": "Deploy current code only to the exact test guild, then record guard denial, restart and no-duplicate proof; do not rebuild the lab for artifact-only work.",
       "affectedFiles": [
         "src/paradise3a59.js",
         "src/discordBot.js"
@@ -681,16 +683,20 @@
         "RBAC-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until Milestone 1 setup foundation is stable.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging bot/runtime identity is available to install the current compact schemas in the exact test guild.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild, install each compact template, verify channel type/count/mapping/role visibility, and capture no-duplicate repair proof before any production migration preview.",
       "affectedFiles": [
-        "src/paradise3a59.js"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -700,7 +706,8 @@
         "Community 10-12 public/4-6 private",
         "Clan 15-18 public/6-8 private",
         "TSBTR 14-17 public/6-8 private",
-        "no default role-guide"
+        "no default role-guide",
+        "welcome/leave and staff guides are consolidated"
       ]
     },
     {
