@@ -69,6 +69,14 @@ test("repeat smoke refreshes boards without replaying a full template repair", a
   assert.match(source, /staffTeamReady/);
 });
 
+test("compact lab rebuild remains hard-guarded to the disposable test guild", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /const PARADISE_TEST_LAB_LAYOUT_REVISION/);
+  assert.match(source, /rebuildParadiseTestTemplate\(guild, "tsbtr", "REBUILD TEST TSBTR"\)/);
+  assert.match(source, /guild\.id !== PARADISE_TEST_GUILD_ID/);
+  assert.match(source, /3a65-test-server-pre-rebuild-backup\.json/);
+});
+
 test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);

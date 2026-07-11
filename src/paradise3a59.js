@@ -14,6 +14,9 @@ export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
 const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v7";
+// This revision is intentionally limited to the fixed lab guild. It is the
+// owner-authorized compact test layout, never a production-guild rebuild.
+const PARADISE_TEST_LAB_LAYOUT_REVISION = "3a71-compact-tsbtr-lab-v1";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -2289,12 +2292,19 @@ export async function runParadiseAutoSmokeOnce(guild) {
     if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
       return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
     }
+    const needsCompactLab = state.securityState?.[guild.id]?.testLabLayoutRevision !== PARADISE_TEST_LAB_LAYOUT_REVISION;
+    // The test guild was expressly designated as a disposable template lab.
+    // This call is still guarded inside rebuildParadiseTestTemplate by its
+    // fixed guild ID and creates a timestamped backup before any deletion.
+    const compactRebuild = needsCompactLab
+      ? await rebuildParadiseTestTemplate(guild, "tsbtr", "REBUILD TEST TSBTR")
+      : null;
     // A full missing-only repair is needed for an empty lab, but repeating the
     // whole template on every source revision delays panel smoke tests for minutes.
-    const existingTestLab = Boolean(state.securityState?.[guild.id]?.lastAutoSmokeResult);
-    const repair = existingTestLab
+    const existingTestLab = Boolean(state.securityState?.[guild.id]?.lastAutoSmokeResult) && !needsCompactLab;
+    const repair = compactRebuild || (existingTestLab
       ? { skipped: true, reason: "existing_test_lab" }
-      : await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
+      : await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true }));
     const result = await runParadiseTestSmokeSuite(guild, { fast: existingTestLab });
     const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
     const appealChannel = guild.channels.cache.find(channel =>
@@ -2320,7 +2330,8 @@ export async function runParadiseAutoSmokeOnce(guild) {
     await saveState(next => {
       next.securityState[guild.id] = {
         ...(next.securityState[guild.id] || {}),
-        lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
+          lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
+          testLabLayoutRevision: PARADISE_TEST_LAB_LAYOUT_REVISION,
         lastAutoSmokeAt: new Date().toISOString(),
         lastAutoSmokeError: null,
         lastAutoSmokeFailedAt: null,
