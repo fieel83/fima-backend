@@ -19,6 +19,7 @@ import {
   paradiseCommandRegistrationAllowed,
   visibleParadiseCommands
 } from "./paradiseCommandRegistry.js";
+import { resolveParadiseFeatureFlag } from "./paradiseFeatureFlags.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "./paradiseComponentProtocol.js";
 import { buildParadiseRestoreDryRun, createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
 
@@ -7246,6 +7247,14 @@ export function paradiseRuntimeCommandAccess(context = {}) {
 async function enforceParadiseCommandRegistry(interaction) {
   const state = await loadState();
   const context = paradiseRegistryContextForInteraction(interaction, state);
+  const flag = resolveParadiseFeatureFlag({
+    feature: "command_registry_enforcement",
+    flags: context.config.featureFlags,
+    guildId: interaction.guildId,
+    userId: interaction.user?.id,
+    isOwner: context.isOwner
+  });
+  if (!flag.allowed) return { allowed: true, context, code: flag.reason };
   const access = paradiseRuntimeCommandAccess(context);
   if (!access.allowed) {
     await interaction.reply({ content: paradiseRegistryDenialMessage(access.code, interaction.locale), ephemeral: true });

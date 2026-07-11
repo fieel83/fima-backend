@@ -3,8 +3,15 @@ import { PARADISE_TEST_GUILD_ID } from "./runtimeEnvironment.js";
 export const PARADISE_FEATURE_STATES = Object.freeze(["disabled", "owner_only", "test_guild", "allowlist", "enabled"]);
 export const PARADISE_HIGH_RISK_FEATURES = Object.freeze([
   "ai_assistant", "ticket_ai", "profile_transfer", "premium_billing", "social_feeds", "challenge_transaction",
-  "template_repair", "scheduled_rewards", "automod_destructive_actions", "production_license_repair"
+  "template_repair", "scheduled_rewards", "automod_destructive_actions", "production_license_repair",
+  "command_registry_enforcement"
 ]);
+
+export const PARADISE_MILESTONE_ONE_FEATURE_DEFAULTS = Object.freeze({
+  // The new command enforcement path is canaried only in the exact disposable
+  // guild until interaction and restart evidence exists.
+  command_registry_enforcement: Object.freeze({ state: "test_guild", guildAllowlist: [], userAllowlist: [] })
+});
 
 const SAFE_MILESTONE_ONE_STATES = new Set(["disabled", "owner_only", "test_guild", "allowlist"]);
 
@@ -13,7 +20,7 @@ function normalizeState(value) {
 }
 
 export function resolveParadiseFeatureFlag({ feature, flags = {}, guildId, userId, isOwner = false, testGuildId = PARADISE_TEST_GUILD_ID } = {}) {
-  const config = flags?.[feature] || {};
+  const config = flags?.[feature] || PARADISE_MILESTONE_ONE_FEATURE_DEFAULTS[feature] || {};
   const state = normalizeState(config.state);
   const targetGuildId = String(guildId || "");
   const allowedGuilds = new Set(Array.isArray(config.guildAllowlist) ? config.guildAllowlist.map(String) : []);
