@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:28:19.175Z",
+  "generatedAt": "2026-07-11T15:31:24.302Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -131,12 +131,15 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "test/paradiseFoundation.test.js"
+        "test/paradiseFoundation.test.js",
+        "test/paradiseCustomerWorkspaces.test.js",
+        "test/paradise-dashboard.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Integrate workspace access into customer-facing server selector/config APIs after the existing owner-only endpoint split is mapped.",
+      "nextExactAction": "Run an owner-controlled OAuth guilds-scope browser test, then add a separately authorized customer guild config route; keep owner console routes owner-only.",
       "affectedFiles": [
         "src/paradiseGuildScope.js",
+        "src/paradiseCustomerWorkspaces.js",
         "src/server.js",
         "src/adminAuth.js"
       ],

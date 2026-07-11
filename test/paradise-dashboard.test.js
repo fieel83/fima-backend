@@ -65,6 +65,15 @@ test("multi-server owner console scopes reads and writes to a managed guild", ()
   assert.match(serverSource, /state\.guildConfigs/);
 });
 
+test("customer workspace discovery is separate from the owner console and requires Manage Guild/Admin", () => {
+  assert.match(serverSource, /scope", "identify email guilds"/);
+  assert.match(serverSource, /app\.get\("\/api\/paradise\/customer\/workspaces", requireUser/);
+  assert.doesNotMatch(serverSource.match(/app\.get\("\/api\/paradise\/customer\/workspaces"[\s\S]{0,240}/)?.[0] || "", /requireParadiseOwner/);
+  assert.match(serverSource, /paradiseCustomerWorkspaceAccess/);
+  assert.match(serverSource, /discord_reauthorization_required/);
+  assert.match(serverSource, /buildParadiseCustomerWorkspaceCards/);
+});
+
 test("Paradise dashboard is noindex and never renders a bot token", () => {
   assert.match(htmlSource, /noindex,nofollow,noarchive/);
   assert.doesNotMatch(htmlSource, /DISCORD_BOT_TOKEN|botToken|token\s*:/i);

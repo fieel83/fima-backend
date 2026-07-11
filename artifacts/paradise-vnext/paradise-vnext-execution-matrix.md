@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T15:28:19.175Z
+Generated: 2026-07-11T15:31:24.302Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -9,7 +9,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | LIC-001 | P0 | Milestone 1 | DEPLOYED | LOCAL VERIFIED | DEPLOYED | SOURCE ONLY | BLOCKED | Reconnect owner browser; run masked paid-license scan and copy/reveal test without recording the key. |
 | ENV-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Create the redacted staging/production readiness contract for ENV-002; do not widen the exact test-guild guard. |
 | ENV-002 | P1 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Have the owner provision separate staging identities, then run the redacted readiness check before any staging deploy. |
-| AUTH-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Integrate workspace access into customer-facing server selector/config APIs after the existing owner-only endpoint split is mapped. |
+| AUTH-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Run an owner-controlled OAuth guilds-scope browser test, then add a separately authorized customer guild config route; keep owner console routes owner-only. |
 | AUTH-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Design after the shared guild authorization foundation is established. |
 | CFG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add authorized config-version history reading and rollback preview before exposing rollback actions. |
 | FLAG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Persist flags through the versioned guild configuration envelope after CFG-001 is integrated. |

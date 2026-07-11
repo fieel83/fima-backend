@@ -37,6 +37,7 @@ import {
 import { adminPage, loginPage } from "./adminHtml.js";
 import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { createParadiseConfigVersion } from "./paradiseConfigVersioning.js";
+import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
@@ -742,6 +743,27 @@ app.get("/api/paradise/session-status", async (req, res) => {
   }
 });
 
+app.get("/api/paradise/customer/workspaces", requireUser, async (req, res) => {
+  try {
+    const workspaceAccess = await paradiseCustomerWorkspaceAccess(req.user);
+    if (!workspaceAccess.ready) {
+      return res.status(409).json({
+        success: false,
+        error: workspaceAccess.code,
+        reconnectDiscord: workspaceAccess.code === "discord_reauthorization_required"
+      });
+    }
+    await createAuditLog("paradise_customer_workspace_listed", "user", req.user.id, {
+      workspaceCount: workspaceAccess.cards.length,
+      discordIdMasked: maskExternalId(workspaceAccess.discordUserId)
+    });
+    return res.json({ success: true, workspaces: workspaceAccess.cards });
+  } catch (error) {
+    console.error("Paradise customer workspace lookup failed", publicError(error));
+    return res.status(503).json({ success: false, error: error.code || "paradise_workspace_unavailable" });
+  }
+});
+
 app.get("/api/paradise/public-status", async (_req, res) => {
   const [health, guilds, testLab, testRuntime] = await Promise.all([
     discordBotHealth().catch(() => null),
@@ -1316,7 +1338,7 @@ app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
     url.searchParams.set("client_id", requiredEnv("DISCORD_CLIENT_ID"));
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "identify email");
+    url.searchParams.set("scope", "identify email guilds");
     url.searchParams.set("state", state);
     return res.redirect(url.toString());
   } catch (error) {
@@ -8086,6 +8108,19 @@ async function requireUser(req, res, next) {
   }
 }
 
+async function fetchDiscordGuildMemberships(accessToken) {
+  const response = await fetchWithAbort("https://discord.com/api/v10/users/@me/guilds", {
+    headers: { authorization: `Bearer ${accessToken}` }
+  }, 8000);
+  if (!response.ok) {
+    const error = new Error(`discord_guilds_failed_${response.status}`);
+    error.code = response.status === 401 || response.status === 403 ? "discord_reauthorization_required" : "discord_guilds_unavailable";
+    throw error;
+  }
+  const guilds = await response.json();
+  return Array.isArray(guilds) ? guilds.filter(guild => guild?.id) : [];
+}
+
 async function requireParadiseOwner(req, res, next) {
   try {
     const access = await paradiseOwnerAccess(req.user);
@@ -8128,6 +8163,39 @@ async function paradiseLinkedDiscordAccess(user) {
     discordUserId: discordUserId || null,
     reasonCode: discordLinked ? "ok" : "discord_link_required",
     link
+  };
+}
+
+async function paradiseCustomerWorkspaceAccess(user) {
+  const link = await prisma.oAuthLink.findFirst({
+    where: { userId: user.id, provider: "discord" },
+    select: {
+      providerSubject: true,
+      accessTokenCipher: true,
+      tokenExpiresAt: true,
+      scopes: true
+    }
+  });
+  const discordUserId = String(link?.providerSubject || user.discordUserId || "");
+  if (!discordUserId) return { ready: false, code: "discord_link_required", discordUserId: null, cards: [] };
+  const scopes = new Set(String(link?.scopes || "").split(/\s+/).filter(Boolean));
+  if (!scopes.has("guilds") || (link?.tokenExpiresAt && link.tokenExpiresAt.getTime() <= Date.now())) {
+    return { ready: false, code: "discord_reauthorization_required", discordUserId, cards: [] };
+  }
+  const accessToken = decryptToken(link?.accessTokenCipher);
+  if (!accessToken) return { ready: false, code: "discord_reauthorization_required", discordUserId, cards: [] };
+  const [memberships, managedGuilds, legacyState] = await Promise.all([
+    fetchDiscordGuildMemberships(accessToken),
+    paradiseDiscordGuildsSnapshot().catch(() => []),
+    prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } }).catch(() => null)
+  ]);
+  const state = legacyState?.value && typeof legacyState.value === "object" ? legacyState.value : {};
+  const templateByGuildId = Object.fromEntries(Object.entries(state.guildConfigs || {}).map(([guildId, config]) => [guildId, String(config?.activeSetupMode || "") || null]));
+  return {
+    ready: true,
+    code: "ok",
+    discordUserId,
+    cards: buildParadiseCustomerWorkspaceCards({ memberships, managedGuilds, templateByGuildId })
   };
 }
 
