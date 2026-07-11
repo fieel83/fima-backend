@@ -13,7 +13,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-ticket-transcript-live-smoke-v2";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-markdown-reply-live-smoke-v3";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -1870,6 +1870,14 @@ export async function runParadiseTestSmokeSuite(guild) {
       throw error;
     }
   };
+  const smokeReply = async (message, content, code) => {
+    try {
+      return await message.reply({ content, allowedMentions: { parse: [] } });
+    } catch (error) {
+      error.code = code;
+      throw error;
+    }
+  };
   const upsertSmokePanel = async (key, channel, payload) => {
     const state = await loadState();
     const storedId = configForGuild(state, guild.id).smokePanelMessageIds?.[key];
@@ -1952,12 +1960,12 @@ export async function runParadiseTestSmokeSuite(guild) {
   }, "smoke_tryout_send_failed");
 
   smokeStep = "lifecycle_send";
-  await smokeSend(trainingChannel, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
-  await smokeSend(trainingChannel, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
-  await smokeSend(trainingChannel, "# TRAINING ENDED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
-  await smokeSend(tryoutChannel, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
-  await smokeSend(tryoutChannel, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
-  await smokeSend(tryoutChannel, "# ENDED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
+  await smokeReply(training, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
+  await smokeReply(training, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
+  await smokeReply(training, "# TRAINING ENDED\n-# Paradise lifecycle rendering test", "smoke_training_lifecycle_failed");
+  await smokeReply(tryout, "# SERVER LOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
+  await smokeReply(tryout, "# SERVER UNLOCKED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
+  await smokeReply(tryout, "# ENDED\n-# Paradise lifecycle rendering test", "smoke_tryout_lifecycle_failed");
 
   const sessions = {
     [trainingId]: {
@@ -2114,8 +2122,8 @@ export async function runParadiseTestSmokeSuite(guild) {
     status: "LIVE DISCORD VERIFIED",
     completedAt: new Date().toISOString(),
     guildId: guild.id,
-    training: { channelId: trainingChannel.id, messageId: training.id, url: training.url },
-    tryout: { channelId: tryoutChannel.id, messageId: tryout.id, url: tryout.url },
+    training: { channelId: trainingChannel.id, messageId: training.id, url: training.url, plainMarkdown: training.embeds.size === 0, lifecycleReplies: 3 },
+    tryout: { channelId: tryoutChannel.id, messageId: tryout.id, url: tryout.url, plainMarkdown: tryout.embeds.size === 0, lifecycleReplies: 3 },
     lifecycleMessages: 6,
     welcomeLeaveSimulation: Boolean(owner),
     leaderboardBoards,
@@ -2187,6 +2195,10 @@ export async function runParadiseAutoSmokeOnce(guild) {
         lastAutoSmokeResult: {
           trainingMessageId: result.training?.messageId || null,
           tryoutMessageId: result.tryout?.messageId || null,
+          trainingPlainMarkdown: result.training?.plainMarkdown === true,
+          tryoutPlainMarkdown: result.tryout?.plainMarkdown === true,
+          trainingLifecycleReplies: Number(result.training?.lifecycleReplies || 0),
+          tryoutLifecycleReplies: Number(result.tryout?.lifecycleReplies || 0),
           supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
           supportTicketTranscriptReady: Boolean(result.workflowPanels?.supportTicket?.transcriptSaved),
           supportTicketReopenReady: Boolean(result.workflowPanels?.supportTicket?.closedThenReopened),
@@ -2241,6 +2253,10 @@ export async function paradiseTestLabStatus() {
     lastFailureAt: record.lastAutoSmokeFailedAt || null,
     trainingReady: Boolean(result.trainingMessageId),
     tryoutReady: Boolean(result.tryoutMessageId),
+    trainingPlainMarkdown: result.trainingPlainMarkdown === true,
+    tryoutPlainMarkdown: result.tryoutPlainMarkdown === true,
+    trainingLifecycleReplies: Number(result.trainingLifecycleReplies || 0),
+    tryoutLifecycleReplies: Number(result.tryoutLifecycleReplies || 0),
     supportTicketReady: Boolean(result.supportTicketChannelId),
     supportTicketTranscriptReady: result.supportTicketTranscriptReady === true,
     supportTicketReopenReady: result.supportTicketReopenReady === true,

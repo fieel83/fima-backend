@@ -50,6 +50,15 @@ test("test-guild smoke includes transcript-first close and reopen coverage", asy
   assert.match(source, /supportTicketTranscriptReady/);
 });
 
+test("test-guild session lifecycle replies to the original Markdown announcement", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /const smokeReply = async \(message, content, code\)/);
+  assert.match(source, /await smokeReply\(training, "# SERVER LOCKED/);
+  assert.match(source, /await smokeReply\(tryout, "# SERVER LOCKED/);
+  assert.match(source, /trainingPlainMarkdown/);
+  assert.match(source, /tryoutPlainMarkdown/);
+});
+
 test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);
