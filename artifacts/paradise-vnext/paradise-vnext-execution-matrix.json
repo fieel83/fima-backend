@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T21:44:12.873Z",
+  "generatedAt": "2026-07-11T21:50:03.660Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -1030,14 +1030,18 @@
         "SETUP-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until component/persistence base.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "src/discordBot.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild; verify Join to Create, Community Voice and AFK are GuildVoice, then test move, control panel, empty cleanup and wrong-type repair preview.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1045,6 +1049,7 @@
       "securityRisk": "high",
       "acceptanceCriteria": [
         "wrong text mapping detected",
+        "repair creates the correct voice type before any approved removal",
         "temporary room/move/cleanup works",
         "restart recovery",
         "owner-only repair"
