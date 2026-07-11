@@ -1,4 +1,5 @@
 const STATUS_ORDER = Object.freeze({ healthy: 0, auto_repairable: 1, owner_review_required: 2, unsafe_blocking: 3 });
+export const PARADISE_RECONCILIATION_MIN_INTERVAL_MS = 15 * 60_000;
 
 function highestStatus(issues) {
   return issues.reduce((highest, issue) => STATUS_ORDER[issue.status] > STATUS_ORDER[highest] ? issue.status : highest, "healthy");
@@ -64,4 +65,26 @@ export function buildParadiseReconciliation({ state = {}, managedGuildIds = [], 
       supportTickets: Object.keys(state.supportTickets || {}).length
     }
   };
+}
+
+export function shouldRunParadiseReconciliation({ lastRunAt = null, now = Date.now(), minimumIntervalMs = PARADISE_RECONCILIATION_MIN_INTERVAL_MS } = {}) {
+  const previous = Date.parse(String(lastRunAt || ""));
+  return !Number.isFinite(previous) || Number(now) - previous >= Number(minimumIntervalMs);
+}
+
+export function summarizeParadiseReconciliation(result = {}, now = new Date().toISOString()) {
+  const issues = Array.isArray(result.issues) ? result.issues : [];
+  return Object.freeze({
+    lastRunAt: now,
+    status: result.status || "unsafe_blocking",
+    healthy: result.healthy === true,
+    issueCount: Number(result.issueCount || 0),
+    issueCodes: [...new Set(issues.map(issue => String(issue?.code || "unknown")))].sort(),
+    checked: {
+      guildConfigs: Number(result.checked?.guildConfigs || 0),
+      leaderboards: Number(result.checked?.leaderboards || 0),
+      supportTickets: Number(result.checked?.supportTickets || 0)
+    },
+    autoRepairExecuted: false
+  });
 }

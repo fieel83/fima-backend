@@ -4,13 +4,14 @@ export const PARADISE_FEATURE_STATES = Object.freeze(["disabled", "owner_only", 
 export const PARADISE_HIGH_RISK_FEATURES = Object.freeze([
   "ai_assistant", "ticket_ai", "profile_transfer", "premium_billing", "social_feeds", "challenge_transaction",
   "template_repair", "scheduled_rewards", "automod_destructive_actions", "production_license_repair",
-  "command_registry_enforcement"
+  "command_registry_enforcement", "reconciliation_health"
 ]);
 
 export const PARADISE_MILESTONE_ONE_FEATURE_DEFAULTS = Object.freeze({
   // The new command enforcement path is canaried only in the exact disposable
   // guild until interaction and restart evidence exists.
-  command_registry_enforcement: Object.freeze({ state: "test_guild", guildAllowlist: [], userAllowlist: [] })
+  command_registry_enforcement: Object.freeze({ state: "test_guild", guildAllowlist: [], userAllowlist: [] }),
+  reconciliation_health: Object.freeze({ state: "test_guild", guildAllowlist: [], userAllowlist: [] })
 });
 
 const SAFE_MILESTONE_ONE_STATES = new Set(["disabled", "owner_only", "test_guild", "allowlist"]);

@@ -92,6 +92,16 @@ test("availability panel uses a restart-safe guild-scoped component ID while kee
   assert.match(source, /interaction\.customId === "paradise_availability_refresh"/);
 });
 
+test("reconciliation is a test-guild-canary, rate-limited, and performs no Discord repair", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /async function runParadiseGuildReconciliation\(guild\)/);
+  assert.match(source, /feature: "reconciliation_health"/);
+  assert.match(source, /shouldRunParadiseReconciliation\(\{ lastRunAt:/);
+  assert.match(source, /summarizeParadiseReconciliation\(result\)/);
+  assert.match(source, /await runParadiseGuildReconciliation\(guild\)\.catch\(\(\) => null\)/);
+  assert.doesNotMatch(source.slice(source.indexOf("async function runParadiseGuildReconciliation"), source.indexOf("async function runParadiseMaintenance")), /\.delete\(|\.create\(/);
+});
+
 test("compact lab rebuild remains hard-guarded to the disposable test guild", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /const PARADISE_TEST_LAB_LAYOUT_REVISION/);

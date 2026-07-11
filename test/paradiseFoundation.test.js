@@ -30,6 +30,8 @@ test("feature flags default to disabled and permit only selected rollout scopes"
   assert.equal(resolveParadiseFeatureFlag({ feature: "ticket_ai" }).allowed, false);
   assert.equal(resolveParadiseFeatureFlag({ feature: "command_registry_enforcement", guildId: PARADISE_TEST_GUILD_ID }).allowed, true);
   assert.equal(resolveParadiseFeatureFlag({ feature: "command_registry_enforcement", guildId: "production-guild" }).allowed, false);
+  assert.equal(resolveParadiseFeatureFlag({ feature: "reconciliation_health", guildId: PARADISE_TEST_GUILD_ID }).allowed, true);
+  assert.equal(resolveParadiseFeatureFlag({ feature: "reconciliation_health", guildId: "production-guild" }).allowed, false);
   assert.equal(resolveParadiseFeatureFlag({ feature: "command_registry_enforcement", guildId: PARADISE_TEST_GUILD_ID, flags: { command_registry_enforcement: { state: "disabled" } } }).allowed, false);
   assert.equal(resolveParadiseFeatureFlag({ feature: "ticket_ai", guildId: PARADISE_TEST_GUILD_ID, flags: { ticket_ai: { state: "test_guild" } } }).allowed, true);
   assert.equal(resolveParadiseFeatureFlag({ feature: "ticket_ai", guildId: "production-guild", flags: { ticket_ai: { state: "test_guild" } } }).allowed, false);

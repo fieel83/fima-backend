@@ -20,6 +20,11 @@ import {
   visibleParadiseCommands
 } from "./paradiseCommandRegistry.js";
 import { resolveParadiseFeatureFlag } from "./paradiseFeatureFlags.js";
+import {
+  buildParadiseReconciliation,
+  shouldRunParadiseReconciliation,
+  summarizeParadiseReconciliation
+} from "./paradiseReconciliation.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "./paradiseComponentProtocol.js";
 import { buildParadiseRestoreDryRun, createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
 
@@ -5491,6 +5496,39 @@ async function postAutomaticActivityCheck(guild, group, state) {
   return id;
 }
 
+function paradiseStateForGuildReconciliation(state, guildId) {
+  const scoped = bucket => Object.fromEntries(Object.entries(bucket || {})
+    .filter(([, record]) => belongsToGuild(record, guildId)));
+  return {
+    guildConfigs: state.guildConfigs?.[guildId] ? { [guildId]: state.guildConfigs[guildId] } : {},
+    leaderboards: state.leaderboards?.[guildId] ? { [guildId]: state.leaderboards[guildId] } : {},
+    supportTickets: scoped(state.supportTickets)
+  };
+}
+
+async function runParadiseGuildReconciliation(guild) {
+  const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  const flag = resolveParadiseFeatureFlag({
+    feature: "reconciliation_health",
+    flags: config.featureFlags,
+    guildId: guild.id
+  });
+  if (!flag.allowed || !shouldRunParadiseReconciliation({ lastRunAt: config.reconciliationHealth?.lastRunAt })) return null;
+  const result = buildParadiseReconciliation({
+    state: paradiseStateForGuildReconciliation(state, guild.id),
+    managedGuildIds: [guild.id],
+    existingChannelIds: [...guild.channels.cache.keys()]
+  });
+  const summary = summarizeParadiseReconciliation(result);
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].reconciliationHealth = summary;
+    return next;
+  });
+  return summary;
+}
+
 async function runParadiseMaintenance(guild) {
   await guild.members.fetch().catch(() => {});
   await saveState(async state => {
@@ -5594,6 +5632,7 @@ async function runParadiseMaintenance(guild) {
   }
   await updateLoaPanel(guild).catch(() => {});
   await updateAvailabilityPanel(guild).catch(() => {});
+  await runParadiseGuildReconciliation(guild).catch(() => null);
 }
 
 async function handleWhitelist(interaction) {
