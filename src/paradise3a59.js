@@ -4037,35 +4037,45 @@ export function paradiseSupportTicketControls(ticketId, status = "open") {
   )];
 }
 
-function supportTicketStatusLabel(status = "open") {
+function supportTicketStatusLabel(status = "open", language = "tr") {
   const normalized = String(status || "open").toLowerCase();
+  if (language === "en") {
+    if (normalized === "closed") return "CLOSED";
+    if (normalized === "claimed") return "CLAIMED";
+    if (normalized === "deleted") return "DELETED";
+    return "OPEN";
+  }
   if (normalized === "closed") return "KAPALI";
   if (normalized === "claimed") return "ÜSTLENİLDİ";
   if (normalized === "deleted") return "SİLİNDİ";
   return "AÇIK";
 }
 
-function paradiseSupportTicketDescription(record) {
-  const status = supportTicketStatusLabel(record.status);
+function paradiseSupportTicketDescription(record, language = "tr") {
+  const status = supportTicketStatusLabel(record.status, language);
+  const tr = language !== "en";
   const lines = [
-    `Üye: <@${record.userId}>`,
+    `${tr ? "Üye" : "Member"}: <@${record.userId}>`,
     `Ticket: \`${record.id.slice(0, 8)}\``,
-    `Durum: **${status}**`
+    `${tr ? "Durum" : "Status"}: **${status}**`
   ];
-  if (record.claimedBy) lines.push(`Üstlenen: <@${record.claimedBy}>`);
+  if (record.claimedBy) lines.push(`${tr ? "Üstlenen" : "Claimed by"}: <@${record.claimedBy}>`);
   lines.push("");
-  if (status === "AÇIK") lines.push("Kapatıldığında transcript otomatik kaydedilir ve üye erişimi kaldırılır.");
-  else if (status === "ÜSTLENİLDİ") lines.push("Bu ticket bir yetkili tarafından üstlenildi. Kapatma transcript'i otomatik kaydeder.");
-  else if (status === "KAPALI") lines.push("Ticket kapalı. Yeniden açabilir veya güvenli silme akışını başlatabilirsin. Silme, transcript kaydedilmeden devam etmez.");
-  else lines.push("Ticket silindi. Transcript ve güvenli denetim kaydı saklandı.");
+  if (String(record.status || "open").toLowerCase() === "open") lines.push(tr ? "Kapatıldığında transcript otomatik kaydedilir ve üye erişimi kaldırılır." : "Closing automatically saves a transcript and removes member access.");
+  else if (String(record.status || "").toLowerCase() === "claimed") lines.push(tr ? "Bu ticket bir yetkili tarafından üstlenildi. Kapatma transcript'i otomatik kaydeder." : "A staff member claimed this ticket. Closing automatically saves a transcript.");
+  else if (String(record.status || "").toLowerCase() === "closed") lines.push(tr ? "Ticket kapalı. Yeniden açabilir veya güvenli silme akışını başlatabilirsin. Silme, transcript kaydedilmeden devam etmez." : "This ticket is closed. You can reopen it or start the secure deletion flow. Deletion never continues without a transcript.");
+  else lines.push(tr ? "Ticket silindi. Transcript ve güvenli denetim kaydı saklandı." : "The ticket was deleted. The transcript and safe audit record were retained.");
   return lines.join("\n");
 }
 
 async function paradiseSupportTicketEmbed(record) {
+  const state = await loadState();
+  const language = guildLanguage(configForGuild(state, record.guildId));
+  const status = supportTicketStatusLabel(record.status, language);
   return new EmbedBuilder()
     .setColor(await paradiseBrandColor())
-    .setTitle(`SUPPORT TICKET - ${supportTicketStatusLabel(record.status)}`)
-    .setDescription(paradiseSupportTicketDescription(record));
+    .setTitle(language === "tr" ? `DESTEK TICKETI — ${status}` : `SUPPORT TICKET — ${status}`)
+    .setDescription(paradiseSupportTicketDescription(record, language));
 }
 
 function supportTicketAudit(record, action, actorId, metadata = {}) {

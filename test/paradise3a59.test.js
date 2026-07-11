@@ -63,6 +63,13 @@ test("Paradise support panel has state-aware transcript-first ticket controls", 
   assert.doesNotMatch(source.slice(source.indexOf("export function paradiseSupportTicketControls"), source.indexOf("function supportTicketStatusLabel")), /paradise_support_transcript/);
 });
 
+test("support ticket heading and state text follow the configured guild language", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /language === "tr" \? `DESTEK TICKETI — \$\{status\}` : `SUPPORT TICKET — \$\{status\}`/);
+  assert.match(source, /if \(language === "en"\) \{/);
+  assert.match(source, /return "CLOSED"/);
+});
+
 test("Paradise support transcripts mask common secrets before staff storage", () => {
   const masked = maskParadiseTranscriptText("mail person@example.com FIMA-ABCD-EFGH-IJKL mfa.abcdefghijklmnopqrstuv aaaaaaaaaaaaaaaaaaaaaaaa.bbbbbb.cccccccccccccccccccccc password @everyone");
   assert.doesNotMatch(masked, /person@example\.com|FIMA-ABCD|mfa\.abcdefghijklmnopqrstuv|@everyone/);
