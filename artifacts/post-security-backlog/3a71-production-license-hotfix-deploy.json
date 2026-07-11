@@ -2,11 +2,11 @@
   "status": "LIVE VERIFIED",
   "createdAt": "2026-07-11T02:50:00+02:00",
   "localCommit": "2173ea0",
-  "deployedCommit": "2173ea0b56e1a2ec960ec956b5e71ec42e63b519",
+  "deployedCommit": "77fb4e7ceee322ae135b570602a7cdd86fae2ea3",
   "deployment": {
     "service": "Render",
     "versionEndpoint": "https://api.fimamacro.com/api/version",
-    "buildTime": "2026-07-11T02:47:44.923Z",
+    "buildTime": "2026-07-11T03:13:20.344Z",
     "mode": "production",
     "verifiedBy": "public version endpoint"
   },
@@ -17,6 +17,7 @@
     "The client has Clipboard API and textarea fallback and does not report a copy success for an empty key.",
     "The paginated paid-license scan no longer has a fixed 2,000-record cap."
   ],
+  "deployedLineage": ["d8cef42", "57ca82d", "2173ea0", "9bd9af0", "77fb4e7"],
   "tests": {
     "syntax": "src/server.js, src/discordBot.js and src/paradise3a59.js passed node --check",
     "unit": "70/70 passed"

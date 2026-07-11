@@ -1,6 +1,6 @@
 {
   "status": "LIVE DISCORD VERIFIED",
-  "verifiedAt": "2026-07-11T02:49:00+02:00",
+  "verifiedAt": "2026-07-11T03:13:45+02:00",
   "verificationSource": "https://api.fimamacro.com/api/paradise/public-status",
   "guild": {
     "id": "1520519015661961257",
@@ -14,11 +14,13 @@
   },
   "smoke": {
     "completed": true,
-    "revision": "3a71-license-ticket-live-smoke-v1",
+    "revision": "3a71-ticket-transcript-live-smoke-v2",
     "lastError": null,
     "trainingReady": true,
     "tryoutReady": true,
     "supportTicketPanelReady": true,
+    "supportTicketTranscriptReady": true,
+    "supportTicketReopenReady": true,
     "applicationPanelReady": true,
     "supportPanelReady": true,
     "moderationPanelReady": true,
@@ -35,8 +37,8 @@
     "templateCommands": 67
   },
   "limits": [
-    "This automated smoke proves successful official bot posting/repair in the test guild. It does not prove a human clicked every button.",
-    "No support ticket was closed/reopened by a human interaction during this verification.",
+    "The official bot created or reused its marked test ticket, saved a masked transcript before close, changed it to CLOSED, then restored it to OPEN in the fixed test guild.",
+    "This automated smoke does not replace a separate human click test for every button.",
     "No main-server channel, role, panel or message was deleted, rebuilt or reposted."
   ]
 }

@@ -1,6 +1,6 @@
 {
-  "status": "LOCAL VERIFIED",
-  "createdAt": "2026-07-11T02:50:00+02:00",
+  "status": "LIVE DISCORD VERIFIED",
+  "createdAt": "2026-07-11T03:13:45+02:00",
   "controls": ["Claim", "Close", "Reopen", "Add note", "Escalate", "Transcript"],
   "publicDeleteButton": false,
   "transcriptSafety": {
@@ -15,12 +15,15 @@
     "transcriptMessageIdOrUrlStored": true,
     "paymentLicenseLogChannelSupportedForCommunity": true
   },
-  "testGuildPanelProof": {
+  "testGuildLifecycleProof": {
     "status": "LIVE DISCORD VERIFIED",
     "guildId": "1520519015661961257",
     "supportTicketPanelReady": true,
-    "smokeRevision": "3a71-license-ticket-live-smoke-v1",
-    "note": "This proves the safe test-guild panel is posted. It does not replace a real staff close/reopen/transcript button interaction."
+    "smokeRevision": "3a71-ticket-transcript-live-smoke-v2",
+    "transcriptSavedBeforeClose": true,
+    "closedThenReopened": true,
+    "lastError": null,
+    "note": "The official bot ran the transcript-first lifecycle on its marked test ticket. A separate human click test remains useful but is not required to claim this bot lifecycle execution."
   },
-  "remainingLiveInteraction": "BLOCKED pending an official test-guild ticket interaction from the owner session or a connected Discord bot test account."
+  "remainingLiveInteraction": "A manual staff-button usability click is not yet separately captured because the owner Chrome connection is unavailable."
 }
