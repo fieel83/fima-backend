@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T21:29:02.463Z",
+  "generatedAt": "2026-07-11T21:44:12.873Z",
   "status": "LOCAL VERIFIED",
   "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
   "sourcePlans": [
@@ -1615,6 +1615,7 @@
         "closed shows Reopen/Delete only",
         "delete creates transcript first",
         "failure blocks deletion",
+        "senior staff-only delete confirmation",
         "staff-only transcript access"
       ],
       "testRequirements": [
@@ -1622,18 +1623,22 @@
         "node --test",
         "secret scan",
         "matrix row update",
+        "state-aware control test",
         "close/reopen/delete/transcript failure live test"
       ],
       "priority": "P1",
       "milestone": "Milestone 2",
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until persisted state/component protocol are in place.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild; prove Claim → Close → Reopen → Close → typed Delete and transcript-failure channel preservation with staff and member personas.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],

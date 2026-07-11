@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T21:29:02.463Z
+Generated: 2026-07-11T21:44:12.873Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -32,7 +32,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | CHALLENGE-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after profile/database foundation. |
 | CHALLENGE-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until ticket and persisted leaderboard foundations exist. |
 | SESSION-001 | P1 | Milestone 2 | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Re-test only after component/RBAC upgrade; localize remaining English labels later. |
-| TICKET-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until persisted state/component protocol are in place. |
+| TICKET-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove Claim → Close → Reopen → Close → typed Delete and transcript-failure channel preservation with staff and member personas. |
 | TICKET-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after ticket state machine. |
 | VOICE-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until component/persistence base. |
 | APP-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after persistent component and DB foundation. |
