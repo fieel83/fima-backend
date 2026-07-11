@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T15:12:16.146Z
+Generated: 2026-07-11T15:14:02.424Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -15,7 +15,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | FLAG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Persist flags through the versioned guild configuration envelope after CFG-001 is integrated. |
 | DB-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Inventory existing Setting JSON state and prepare additive migration preview; do not migrate production data yet. |
 | DB-002 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Build read-only legacy-state inventory from existing Setting and fallback JSON structure. |
-| BACKUP-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Wrap existing structure snapshots in a versioned integrity envelope without altering Discord objects. |
+| BACKUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add restore dry-run validation and encrypted storage policy before any destructive rebuild path can consume backups. |
 | OPS-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Implement read-only reconciliation result builder for state/config records. |
 | CMD-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Map existing slash command builders, help rendering and handlers to this registry incrementally without unregistering commands prematurely. |
 | RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Map current Discord role IDs and existing staff checks to this vocabulary without changing role assignments. |

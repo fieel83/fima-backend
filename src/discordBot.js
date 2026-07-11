@@ -4,6 +4,7 @@ import path from "node:path";
 import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
+import { createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
 import {
   applyParadiseTemplateMissingOnly,
   handleParadiseGuildMemberAdd,
@@ -2764,7 +2765,7 @@ export async function paradiseDiscordStructureBackup(guildId = null) {
     error.code = "paradise_guild_unavailable";
     throw error;
   }
-  return {
+  return createParadiseBackupEnvelope({
     status: "LIVE DISCORD VERIFIED",
     backupVersion: 1,
     capturedAt: new Date().toISOString(),
@@ -2774,7 +2775,7 @@ export async function paradiseDiscordStructureBackup(guildId = null) {
     roles: snapshot.roles,
     autoModRules: snapshot.autoModRules,
     webhooks: snapshot.webhooks
-  };
+  });
 }
 
 export async function paradiseDiscordSetupPreview(guildId, mode) {
