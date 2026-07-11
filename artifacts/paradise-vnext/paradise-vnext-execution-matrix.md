@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T21:50:03.660Z
+Generated: 2026-07-11T21:54:08.748Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -31,7 +31,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | PROFILE-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until verified profile storage exists. |
 | CHALLENGE-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after profile/database foundation. |
 | CHALLENGE-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until ticket and persisted leaderboard foundations exist. |
-| SESSION-001 | P1 | Milestone 2 | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Re-test only after component/RBAC upgrade; localize remaining English labels later. |
+| SESSION-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; create Turkish and English training/tryout posts, press Lock/Unlock/End as authorized and unauthorized personas, then verify reply placement and no active-session footer. |
 | TICKET-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove Claim → Close → Reopen → Close → typed Delete and transcript-failure channel preservation with staff and member personas. |
 | TICKET-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after ticket state machine. |
 | VOICE-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; verify Join to Create, Community Voice and AFK are GuildVoice, then test move, control panel, empty cleanup and wrong-type repair preview. |

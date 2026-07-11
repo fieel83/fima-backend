@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T21:50:03.660Z",
+  "generatedAt": "2026-07-11T21:54:08.748Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -932,15 +932,16 @@
       ],
       "ownerDecision": null,
       "sourceStatus": "LOCAL VERIFIED",
-      "localTestStatus": "SOURCE ONLY",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
-      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Re-test only after component/RBAC upgrade; localize remaining English labels later.",
+      "blocker": "No isolated staging bot/runtime identity or safe staging deployment path is currently available.",
+      "nextExactAction": "Deploy only to isolated staging/the exact test guild; create Turkish and English training/tryout posts, press Lock/Unlock/End as authorized and unauthorized personas, then verify reply placement and no active-session footer.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -948,6 +949,8 @@
       "securityRisk": "high",
       "acceptanceCriteria": [
         "no active embed",
+        "TR/EN announcement and button language",
+        "no Made By Fieel footer on active session posts",
         "reply lifecycle",
         "authority ceiling",
         "training activity review"
