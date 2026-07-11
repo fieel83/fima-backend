@@ -3116,9 +3116,7 @@ async function handleChallenge(interaction) {
     return interaction.reply({ content: `Challenge closed. Player access removed. Reason: **${reason}**`, ephemeral: true });
   }
   if (sub === "autowin") {
-    const hasRefereeRole = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)
-      || interaction.member.roles.cache.some(role => ["Trial Referee", "Referee", "Experienced Referee", "Head Referee", "Referee Manager"].includes(role.name));
-    if (!hasRefereeRole) return interaction.reply({ content: "Referee role required.", ephemeral: true });
+    if (!await canWorkReferee(interaction.member)) return interaction.reply({ content: "Referee role required.", ephemeral: true });
     const state = await loadState();
     const ticket = state.pendingChallenges[interaction.channelId];
     if (!ticket || ticket.status !== "open") return interaction.reply({ content: "Run `/challenge autowin` inside an open challenge ticket.", ephemeral: true });
@@ -3207,9 +3205,8 @@ export function canRoleNamesApproveScore(roleNames = [], isAdministrator = false
   );
 }
 
-async function canApproveReferee(member) {
+async function memberHasParadisePermission(member, permission) {
   const administrator = member.permissions.has(PermissionsBitField.Flags.Administrator);
-  if (administrator) return true;
   const state = await loadState();
   const guildConfig = configForGuild(state, member.guild.id);
   const roles = [...member.roles.cache.values()];
@@ -3218,8 +3215,19 @@ async function canApproveReferee(member) {
     roleNames: roles.map(role => role.name),
     mappings: guildConfig.roleMappings
   });
-  return hasParadisePermission({ permission: PARADISE_PERMISSIONS.REFEREE_APPROVE, roleKeys })
-    || canRoleNamesApproveScore(roles.map(role => role.name), administrator);
+  return hasParadisePermission({
+    permission,
+    roleKeys,
+    isOwner: administrator || member.guild.ownerId === member.id
+  });
+}
+
+async function canWorkReferee(member) {
+  return memberHasParadisePermission(member, PARADISE_PERMISSIONS.REFEREE_WORK);
+}
+
+async function canApproveReferee(member) {
+  return memberHasParadisePermission(member, PARADISE_PERMISSIONS.REFEREE_APPROVE);
 }
 
 async function handleChallengeApproval(interaction) {

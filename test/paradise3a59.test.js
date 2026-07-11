@@ -26,6 +26,14 @@ test("score approval routes configured Discord role IDs through the shared Parad
   assert.match(source, /mappings: guildConfig\.roleMappings/);
 });
 
+test("challenge autowin uses shared referee-work RBAC instead of a separate role-name check", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /async function memberHasParadisePermission/);
+  assert.match(source, /async function canWorkReferee/);
+  assert.match(source, /if \(!await canWorkReferee\(interaction\.member\)\)/);
+  assert.doesNotMatch(source, /const hasRefereeRole/);
+});
+
 test("Paradise support panel has a real audited ticket lifecycle", () => {
   const launcher = paradiseSupportPanelPayload(0).components[0].toJSON();
   assert.equal(launcher.components[0].custom_id, "paradise_support_open");
