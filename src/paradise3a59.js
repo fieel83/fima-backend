@@ -13,7 +13,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v7";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v8";
 // This revision is intentionally limited to the fixed lab guild. It is the
 // owner-authorized compact test layout, never a production-guild rebuild.
 const PARADISE_TEST_LAB_LAYOUT_REVISION = "3a71-compact-tsbtr-lab-v1";
@@ -3854,11 +3854,14 @@ async function handleQotdPayoutReview(interaction) {
   });
 }
 
-function paradiseApplicationPanelPayload(color) {
+function paradiseApplicationPanelPayload(color, language = "tr") {
+  const tr = language !== "en";
   return {
-    embeds: [new EmbedBuilder().setColor(color).setTitle("PARADISE APPLICATIONS")
-      .setDescription("# Join the team\nChoose a position, answer the form honestly, then follow the private status shown by Paradise.\n\n- One active application at a time\n- Blacklisted users cannot apply\n- Reviewers cannot grant roles above their own hierarchy\n-# Turkish and English answers are accepted.")
-      .setFooter(paradiseFooter("Private review queue"))],
+    embeds: [new EmbedBuilder().setColor(color).setTitle(tr ? "PARADISE BAŞVURULAR" : "PARADISE APPLICATIONS")
+      .setDescription(tr
+        ? "# Ekibe katıl\nPozisyonunu seç, formu dürüstçe doldur ve Paradise'ın gösterdiği özel başvuru durumunu takip et.\n\n- Aynı anda yalnızca bir aktif başvuru\n- Blacklistteki kullanıcılar başvuramaz\n- İnceleyenler kendi hiyerarşilerinin üstündeki rolleri veremez\n-# Açıklamalar seçili sunucu dilini kullanır."
+        : "# Join the team\nChoose a position, answer the form honestly, then follow the private status shown by Paradise.\n\n- One active application at a time\n- Blacklisted users cannot apply\n- Reviewers cannot grant roles above their own hierarchy\n-# Explanations follow the selected server language.")
+      .setFooter(paradiseFooter(tr ? "Özel inceleme kuyruğu" : "Private review queue"))],
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("paradise_application_open").setLabel("Apply / Basvur").setEmoji("📝").setStyle(ButtonStyle.Primary)
     )]
@@ -4340,7 +4343,8 @@ async function handleApplicationCommand(interaction) {
   if (sub === "panel") {
     if (!canManageClan(interaction.member)) return interaction.reply({ content: "Application management authority required.", ephemeral: true });
     const channel = await configuredChannel(interaction.guild, "application_ticket_channel", "application-ticket") || interaction.channel;
-    await channel.send(paradiseApplicationPanelPayload(await paradiseBrandColor()));
+    const language = guildLanguage(configForGuild(await loadState(), interaction.guildId));
+    await channel.send(paradiseApplicationPanelPayload(await paradiseBrandColor(), language));
     return interaction.reply({ content: `Application panel posted in ${channel}.`, ephemeral: true });
   }
   const state = await loadState();

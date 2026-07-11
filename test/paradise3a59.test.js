@@ -77,6 +77,13 @@ test("compact lab rebuild remains hard-guarded to the disposable test guild", as
   assert.match(source, /3a65-test-server-pre-rebuild-backup\.json/);
 });
 
+test("application panel follows the selected server language and defaults to Turkish", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /function paradiseApplicationPanelPayload\(color, language = "tr"\)/);
+  assert.match(source, /PARADISE BAŞVURULAR/);
+  assert.match(source, /paradiseApplicationPanelPayload\(await paradiseBrandColor\(\), language\)/);
+});
+
 test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);
