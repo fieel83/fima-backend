@@ -10,6 +10,7 @@ import {
 } from "discord.js";
 import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
 import { hasParadisePermission, PARADISE_PERMISSIONS, paradiseRoleKeysForMember } from "./paradiseRbac.js";
+import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "./paradiseComponentProtocol.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
@@ -6388,7 +6389,9 @@ async function updateAvailabilityPanel(guild) {
     ? await channel.messages.fetch(guildConfig.availabilityMessageId).catch(() => null)
     : null;
   const components = [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("paradise_availability_refresh").setLabel("Refresh availability").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder()
+      .setCustomId(buildParadiseComponentId({ family: "availability", guildId: guild.id, entityId: "availability", action: "refresh" }))
+      .setLabel("Refresh availability").setStyle(ButtonStyle.Secondary)
   )];
   if (message) await message.edit({ embeds: [embed], components }); else message = await channel.send({ embeds: [embed], components });
   await saveState(next => {
@@ -7412,6 +7415,20 @@ async function handleParadiseInteractionInner(interaction) {
     return true;
   }
   if (interaction.isButton?.()) {
+    if (String(interaction.customId || "").startsWith("pv:")) {
+      const component = parseParadiseComponentId(interaction.customId, { guildId: interaction.guildId });
+      if (!component.ok) {
+        await interaction.reply({ content: outdatedParadiseComponentMessage(interaction.locale), ephemeral: true });
+        return true;
+      }
+      if (component.family === "availability" && component.action === "refresh") {
+        const panel = await updateAvailabilityPanel(interaction.guild);
+        await interaction.reply({ content: panel ? "Availability refreshed." : "Availability channel is not configured.", ephemeral: true });
+        return true;
+      }
+      await interaction.reply({ content: outdatedParadiseComponentMessage(interaction.locale), ephemeral: true });
+      return true;
+    }
     if (interaction.customId === "paradise_verify_open") {
       const modal = new ModalBuilder().setCustomId("paradise_verify_modal").setTitle("Roblox Verification");
       const username = new TextInputBuilder().setCustomId("roblox_username").setLabel("Roblox Username")

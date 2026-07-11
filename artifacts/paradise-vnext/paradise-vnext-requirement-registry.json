@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:38:25.518Z",
+  "generatedAt": "2026-07-11T15:40:09.879Z",
   "status": "LOCAL VERIFIED",
   "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
   "sourcePlans": [
@@ -888,10 +888,11 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "test/paradiseFoundation.test.js"
+        "test/paradiseFoundation.test.js",
+        "test/paradise3a59.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Migrate one non-destructive component family in the test guild and retain old-family repair messaging during the compatibility window.",
+      "nextExactAction": "Deploy and test the non-destructive availability refresh panel across a bot restart in the exact test guild; retain old panel compatibility during the migration window.",
       "affectedFiles": [
         "src/paradiseComponentProtocol.js",
         "src/paradise3a59.js",

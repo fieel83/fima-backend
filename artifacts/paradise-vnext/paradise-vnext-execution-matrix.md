@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T15:38:25.518Z
+Generated: 2026-07-11T15:40:09.879Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -19,7 +19,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | OPS-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Implement read-only reconciliation result builder for state/config records. |
 | CMD-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Map existing slash command builders, help rendering and handlers to this registry incrementally without unregistering commands prematurely. |
 | RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Migrate the next high-risk staff handler to shared RBAC without altering role assignments; then run role-persona proof in the test guild. |
-| COMP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Migrate one non-destructive component family in the test guild and retain old-family repair messaging during the compatibility window. |
+| COMP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy and test the non-destructive availability refresh panel across a bot restart in the exact test guild; retain old panel compatibility during the migration window. |
 | SETUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior. |
 | DASH-001 | P0 | Milestone 1 | SOURCE ONLY | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | BLOCKED | Map existing dashboard APIs to guild-scope auth; defer visual polish until baseline save/reload works. |
 | TEST-001 | P0 | Milestone 1 | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Repeat only after Milestone 1 guard/component/RBAC changes; do not rebuild the lab for artifact-only work. |

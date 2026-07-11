@@ -76,6 +76,14 @@ test("repeat smoke refreshes boards without replaying a full template repair", a
   assert.match(source, /staffTeamReady/);
 });
 
+test("availability panel uses a restart-safe guild-scoped component ID while keeping old panels repairable", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /family: "availability", guildId: guild\.id, entityId: "availability", action: "refresh"/);
+  assert.match(source, /parseParadiseComponentId\(interaction\.customId, \{ guildId: interaction\.guildId \}\)/);
+  assert.match(source, /outdatedParadiseComponentMessage/);
+  assert.match(source, /interaction\.customId === "paradise_availability_refresh"/);
+});
+
 test("compact lab rebuild remains hard-guarded to the disposable test guild", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /const PARADISE_TEST_LAB_LAYOUT_REVISION/);
