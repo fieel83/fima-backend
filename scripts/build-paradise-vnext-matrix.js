@@ -51,9 +51,9 @@ const requirements = [
     nextExactAction: "Create the redacted staging/production readiness contract for ENV-002; do not widen the exact test-guild guard.", affectedFiles: ["src/runtimeEnvironment.js", "src/env.js", "src/server.js", "src/discordBot.js", "src/paradise3a59.js"], securityRisk: "critical"
   }),
   requirement("ENV-002", "Environment deployment separation", "Development, staging and production need distinct DB identity, OAuth callback, session secret, bot identity and mutation policy.", {
-    module: "environment", priority: "P1", milestone: "Milestone 1", dependencies: ["ENV-001"], ownerDecisionRequired: true, securityCritical: true,
+    module: "environment", priority: "P1", milestone: "Milestone 1", dependencies: ["ENV-001"], securityCritical: true,
     acceptanceCriteria: ["separate staging configuration documented", "production credentials cannot be accepted in staging guard", "Render environment checklist exists"],
-    testRequirements: [...commonTest, "staging readiness dry-run"], sourceStatus: "SOURCE ONLY", nextExactAction: "Create redacted environment readiness contract after ENV-001 is integrated.", affectedFiles: [".env.example", "render.yaml", "src/server.js"], securityRisk: "critical"
+    testRequirements: [...commonTest, "staging readiness dry-run"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["src/paradiseEnvironmentReadiness.js", "test/paradiseEnvironmentReadiness.test.js"], blocker: "Real staging/Render identities were not inspected or changed in this local worktree.", nextExactAction: "Have the owner provision separate staging identities, then run the redacted readiness check before any staging deploy.", affectedFiles: ["src/paradiseEnvironmentReadiness.js", ".env.example", "render.yaml", "src/server.js"], securityRisk: "critical"
   }),
   requirement("AUTH-001", "Owner Console versus customer dashboard authorization", "Owner-only operational APIs are separate from customer guild workspaces. Customer users can view only Discord guilds where they have Manage Guild or Administrator.", {
     module: "authorization", priority: "P0", milestone: "Milestone 1", dependencies: ["ENV-001"], securityCritical: true,

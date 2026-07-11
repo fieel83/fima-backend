@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T15:22:13.066Z",
+  "capturedAt": "2026-07-11T15:24:21.116Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "bf8563df266f57d5dbbd99edc9030257eef84be9",
+    "localCommit": "53824dc974b2e4da1b6f6a2ec94d87d788fe78c6",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -110,7 +110,7 @@
     },
     {
       "requirementId": "ENV-002",
-      "status": "SOURCE ONLY"
+      "status": "LOCAL VERIFIED"
     },
     {
       "requirementId": "AUTH-001",
