@@ -2139,63 +2139,82 @@ export async function runParadiseTestSmokeSuite(guild) {
 
 export async function runParadiseAutoSmokeOnce(guild) {
   if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) return { skipped: true, reason: "test_guild_only" };
-  const state = await loadState();
-  if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
-    return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
-  }
-  const repair = await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
-  const result = await runParadiseTestSmokeSuite(guild);
-  const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
-  const appealChannel = guild.channels.cache.find(channel =>
-    ["ban-appeal", "blacklist-appeal"].includes(channel.name) && channel.isTextBased?.()
-  );
-  const staffReviewChannels = [...guild.channels.cache.values()].filter(channel =>
-    ["unblacklist", "bail-review", "blacklist-logs"].includes(channel.name) && channel.isTextBased?.()
-  );
-  const everyoneAppealOverwrite = appealChannel?.permissionOverwrites?.cache?.get(guild.roles.everyone.id);
-  const blacklistedAppealOverwrite = blacklistedRole
-    ? appealChannel?.permissionOverwrites?.cache?.get(blacklistedRole.id)
-    : null;
-  const blacklistPermissionReady = Boolean(
-    blacklistedRole
-    && appealChannel
-    && everyoneAppealOverwrite?.deny?.has(PermissionsBitField.Flags.ViewChannel)
-    && blacklistedAppealOverwrite?.allow?.has(PermissionsBitField.Flags.ViewChannel)
-    && staffReviewChannels.length >= 2
-    && staffReviewChannels.every(channel =>
-      channel.permissionOverwrites.cache.get(guild.roles.everyone.id)?.deny?.has(PermissionsBitField.Flags.ViewChannel)
-    )
-  );
-  await saveState(next => {
-    next.securityState[guild.id] = {
-      ...(next.securityState[guild.id] || {}),
-      lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
-      lastAutoSmokeAt: new Date().toISOString(),
-      lastAutoSmokeResult: {
-        trainingMessageId: result.training?.messageId || null,
-        tryoutMessageId: result.tryout?.messageId || null,
-        supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
-        applicationPanelReady: Boolean(result.workflowPanels?.application),
-        supportPanelReady: Boolean(result.workflowPanels?.support),
-        moderationPanelReady: Boolean(result.workflowPanels?.moderation),
-        securityPanelReady: Boolean(result.workflowPanels?.security),
-        xpPanelReady: Boolean(result.workflowPanels?.xp),
-        repairCreatedChannels: Number(repair?.created?.channels || 0),
-        repairCreatedRoles: Number(repair?.created?.roles || 0),
-        blacklistedRoleReady: Boolean(blacklistedRole),
-        blacklistPermissionReady
-      }
+  try {
+    const state = await loadState();
+    if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
+      return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
+    }
+    const repair = await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
+    const result = await runParadiseTestSmokeSuite(guild);
+    const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
+    const appealChannel = guild.channels.cache.find(channel =>
+      ["ban-appeal", "blacklist-appeal"].includes(channel.name) && channel.isTextBased?.()
+    );
+    const staffReviewChannels = [...guild.channels.cache.values()].filter(channel =>
+      ["unblacklist", "bail-review", "blacklist-logs"].includes(channel.name) && channel.isTextBased?.()
+    );
+    const everyoneAppealOverwrite = appealChannel?.permissionOverwrites?.cache?.get(guild.roles.everyone.id);
+    const blacklistedAppealOverwrite = blacklistedRole
+      ? appealChannel?.permissionOverwrites?.cache?.get(blacklistedRole.id)
+      : null;
+    const blacklistPermissionReady = Boolean(
+      blacklistedRole
+      && appealChannel
+      && everyoneAppealOverwrite?.deny?.has(PermissionsBitField.Flags.ViewChannel)
+      && blacklistedAppealOverwrite?.allow?.has(PermissionsBitField.Flags.ViewChannel)
+      && staffReviewChannels.length >= 2
+      && staffReviewChannels.every(channel =>
+        channel.permissionOverwrites.cache.get(guild.roles.everyone.id)?.deny?.has(PermissionsBitField.Flags.ViewChannel)
+      )
+    );
+    await saveState(next => {
+      next.securityState[guild.id] = {
+        ...(next.securityState[guild.id] || {}),
+        lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
+        lastAutoSmokeAt: new Date().toISOString(),
+        lastAutoSmokeError: null,
+        lastAutoSmokeFailedAt: null,
+        lastAutoSmokeResult: {
+          trainingMessageId: result.training?.messageId || null,
+          tryoutMessageId: result.tryout?.messageId || null,
+          supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
+          applicationPanelReady: Boolean(result.workflowPanels?.application),
+          supportPanelReady: Boolean(result.workflowPanels?.support),
+          moderationPanelReady: Boolean(result.workflowPanels?.moderation),
+          securityPanelReady: Boolean(result.workflowPanels?.security),
+          xpPanelReady: Boolean(result.workflowPanels?.xp),
+          repairCreatedChannels: Number(repair?.created?.channels || 0),
+          repairCreatedRoles: Number(repair?.created?.roles || 0),
+          blacklistedRoleReady: Boolean(blacklistedRole),
+          blacklistPermissionReady
+        }
+      };
+      return next;
+    });
+    return {
+      skipped: false,
+      revision: PARADISE_AUTO_SMOKE_REVISION,
+      repair,
+      blacklistedRoleReady: Boolean(blacklistedRole),
+      blacklistPermissionReady,
+      result
     };
-    return next;
-  });
-  return {
-    skipped: false,
-    revision: PARADISE_AUTO_SMOKE_REVISION,
-    repair,
-    blacklistedRoleReady: Boolean(blacklistedRole),
-    blacklistPermissionReady,
-    result
-  };
+  } catch (error) {
+    // The public test-lab endpoint exposes only this short internal step code—never
+    // Discord/credential payloads—so a failed test-guild-only smoke can be fixed safely.
+    const safeCode = String(error?.code || "test_lab_smoke_failed")
+      .replace(/[^a-z0-9_-]/gi, "_")
+      .slice(0, 96) || "test_lab_smoke_failed";
+    await saveState(next => {
+      next.securityState[guild.id] = {
+        ...(next.securityState[guild.id] || {}),
+        lastAutoSmokeError: safeCode,
+        lastAutoSmokeFailedAt: new Date().toISOString()
+      };
+      return next;
+    }).catch(() => {});
+    throw error;
+  }
 }
 
 export async function paradiseTestLabStatus() {
@@ -2206,6 +2225,8 @@ export async function paradiseTestLabStatus() {
     completed: record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION,
     revision: record.lastAutoSmokeRevision || null,
     completedAt: record.lastAutoSmokeAt || null,
+    lastError: record.lastAutoSmokeError || null,
+    lastFailureAt: record.lastAutoSmokeFailedAt || null,
     trainingReady: Boolean(result.trainingMessageId),
     tryoutReady: Boolean(result.tryoutMessageId),
     supportTicketReady: Boolean(result.supportTicketChannelId),
