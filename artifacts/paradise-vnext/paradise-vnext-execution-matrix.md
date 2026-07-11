@@ -1,13 +1,13 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T15:18:13.521Z
+Generated: 2026-07-11T15:22:13.066Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
 | ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |
 |---|---|---|---|---|---|---|---|---|
 | LIC-001 | P0 | Milestone 1 | DEPLOYED | LOCAL VERIFIED | DEPLOYED | SOURCE ONLY | BLOCKED | Reconnect owner browser; run masked paid-license scan and copy/reveal test without recording the key. |
-| ENV-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Wire the tested guard into all remaining production mutation entry points after environment contract review. |
+| ENV-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Create the redacted staging/production readiness contract for ENV-002; do not widen the exact test-guild guard. |
 | ENV-002 | P1 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Create redacted environment readiness contract after ENV-001 is integrated. |
 | AUTH-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Integrate workspace access into customer-facing server selector/config APIs after the existing owner-only endpoint split is mapped. |
 | AUTH-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Design after the shared guild authorization foundation is established. |

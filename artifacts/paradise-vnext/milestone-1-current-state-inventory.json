@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T15:18:13.521Z",
+  "capturedAt": "2026-07-11T15:22:13.066Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "a755a7b4ee247a84d84047a816e57a1e6e6ee45e",
+    "localCommit": "bf8563df266f57d5dbbd99edc9030257eef84be9",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -43,9 +43,9 @@
       "src/env.js helpers",
       "NODE_ENV guards",
       "src/runtimeEnvironment.js",
-      "fixed test guild constant"
+      "exact test-guild assertions for setup/create-missing/rebuild/smoke"
     ],
-    "gap": "The new fail-closed mutation policy must still be wired into all dashboard and bot mutation paths."
+    "gap": "Staging/production configuration separation and Render readiness evidence are not yet available."
   },
   "configurationVersioning": {
     "status": "partially implemented",

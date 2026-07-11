@@ -45,10 +45,10 @@ const requirements = [
   }),
   requirement("ENV-001", "Fail-closed runtime environment guard", "Development, staging and production must be explicit. Missing or malformed environment identity must never default to production or permit production Discord mutation.", {
     module: "environment", priority: "P0", milestone: "Milestone 1", securityCritical: true,
-    acceptanceCriteria: ["environment validation rejects invalid marker", "production mutation requires explicit production guard", "test guild allowlist is environment scoped", "no secret values appear in error output"],
+    acceptanceCriteria: ["environment validation rejects invalid marker", "production mutation requires explicit production guard", "only the exact test guild can run setup/create-missing/rebuild/smoke", "no secret values appear in error output"],
     testRequirements: [...commonTest, "development/staging/production matrix test"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED",
-    evidencePath: ["test/runtimeEnvironment.test.js"],
-    nextExactAction: "Wire the tested guard into all remaining production mutation entry points after environment contract review.", affectedFiles: ["src/runtimeEnvironment.js", "src/env.js", "src/server.js", "src/discordBot.js", "src/paradise3a59.js"], securityRisk: "critical"
+    evidencePath: ["test/runtimeEnvironment.test.js", "test/paradise3a59.test.js"],
+    nextExactAction: "Create the redacted staging/production readiness contract for ENV-002; do not widen the exact test-guild guard.", affectedFiles: ["src/runtimeEnvironment.js", "src/env.js", "src/server.js", "src/discordBot.js", "src/paradise3a59.js"], securityRisk: "critical"
   }),
   requirement("ENV-002", "Environment deployment separation", "Development, staging and production need distinct DB identity, OAuth callback, session secret, bot identity and mutation policy.", {
     module: "environment", priority: "P1", milestone: "Milestone 1", dependencies: ["ENV-001"], ownerDecisionRequired: true, securityCritical: true,
@@ -232,7 +232,7 @@ const inventory = {
   database: { provider: "PostgreSQL via Prisma", migrationState: "not queried in this local inventory", paradiseState: "Stored primarily in Setting key paradise_3a59_state_v1 with artifact JSON fallback", risk: "Critical Paradise state remains partly opaque JSON/fallback-based." },
   commandRegistration: { status: "partially implemented", evidence: ["src/paradise3a59.js exports paradiseCommands", "src/discordBot.js has separate command handling"], gap: "No central command manifest governs registration/help/RBAC/dashboard together." },
   rbac: { status: "partially implemented", evidence: ["role checks and Discord permission checks exist", "src/paradiseRbac.js"], gap: "Existing handlers are not yet fully migrated to the central vocabulary." },
-  environment: { status: "partially implemented", evidence: ["src/env.js helpers", "NODE_ENV guards", "src/runtimeEnvironment.js", "fixed test guild constant"], gap: "The new fail-closed mutation policy must still be wired into all dashboard and bot mutation paths." },
+  environment: { status: "partially implemented", evidence: ["src/env.js helpers", "NODE_ENV guards", "src/runtimeEnvironment.js", "exact test-guild assertions for setup/create-missing/rebuild/smoke"], gap: "Staging/production configuration separation and Render readiness evidence are not yet available." },
   configurationVersioning: { status: "partially implemented", evidence: ["src/paradiseConfigVersioning.js", "versioned Paradise dashboard config save"], gap: "History browsing and rollback UI are not implemented." },
   dashboard: { status: "partially implemented", evidence: ["Paradise dashboard route and APIs exist", "local dashboard tests exist"], gap: "Owner authenticated save/reload/CSRF browser proof is blocked; visual architecture still needs milestone work." },
   components: { status: "partially implemented", evidence: ["custom ID family dispatch exists in src/paradise3a59.js", "src/paradiseComponentProtocol.js"], gap: "Existing component families are not yet migrated to the versioned protocol." },

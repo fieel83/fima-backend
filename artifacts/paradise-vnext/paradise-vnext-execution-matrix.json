@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:18:13.521Z",
+  "generatedAt": "2026-07-11T15:22:13.066Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -57,10 +57,11 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
-        "test/runtimeEnvironment.test.js"
+        "test/runtimeEnvironment.test.js",
+        "test/paradise3a59.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Wire the tested guard into all remaining production mutation entry points after environment contract review.",
+      "nextExactAction": "Create the redacted staging/production readiness contract for ENV-002; do not widen the exact test-guild guard.",
       "affectedFiles": [
         "src/runtimeEnvironment.js",
         "src/env.js",
@@ -75,7 +76,7 @@
       "acceptanceCriteria": [
         "environment validation rejects invalid marker",
         "production mutation requires explicit production guard",
-        "test guild allowlist is environment scoped",
+        "only the exact test guild can run setup/create-missing/rebuild/smoke",
         "no secret values appear in error output"
       ]
     },

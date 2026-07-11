@@ -20,12 +20,10 @@ export function resolveRuntimeEnvironment(source = process.env) {
 }
 
 export function paradiseTestGuildAllowlist(source = process.env) {
-  const configured = String(source.PARADISE_TEST_GUILD_IDS || "")
-    .split(",")
-    .map(value => value.trim())
-    .filter(Boolean);
-  // The owner-designated template lab remains the only default mutation target.
-  return [...new Set([PARADISE_TEST_GUILD_ID, ...configured])];
+  // Milestone 1 has one owner-designated disposable lab. Environment values must
+  // never silently widen a destructive Discord mutation boundary.
+  void source;
+  return [PARADISE_TEST_GUILD_ID];
 }
 
 export function paradiseGuildMutationPolicy({ guildId, operation = "read_only", source = process.env } = {}) {
@@ -49,4 +47,13 @@ export function assertParadiseGuildMutation(input = {}) {
   error.code = policy.code;
   error.policy = policy;
   throw error;
+}
+
+export function assertParadiseTestGuildMutation({ guildId, operation = "test_mutation", source = process.env } = {}) {
+  if (String(guildId || "").trim() !== PARADISE_TEST_GUILD_ID) {
+    const error = new Error("test_guild_only");
+    error.code = "test_guild_only";
+    throw error;
+  }
+  return assertParadiseGuildMutation({ guildId, operation, source });
 }

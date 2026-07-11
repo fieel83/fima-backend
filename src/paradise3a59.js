@@ -8,7 +8,7 @@ import {
   TextInputBuilder, TextInputStyle,
   AutoModerationActionType, AutoModerationRuleEventType, AutoModerationRuleTriggerType
 } from "discord.js";
-import { assertParadiseGuildMutation } from "./runtimeEnvironment.js";
+import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
@@ -1703,6 +1703,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
   if (!isOwner(interaction) || interaction.guildId !== PARADISE_TEST_GUILD_ID) {
     return interaction.reply({ content: "Blocked: wrong guild or non-owner.", ephemeral: true });
   }
+  assertParadiseTestGuildMutation({ guildId: interaction.guildId, operation: destructive ? "rebuild" : "repair" });
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) return interaction.reply({ content: "Blocked: unknown setup template.", ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
@@ -1789,11 +1790,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
 }
 
 export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPermissions = true } = {}) {
-  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
-    const error = new Error("test_guild_only");
-    error.code = "test_guild_only";
-    throw error;
-  }
+  assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "create_missing" });
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) {
     const error = new Error("invalid_template");
@@ -1895,12 +1892,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
 }
 
 export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
-  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
-    const error = new Error("test_guild_only");
-    error.code = "test_guild_only";
-    throw error;
-  }
-  assertParadiseGuildMutation({ guildId: guild.id, operation: "rebuild" });
+  assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "rebuild" });
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) {
     const error = new Error("invalid_template");
@@ -1959,11 +1951,7 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
 export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   let smokeStep = "guard";
   try {
-  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
-    const error = new Error("test_guild_only");
-    error.code = "test_guild_only";
-    throw error;
-  }
+  assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "test_smoke" });
   smokeStep = "channel_lookup";
   const ownerId = guild.ownerId;
   const trainingChannel = await configuredChannel(guild, "training_channel", "training");
@@ -2288,7 +2276,12 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
 }
 
 export async function runParadiseAutoSmokeOnce(guild) {
-  if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) return { skipped: true, reason: "test_guild_only" };
+  try {
+    assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "auto_smoke" });
+  } catch (error) {
+    if (error.code === "test_guild_only") return { skipped: true, reason: "test_guild_only" };
+    throw error;
+  }
   try {
     const state = await loadState();
     if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {

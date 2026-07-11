@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   PARADISE_TEST_GUILD_ID,
   assertParadiseGuildMutation,
+  assertParadiseTestGuildMutation,
   paradiseGuildMutationPolicy,
   paradiseTestGuildAllowlist,
   resolveRuntimeEnvironment
@@ -26,10 +27,19 @@ test("production permits read-only access but blocks non-test guild mutation", (
   assert.throws(() => assertParadiseGuildMutation({ guildId: "main-guild", operation: "create_missing", source }), { code: "production_guild_mutation_blocked" });
 });
 
-test("only the explicit test-guild allowlist can mutate in every environment", () => {
+test("only the exact owner-designated test guild can mutate in every environment", () => {
   const source = { PARADISE_RUNTIME_ENV: "production", PARADISE_TEST_GUILD_IDS: "extra-test-guild" };
-  assert.deepEqual(paradiseTestGuildAllowlist(source), [PARADISE_TEST_GUILD_ID, "extra-test-guild"]);
+  assert.deepEqual(paradiseTestGuildAllowlist(source), [PARADISE_TEST_GUILD_ID]);
   assert.equal(paradiseGuildMutationPolicy({ guildId: PARADISE_TEST_GUILD_ID, operation: "rebuild", source }).allowed, true);
-  assert.equal(paradiseGuildMutationPolicy({ guildId: "extra-test-guild", operation: "repair", source }).allowed, true);
+  assert.equal(paradiseGuildMutationPolicy({ guildId: "extra-test-guild", operation: "repair", source }).allowed, false);
   assert.equal(paradiseGuildMutationPolicy({ guildId: "production-guild", operation: "repair", source }).allowed, false);
+  assert.throws(() => assertParadiseTestGuildMutation({ guildId: "extra-test-guild", operation: "repair", source }), { code: "test_guild_only" });
+});
+
+test("high-risk Paradise setup and smoke routines use the exact test-guild assertion", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "create_missing" \}\)/);
+  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "rebuild" \}\)/);
+  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "test_smoke" \}\)/);
+  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "auto_smoke" \}\)/);
 });
