@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-11T15:12:16.146Z",
+  "status": "LOCAL VERIFIED",
+  "repository": {
+    "localCommit": "3953c053e5ca8957459fc16aeec9661cbb4c8787",
+    "dirtyWorktree": true,
+    "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
+  },
+  "runtimeEvidence": {
+    "deployedLicenseHotfix": "DEPLOYED",
+    "deployedLicenseHotfixCommitFromEvidence": "77fb4e7ceee322ae135b570602a7cdd86fae2ea3",
+    "productionScan": "BLOCKED",
+    "browserCopyReveal": "BLOCKED",
+    "testGuildSmoke": "LIVE DISCORD VERIFIED",
+    "currentLocalTestCount": 87
+  },
+  "database": {
+    "provider": "PostgreSQL via Prisma",
+    "migrationState": "not queried in this local inventory",
+    "paradiseState": "Stored primarily in Setting key paradise_3a59_state_v1 with artifact JSON fallback",
+    "risk": "Critical Paradise state remains partly opaque JSON/fallback-based."
+  },
+  "commandRegistration": {
+    "status": "partially implemented",
+    "evidence": [
+      "src/paradise3a59.js exports paradiseCommands",
+      "src/discordBot.js has separate command handling"
+    ],
+    "gap": "No central command manifest governs registration/help/RBAC/dashboard together."
+  },
+  "rbac": {
+    "status": "partially implemented",
+    "evidence": [
+      "role checks and Discord permission checks exist",
+      "src/paradiseRbac.js"
+    ],
+    "gap": "Existing handlers are not yet fully migrated to the central vocabulary."
+  },
+  "environment": {
+    "status": "partially implemented",
+    "evidence": [
+      "src/env.js helpers",
+      "NODE_ENV guards",
+      "src/runtimeEnvironment.js",
+      "fixed test guild constant"
+    ],
+    "gap": "The new fail-closed mutation policy must still be wired into all dashboard and bot mutation paths."
+  },
+  "configurationVersioning": {
+    "status": "partially implemented",
+    "evidence": [
+      "src/paradiseConfigVersioning.js",
+      "versioned Paradise dashboard config save"
+    ],
+    "gap": "History browsing and rollback UI are not implemented."
+  },
+  "dashboard": {
+    "status": "partially implemented",
+    "evidence": [
+      "Paradise dashboard route and APIs exist",
+      "local dashboard tests exist"
+    ],
+    "gap": "Owner authenticated save/reload/CSRF browser proof is blocked; visual architecture still needs milestone work."
+  },
+  "components": {
+    "status": "partially implemented",
+    "evidence": [
+      "custom ID family dispatch exists in src/paradise3a59.js",
+      "src/paradiseComponentProtocol.js"
+    ],
+    "gap": "Existing component families are not yet migrated to the versioned protocol."
+  },
+  "backup": {
+    "status": "partially implemented",
+    "evidence": [
+      "structure snapshot and backup endpoints exist"
+    ],
+    "gap": "No integrity envelope/SHA256/restore drill contract implemented."
+  },
+  "reconciliation": {
+    "status": "missing",
+    "evidence": [],
+    "gap": "No centralized recurring invariant/reconciliation service found."
+  },
+  "featureFlags": {
+    "status": "partially implemented",
+    "evidence": [
+      "ad hoc environment flags",
+      "src/paradiseFeatureFlags.js"
+    ],
+    "gap": "Flags are not yet persisted through the versioned guild configuration envelope."
+  },
+  "testGuildGuard": {
+    "status": "partially implemented",
+    "evidence": [
+      "PARADISE_TEST_GUILD_ID is fixed to the accepted guild",
+      "guarded smoke/rebuild code exists"
+    ],
+    "gap": "Guard must be centralized with environment policy and negative live proof."
+  },
+  "currentMilestoneClassification": [
+    {
+      "requirementId": "LIC-001",
+      "status": "DEPLOYED"
+    },
+    {
+      "requirementId": "ENV-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "ENV-002",
+      "status": "SOURCE ONLY"
+    },
+    {
+      "requirementId": "AUTH-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "AUTH-002",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "CFG-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "FLAG-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "DB-001",
+      "status": "SOURCE ONLY"
+    },
+    {
+      "requirementId": "DB-002",
+      "status": "SOURCE ONLY"
+    },
+    {
+      "requirementId": "BACKUP-001",
+      "status": "SOURCE ONLY"
+    },
+    {
+      "requirementId": "OPS-001",
+      "status": "SOURCE ONLY"
+    },
+    {
+      "requirementId": "CMD-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "RBAC-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "COMP-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "SETUP-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "DASH-001",
+      "status": "SOURCE ONLY"
+    },
+    {
+      "requirementId": "TEST-001",
+      "status": "LOCAL VERIFIED"
+    },
+    {
+      "requirementId": "TPL-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "NAMING-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "LANG-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "PANEL-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "PROFILE-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "PROFILE-002",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "CHALLENGE-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "CHALLENGE-002",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "SESSION-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "TICKET-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "TICKET-002",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "VOICE-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "APP-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "RESELL-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "ROBUX-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "LINEUP-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "XP-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "EVENT-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "SOCIAL-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "AI-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "AI-002",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "SEC-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "LOG-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "BLACKLIST-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "WEB-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "BILLING-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "LEGAL-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "OPS-002",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "MIGRATE-001",
+      "status": "DEFERRED"
+    },
+    {
+      "requirementId": "FIMAAPP-001",
+      "status": "DEFERRED"
+    }
+  ]
+}

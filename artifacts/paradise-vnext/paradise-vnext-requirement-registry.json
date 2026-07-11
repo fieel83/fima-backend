@@ -1,0 +1,2644 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-11T15:12:16.146Z",
+  "status": "LOCAL VERIFIED",
+  "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
+  "sourcePlans": [
+    "Paradise vNext consolidated plan",
+    "Naming correction",
+    "Final missing contracts",
+    "Final execution safety and cutover contracts",
+    "3A73 directive"
+  ],
+  "conflictResolutions": [
+    {
+      "id": "CONFLICT-001",
+      "sources": [
+        "early ticket panel",
+        "final ticket contract"
+      ],
+      "resolution": "Closed ticket shows only Reopen and Delete; deletion is transcript-first and transcript failure blocks deletion."
+    },
+    {
+      "id": "CONFLICT-002",
+      "sources": [
+        "early channel proposals",
+        "compact channel and naming corrections"
+      ],
+      "resolution": "Use compact channel budgets and owner-selected premium readable naming; no generic emoji spam or corporate codes."
+    },
+    {
+      "id": "CONFLICT-003",
+      "sources": [
+        "early footer use",
+        "visual copy correction"
+      ],
+      "resolution": "Made By Fieel appears only on selected important static panels, never active sessions, welcome/leave or ticket state posts."
+    },
+    {
+      "id": "CONFLICT-004",
+      "sources": [
+        "public command guide",
+        "role-aware guide contract"
+      ],
+      "resolution": "Public help is member-safe; staff command guide is private, role-aware and template-aware."
+    },
+    {
+      "id": "CONFLICT-005",
+      "sources": [
+        "embedded session posts",
+        "owner explicit instruction"
+      ],
+      "resolution": "Training/Tryout active posts are plain Markdown; only configured result/static panels may be embeds."
+    }
+  ],
+  "requirements": [
+    {
+      "requirementId": "LIC-001",
+      "title": "Paid license reveal and repair regression safety",
+      "description": "Paid active licenses must never report an available key while secure reveal/copy is unavailable. Repair stays on the same entitlement record and logs only masked metadata.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "license",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001",
+        "AUTH-001",
+        "CFG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "GET metadata never exposes a raw key",
+        "authenticated POST reveal/copy returns a usable key or support-safe error",
+        "paid-null-key scan is masked",
+        "repair preserves plan and entitlement"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "owner-authenticated production scan",
+        "owner-controlled browser copy/reveal"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "DEPLOYED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "DEPLOYED",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "BLOCKED",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-production-license-hotfix-deploy.json",
+        "artifacts/post-security-backlog/3a71-production-paid-license-null-key-scan.json"
+      ],
+      "blocker": "Post-deploy owner browser and production scan are blocked by unavailable owner Chrome connection.",
+      "nextExactAction": "Reconnect owner browser; run masked paid-license scan and copy/reveal test without recording the key.",
+      "affectedFiles": [
+        "src/server.js",
+        "src/entitlements.js"
+      ],
+      "affectedDatabaseTables": [
+        "licenses",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "ENV-001",
+      "title": "Fail-closed runtime environment guard",
+      "description": "Development, staging and production must be explicit. Missing or malformed environment identity must never default to production or permit production Discord mutation.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "environment",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "environment validation rejects invalid marker",
+        "production mutation requires explicit production guard",
+        "test guild allowlist is environment scoped",
+        "no secret values appear in error output"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "development/staging/production matrix test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/runtimeEnvironment.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Wire the tested guard into all remaining production mutation entry points after environment contract review.",
+      "affectedFiles": [
+        "src/runtimeEnvironment.js",
+        "src/env.js",
+        "src/server.js",
+        "src/discordBot.js",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "ENV-002",
+      "title": "Environment deployment separation",
+      "description": "Development, staging and production need distinct DB identity, OAuth callback, session secret, bot identity and mutation policy.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "environment",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "separate staging configuration documented",
+        "production credentials cannot be accepted in staging guard",
+        "Render environment checklist exists"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "staging readiness dry-run"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 1",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Create redacted environment readiness contract after ENV-001 is integrated.",
+      "affectedFiles": [
+        ".env.example",
+        "render.yaml",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "AUTH-001",
+      "title": "Owner Console versus customer dashboard authorization",
+      "description": "Owner-only operational APIs are separate from customer guild workspaces. Customer users can view only Discord guilds where they have Manage Guild or Administrator.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "authorization",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "guild-scope authorization on every API",
+        "cross-guild request is denied",
+        "owner endpoints require step-up policy",
+        "customer dashboard does not expose owner operations"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "two-user/two-guild authorization test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Integrate workspace access into customer-facing server selector/config APIs after the existing owner-only endpoint split is mapped.",
+      "affectedFiles": [
+        "src/paradiseGuildScope.js",
+        "src/server.js",
+        "src/adminAuth.js"
+      ],
+      "affectedDatabaseTables": [
+        "users",
+        "oauth_links",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "AUTH-002",
+      "title": "Dashboard API and OAuth hardening",
+      "description": "OAuth state/PKCE, CSRF, secure sessions, rate limits, encrypted provider token storage, webhook signatures and owner session revocation are enforced.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "authorization",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "AUTH-001",
+        "ENV-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "OAuth state replay fails",
+        "CSRF retry does not bypass authorization",
+        "provider tokens are encrypted",
+        "SSRF/file upload validation exists"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "OAuth state test",
+        "CSRF negative test",
+        "guild scope API test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Design after the shared guild authorization foundation is established.",
+      "affectedFiles": [
+        "src/server.js",
+        "src/csrf.js",
+        "src/adminAuth.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "CFG-001",
+      "title": "Configuration versioning and audit foundation",
+      "description": "Every guild configuration save creates a schema-versioned snapshot, field-level diff, actor, source and rollback record.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "configuration",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "AUTH-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "one safe config save creates an audit row",
+        "rollback preview is available",
+        "invalid advanced JSON is rejected",
+        "no cross-guild config access"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "save/reload/audit test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js",
+        "test/paradise-dashboard.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Add authorized config-version history reading and rollback preview before exposing rollback actions.",
+      "affectedFiles": [
+        "src/paradiseConfigVersioning.js",
+        "src/server.js",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "FLAG-001",
+      "title": "Feature flags and kill switches",
+      "description": "High-risk modules use global/environment/guild/plan/role scoped flags with safe disable/re-enable behavior.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "feature-flags",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001",
+        "CFG-001",
+        "AUTH-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "disabled module rejects new action safely",
+        "existing state remains intact",
+        "flag transition is audited",
+        "test guild canary cannot affect production guild"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "enable/disable/re-enable test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Persist flags through the versioned guild configuration envelope after CFG-001 is integrated.",
+      "affectedFiles": [
+        "src/paradiseFeatureFlags.js",
+        "src/server.js",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "DB-001",
+      "title": "PostgreSQL guild-scope data foundation",
+      "description": "Guild-local Paradise state moves from opaque state JSON toward scoped PostgreSQL records while global identity remains separate.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "database",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001",
+        "CFG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "guild ID is required on new scoped records",
+        "indexes support guild lookups",
+        "cross-guild reference tests fail safely",
+        "critical state is not memory-only"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "Prisma schema validation",
+        "guild isolation test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Inventory existing Setting JSON state and prepare additive migration preview; do not migrate production data yet.",
+      "affectedFiles": [
+        "prisma/schema.prisma",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "DB-002",
+      "title": "Legacy state migration preview",
+      "description": "Profiles, verification, panels, XP, tickets, applications, lineups, cooldowns and jobs receive backup, count comparison, duplicate detection and rollback-ready migration previews.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "database",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "BACKUP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": true,
+      "acceptanceCriteria": [
+        "legacy inventory counts exist",
+        "migration preview has old/new counts",
+        "duplicate/referential integrity checks exist",
+        "production apply is blocked without verified backup"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "synthetic migration dry-run",
+        "rollback dry-run"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Build read-only legacy-state inventory from existing Setting and fallback JSON structure.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "prisma/schema.prisma"
+      ],
+      "affectedDatabaseTables": [
+        "settings"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "BACKUP-001",
+      "title": "Backup integrity foundation",
+      "description": "Backups carry schema version, counts, overwrite and panel metadata, checksum, validation and restore dry-run status.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "backup",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "backup includes integrity metadata",
+        "invalid backup blocks rebuild",
+        "restore dry-run verifies counts and schema",
+        "backup action is audited"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "backup checksum test",
+        "restore dry-run test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Wrap existing structure snapshots in a versioned integrity envelope without altering Discord objects.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/discordBot.js",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "OPS-001",
+      "title": "Reconciliation health foundation",
+      "description": "Recurring safe checks discover orphaned channels, roles, panels, tickets, transcripts, component schemas, leaderboard duplicates and cross-guild references.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "operations",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "CFG-001",
+        "DB-001",
+        "BACKUP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "health result distinguishes healthy/auto-repairable/owner-review/unsafe",
+        "no destructive auto-repair",
+        "overview can display last reconciliation safely"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "synthetic orphan detection test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Implement read-only reconciliation result builder for state/config records.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "CMD-001",
+      "title": "Central command registry",
+      "description": "Every command/subcommand has one manifest for template, module, premium tier, channel, role, parameters, help text, audit and registration scope.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "commands",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "RBAC-001",
+        "FLAG-001",
+        "AUTH-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "same manifest drives slash registration/help/backend authorization",
+        "Community excludes challenge/roster/referee",
+        "disabled module command is rejected at runtime"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "template command visibility test",
+        "role visibility test",
+        "runtime denial test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Map existing slash command builders, help rendering and handlers to this registry incrementally without unregistering commands prematurely.",
+      "affectedFiles": [
+        "src/paradiseCommandRegistry.js",
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "RBAC-001",
+      "title": "Paradise RBAC and role manifest foundation",
+      "description": "Discord role checks, Paradise permissions, hierarchy validation and role assignment authority are centralized.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "rbac",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "AUTH-001",
+        "CFG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "role/persona check is centralized",
+        "bot hierarchy blocker is explicit",
+        "hidden command remains runtime denied",
+        "owner actions are audited"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "owner/admin/member/referee persona tests"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Map current Discord role IDs and existing staff checks to this vocabulary without changing role assignments.",
+      "affectedFiles": [
+        "src/paradiseRbac.js",
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "COMP-001",
+      "title": "Persistent Discord component protocol",
+      "description": "Versioned custom IDs are guild scoped, restart safe, authorization checked and repairable without collectors.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "components",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "RBAC-001",
+        "CFG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "restart-safe component dispatch",
+        "stale/cross-guild/unauthorized interaction is rejected",
+        "no secret in custom ID",
+        "outdated panel gives repair response"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "restart interaction test",
+        "stale component test",
+        "cross-guild replay test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Migrate one non-destructive component family in the test guild and retain old-family repair messaging during the compatibility window.",
+      "affectedFiles": [
+        "src/paradiseComponentProtocol.js",
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "SETUP-001",
+      "title": "Exact setup preview, status and audit commands",
+      "description": "Setup commands use test-guild guard, preview/create-missing/repair/repost/backup/restore/rebuild/status/audit behavior and never mutate production without confirmation.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "setup",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001",
+        "BACKUP-001",
+        "RBAC-001",
+        "CMD-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": true,
+      "acceptanceCriteria": [
+        "test guild exact allowlist works",
+        "production guild guard fails",
+        "preview/status/audit are non-destructive",
+        "repeated create-missing is idempotent"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "test guild safe preview",
+        "non-allowed guild denial",
+        "idempotency test"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/discordBot.js",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [
+        "test-guild structure"
+      ],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "DASH-001",
+      "title": "Customer dashboard baseline",
+      "description": "Authorized login, top server selector, isolated routes, safe config save/reload, validation, toast and CSRF retry form the first dashboard proof.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "dashboard",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "AUTH-001",
+        "CFG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "Manage Guild/Admin scope",
+        "bot installed/invite state",
+        "safe save/reload",
+        "audit record",
+        "desktop/mobile proof",
+        "not one giant route"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "authorized browser save/reload",
+        "CSRF retry",
+        "two-guild isolation"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "BLOCKED",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a68-dashboard-owner-save-live-proof.json"
+      ],
+      "blocker": "Owner-authenticated browser interaction not currently available.",
+      "nextExactAction": "Map existing dashboard APIs to guild-scope auth; defer visual polish until baseline save/reload works.",
+      "affectedFiles": [
+        "src/server.js",
+        "src/paradiseDashboardHtml.js",
+        "public/dashboard.html"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "TEST-001",
+      "title": "Test-guild-only smoke proof",
+      "description": "The exact test guild proves safe guard, setup preview/status/audit, idempotency, persistent component restart and RBAC denial without production mutation.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "testing",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-001",
+        "SETUP-001",
+        "COMP-001",
+        "RBAC-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "test guild identified",
+        "production guard denial captured",
+        "persistent component survives restart",
+        "no duplicate safe object",
+        "real command/message proof"
+      ],
+      "testRequirements": [
+        "live bot test on guild 1520519015661961257",
+        "restart proof",
+        "guard negative proof"
+      ],
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Repeat only after Milestone 1 guard/component/RBAC changes; do not rebuild the lab for artifact-only work.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [
+        "test guild only"
+      ],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "TPL-001",
+      "title": "Compact template architecture",
+      "description": "Community, Clan and TSBTR enforce channel budgets, disabled-module absence, same-channel consolidation and test-before-main installation.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "templates",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "SETUP-001",
+        "RBAC-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "Community 10-12 public/4-6 private",
+        "Clan 15-18 public/6-8 private",
+        "TSBTR 14-17 public/6-8 private",
+        "no default role-guide"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "three template install comparison"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until Milestone 1 setup foundation is stable.",
+      "affectedFiles": [
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "NAMING-001",
+      "title": "Premium controlled naming and branding",
+      "description": "Five test-guild sidebar concepts precede owner selection. Naming is decorative but readable, template-specific, configurable and never production-applied without approval.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "branding",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "TPL-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "five real sidebar variants",
+        "TR/EN previews",
+        "no emoji spam/corporate codes",
+        "no duplicate rename repair"
+      ],
+      "testRequirements": [
+        "test-guild screenshots",
+        "mobile sidebar review"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Deferred until compact template foundation and owner branding decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "low"
+    },
+    {
+      "requirementId": "LANG-001",
+      "title": "Three language layers and natural copy",
+      "description": "Personal dashboard language, guild canonical panel language and personal ephemeral help language remain separate; no language click creates duplicate panels.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "i18n",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "CFG-001",
+        "COMP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "canonical stored message edits in place",
+        "TR/EN completeness checks",
+        "personal help is ephemeral",
+        "natural non-literal copy"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "TR/EN message-ID test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after component/config foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "PANEL-001",
+      "title": "Canonical panels and handbooks",
+      "description": "Overview, rules, roles, support, staff guides and operational channel handbooks are stored, pinned where needed and edited in place.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "panels",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "COMP-001",
+        "LANG-001",
+        "TPL-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "one canonical ID per panel",
+        "no duplicates",
+        "handbook repair works",
+        "footer policy followed"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "panel delete/repair test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until component and language foundations are complete.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "PROFILE-001",
+      "title": "Profile and Roblox verification",
+      "description": "Short single-use Roblox-safe codes, duplicate prevention, privacy, re-verification and verified-profile gates support profile/challenge/leaderboard systems.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "profiles",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "no duplicate active profile",
+        "code expiry/rate limit",
+        "privacy controls",
+        "verified gate works"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "profile verify/duplicate test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until database migration preview is ready.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [
+        "future guild profiles",
+        "settings"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "PROFILE-002",
+      "title": "Profile transfer and privacy",
+      "description": "Old/new Discord confirmation, Roblox/Fima secondary verification, fraud controls, review-only AI and rollback govern transfers.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "profiles",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "PROFILE-001",
+        "AI-002"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "dual confirmation",
+        "manual staff-only finalization",
+        "history/rollback",
+        "blacklist restriction"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "transfer fraud/rollback test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until verified profile storage exists.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "CHALLENGE-001",
+      "title": "Leaderboard and stage/range rules",
+      "description": "Compact public boards, full profile view, Stage/Level/Strength, ranges, cooldowns, immunity and manual management use guild-scope audited state.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "challenge",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "PROFILE-001",
+        "DB-001",
+        "CMD-001",
+        "RBAC-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "public cards hide internal data",
+        "vacant is friendly",
+        "timestamps are correct",
+        "manual edits audit"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "Top10/20/30 update-in-place test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after profile/database foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "CHALLENGE-002",
+      "title": "Challenge result transaction and referee approval",
+      "description": "Post/autowin/score approval/co-ref/stroke reason workflows atomically update result, board, immunity, cooldown, availability, ticket and referee activity.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "challenge",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "CHALLENGE-001",
+        "TICKET-001",
+        "RBAC-001",
+        "OPS-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "no partial result state",
+        "Trial Referee blocked",
+        "ticket autofill",
+        "approval audit"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "transaction failure test",
+        "referee persona test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until ticket and persisted leaderboard foundations exist.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "SESSION-001",
+      "title": "Training, tryout, results and activity",
+      "description": "Active posts are plain Markdown in the guild language; result authority, evidence, activity quotas, promotion and lifecycle replies are controlled and audited.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "sessions",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "RBAC-001",
+        "COMP-001",
+        "PROFILE-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "no active embed",
+        "reply lifecycle",
+        "authority ceiling",
+        "training activity review"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "training/tryout live lifecycle",
+        "authority persona test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Re-test only after component/RBAC upgrade; localize remaining English labels later.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "TICKET-001",
+      "title": "Ticket state machine and transcript-first delete",
+      "description": "Open/claimed/closed controls are state-aware. Close/reopen/delete, transcripts, retention, naming, logs and safe failure behavior use one backend state machine.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "tickets",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001",
+        "BACKUP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "closed shows Reopen/Delete only",
+        "delete creates transcript first",
+        "failure blocks deletion",
+        "staff-only transcript access"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "close/reopen/delete/transcript failure live test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until persisted state/component protocol are in place.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "TICKET-002",
+      "title": "Ticket categories, command parity and optional appeal guild",
+      "description": "Commands match controls, template categories are configured, and optional appeal guild bridge remains disabled by default.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "tickets",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "TICKET-001",
+        "CMD-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "command/control parity",
+        "category templates",
+        "appeal bridge audited"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "appeal visibility test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after ticket state machine.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "VOICE-001",
+      "title": "Real Join-to-Create voice system",
+      "description": "Voice-purpose mappings must be real voice channels; temporary room state, controls, cleanup and wrong-type repair are safe and persistent.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "voice",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001",
+        "SETUP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "wrong text mapping detected",
+        "temporary room/move/cleanup works",
+        "restart recovery",
+        "owner-only repair"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "voice type and temporary room live test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until component/persistence base.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "APP-001",
+      "title": "Appy-inspired application workflow",
+      "description": "Template-specific multi-step forms, draft expiry, review, role grants, website submission and audit use one shared queue.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "applications",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "5-input modal steps",
+        "duplicate pending blocked",
+        "approve/deny/more-info audit",
+        "website and Discord same queue"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "application live flow"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after persistent component and DB foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "RESELL-001",
+      "title": "Reseller and partner safe model",
+      "description": "Referral code, pending commission, fraud review, clawback and manual payout avoid raw key/customer data exposure.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "reseller",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "APP-001",
+        "BILLING-001",
+        "AUTH-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "no raw key distribution",
+        "hold/clawback",
+        "manual payout approval"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "self-referral/fraud test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until billing/legal owner decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "ROBUX-001",
+      "title": "Robux purchase ticket workflow",
+      "description": "Product selection, fee explanation, proof, fraud review, staff approval, license creation, Buyer role and transcript remain separate from Stripe billing.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "payments",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "TICKET-001",
+        "LIC-001",
+        "RBAC-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "AI cannot approve/issue",
+        "proof/audit/transcript",
+        "role after approval only"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "safe mocked payment flow"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until ticket transaction and owner policy.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "LINEUP-001",
+      "title": "Lineup, roster, mainer, war and relations",
+      "description": "Stored board IDs and complete command families update Main/Roster/War boards in place with audit, authority and consolidated channels.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "clan",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "CMD-001",
+        "RBAC-001",
+        "PANEL-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "add/remove/move/edit/clear/repost",
+        "mainer canonical message",
+        "war/spar audit"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "board update-in-place test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until persisted board foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "XP-001",
+      "title": "XP, permissions and Daily Question",
+      "description": "Chat/voice XP, trusted media/link roles, board, anti-AFK and clan-only Daily Question with manual Robux queue are configurable and audited.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "xp",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001",
+        "OPS-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "anti-spam/anti-AFK",
+        "temporary level post",
+        "trusted roles do not bypass scam checks",
+        "daily reward no auto-pay"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "XP/role reward/scheduled job test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until scheduler/persistence base.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "EVENT-001",
+      "title": "Giveaway, event, tournament and Game Night",
+      "description": "Entry validation, host permissions, anti-alt, bracket progression, result correction and audit are enforced.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "events",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "winner validation",
+        "bracket progression",
+        "image preview",
+        "reroll history"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "event/tournament workflow test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until shared event state and components exist.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "SOCIAL-001",
+      "title": "Social feeds and Fima update notices",
+      "description": "Official YouTube, Twitch, Kick and permitted TikTok feeds support delay, dedupe, health and role pings; verified Fima releases may announce once.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "social",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "FLAG-001",
+        "OPS-001",
+        "BILLING-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "official/approved source only",
+        "dedupe",
+        "health",
+        "rollback correction"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "feed dedupe/scheduler test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer pending provider selection and release policy.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "AI-001",
+      "title": "AI safety and community/ticket modes",
+      "description": "Approved knowledge, opt-in channels, rate/cost limits, redaction, escalation and kill switch govern AI.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "ai",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "FLAG-001",
+        "AUTH-001",
+        "OPS-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "secret redaction",
+        "staff escalation",
+        "provider failure fallback",
+        "kill switch"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "redaction/escalation/limit test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until AI provider/consent owner decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "AI-002",
+      "title": "AI knowledge base governance",
+      "description": "Draft/review/approve/publish/deprecate/rollback and response source logging ensure approved knowledge only.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "ai",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "AI-001",
+        "DB-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "KB versioning",
+        "staff log includes item/version",
+        "raw conversations never auto-publish"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "KB rollback/language test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until AI mode foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "SEC-001",
+      "title": "Security, media/link/invite policy and moderation",
+      "description": "Quarantine, raid, lockdown, scam links/media, invite policy, utility commands, case approvals and audit are policy-driven.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "security",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "RBAC-001",
+        "LOG-001",
+        "FLAG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "no unsafe auto-ban",
+        "trusted roles do not bypass scans",
+        "utility commands audit",
+        "approval path works"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "moderation persona/negative test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until RBAC/log base is integrated.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "LOG-001",
+      "title": "Complete log taxonomy and retention",
+      "description": "Separate configurable logs, redaction, retention, viewers, correlation IDs and export policy cover Discord, billing, AI and setup events.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "logging",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "RBAC-001",
+        "CFG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "event schema per type",
+        "redaction",
+        "viewer checks",
+        "retention policy"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "sensitive payload redaction test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Create shared safe audit/log event envelope after config versioning.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "BLACKLIST-001",
+      "title": "Blacklist, appeal and bail access",
+      "description": "BLACKLISTED users see only configured appeal route; staff review/evidence stays private; unblacklist restores only safe default access.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "security",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "RBAC-001",
+        "TICKET-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "idempotent role add/remove",
+        "visibility matrix",
+        "appeal audit"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "blacklisted persona test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a67-blacklist-appeal-bail-permissions.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Re-test after RBAC migration; preserve known behavior.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "WEB-001",
+      "title": "Public Paradise bot product website",
+      "description": "Landing, invite, command directory, docs, feedback, changelog, status, support, privacy, terms, AI disclosure and apply pages form the customer-facing product.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "website",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "CMD-001",
+        "AUTH-001",
+        "BILLING-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "searchable command directory",
+        "feedback workflow",
+        "no false live claims"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "public route/accessibility test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until command registry and dashboard auth are reliable.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium"
+    },
+    {
+      "requirementId": "BILLING-001",
+      "title": "Paradise billing, VAT and legal gate",
+      "description": "Legal seller, VAT, currency, invoices, refunds, cancellation, chargebacks and subscription reconciliation are defined before paid plans activate.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "billing",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "LIC-001",
+        "AUTH-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "legal/tax approval",
+        "webhook idempotency",
+        "downgrade/reconciliation test"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "billing lifecycle test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Blocked pending owner legal/tax and product activation decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "LEGAL-001",
+      "title": "Privacy, retention and GDPR controls",
+      "description": "Privacy, terms, AI disclosure, data export/delete, retention, guild disconnect and provider disclosure are documented and enforceable.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "legal",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "DB-001",
+        "LOG-001",
+        "AI-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "retention policies map to storage",
+        "export/delete workflow",
+        "AI disclosure"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "privacy deletion/export test"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer pending owner legal policy decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    },
+    {
+      "requirementId": "OPS-002",
+      "title": "Scheduler, queues, performance and recovery",
+      "description": "Timezone-aware idempotent jobs, rate recovery, dead-letter queue, service objectives, encrypted backups and restore drills support multi-guild operation.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "operations",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "ENV-002",
+        "BACKUP-001",
+        "OPS-001",
+        "FLAG-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": false,
+      "securityCritical": true,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "DST/missed-job policy",
+        "queue health",
+        "RPO/RTO",
+        "restore drill"
+      ],
+      "testRequirements": [
+        "node --check",
+        "node --test",
+        "secret scan",
+        "matrix row update",
+        "scheduler DST/restart test",
+        "load/recovery test"
+      ],
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until environment and backup foundation pass.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "MIGRATE-001",
+      "title": "Production migration matrix and reference audit",
+      "description": "KEEP/EDIT/REPOST/ARCHIVE/DELETE/CREATE decisions preserve important human content and prevent unapproved production rebuilds.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "migration",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [
+        "BACKUP-001",
+        "SETUP-001",
+        "TPL-001"
+      ],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": true,
+      "acceptanceCriteria": [
+        "per-object matrix",
+        "backup",
+        "preview",
+        "human/bot message distinction",
+        "owner confirmation gate"
+      ],
+      "testRequirements": [
+        "read-only audit",
+        "preview review"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Deferred until compact templates and backup integrity are complete.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical"
+    },
+    {
+      "requirementId": "FIMAAPP-001",
+      "title": "Separate Fima desktop app backlog",
+      "description": "Fima GUI, key-screen clipping, FPS/MS, update center, auto-update, admin parity and release gate remain a linked but separate backlog.",
+      "sourcePlan": [
+        "Paradise vNext consolidated specification",
+        "3A72 missing contracts",
+        "3A73 execution directive"
+      ],
+      "module": "fima-app",
+      "templateScope": [
+        "all"
+      ],
+      "premiumScope": "all",
+      "dependencies": [],
+      "conflicts": [],
+      "resolvedRule": "No conflict recorded.",
+      "ownerDecisionRequired": true,
+      "securityCritical": false,
+      "destructive": false,
+      "acceptanceCriteria": [
+        "visual screenshot diff",
+        "updater integrity",
+        "release gate remains separate"
+      ],
+      "testRequirements": [
+        "desktop UI regression suite",
+        "license/macro soak"
+      ],
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Do not mix into Milestone 1; later read-only reference intake from owner-provided Fima assets.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high"
+    }
+  ]
+}

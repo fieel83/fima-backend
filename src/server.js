@@ -36,6 +36,7 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
+import { createParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
@@ -913,6 +914,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     ? state.guildConfigs[guildId]
     : guildId === env("DISCORD_GUILD_ID") && state.config && typeof state.config === "object" ? structuredClone(state.config) : {};
   const config = state.guildConfigs[guildId];
+  const previousConfig = structuredClone(config);
   if (kind === "mainer") {
     const code = String(req.body?.value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
     if (!code) return res.status(400).json({ error: "invalid_mainer_code" });
@@ -1153,12 +1155,38 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     config.autoActivityRoleRemoval = req.body?.value?.autoActivityRoleRemoval === true;
   }
   if (guildId === env("DISCORD_GUILD_ID")) state.config = structuredClone(config);
-  await prisma.setting.upsert({
-    where: { key: "paradise_3a59_state_v1" },
-    update: { value: state },
-    create: { key: "paradise_3a59_state_v1", value: state }
+  const configVersion = createParadiseConfigVersion({
+    guildId,
+    previous: previousConfig,
+    next: config,
+    actorId: req.user.id,
+    source: "paradise_dashboard"
   });
-  await createAuditLog("paradise_owner_config_updated", "discord_user", "762858334440521739", { kind, guildId, userId: req.user.id });
+  await prisma.$transaction(async tx => {
+    await tx.setting.upsert({
+      where: { key: "paradise_3a59_state_v1" },
+      update: { value: state },
+      create: { key: "paradise_3a59_state_v1", value: state }
+    });
+    await tx.setting.create({
+      data: { key: `paradise_config_version_${guildId}_${configVersion.versionId}`, value: configVersion }
+    });
+    await tx.auditLog.create({
+      data: {
+        action: "paradise_owner_config_updated",
+        targetType: "discord_user",
+        targetId: "762858334440521739",
+        metadata: {
+          kind,
+          guildId,
+          userId: req.user.id,
+          configVersionId: configVersion.versionId,
+          schemaVersion: configVersion.schemaVersion,
+          changedPaths: configVersion.diff.map(item => item.path)
+        }
+      }
+    });
+  });
   let panelSync = null;
   if (kind === "channelMappings") {
     panelSync = await syncParadisePanelsFromDashboard(guildId).catch(error => ({
@@ -1167,7 +1195,13 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
       error: publicError(error)
     }));
   }
-  return res.json({ success: true, kind, guildId, panelSync });
+  return res.json({
+    success: true,
+    kind,
+    guildId,
+    panelSync,
+    configVersion: { versionId: configVersion.versionId, schemaVersion: configVersion.schemaVersion, changedPaths: configVersion.diff.map(item => item.path) }
+  });
 });
 
 app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwner, async (req, res) => {

@@ -26,6 +26,9 @@ test("Paradise config writes require owner action header and trusted official or
   assert.match(serverSource, /apiBaseUrl\(\)/);
   assert.match(serverSource, /origin_mismatch/);
   assert.match(serverSource, /invalid_brand_color/);
+  assert.match(serverSource, /createParadiseConfigVersion/);
+  assert.match(serverSource, /paradise_config_version_/);
+  assert.match(serverSource, /changedPaths/);
 });
 
 test("browser dashboard route is UI-first while API authorization remains JSON", () => {

@@ -1,0 +1,1555 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-11T15:12:16.146Z",
+  "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
+  "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
+  "rows": [
+    {
+      "requirementId": "LIC-001",
+      "module": "license",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001",
+        "AUTH-001",
+        "CFG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "DEPLOYED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "DEPLOYED",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "BLOCKED",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-production-license-hotfix-deploy.json",
+        "artifacts/post-security-backlog/3a71-production-paid-license-null-key-scan.json"
+      ],
+      "blocker": "Post-deploy owner browser and production scan are blocked by unavailable owner Chrome connection.",
+      "nextExactAction": "Reconnect owner browser; run masked paid-license scan and copy/reveal test without recording the key.",
+      "affectedFiles": [
+        "src/server.js",
+        "src/entitlements.js"
+      ],
+      "affectedDatabaseTables": [
+        "licenses",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "GET metadata never exposes a raw key",
+        "authenticated POST reveal/copy returns a usable key or support-safe error",
+        "paid-null-key scan is masked",
+        "repair preserves plan and entitlement"
+      ]
+    },
+    {
+      "requirementId": "ENV-001",
+      "module": "environment",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/runtimeEnvironment.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Wire the tested guard into all remaining production mutation entry points after environment contract review.",
+      "affectedFiles": [
+        "src/runtimeEnvironment.js",
+        "src/env.js",
+        "src/server.js",
+        "src/discordBot.js",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "environment validation rejects invalid marker",
+        "production mutation requires explicit production guard",
+        "test guild allowlist is environment scoped",
+        "no secret values appear in error output"
+      ]
+    },
+    {
+      "requirementId": "ENV-002",
+      "module": "environment",
+      "priority": "P1",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Create redacted environment readiness contract after ENV-001 is integrated.",
+      "affectedFiles": [
+        ".env.example",
+        "render.yaml",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "separate staging configuration documented",
+        "production credentials cannot be accepted in staging guard",
+        "Render environment checklist exists"
+      ]
+    },
+    {
+      "requirementId": "AUTH-001",
+      "module": "authorization",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Integrate workspace access into customer-facing server selector/config APIs after the existing owner-only endpoint split is mapped.",
+      "affectedFiles": [
+        "src/paradiseGuildScope.js",
+        "src/server.js",
+        "src/adminAuth.js"
+      ],
+      "affectedDatabaseTables": [
+        "users",
+        "oauth_links",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "guild-scope authorization on every API",
+        "cross-guild request is denied",
+        "owner endpoints require step-up policy",
+        "customer dashboard does not expose owner operations"
+      ]
+    },
+    {
+      "requirementId": "AUTH-002",
+      "module": "authorization",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "AUTH-001",
+        "ENV-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Design after the shared guild authorization foundation is established.",
+      "affectedFiles": [
+        "src/server.js",
+        "src/csrf.js",
+        "src/adminAuth.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "OAuth state replay fails",
+        "CSRF retry does not bypass authorization",
+        "provider tokens are encrypted",
+        "SSRF/file upload validation exists"
+      ]
+    },
+    {
+      "requirementId": "CFG-001",
+      "module": "configuration",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "AUTH-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js",
+        "test/paradise-dashboard.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Add authorized config-version history reading and rollback preview before exposing rollback actions.",
+      "affectedFiles": [
+        "src/paradiseConfigVersioning.js",
+        "src/server.js",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "one safe config save creates an audit row",
+        "rollback preview is available",
+        "invalid advanced JSON is rejected",
+        "no cross-guild config access"
+      ]
+    },
+    {
+      "requirementId": "FLAG-001",
+      "module": "feature-flags",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001",
+        "CFG-001",
+        "AUTH-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Persist flags through the versioned guild configuration envelope after CFG-001 is integrated.",
+      "affectedFiles": [
+        "src/paradiseFeatureFlags.js",
+        "src/server.js",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "disabled module rejects new action safely",
+        "existing state remains intact",
+        "flag transition is audited",
+        "test guild canary cannot affect production guild"
+      ]
+    },
+    {
+      "requirementId": "DB-001",
+      "module": "database",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001",
+        "CFG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Inventory existing Setting JSON state and prepare additive migration preview; do not migrate production data yet.",
+      "affectedFiles": [
+        "prisma/schema.prisma",
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "guild ID is required on new scoped records",
+        "indexes support guild lookups",
+        "cross-guild reference tests fail safely",
+        "critical state is not memory-only"
+      ]
+    },
+    {
+      "requirementId": "DB-002",
+      "module": "database",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "DB-001",
+        "BACKUP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Build read-only legacy-state inventory from existing Setting and fallback JSON structure.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "prisma/schema.prisma"
+      ],
+      "affectedDatabaseTables": [
+        "settings"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "legacy inventory counts exist",
+        "migration preview has old/new counts",
+        "duplicate/referential integrity checks exist",
+        "production apply is blocked without verified backup"
+      ]
+    },
+    {
+      "requirementId": "BACKUP-001",
+      "module": "backup",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Wrap existing structure snapshots in a versioned integrity envelope without altering Discord objects.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/discordBot.js",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [
+        "settings",
+        "audit_logs"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "backup includes integrity metadata",
+        "invalid backup blocks rebuild",
+        "restore dry-run verifies counts and schema",
+        "backup action is audited"
+      ]
+    },
+    {
+      "requirementId": "OPS-001",
+      "module": "operations",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "CFG-001",
+        "DB-001",
+        "BACKUP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Implement read-only reconciliation result builder for state/config records.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "health result distinguishes healthy/auto-repairable/owner-review/unsafe",
+        "no destructive auto-repair",
+        "overview can display last reconciliation safely"
+      ]
+    },
+    {
+      "requirementId": "CMD-001",
+      "module": "commands",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "RBAC-001",
+        "FLAG-001",
+        "AUTH-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Map existing slash command builders, help rendering and handlers to this registry incrementally without unregistering commands prematurely.",
+      "affectedFiles": [
+        "src/paradiseCommandRegistry.js",
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "same manifest drives slash registration/help/backend authorization",
+        "Community excludes challenge/roster/referee",
+        "disabled module command is rejected at runtime"
+      ]
+    },
+    {
+      "requirementId": "RBAC-001",
+      "module": "rbac",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "AUTH-001",
+        "CFG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Map current Discord role IDs and existing staff checks to this vocabulary without changing role assignments.",
+      "affectedFiles": [
+        "src/paradiseRbac.js",
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "role/persona check is centralized",
+        "bot hierarchy blocker is explicit",
+        "hidden command remains runtime denied",
+        "owner actions are audited"
+      ]
+    },
+    {
+      "requirementId": "COMP-001",
+      "module": "components",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "RBAC-001",
+        "CFG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "test/paradiseFoundation.test.js"
+      ],
+      "blocker": null,
+      "nextExactAction": "Migrate one non-destructive component family in the test guild and retain old-family repair messaging during the compatibility window.",
+      "affectedFiles": [
+        "src/paradiseComponentProtocol.js",
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "restart-safe component dispatch",
+        "stale/cross-guild/unauthorized interaction is rejected",
+        "no secret in custom ID",
+        "outdated panel gives repair response"
+      ]
+    },
+    {
+      "requirementId": "SETUP-001",
+      "module": "setup",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001",
+        "BACKUP-001",
+        "RBAC-001",
+        "CMD-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Rebase existing setup handlers on the registry and environment guard; preserve current test guild behavior.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/discordBot.js",
+        "src/server.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [
+        "test-guild structure"
+      ],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "test guild exact allowlist works",
+        "production guild guard fails",
+        "preview/status/audit are non-destructive",
+        "repeated create-missing is idempotent"
+      ]
+    },
+    {
+      "requirementId": "DASH-001",
+      "module": "dashboard",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "AUTH-001",
+        "CFG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "LOCAL VERIFIED",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "BLOCKED",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a68-dashboard-owner-save-live-proof.json"
+      ],
+      "blocker": "Owner-authenticated browser interaction not currently available.",
+      "nextExactAction": "Map existing dashboard APIs to guild-scope auth; defer visual polish until baseline save/reload works.",
+      "affectedFiles": [
+        "src/server.js",
+        "src/paradiseDashboardHtml.js",
+        "public/dashboard.html"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "Manage Guild/Admin scope",
+        "bot installed/invite state",
+        "safe save/reload",
+        "audit record",
+        "desktop/mobile proof",
+        "not one giant route"
+      ]
+    },
+    {
+      "requirementId": "TEST-001",
+      "module": "testing",
+      "priority": "P0",
+      "milestone": "Milestone 1",
+      "dependencyIds": [
+        "ENV-001",
+        "SETUP-001",
+        "COMP-001",
+        "RBAC-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Repeat only after Milestone 1 guard/component/RBAC changes; do not rebuild the lab for artifact-only work.",
+      "affectedFiles": [
+        "src/paradise3a59.js",
+        "src/discordBot.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [
+        "test guild only"
+      ],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "test guild identified",
+        "production guard denial captured",
+        "persistent component survives restart",
+        "no duplicate safe object",
+        "real command/message proof"
+      ]
+    },
+    {
+      "requirementId": "TPL-001",
+      "module": "templates",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "SETUP-001",
+        "RBAC-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until Milestone 1 setup foundation is stable.",
+      "affectedFiles": [
+        "src/paradise3a59.js"
+      ],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "Community 10-12 public/4-6 private",
+        "Clan 15-18 public/6-8 private",
+        "TSBTR 14-17 public/6-8 private",
+        "no default role-guide"
+      ]
+    },
+    {
+      "requirementId": "NAMING-001",
+      "module": "branding",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "TPL-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Deferred until compact template foundation and owner branding decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "low",
+      "acceptanceCriteria": [
+        "five real sidebar variants",
+        "TR/EN previews",
+        "no emoji spam/corporate codes",
+        "no duplicate rename repair"
+      ]
+    },
+    {
+      "requirementId": "LANG-001",
+      "module": "i18n",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "CFG-001",
+        "COMP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after component/config foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "canonical stored message edits in place",
+        "TR/EN completeness checks",
+        "personal help is ephemeral",
+        "natural non-literal copy"
+      ]
+    },
+    {
+      "requirementId": "PANEL-001",
+      "module": "panels",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "COMP-001",
+        "LANG-001",
+        "TPL-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until component and language foundations are complete.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "one canonical ID per panel",
+        "no duplicates",
+        "handbook repair works",
+        "footer policy followed"
+      ]
+    },
+    {
+      "requirementId": "PROFILE-001",
+      "module": "profiles",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until database migration preview is ready.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [
+        "future guild profiles",
+        "settings"
+      ],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "no duplicate active profile",
+        "code expiry/rate limit",
+        "privacy controls",
+        "verified gate works"
+      ]
+    },
+    {
+      "requirementId": "PROFILE-002",
+      "module": "profiles",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "PROFILE-001",
+        "AI-002"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until verified profile storage exists.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "dual confirmation",
+        "manual staff-only finalization",
+        "history/rollback",
+        "blacklist restriction"
+      ]
+    },
+    {
+      "requirementId": "CHALLENGE-001",
+      "module": "challenge",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "PROFILE-001",
+        "DB-001",
+        "CMD-001",
+        "RBAC-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after profile/database foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "public cards hide internal data",
+        "vacant is friendly",
+        "timestamps are correct",
+        "manual edits audit"
+      ]
+    },
+    {
+      "requirementId": "CHALLENGE-002",
+      "module": "challenge",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "CHALLENGE-001",
+        "TICKET-001",
+        "RBAC-001",
+        "OPS-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until ticket and persisted leaderboard foundations exist.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "no partial result state",
+        "Trial Referee blocked",
+        "ticket autofill",
+        "approval audit"
+      ]
+    },
+    {
+      "requirementId": "SESSION-001",
+      "module": "sessions",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "RBAC-001",
+        "COMP-001",
+        "PROFILE-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a71-compact-turkish-test-lab-live-proof.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Re-test only after component/RBAC upgrade; localize remaining English labels later.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "no active embed",
+        "reply lifecycle",
+        "authority ceiling",
+        "training activity review"
+      ]
+    },
+    {
+      "requirementId": "TICKET-001",
+      "module": "tickets",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001",
+        "BACKUP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until persisted state/component protocol are in place.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "closed shows Reopen/Delete only",
+        "delete creates transcript first",
+        "failure blocks deletion",
+        "staff-only transcript access"
+      ]
+    },
+    {
+      "requirementId": "TICKET-002",
+      "module": "tickets",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "TICKET-001",
+        "CMD-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after ticket state machine.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "command/control parity",
+        "category templates",
+        "appeal bridge audited"
+      ]
+    },
+    {
+      "requirementId": "VOICE-001",
+      "module": "voice",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001",
+        "SETUP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until component/persistence base.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "wrong text mapping detected",
+        "temporary room/move/cleanup works",
+        "restart recovery",
+        "owner-only repair"
+      ]
+    },
+    {
+      "requirementId": "APP-001",
+      "module": "applications",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer after persistent component and DB foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "5-input modal steps",
+        "duplicate pending blocked",
+        "approve/deny/more-info audit",
+        "website and Discord same queue"
+      ]
+    },
+    {
+      "requirementId": "RESELL-001",
+      "module": "reseller",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "APP-001",
+        "BILLING-001",
+        "AUTH-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until billing/legal owner decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "no raw key distribution",
+        "hold/clawback",
+        "manual payout approval"
+      ]
+    },
+    {
+      "requirementId": "ROBUX-001",
+      "module": "payments",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "TICKET-001",
+        "LIC-001",
+        "RBAC-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until ticket transaction and owner policy.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "AI cannot approve/issue",
+        "proof/audit/transcript",
+        "role after approval only"
+      ]
+    },
+    {
+      "requirementId": "LINEUP-001",
+      "module": "clan",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "CMD-001",
+        "RBAC-001",
+        "PANEL-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until persisted board foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "add/remove/move/edit/clear/repost",
+        "mainer canonical message",
+        "war/spar audit"
+      ]
+    },
+    {
+      "requirementId": "XP-001",
+      "module": "xp",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001",
+        "OPS-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until scheduler/persistence base.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "anti-spam/anti-AFK",
+        "temporary level post",
+        "trusted roles do not bypass scam checks",
+        "daily reward no auto-pay"
+      ]
+    },
+    {
+      "requirementId": "EVENT-001",
+      "module": "events",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001",
+        "COMP-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until shared event state and components exist.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "winner validation",
+        "bracket progression",
+        "image preview",
+        "reroll history"
+      ]
+    },
+    {
+      "requirementId": "SOCIAL-001",
+      "module": "social",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "FLAG-001",
+        "OPS-001",
+        "BILLING-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer pending provider selection and release policy.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "official/approved source only",
+        "dedupe",
+        "health",
+        "rollback correction"
+      ]
+    },
+    {
+      "requirementId": "AI-001",
+      "module": "ai",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "FLAG-001",
+        "AUTH-001",
+        "OPS-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until AI provider/consent owner decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "secret redaction",
+        "staff escalation",
+        "provider failure fallback",
+        "kill switch"
+      ]
+    },
+    {
+      "requirementId": "AI-002",
+      "module": "ai",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "AI-001",
+        "DB-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until AI mode foundation.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "KB versioning",
+        "staff log includes item/version",
+        "raw conversations never auto-publish"
+      ]
+    },
+    {
+      "requirementId": "SEC-001",
+      "module": "security",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "RBAC-001",
+        "LOG-001",
+        "FLAG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until RBAC/log base is integrated.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "no unsafe auto-ban",
+        "trusted roles do not bypass scans",
+        "utility commands audit",
+        "approval path works"
+      ]
+    },
+    {
+      "requirementId": "LOG-001",
+      "module": "logging",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "RBAC-001",
+        "CFG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Create shared safe audit/log event envelope after config versioning.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "event schema per type",
+        "redaction",
+        "viewer checks",
+        "retention policy"
+      ]
+    },
+    {
+      "requirementId": "BLACKLIST-001",
+      "module": "security",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "RBAC-001",
+        "TICKET-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "LIVE DISCORD VERIFIED",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [
+        "artifacts/post-security-backlog/3a67-blacklist-appeal-bail-permissions.json"
+      ],
+      "blocker": null,
+      "nextExactAction": "Re-test after RBAC migration; preserve known behavior.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "idempotent role add/remove",
+        "visibility matrix",
+        "appeal audit"
+      ]
+    },
+    {
+      "requirementId": "WEB-001",
+      "module": "website",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "CMD-001",
+        "AUTH-001",
+        "BILLING-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until command registry and dashboard auth are reliable.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "medium",
+      "acceptanceCriteria": [
+        "searchable command directory",
+        "feedback workflow",
+        "no false live claims"
+      ]
+    },
+    {
+      "requirementId": "BILLING-001",
+      "module": "billing",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "LIC-001",
+        "AUTH-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Blocked pending owner legal/tax and product activation decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "legal/tax approval",
+        "webhook idempotency",
+        "downgrade/reconciliation test"
+      ]
+    },
+    {
+      "requirementId": "LEGAL-001",
+      "module": "legal",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "DB-001",
+        "LOG-001",
+        "AI-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer pending owner legal policy decision.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "retention policies map to storage",
+        "export/delete workflow",
+        "AI disclosure"
+      ]
+    },
+    {
+      "requirementId": "OPS-002",
+      "module": "operations",
+      "priority": "P1",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "ENV-002",
+        "BACKUP-001",
+        "OPS-001",
+        "FLAG-001"
+      ],
+      "ownerDecision": null,
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Defer until environment and backup foundation pass.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "DST/missed-job policy",
+        "queue health",
+        "RPO/RTO",
+        "restore drill"
+      ]
+    },
+    {
+      "requirementId": "MIGRATE-001",
+      "module": "migration",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [
+        "BACKUP-001",
+        "SETUP-001",
+        "TPL-001"
+      ],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Deferred until compact templates and backup integrity are complete.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "critical",
+      "acceptanceCriteria": [
+        "per-object matrix",
+        "backup",
+        "preview",
+        "human/bot message distinction",
+        "owner confirmation gate"
+      ]
+    },
+    {
+      "requirementId": "FIMAAPP-001",
+      "module": "fima-app",
+      "priority": "P2",
+      "milestone": "Milestone 2",
+      "dependencyIds": [],
+      "ownerDecision": "OWNER DECISION REQUIRED",
+      "sourceStatus": "SOURCE ONLY",
+      "localTestStatus": "SOURCE ONLY",
+      "deployStatus": "SOURCE ONLY",
+      "liveDiscordStatus": "SOURCE ONLY",
+      "dashboardBrowserStatus": "SOURCE ONLY",
+      "evidencePath": [],
+      "blocker": null,
+      "nextExactAction": "Do not mix into Milestone 1; later read-only reference intake from owner-provided Fima assets.",
+      "affectedFiles": [],
+      "affectedDatabaseTables": [],
+      "affectedDiscordObjects": [],
+      "rollbackMethod": "Feature flag disable and configuration rollback.",
+      "securityRisk": "high",
+      "acceptanceCriteria": [
+        "visual screenshot diff",
+        "updater integrity",
+        "release gate remains separate"
+      ]
+    }
+  ]
+}

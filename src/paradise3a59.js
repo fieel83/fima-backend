@@ -8,6 +8,7 @@ import {
   TextInputBuilder, TextInputStyle,
   AutoModerationActionType, AutoModerationRuleEventType, AutoModerationRuleTriggerType
 } from "discord.js";
+import { assertParadiseGuildMutation } from "./runtimeEnvironment.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
@@ -1899,6 +1900,7 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
     error.code = "test_guild_only";
     throw error;
   }
+  assertParadiseGuildMutation({ guildId: guild.id, operation: "rebuild" });
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) {
     const error = new Error("invalid_template");
