@@ -354,7 +354,9 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Discord command registration failed", { message: error.message });
     });
-    await initializeParadise(client).catch((error) => {
+    // Guild maintenance can take time across several servers. Do not make the
+    // strictly test-guild-only smoke wait behind it after a deploy.
+    void initializeParadise(client).catch((error) => {
       lastError = error.message;
       console.warn("Paradise initialization failed", { message: error.message });
     });
