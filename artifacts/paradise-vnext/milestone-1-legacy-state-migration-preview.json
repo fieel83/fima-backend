@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-11T15:18:13.521Z",
+  "status": "LOCAL VERIFIED",
+  "sourceInventory": {
+    "schemaVersion": 1,
+    "totalBuckets": 35,
+    "presentBuckets": 0,
+    "totalRecords": 0,
+    "buckets": [
+      {
+        "legacyBucket": "profiles",
+        "target": "guild_profiles/global_verified_identities",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "verificationChallenges",
+        "target": "profile_verification_challenges",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "pendingTryouts",
+        "target": "tryout_results",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "pendingChallenges",
+        "target": "challenge_tickets",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "trainings",
+        "target": "training_sessions",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "tournaments",
+        "target": "tournaments",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "leaderboard",
+        "target": "leaderboard_entries",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "leaderboards",
+        "target": "leaderboard_entries",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "staffActivity",
+        "target": "staff_activity",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "activityChecks",
+        "target": "activity_checks",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "whitelists",
+        "target": "security_whitelists",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "giveaways",
+        "target": "giveaways",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "rsvps",
+        "target": "event_rsvps",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "relations",
+        "target": "guild_relations",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "loa",
+        "target": "availability_loa",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "config",
+        "target": "guild_configurations",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate after schema and guild-scope validation"
+      },
+      {
+        "legacyBucket": "guildConfigs",
+        "target": "guild_configurations",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate after schema and guild-scope validation"
+      },
+      {
+        "legacyBucket": "ticketOptOuts",
+        "target": "ticket_preferences",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "transcripts",
+        "target": "ticket_transcripts",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "rosters",
+        "target": "roster_entries",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "lineups",
+        "target": "lineup_entries",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "blacklists",
+        "target": "blacklist_cases",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "appeals",
+        "target": "appeal_cases",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "bails",
+        "target": "bail_reviews",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "serverBackups",
+        "target": "guild_backups",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "realAudits",
+        "target": "guild_audits",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "setupPreviews",
+        "target": "setup_previews",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "temporaryVoices",
+        "target": "temporary_voice_rooms",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "memberLevels",
+        "target": "guild_member_xp",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "questionOfDay",
+        "target": "daily_questions",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "applications",
+        "target": "applications",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "applicationDrafts",
+        "target": "application_drafts",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "moderationCases",
+        "target": "moderation_cases",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "securityState",
+        "target": "guild_security_state",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      },
+      {
+        "legacyBucket": "supportTickets",
+        "target": "support_tickets",
+        "present": false,
+        "count": 0,
+        "migrationRule": "migrate only after duplicate and referential-integrity validation"
+      }
+    ]
+  },
+  "sourceStatus": "fallback_absent",
+  "productionDbInspection": {
+    "status": "BLOCKED",
+    "reason": "No production database credential or owner-authenticated DB session was read for this local preview."
+  },
+  "applyBlockedUntil": [
+    "verified backup integrity",
+    "production count comparison",
+    "duplicate detection",
+    "referential integrity check",
+    "owner approval for destructive migration"
+  ],
+  "outputPolicy": "Counts and bucket mappings only; no profile, ticket, transcript, key or private message content is written."
+}

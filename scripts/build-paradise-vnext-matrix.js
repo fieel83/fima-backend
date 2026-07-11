@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { buildParadiseLegacyStateInventory } from "../src/paradiseLegacyStateInventory.js";
 
 const root = process.cwd();
 const outDir = path.join(root, "artifacts", "paradise-vnext");
@@ -82,7 +83,7 @@ const requirements = [
   requirement("DB-002", "Legacy state migration preview", "Profiles, verification, panels, XP, tickets, applications, lineups, cooldowns and jobs receive backup, count comparison, duplicate detection and rollback-ready migration previews.", {
     module: "database", priority: "P0", milestone: "Milestone 1", dependencies: ["DB-001", "BACKUP-001"], destructive: true, securityCritical: true,
     acceptanceCriteria: ["legacy inventory counts exist", "migration preview has old/new counts", "duplicate/referential integrity checks exist", "production apply is blocked without verified backup"],
-    testRequirements: [...commonTest, "synthetic migration dry-run", "rollback dry-run"], sourceStatus: "SOURCE ONLY", nextExactAction: "Build read-only legacy-state inventory from existing Setting and fallback JSON structure.", affectedFiles: ["src/paradise3a59.js", "prisma/schema.prisma"], affectedDatabaseTables: ["settings"], securityRisk: "critical"
+    testRequirements: [...commonTest, "synthetic migration dry-run", "rollback dry-run"], sourceStatus: "LOCAL VERIFIED", localTestStatus: "LOCAL VERIFIED", evidencePath: ["test/paradiseLegacyStateInventory.test.js", "artifacts/paradise-vnext/milestone-1-legacy-state-migration-preview.json"], blocker: "Production DB state inspection is intentionally blocked without authenticated owner access.", nextExactAction: "Design additive Prisma migration after production count preview and backup validation are available.", affectedFiles: ["src/paradiseLegacyStateInventory.js", "src/paradise3a59.js", "prisma/schema.prisma"], affectedDatabaseTables: ["settings"], securityRisk: "critical"
   }),
   requirement("BACKUP-001", "Backup integrity foundation", "Backups carry schema version, counts, overwrite and panel metadata, checksum, validation and restore dry-run status.", {
     module: "backup", priority: "P0", milestone: "Milestone 1", dependencies: ["ENV-001"], securityCritical: true,
@@ -242,6 +243,31 @@ const inventory = {
   currentMilestoneClassification: executionRows.map(row => ({ requirementId: row.requirementId, status: included.includes(row.requirementId) ? row.sourceStatus : "DEFERRED" }))
 };
 
+const legacyFallbackPath = path.join(root, "artifacts", "post-security-backlog", "3a59-paradise-state-fallback.json");
+const legacyProfileFallbackPath = path.join(root, "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
+let legacySource = {};
+let legacySourceStatus = "fallback_absent";
+for (const candidate of [legacyFallbackPath, legacyProfileFallbackPath]) {
+  try {
+    legacySource = JSON.parse(await fs.readFile(candidate, "utf8"));
+    legacySourceStatus = path.basename(candidate);
+    break;
+  } catch {}
+}
+const legacyMigrationPreview = {
+  schemaVersion: 1,
+  generatedAt: now,
+  status: "LOCAL VERIFIED",
+  sourceInventory: buildParadiseLegacyStateInventory(legacySource),
+  sourceStatus: legacySourceStatus,
+  productionDbInspection: {
+    status: "BLOCKED",
+    reason: "No production database credential or owner-authenticated DB session was read for this local preview."
+  },
+  applyBlockedUntil: ["verified backup integrity", "production count comparison", "duplicate detection", "referential integrity check", "owner approval for destructive migration"],
+  outputPolicy: "Counts and bucket mappings only; no profile, ticket, transcript, key or private message content is written."
+};
+
 const mdRows = executionRows.map(row => `| ${row.requirementId} | ${row.priority} | ${row.milestone} | ${row.sourceStatus} | ${row.localTestStatus} | ${row.deployStatus} | ${row.liveDiscordStatus} | ${row.dashboardBrowserStatus} | ${row.nextExactAction.replace(/\|/g, "/")} |`).join("\n");
 const markdown = `# Paradise vNext Execution Matrix\n\nGenerated: ${now}\n\nThis file is a readable view of \`paradise-vnext-execution-matrix.json\`. The JSON matrix is authoritative.\n\n| ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |\n|---|---|---|---|---|---|---|---|---|\n${mdRows}\n\n## Milestone 1 frozen scope\n\n${included.map(id => `- ${id}`).join("\n")}\n\n## Blocking owner decisions\n\n${milestone.blockingOwnerDecisions.map(id => { const d = decisions.find(x => x.decisionId === id); return `- ${id}: ${d.title}`; }).join("\n")}\n\n## Progress rule\n\nBefore work, read the JSON matrix, select the oldest incomplete unblocked dependency in Milestone 1, update the same row and avoid duplicate proof artifacts.\n`;
 
@@ -252,7 +278,8 @@ await Promise.all([
   fs.writeFile(path.join(outDir, "paradise-vnext-execution-matrix.md"), markdown),
   fs.writeFile(path.join(outDir, "paradise-vnext-owner-decisions.json"), `${JSON.stringify({ schemaVersion: 1, generatedAt: now, decisions }, null, 2)}\n`),
   fs.writeFile(path.join(outDir, "milestone-1-scope-freeze.json"), `${JSON.stringify(milestone, null, 2)}\n`),
-  fs.writeFile(path.join(outDir, "milestone-1-current-state-inventory.json"), `${JSON.stringify(inventory, null, 2)}\n`)
+  fs.writeFile(path.join(outDir, "milestone-1-current-state-inventory.json"), `${JSON.stringify(inventory, null, 2)}\n`),
+  fs.writeFile(path.join(outDir, "milestone-1-legacy-state-migration-preview.json"), `${JSON.stringify(legacyMigrationPreview, null, 2)}\n`)
 ]);
 
 console.log(JSON.stringify({ requirements: requirements.length, milestoneOne: included.length, outDir }, null, 2));

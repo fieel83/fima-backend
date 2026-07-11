@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:14:02.424Z",
+  "generatedAt": "2026-07-11T15:18:13.521Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -309,15 +309,19 @@
         "BACKUP-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Build read-only legacy-state inventory from existing Setting and fallback JSON structure.",
+      "evidencePath": [
+        "test/paradiseLegacyStateInventory.test.js",
+        "artifacts/paradise-vnext/milestone-1-legacy-state-migration-preview.json"
+      ],
+      "blocker": "Production DB state inspection is intentionally blocked without authenticated owner access.",
+      "nextExactAction": "Design additive Prisma migration after production count preview and backup validation are available.",
       "affectedFiles": [
+        "src/paradiseLegacyStateInventory.js",
         "src/paradise3a59.js",
         "prisma/schema.prisma"
       ],
