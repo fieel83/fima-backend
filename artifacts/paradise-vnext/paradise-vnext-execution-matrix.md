@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T15:24:21.116Z
+Generated: 2026-07-11T15:28:19.175Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -13,7 +13,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | AUTH-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Design after the shared guild authorization foundation is established. |
 | CFG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add authorized config-version history reading and rollback preview before exposing rollback actions. |
 | FLAG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Persist flags through the versioned guild configuration envelope after CFG-001 is integrated. |
-| DB-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Inventory existing Setting JSON state and prepare additive migration preview; do not migrate production data yet. |
+| DB-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Run Prisma migration only in an isolated staging database, then dual-write a single safe guild config before any legacy-state migration. |
 | DB-002 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Design additive Prisma migration after production count preview and backup validation are available. |
 | BACKUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add restore dry-run validation and encrypted storage policy before any destructive rebuild path can consume backups. |
 | OPS-001 | P0 | Milestone 1 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Implement read-only reconciliation result builder for state/config records. |

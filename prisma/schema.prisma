@@ -506,6 +506,40 @@ model Setting {
   @@map("settings")
 }
 
+/// Additive Milestone 1 foundation. Existing Paradise state remains in the
+/// legacy Setting envelope until a verified count-based migration is approved.
+model ParadiseGuildConfig {
+  guildId        String   @id @map("guild_id")
+  schemaVersion  Int      @default(1) @map("schema_version")
+  revision       Int      @default(1)
+  config         Json
+  updatedByUserId String? @map("updated_by_user_id")
+  source         String   @default("unknown")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([updatedAt])
+  @@map("paradise_guild_configs")
+}
+
+/// Transitional storage for guild-local entities. Its compound key prevents a
+/// record from being read or overwritten through a different guild scope.
+model ParadiseGuildRecord {
+  id            String   @id @default(cuid())
+  guildId       String   @map("guild_id")
+  kind          String
+  recordKey     String   @map("record_key")
+  schemaVersion Int      @default(1) @map("schema_version")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([guildId, kind, recordKey])
+  @@index([guildId, kind])
+  @@index([updatedAt])
+  @@map("paradise_guild_records")
+}
+
 model AuditLog {
   id         String   @id @default(cuid())
   action     String

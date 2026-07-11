@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:24:21.116Z",
+  "generatedAt": "2026-07-11T15:28:19.175Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "rows": [
@@ -278,20 +278,27 @@
         "CFG-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Inventory existing Setting JSON state and prepare additive migration preview; do not migrate production data yet.",
+      "evidencePath": [
+        "prisma/migrations/202607110001_paradise_guild_scope_foundation/migration.sql",
+        "test/paradiseGuildStateRepository.test.js"
+      ],
+      "blocker": "The additive migration is intentionally unapplied until a verified backup and count preview are available.",
+      "nextExactAction": "Run Prisma migration only in an isolated staging database, then dual-write a single safe guild config before any legacy-state migration.",
       "affectedFiles": [
         "prisma/schema.prisma",
+        "prisma/migrations/202607110001_paradise_guild_scope_foundation/migration.sql",
+        "src/paradiseGuildStateRepository.js",
         "src/paradise3a59.js"
       ],
       "affectedDatabaseTables": [
         "settings",
+        "paradise_guild_configs",
+        "paradise_guild_records",
         "audit_logs"
       ],
       "affectedDiscordObjects": [],

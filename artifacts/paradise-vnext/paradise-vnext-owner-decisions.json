@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T15:24:21.116Z",
+  "generatedAt": "2026-07-11T15:28:19.175Z",
   "decisions": [
     {
       "decisionId": "DEC-001",
@@ -8,7 +8,7 @@
       "description": "Freeze the listed foundation requirements; all later features remain deferred.",
       "status": "PROVISIONAL",
       "reason": "Reversible",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-002",
@@ -16,7 +16,7 @@
       "description": "Use only the verified test guild 1520519015661961257 for provisional non-production smoke work.",
       "status": "PROVISIONAL",
       "reason": "Reversible",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-003",
@@ -24,7 +24,7 @@
       "description": "Final Paradise visual/naming concept for production guilds.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Production rename is externally visible",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-004",
@@ -32,7 +32,7 @@
       "description": "Any destructive Paradise/Fieel's Community/TSBTR rebuild.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Destructive",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-005",
@@ -40,7 +40,7 @@
       "description": "Final prices, Stripe product creation, VAT/legal seller setup.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Financial/legal",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-006",
@@ -48,7 +48,7 @@
       "description": "Provider, cost ceiling, storage policy and production opt-in default.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Privacy/cost",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-007",
@@ -56,7 +56,7 @@
       "description": "Production transcript, log and attachment retention periods.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Privacy/legal",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-008",
@@ -64,7 +64,7 @@
       "description": "Dedicated appeal guild enabled or disabled.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Cross-guild workflow",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-009",
@@ -72,7 +72,7 @@
       "description": "Kick/TikTok provider availability and music provider/roadmap choice.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Provider/legal",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-010",
@@ -80,7 +80,7 @@
       "description": "Production backup retention, encryption location class and recovery targets.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Operations",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-011",
@@ -88,7 +88,7 @@
       "description": "Generated banners/icons approved for production use.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Public branding",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     },
     {
       "decisionId": "DEC-012",
@@ -96,7 +96,7 @@
       "description": "Enablement, reward amount and payout approval roles.",
       "status": "OWNER DECISION REQUIRED",
       "reason": "Financial/community",
-      "createdAt": "2026-07-11T15:24:21.116Z"
+      "createdAt": "2026-07-11T15:28:19.175Z"
     }
   ]
 }
