@@ -1,0 +1,26 @@
+{
+  "status": "LOCAL VERIFIED",
+  "createdAt": "2026-07-11T02:50:00+02:00",
+  "controls": ["Claim", "Close", "Reopen", "Add note", "Escalate", "Transcript"],
+  "publicDeleteButton": false,
+  "transcriptSafety": {
+    "closeIsTranscriptFirst": true,
+    "transcriptFailureKeepsTicketManageable": true,
+    "manualTranscriptAvailable": true,
+    "maskedBeforeStorage": ["email-like text", "token-shaped strings", "long key or ID-shaped strings", "@everyone", "@here"]
+  },
+  "stateAndAudit": {
+    "ticketPanelUpdatesInPlace": true,
+    "closedPanelShowsClosedStatus": true,
+    "transcriptMessageIdOrUrlStored": true,
+    "paymentLicenseLogChannelSupportedForCommunity": true
+  },
+  "testGuildPanelProof": {
+    "status": "LIVE DISCORD VERIFIED",
+    "guildId": "1520519015661961257",
+    "supportTicketPanelReady": true,
+    "smokeRevision": "3a71-license-ticket-live-smoke-v1",
+    "note": "This proves the safe test-guild panel is posted. It does not replace a real staff close/reopen/transcript button interaction."
+  },
+  "remainingLiveInteraction": "BLOCKED pending an official test-guild ticket interaction from the owner session or a connected Discord bot test account."
+}

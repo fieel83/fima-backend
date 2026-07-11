@@ -1,0 +1,5 @@
+Hey, I found the issue. Your lifetime license is active, but the website had a key display/copy bug where the license existed but the raw key was not being revealed correctly.
+
+You did not lose your payment and I’m repairing the license key safely. I’ll update you once the key is visible/copyable in My Products.
+
+Please don’t share any license key publicly.

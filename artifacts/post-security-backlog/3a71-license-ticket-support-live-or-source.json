@@ -1,0 +1,29 @@
+{
+  "status": "LOCAL VERIFIED",
+  "createdAt": "2026-07-11T02:50:00+02:00",
+  "deployedCommitContainingFeature": "57ca82d",
+  "command": "/fima_license_check",
+  "staffAccess": "Owner, administrator, configured Fima Support role or configured Support role only.",
+  "safeFieldsOnly": [
+    "plan",
+    "status",
+    "source",
+    "active access",
+    "masked key",
+    "key repair needed",
+    "checkout linked",
+    "download or validation timestamp",
+    "suggested action"
+  ],
+  "neverReturned": [
+    "raw license key",
+    "full email",
+    "HWID",
+    "payment secret",
+    "token"
+  ],
+  "repairControl": "Create license repair task is restricted to owner/admin and only appears for a paid active record that needs repair.",
+  "ticketHint": "License/copy/null-key phrases produce a staff-safe checklist; no automated DM or public disclosure is sent.",
+  "tests": "70/70 passed, including masked support lookup, configured-support access, owner/admin-only repair action, transcript-first close and no public delete button.",
+  "liveDiscordInteraction": "BLOCKED: the test-lab smoke posted support panels, but a human interaction of the command in Discord was not exercised in this turn."
+}

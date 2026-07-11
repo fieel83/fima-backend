@@ -1,0 +1,34 @@
+{
+  "status": "LIVE VERIFIED",
+  "createdAt": "2026-07-11T02:50:00+02:00",
+  "localCommit": "2173ea0",
+  "deployedCommit": "2173ea0b56e1a2ec960ec956b5e71ec42e63b519",
+  "deployment": {
+    "service": "Render",
+    "versionEndpoint": "https://api.fimamacro.com/api/version",
+    "buildTime": "2026-07-11T02:47:44.923Z",
+    "mode": "production",
+    "verifiedBy": "public version endpoint"
+  },
+  "licenseHotfixesLive": [
+    "The public account payload keeps raw license keys redacted.",
+    "Authenticated POST reveal/repair is CSRF-protected and no-store.",
+    "Paid active records with missing or malformed key material can be repaired on the same entitlement record.",
+    "The client has Clipboard API and textarea fallback and does not report a copy success for an empty key.",
+    "The paginated paid-license scan no longer has a fixed 2,000-record cap."
+  ],
+  "tests": {
+    "syntax": "src/server.js, src/discordBot.js and src/paradise3a59.js passed node --check",
+    "unit": "70/70 passed"
+  },
+  "safety": {
+    "latestJsonChanged": false,
+    "publicReleaseCreated": false,
+    "rawKeyInArtifact": false,
+    "credentialsInArtifact": false
+  },
+  "blockedItems": [
+    "Current authenticated production DB scan requires the owner session; the Chrome extension connection was unavailable after the deployment.",
+    "Current post-deployment browser click/reveal verification is blocked by the same Chrome connection issue."
+  ]
+}

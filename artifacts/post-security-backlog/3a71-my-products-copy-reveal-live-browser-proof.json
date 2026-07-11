@@ -1,0 +1,33 @@
+{
+  "status": "BLOCKED",
+  "createdAt": "2026-07-11T02:50:00+02:00",
+  "currentDeployment": "2173ea0",
+  "deployedPublicAssetChecks": {
+    "accountUsesProtectedPostReveal": true,
+    "accountHasClipboardFallback": true,
+    "checkoutSuccessDoesNotPresentSilentEmptyCopy": true,
+    "rawKeyInHtml": false
+  },
+  "priorOwnerBrowserEvidence": {
+    "status": "BROWSER VERIFIED",
+    "deployment": "pre-2173ea0 baseline",
+    "copyButtonEnabled": true,
+    "copySuccessToastObserved": true,
+    "revealResponseHadRawKey": true,
+    "rawKeyCaptured": false,
+    "eyeButtonsChangedToShownState": true,
+    "desktopButtonsStayedWithinContainer": true,
+    "mobileVerification": "not proven"
+  },
+  "currentPostDeployBrowserCheck": {
+    "status": "BLOCKED",
+    "reason": "Chrome extension connection failed after a documented retry. No cookie, clipboard or customer account data was accessed as a workaround."
+  },
+  "requiredRecheck": [
+    "Use an owner-controlled paid test license or the entitled owner's normal authenticated session.",
+    "Confirm My Products displays a masked key.",
+    "Click Reveal/Copy once and confirm a success toast without reading or logging the key.",
+    "Reload and confirm the masked record remains visible.",
+    "Check mobile-width control visibility and account eye buttons."
+  ]
+}

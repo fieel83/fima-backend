@@ -1,0 +1,33 @@
+{
+  "status": "BLOCKED",
+  "createdAt": "2026-07-11T02:50:00+02:00",
+  "currentDeployment": "2173ea0",
+  "scope": "Active paid Stripe/Website licenses only; trial, gift, manual, expired and disabled records are reported separately and are not auto-reissued.",
+  "currentRun": {
+    "status": "BLOCKED",
+    "reason": "The required owner-authenticated production scan could not be run after deployment because the existing Chrome extension connection became unavailable. No database URL, cookie, token or other credential was read or logged as a workaround."
+  },
+  "historicalProductionEvidence": {
+    "status": "PRODUCTION DB VERIFIED",
+    "deploymentCommit": "55dad55",
+    "paidActiveScanned": 7,
+    "paidAffectedCount": 0,
+    "duplicateKeyConflicts": 0,
+    "separateNonPaidIssueCounts": {
+      "trial": 0,
+      "gift": 0,
+      "manualOrOther": 0,
+      "expiredOrDisabled": 0
+    },
+    "note": "This is prior owner-authorized scan evidence only. It is not represented as a post-2173ea0 scan."
+  },
+  "knownAffectedRecord": {
+    "licenseIdMasked": "cmre***e1y",
+    "plan": "lifetime",
+    "source": "Stripe/Website",
+    "currentPostDeployVerification": "BLOCKED",
+    "rawKeyRecorded": false,
+    "customerEmailRecorded": false
+  },
+  "nextSafeAction": "Reconnect the owner Chrome session, run the paginated owner scan endpoint once, and retain only masked IDs, plan, source, status and action in the resulting artifact."
+}

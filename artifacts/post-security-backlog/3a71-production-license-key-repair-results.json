@@ -1,0 +1,26 @@
+{
+  "status": "BLOCKED",
+  "createdAt": "2026-07-11T02:50:00+02:00",
+  "currentDeployment": "2173ea0",
+  "repairRules": {
+    "sameEntitlementRecord": true,
+    "duplicatePaidLicenseCreated": false,
+    "expiredDisabledOrRefundedAutoRepair": false,
+    "rawKeyInAuditOrArtifact": false,
+    "maskedAuditAction": "paid_license_key_repair"
+  },
+  "knownLifetimeRecord": {
+    "licenseIdMasked": "cmre***e1y",
+    "previousOwnerAuthorizedCheck": {
+      "status": "PRODUCTION DB VERIFIED",
+      "repairNeeded": false,
+      "plan": "lifetime",
+      "licenseStatus": "active",
+      "rawKeyRead": false
+    },
+    "currentPostDeployRepair": "BLOCKED",
+    "reason": "No authenticated production repair run was performed after 2173ea0 because the browser owner session connection failed. The record was not modified blindly."
+  },
+  "validationAfterRepair": "The deployed endpoint permits secure owner-authenticated reveal/repair only for the entitled active account; frontend copy uses that protected POST path.",
+  "nextSafeAction": "Run the owner scan, repair only records the scan flags, then check the affected owner's My Products reveal/copy flow without recording the raw key."
+}
