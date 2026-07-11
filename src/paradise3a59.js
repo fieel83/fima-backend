@@ -13,7 +13,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v6";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v7";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -1951,7 +1951,7 @@ export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
   return result;
 }
 
-export async function runParadiseTestSmokeSuite(guild) {
+export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   let smokeStep = "guard";
   try {
   if (!guild || guild.id !== PARADISE_TEST_GUILD_ID) {
@@ -2166,7 +2166,10 @@ export async function runParadiseTestSmokeSuite(guild) {
   smokeStep = "staff_team";
   const staffTeam = await updateStaffTeamEmbed(guild).catch(() => null);
   smokeStep = "help_guide";
-  const helpGuide = await publishSetupGuides(guild, "tsbtr").catch(() => null);
+  // Guide reposts are intentionally skipped on a repeat smoke: they can take
+  // several minutes due Discord's rate limits and do not validate a changed
+  // Training/Tryout, leaderboard, staff or transcript flow.
+  const helpGuide = fast ? null : await publishSetupGuides(guild, "tsbtr").catch(() => null);
   smokeStep = "workflow_panels";
   const applicationChannel = await configuredChannel(guild, "application_ticket_channel", "application-ticket");
   const supportChannel = await configuredChannel(guild, "support_ticket_channel", "support-ticket")
@@ -2288,10 +2291,11 @@ export async function runParadiseAutoSmokeOnce(guild) {
     }
     // A full missing-only repair is needed for an empty lab, but repeating the
     // whole template on every source revision delays panel smoke tests for minutes.
-    const repair = state.securityState?.[guild.id]?.lastAutoSmokeResult
+    const existingTestLab = Boolean(state.securityState?.[guild.id]?.lastAutoSmokeResult);
+    const repair = existingTestLab
       ? { skipped: true, reason: "existing_test_lab" }
       : await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true });
-    const result = await runParadiseTestSmokeSuite(guild);
+    const result = await runParadiseTestSmokeSuite(guild, { fast: existingTestLab });
     const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
     const appealChannel = guild.channels.cache.find(channel =>
       ["ban-appeal", "blacklist-appeal"].includes(channel.name) && channel.isTextBased?.()
