@@ -1,16 +1,16 @@
 {
   "status": "LIVE DISCORD VERIFIED",
-  "verifiedAt": "2026-07-11T05:13:53.802Z",
+  "verifiedAt": "2026-07-11T05:25:27.843Z",
   "verificationSource": "Official Paradise public test-lab status after guarded bot smoke",
-  "deployedCommit": "e9640aa13afb37489916cb3ebcafd365dc97774a",
+  "deployedCommit": "bf0513ead3f38bc0c5d99b12f5294dbcf39a702b",
   "testGuild": {
     "idMasked": "1520***1257",
     "layoutRevision": "3a71-compact-tsbtr-lab-v1",
-    "smokeRevision": "3a71-compact-turkish-template-smoke-v7",
+    "smokeRevision": "3a71-compact-turkish-template-smoke-v8",
     "categories": 8,
-    "channels": 53,
+    "channels": 54,
     "roles": 167,
-    "notes": "The source compact schema contains 51 template channels. The two additional channels are created by safe test workflows such as the support-ticket smoke and its transcript path."
+    "notes": "The source compact schema contains 51 template channels. The three additional channels are created by safe test workflows such as the support-ticket smoke, transcript path and temporary review flow."
   },
   "livePanels": {
     "trainingPlainMarkdown": true,
@@ -20,11 +20,13 @@
     "leaderboardBoards": 3,
     "staffTeamSectionBoards": true,
     "supportTranscriptBeforeClose": true,
-    "supportTicketReopen": true
+    "supportTicketReopen": true,
+    "applicationPanelReady": true
   },
   "language": {
     "default": "tr",
-    "trainingAndTryout": "Selected guild language is used; Turkish is the default and the v7 smoke was built from Turkish-default session copy.",
+    "trainingAndTryout": "Selected guild language is used; Turkish is the default and the v8 smoke was built from Turkish-default session copy.",
+    "applicationPanel": "Turkish-default application panel was reposted in the live test smoke; English is used only when the selected server language is English.",
     "englishFallback": "Available only when the selected guild language is English."
   },
   "safety": {
