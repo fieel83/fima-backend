@@ -13,7 +13,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-license-ticket-live-smoke-v1";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-ticket-transcript-live-smoke-v2";
 const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
 const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
 const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
@@ -2052,6 +2052,10 @@ export async function runParadiseTestSmokeSuite(guild) {
   const supportTicket = owner && supportChannel
     ? await createParadiseSupportTicket(guild, owner.user, supportChannel, { test: true })
     : null;
+  smokeStep = "support_ticket_lifecycle";
+  const supportTicketLifecycle = supportTicket
+    ? await runParadiseSupportTicketLifecycleSmoke(guild, supportTicket)
+    : null;
 
   let moderationPanel = null;
   if (moderationChannel) {
@@ -2119,7 +2123,13 @@ export async function runParadiseTestSmokeSuite(guild) {
     workflowPanels: {
       application: applicationPanel ? { channelId: applicationPanel.channelId, messageId: applicationPanel.id, url: applicationPanel.url } : null,
       support: supportPanel ? { channelId: supportPanel.channelId, messageId: supportPanel.id, url: supportPanel.url } : null,
-      supportTicket: supportTicket ? { channelId: supportTicket.channel.id, ticketId: supportTicket.record.id, existing: supportTicket.existing } : null,
+      supportTicket: supportTicket ? {
+        channelId: supportTicket.channel.id,
+        ticketId: supportTicket.record.id,
+        existing: supportTicket.existing,
+        transcriptSaved: Boolean(supportTicketLifecycle?.transcriptSaved),
+        closedThenReopened: Boolean(supportTicketLifecycle?.closedThenReopened)
+      } : null,
       moderation: moderationPanel ? { channelId: moderationPanel.channelId, messageId: moderationPanel.id, url: moderationPanel.url } : null,
       security: securityPanel ? { channelId: securityPanel.channelId, messageId: securityPanel.id, url: securityPanel.url } : null,
       xp: xpBoard ? { channelId: xpBoard.channelId, messageId: xpBoard.id, url: xpBoard.url } : null
@@ -2178,6 +2188,8 @@ export async function runParadiseAutoSmokeOnce(guild) {
           trainingMessageId: result.training?.messageId || null,
           tryoutMessageId: result.tryout?.messageId || null,
           supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
+          supportTicketTranscriptReady: Boolean(result.workflowPanels?.supportTicket?.transcriptSaved),
+          supportTicketReopenReady: Boolean(result.workflowPanels?.supportTicket?.closedThenReopened),
           applicationPanelReady: Boolean(result.workflowPanels?.application),
           supportPanelReady: Boolean(result.workflowPanels?.support),
           moderationPanelReady: Boolean(result.workflowPanels?.moderation),
@@ -2230,6 +2242,8 @@ export async function paradiseTestLabStatus() {
     trainingReady: Boolean(result.trainingMessageId),
     tryoutReady: Boolean(result.tryoutMessageId),
     supportTicketReady: Boolean(result.supportTicketChannelId),
+    supportTicketTranscriptReady: result.supportTicketTranscriptReady === true,
+    supportTicketReopenReady: result.supportTicketReopenReady === true,
     applicationPanelReady: result.applicationPanelReady === true,
     supportPanelReady: result.supportPanelReady === true,
     moderationPanelReady: result.moderationPanelReady === true,
@@ -3708,6 +3722,19 @@ function paradiseSupportTicketDescription(record) {
   return lines.join("\n");
 }
 
+// Ticket transcripts are private staff records, not a raw data export. Keep the
+// useful conversation while removing common secrets before the attachment is sent.
+export function maskParadiseTranscriptText(value) {
+  return String(value || "")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[masked-email]")
+    .replace(/\b(?:mfa\.[\w-]{20,}|[\w-]{24}\.[\w-]{6}\.[\w-]{20,})\b/g, "[masked-token]")
+    .replace(/\bFIMA(?:-[A-Z0-9]{2,}){2,}\b/gi, "[masked-license-key]")
+    .replace(/\b(?:hwid|machine|device)[\s:=#-]*[a-z0-9_-]{8,}\b/gi, "[masked-device-id]")
+    .replace(/\b(?:[A-F0-9]{8}[-:]){3,}[A-F0-9]{4,}\b/gi, "[masked-id]")
+    .replace(/@everyone|@here/gi, "@ blocked")
+    .slice(0, 1800);
+}
+
 async function createParadiseSupportTicket(guild, user, sourceChannel, { test = false } = {}) {
   const state = await loadState();
   const existing = Object.values(state.supportTickets?.[guild.id] || {}).find(item => item.userId === user.id && item.status === "open");
@@ -3763,14 +3790,73 @@ async function saveParadiseSupportTranscript(guild, channel, record, trigger) {
   const messages = [...(await channel.messages.fetch({ limit: 100 })).values()].reverse();
   const lines = messages.map(message => {
     const timestamp = message.createdAt?.toISOString?.() || "unknown";
-    const author = message.author ? `${message.author.username} (${message.author.id})` : "unknown";
-    return `[${timestamp}] ${author}: ${String(message.cleanContent || message.content || "[embed / attachment]").replace(/\r?\n/g, " ")}`;
+    const author = message.author ? String(message.author.username || "unknown") : "unknown";
+    const rawText = String(message.cleanContent || message.content || "[embed / attachment]").replace(/\r?\n/g, " ");
+    const attachmentNote = message.attachments?.size ? ` [attachments:${message.attachments.size}]` : "";
+    return `[${timestamp}] ${author}: ${maskParadiseTranscriptText(rawText)}${attachmentNote}`;
   });
   const sent = await destination.send({
     content: `Support transcript - Ticket **${record.id.slice(0, 8)}** - ${trigger}`,
     files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `paradise-support-${record.id.slice(0, 8)}.txt` }]
   });
   return sent;
+}
+
+async function runParadiseSupportTicketLifecycleSmoke(guild, ticket) {
+  const record = ticket?.record;
+  const channel = ticket?.channel;
+  if (!record?.test || !channel?.isTextBased?.()) return { skipped: true, reason: "test_ticket_required" };
+  const transcript = await saveParadiseSupportTranscript(guild, channel, record, "smoke-close").catch(() => null);
+  if (!transcript) {
+    const error = new Error("smoke_support_transcript_failed");
+    error.code = "smoke_support_transcript_failed";
+    throw error;
+  }
+  const closed = {
+    ...record,
+    status: "closed",
+    ...transcriptMetadataFromMessage(transcript, "smoke-close"),
+    updatedAt: new Date().toISOString(),
+    updatedBy: "system-test"
+  };
+  await channel.permissionOverwrites.edit(record.userId, { ViewChannel: false });
+  await channel.setName(`closed-${channel.name.replace(/^closed-/, "")}`.slice(0, 90));
+  const header = record.headerMessageId ? await channel.messages.fetch(record.headerMessageId).catch(() => null) : null;
+  if (header) {
+    await header.edit({
+      embeds: [EmbedBuilder.from(header.embeds[0])
+        .setTitle("SUPPORT TICKET - CLOSED")
+        .setDescription(paradiseSupportTicketDescription(closed))],
+      components: paradiseSupportTicketControls(record.id, "closed")
+    });
+  }
+  await saveState(next => {
+    next.supportTickets[guild.id] = next.supportTickets[guild.id] || {};
+    next.supportTickets[guild.id][record.id] = closed;
+    return next;
+  });
+
+  const reopened = { ...closed, status: "open", updatedAt: new Date().toISOString(), updatedBy: "system-test" };
+  await channel.permissionOverwrites.edit(record.userId, {
+    ViewChannel: true,
+    SendMessages: true,
+    ReadMessageHistory: true
+  });
+  await channel.setName(channel.name.replace(/^closed-/, "").slice(0, 90));
+  if (header) {
+    await header.edit({
+      embeds: [EmbedBuilder.from(header.embeds[0])
+        .setTitle("SUPPORT TICKET - OPEN")
+        .setDescription(paradiseSupportTicketDescription(reopened))],
+      components: paradiseSupportTicketControls(record.id, "open")
+    });
+  }
+  await saveState(next => {
+    next.supportTickets[guild.id] = next.supportTickets[guild.id] || {};
+    next.supportTickets[guild.id][record.id] = reopened;
+    return next;
+  });
+  return { skipped: false, transcriptSaved: true, closedThenReopened: true };
 }
 
 function transcriptMetadataFromMessage(message, trigger) {

@@ -6,7 +6,7 @@ import {
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, rankPower, rankToRoleName, shortVerificationCode,
-  paradiseSupportPanelPayload, paradiseSupportTicketControls,
+  maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls,
   sanitizeTemporaryVoiceName,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
@@ -34,6 +34,20 @@ test("Paradise support panel has a real audited ticket lifecycle", () => {
   const closed = paradiseSupportTicketControls("ticket-id", "closed")[0].toJSON().components;
   assert.equal(closed[1].disabled, true);
   assert.equal(closed[2].disabled, false);
+});
+
+test("Paradise support transcripts mask common secrets before staff storage", () => {
+  const masked = maskParadiseTranscriptText("mail person@example.com FIMA-ABCD-EFGH-IJKL mfa.abcdefghijklmnopqrstuv aaaaaaaaaaaaaaaaaaaaaaaa.bbbbbb.cccccccccccccccccccccc password @everyone");
+  assert.doesNotMatch(masked, /person@example\.com|FIMA-ABCD|mfa\.abcdefghijklmnopqrstuv|@everyone/);
+  assert.match(masked, /\[masked-email\].*\[masked-license-key\].*\[masked-token\].*@ blocked/);
+});
+
+test("test-guild smoke includes transcript-first close and reopen coverage", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /runParadiseSupportTicketLifecycleSmoke/);
+  assert.match(source, /saveParadiseSupportTranscript\(guild, channel, record, "smoke-close"\)/);
+  assert.match(source, /closedThenReopened: true/);
+  assert.match(source, /supportTicketTranscriptReady/);
 });
 
 test("server templates hide irrelevant command families", () => {
