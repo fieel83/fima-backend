@@ -342,6 +342,13 @@ test("compact templates keep the critical panels without flooding the channel li
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("〢・personel-rehberleri"), true);
 });
 
+test("canonical handbooks are pinned and operational guides do not receive the global footer", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /const GUIDE_FOOTER_KEYS = new Set\(\["rules", "role_guide", "faq_trust"\]\)/);
+  assert.match(source, /message\.pin\?\.\("Paradise canonical channel handbook"\)/);
+  assert.doesNotMatch(source, /\*\*SERVER LOCKED\*\*, \*\*UNLOCK\*\*, \*\*END\*\*/);
+});
+
 test("availability board separates timed entries and active tickets", () => {
   const state = {
     leaderboard: {

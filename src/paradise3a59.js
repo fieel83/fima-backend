@@ -6430,7 +6430,7 @@ const GUIDE_POSTS = Object.freeze([
     key: "referee_guide",
     channel: "referee-guide",
     title: "👑 REFEREE GUIDE 👑",
-    body: "# __Ticket control checklist__\n1. Confirm both Paradise profiles exist.\n2. Check challenger cooldown and target immunity.\n3. Check allowed rank range and open challenges.\n4. Add/ping both players and keep the pinned context header current.\n5. Record the complete set and remain neutral.\n\n## __If the ticket is valid__\n- Claim the match and add a co-referee when required.\n- Use `/challenge post` or `/challenge autowin` **inside the ticket**.\n- Close first; save transcript before access is removed.\n\n## __Score format__\n- `winner` = winning fighter\n- `loser` = losing fighter\n- `score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never type `to @user`; Paradise formats the sentence.\n- Auto/strike requires a clear note; co-referee is optional.\n\n## __Recovery and corrections__\nIf a ticket was closed, recover context from the transcript/header. Managers use the correction workflow; never silently delete evidence.\n\n-# Yanlış postu aktif Referee Manager'a iletin • Made By Fieel"
+    body: "# __Ticket control checklist__\n1. Confirm both Paradise profiles exist.\n2. Check challenger cooldown and target immunity.\n3. Check allowed rank range and open challenges.\n4. Add/ping both players and keep the pinned context header current.\n5. Record the complete set and remain neutral.\n\n## __If the ticket is valid__\n- Claim the match and add a co-referee when required.\n- Use `/challenge post` or `/challenge autowin` **inside the ticket**.\n- Close first; save transcript before access is removed.\n\n## __Score format__\n- `winner` = winning fighter\n- `loser` = losing fighter\n- `score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never type `to @user`; Paradise formats the sentence.\n- Auto/strike requires a clear note; co-referee is optional.\n\n## __Recovery and corrections__\nIf a ticket was closed, recover context from the transcript/header. Managers use the correction workflow; never silently delete evidence.\n\n-# Yanlış postu aktif Referee Manager'a iletin."
   },
   {
     key: "referee_rules",
@@ -6538,7 +6538,7 @@ const GUIDE_POSTS = Object.freeze([
     key: "hoster_rules",
     channel: "hoster-rules",
     title: "◆ HOSTER RULES",
-    body: "# Hoster kuralları\n## ◆ Temel beklenti\n- Duyuruları bot komutlarıyla aç; manuel karışık mesaj atma.\n- Hoster olduğun etkinliği yarıda bırakma; sorun çıkarsa üst staffı etiketle.\n- Kanıt, sonuç ve katılımcı bilgisini düzgün gir.\n- Katılımcılara saygılı ol; toxic davranış hoster yetkisinin incelenmesine sebep olur.\n\n## ◆ Aktivite\n- Training hoster: varsayılan minimum **haftada 2** etkinlik.\n- Tryout hoster: varsayılan minimum **haftada 1** etkinlik.\n- Referee work ve event/giveaway/game night aktiviteleri ayrı loglanır.\n- LOA/whitelist varsa kota değerlendirmesi duraklatılır.\n\n## ◆ Komutlar\n- `/training start` ve `/tryout start` aktif duyuruları düz Markdown atar.\n- **SERVER LOCKED**, **UNLOCK**, **END** düğmeleri sadece hoster/owner tarafından kullanılır.\n- Sonuçlar `/training result`, `/tryout result`, `/activity log` gibi yapılandırılmış komutlarla girilir.\n\n-# Kurallar ve kotalar dashboard üzerinden değiştirilebilir • Made By Fieel"
+    body: "# Hoster kuralları\n## ◆ Temel beklenti\n- Duyuruları bot komutlarıyla aç; manuel karışık mesaj atma.\n- Hoster olduğun etkinliği yarıda bırakma; sorun çıkarsa üst staffı etiketle.\n- Kanıt, sonuç ve katılımcı bilgisini düzgün gir.\n- Katılımcılara saygılı ol; toxic davranış hoster yetkisinin incelenmesine sebep olur.\n\n## ◆ Aktivite\n- Training hoster: varsayılan minimum **haftada 2** etkinlik.\n- Tryout hoster: varsayılan minimum **haftada 1** etkinlik.\n- Referee work ve event/giveaway/game night aktiviteleri ayrı loglanır.\n- LOA/whitelist varsa kota değerlendirmesi duraklatılır.\n\n## ◆ Komutlar\n- `/training start` ve `/tryout start` aktif duyuruları düz Markdown atar.\n- **SUNUCU KİLİTLİ**, **KİLİDİ AÇ**, **BİTİR** düğmeleri sadece hoster/owner tarafından kullanılır.\n- Sonuçlar `/training result`, `/tryout result`, `/activity log` gibi yapılandırılmış komutlarla girilir.\n\n-# Kurallar ve kotalar dashboard üzerinden değiştirilebilir."
   },
   {
     key: "dashboard_guide",
@@ -6594,6 +6594,10 @@ const GUIDE_MAPPING_KEYS = Object.freeze({
   report_guide: "staff_guides_channel"
 });
 
+// Only selected canonical public handbooks carry the credit footer. Staff
+// instructions and operational messages stay focused on their workflow.
+const GUIDE_FOOTER_KEYS = new Set(["rules", "role_guide", "faq_trust"]);
+
 async function publishGuidePost(guild, definition) {
   const mappingKey = GUIDE_MAPPING_KEYS[definition.key];
   const channel = mappingKey
@@ -6603,11 +6607,12 @@ async function publishGuidePost(guild, definition) {
   const state = await loadState();
   const oldId = configForGuild(state, guild.id).guideMessageIds?.[definition.key];
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
-  const payload = {
-    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(definition.title)
-      .setDescription(definition.body.slice(0, 4096)).setFooter(paradiseFooter("TR / EN handbook")).setTimestamp()]
-  };
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(definition.title)
+    .setDescription(definition.body.slice(0, 4096)).setTimestamp();
+  if (GUIDE_FOOTER_KEYS.has(definition.key)) embed.setFooter(paradiseFooter("TR / EN handbook"));
+  const payload = { embeds: [embed] };
   if (message) await message.edit(payload); else message = await channel.send(payload);
+  await message.pin?.("Paradise canonical channel handbook").catch(() => null);
   await saveState(next => {
     next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
     next.guildConfigs[guild.id].guideMessageIds = next.guildConfigs[guild.id].guideMessageIds || {};
