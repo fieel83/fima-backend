@@ -1,19 +1,25 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T20:39:23.370Z",
+  "capturedAt": "2026-07-11T20:41:31.850Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "01bb6f8",
+    "localCommit": "8461e9d",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
   "runtimeEvidence": {
     "deployedLicenseHotfix": "DEPLOYED",
     "deployedLicenseHotfixCommitFromEvidence": "77fb4e7ceee322ae135b570602a7cdd86fae2ea3",
+    "observedProductionVersion": {
+      "status": "LIVE VERIFIED",
+      "commit": "47f9570d3bf826ed6c1e660a02e722c29d8bbcc2",
+      "version": "1.0.128",
+      "source": "read-only /api/version"
+    },
     "productionScan": "BLOCKED",
     "browserCopyReveal": "BLOCKED",
     "testGuildSmoke": "LIVE DISCORD VERIFIED",
-    "currentLocalTestCount": 87
+    "currentLocalTestCount": 104
   },
   "database": {
     "provider": "PostgreSQL via Prisma",
@@ -22,20 +28,21 @@
     "risk": "Critical Paradise state remains partly opaque JSON/fallback-based."
   },
   "commandRegistration": {
-    "status": "partially implemented",
+    "status": "LOCAL VERIFIED",
     "evidence": [
-      "src/paradise3a59.js exports paradiseCommands",
-      "src/discordBot.js has separate command handling"
+      "src/paradiseCommandRegistry.js",
+      "registry-backed guild command filtering",
+      "registry-backed member /help and runtime denial"
     ],
-    "gap": "No central command manifest governs registration/help/RBAC/dashboard together."
+    "gap": "Staging/test-guild command re-registration and real interaction proof remain BLOCKED until a safe deployment path exists."
   },
   "rbac": {
-    "status": "partially implemented",
+    "status": "LOCAL VERIFIED",
     "evidence": [
-      "role checks and Discord permission checks exist",
-      "src/paradiseRbac.js"
+      "src/paradiseRbac.js",
+      "challenge autowin and approval now use shared referee permissions"
     ],
-    "gap": "Existing handlers are not yet fully migrated to the central vocabulary."
+    "gap": "Role-persona proof in the exact test guild remains BLOCKED until a safe deployment path exists."
   },
   "environment": {
     "status": "partially implemented",
@@ -72,32 +79,38 @@
     "gap": "Existing component families are not yet migrated to the versioned protocol."
   },
   "backup": {
-    "status": "partially implemented",
+    "status": "LOCAL VERIFIED",
     "evidence": [
-      "structure snapshot and backup endpoints exist"
+      "src/paradiseBackupIntegrity.js",
+      "SHA256 backup envelope",
+      "non-mutating restore dry-run"
     ],
-    "gap": "No integrity envelope/SHA256/restore drill contract implemented."
+    "gap": "Encrypted storage and an authorized staging restore drill remain BLOCKED."
   },
   "reconciliation": {
-    "status": "missing",
-    "evidence": [],
-    "gap": "No centralized recurring invariant/reconciliation service found."
+    "status": "LOCAL VERIFIED",
+    "evidence": [
+      "src/paradiseReconciliation.js",
+      "safe classifications without automatic mutation"
+    ],
+    "gap": "Scheduled runtime reconciliation with Discord existence checks remains SOURCE ONLY."
   },
   "featureFlags": {
-    "status": "partially implemented",
+    "status": "LOCAL VERIFIED",
     "evidence": [
       "src/paradiseFeatureFlags.js",
-      "versioned guild configuration envelope"
+      "test-guild-only command registry canary",
+      "persisted guild featureFlags configuration"
     ],
-    "gap": "No high-risk runtime handler has been migrated to a persisted feature flag yet."
+    "gap": "Canary enable/disable proof after deploy remains BLOCKED."
   },
   "testGuildGuard": {
-    "status": "partially implemented",
+    "status": "LOCAL VERIFIED",
     "evidence": [
       "PARADISE_TEST_GUILD_ID is fixed to the accepted guild",
-      "guarded smoke/rebuild code exists"
+      "centralized guarded setup/create-missing/rebuild/smoke"
     ],
-    "gap": "Guard must be centralized with environment policy and negative live proof."
+    "gap": "Negative live proof for a non-allowed guild remains BLOCKED until a safe test deployment."
   },
   "currentMilestoneClassification": [
     {
