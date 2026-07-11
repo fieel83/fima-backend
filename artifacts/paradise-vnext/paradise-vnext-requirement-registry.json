@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T20:36:30.558Z",
+  "generatedAt": "2026-07-11T20:39:23.370Z",
   "status": "LOCAL VERIFIED",
   "authoritativeProgressSource": "artifacts/paradise-vnext/paradise-vnext-execution-matrix.json",
   "sourcePlans": [
@@ -460,11 +460,13 @@
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
+        "src/paradiseFeatureFlags.js",
+        "src/paradise3a59.js",
         "test/paradiseFoundation.test.js",
         "test/paradise-dashboard.test.js"
       ],
       "blocker": null,
-      "nextExactAction": "Migrate one high-risk handler behind a persisted disabled-by-default flag; keep production global enable unavailable during Milestone 1.",
+      "nextExactAction": "Deploy only to staging/test guild and verify the command registry canary enables there while its kill switch leaves production command behavior unchanged.",
       "affectedFiles": [
         "src/paradiseFeatureFlags.js",
         "src/server.js",

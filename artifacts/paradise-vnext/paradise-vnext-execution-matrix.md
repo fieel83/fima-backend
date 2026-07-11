@@ -1,6 +1,6 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T20:36:30.558Z
+Generated: 2026-07-11T20:39:23.370Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
@@ -12,7 +12,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | AUTH-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Run an owner-controlled OAuth guilds-scope browser test, then add a separately authorized customer guild config route; keep owner console routes owner-only. |
 | AUTH-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Design after the shared guild authorization foundation is established. |
 | CFG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Browser-test history and rollback preview in an owner session; keep actual rollback disabled until a verified backup and dual-write migration are available. |
-| FLAG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Migrate one high-risk handler behind a persisted disabled-by-default flag; keep production global enable unavailable during Milestone 1. |
+| FLAG-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to staging/test guild and verify the command registry canary enables there while its kill switch leaves production command behavior unchanged. |
 | DB-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Run Prisma migration only in an isolated staging database, then dual-write a single safe guild config before any legacy-state migration. |
 | DB-002 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Design additive Prisma migration after production count preview and backup validation are available. |
 | BACKUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Define encrypted backup storage and perform an authorized restore drill in staging before any production rebuild path can consume backups. |
