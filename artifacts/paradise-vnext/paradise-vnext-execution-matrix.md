@@ -1,14 +1,14 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-12T07:47:14.442Z
+Generated: 2026-07-12T08:37:51.961Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
 ## Current status summary
 
 - Total accepted requirements: 47
-- SOURCE ONLY: 27
-- LOCAL VERIFIED: 19
+- SOURCE ONLY: 26
+- LOCAL VERIFIED: 20
 - DEPLOYED: 1
 - LIVE DISCORD VERIFIED: 1
 - DASHBOARD VERIFIED: 0
@@ -32,7 +32,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | RBAC-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to staging/test guild, then run Owner, Training Hoster, Trial Referee and normal-member persona proof against challenge controls without changing role assignments. |
 | COMP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy and test the non-destructive availability refresh panel across a bot restart in the exact test guild; retain old panel compatibility during the migration window. |
 | SETUP-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove preview, create-missing, idempotent rerun and a production-guild guard denial using the current compact schema. |
-| DASH-001 | P0 | Milestone 1 | SOURCE ONLY | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | BLOCKED | Map existing dashboard APIs to guild-scope auth; defer visual polish until baseline save/reload works. |
+| DASH-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | BLOCKED | Use an authorized customer browser session to verify save, reload, CSRF refresh/retry and responsive server switching; do not call local API tests dashboard proof. |
 | TEST-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy current code only to the exact test guild, then record guard denial, restart and no-duplicate proof; do not rebuild the lab for artifact-only work. |
 | TPL-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild, install each compact template, verify channel type/count/mapping/role visibility, and capture no-duplicate repair proof before any production migration preview. |
 | NAMING-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deferred until compact template foundation and owner branding decision. |

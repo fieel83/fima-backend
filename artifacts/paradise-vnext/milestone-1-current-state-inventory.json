@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-12T07:47:14.442Z",
+  "capturedAt": "2026-07-12T08:37:51.961Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "e65278100a09f3e7b39e9d3977c424e8101c9146",
+    "localCommit": "unavailable",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -11,15 +11,15 @@
     "deployedLicenseHotfix": "DEPLOYED",
     "deployedLicenseHotfixCommitFromEvidence": "77fb4e7ceee322ae135b570602a7cdd86fae2ea3",
     "observedProductionVersion": {
-      "status": "LIVE VERIFIED",
-      "commit": "47f9570d3bf826ed6c1e660a02e722c29d8bbcc2",
-      "version": "1.0.128",
-      "source": "read-only /api/version"
+      "status": "SOURCE ONLY",
+      "commit": null,
+      "version": null,
+      "source": "not re-read during this matrix generation"
     },
     "productionScan": "BLOCKED",
     "browserCopyReveal": "BLOCKED",
     "testGuildSmoke": "SOURCE ONLY",
-    "currentLocalTestCount": 115,
+    "currentLocalTestCount": 120,
     "latestJsonChanged": false,
     "productionGuildsChanged": false
   },
@@ -178,7 +178,7 @@
     },
     {
       "requirementId": "DASH-001",
-      "status": "SOURCE ONLY"
+      "status": "LOCAL VERIFIED"
     },
     {
       "requirementId": "TEST-001",
