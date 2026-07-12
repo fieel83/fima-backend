@@ -201,6 +201,9 @@ test("application more-info follow-up returns the same record to private review 
   assert.match(source, /applicationReviewComponents\(id\)/);
   const application = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "application");
   assert.ok(application.options.some(option => option.name === "continue"));
+  const registrySource = await (await import("node:fs/promises")).readFile(new URL("../src/paradiseCommandRegistry.js", import.meta.url), "utf8");
+  assert.match(registrySource, /CMD-APPLICATION-CONTINUE/);
+  assert.match(registrySource, /memberSafe: true/);
 });
 
 test("server templates hide irrelevant command families", () => {
