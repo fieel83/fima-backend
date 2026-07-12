@@ -1384,7 +1384,8 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("apply").setDescription("Open an application form")
         .addStringOption(o => o.setName("type").setDescription("Application type").setRequired(true)
           .addChoices(...APPLICATION_TYPES.map(([value, name]) => ({ name, value })))))
-      .addSubcommand(s => s.setName("status").setDescription("View your latest application status")),
+      .addSubcommand(s => s.setName("status").setDescription("View your latest application status"))
+      .addSubcommand(s => s.setName("continue").setDescription("Reply to a staff request for more information")),
     new SlashCommandBuilder().setName("mod").setDescription("Paradise moderation cases and approval queue")
       .addSubcommand(s => s.setName("warn").setDescription("Record a staff warning")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
@@ -4622,7 +4623,7 @@ function applicationQuestions(type) {
     || APPLICATION_QUESTION_BANK[type] || APPLICATION_QUESTION_BANK.default;
 }
 
-function applicationQuestionChunks(type) {
+export function applicationQuestionChunks(type) {
   const questions = applicationQuestions(type);
   const chunks = [];
   for (let index = 0; index < questions.length; index += DISCORD_APPLICATION_MODAL_LIMIT) {
@@ -4666,6 +4667,32 @@ function applicationContinueComponents(draftId) {
   )];
 }
 
+function applicationReviewComponents(id) {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`paradise_application_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`paradise_application_more:${id}`).setLabel("Ask More Info").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_application_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+  )];
+}
+
+function applicationMoreInfoModal(record, language = "tr") {
+  const tr = language !== "en";
+  const request = maskApplicationReviewText(record.reviewReason || "Please clarify the requested details.", 120);
+  return new ModalBuilder()
+    .setCustomId(`paradise_application_more_info:${record.id}`)
+    .setTitle(tr ? "Başvuru için ek bilgi" : "Additional application information")
+    .addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("more_info_response")
+        .setLabel(tr ? "Yetkilinin istediği açıklama" : "Staff requested clarification")
+        .setPlaceholder(request)
+        .setStyle(TextInputStyle.Paragraph)
+        .setMinLength(5)
+        .setMaxLength(700)
+        .setRequired(true)
+    ));
+}
+
 function maskApplicationReviewText(value, max = 700) {
   return compactText(String(value || "")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
@@ -4679,21 +4706,22 @@ function applicationReviewStatus(action) {
   return action === "approve" ? "approved" : action === "deny" ? "denied" : "more_info";
 }
 
-function applicationReviewReasonModal(action, id) {
+function applicationReviewReasonModal(action, id, language = "tr") {
+  const tr = language !== "en";
   const isMoreInfo = action === "more";
   return new ModalBuilder()
     .setCustomId(`paradise_application_review_reason:${action}:${id}`)
-    .setTitle(isMoreInfo ? "Ask More Info" : "Deny Application")
+    .setTitle(isMoreInfo ? (tr ? "Ek bilgi iste" : "Ask More Info") : (tr ? "Başvuruyu reddet" : "Deny Application"))
     .addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId("review_reason")
-        .setLabel(isMoreInfo ? "What should the applicant clarify?" : "Why is this application denied?")
+        .setLabel(isMoreInfo ? (tr ? "Başvuru sahibi neyi netleştirmeli?" : "What should the applicant clarify?") : (tr ? "Başvuru neden reddedildi?" : "Why is this application denied?"))
         .setStyle(TextInputStyle.Paragraph)
         .setMinLength(5)
         .setMaxLength(700)
         .setPlaceholder(isMoreInfo
-          ? "Example: Please explain your weekly availability and provide one previous staff example."
-          : "Example: Not enough detail in moderation scenarios. Please apply again after improving your answers.")
+          ? (tr ? "Örnek: Haftalık aktifliğini ve önceki bir staff deneyimini açıkla." : "Example: Please explain your weekly availability and provide one previous staff example.")
+          : (tr ? "Örnek: Moderasyon senaryolarında yeterli ayrıntı yok. Cevaplarını geliştirip tekrar başvurabilirsin." : "Example: Not enough detail in moderation scenarios. Please apply again after improving your answers."))
         .setRequired(true)
     ));
 }
@@ -4787,11 +4815,7 @@ export async function submitParadiseWebsiteApplication(guild, { userId, type, an
         .setDescription(`Applicant: <@${userId}>\nApplication ID: \`${id.slice(0, 8)}\`\nSource: **Fima website**`)
         .addFields(Object.entries(normalizedAnswers).map(([label, value]) => ({ name: label, value: maskApplicationReviewText(value, 1024), inline: false })))
         .setFooter(paradiseFooter("Pending private review")).setTimestamp()],
-      components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`paradise_application_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`paradise_application_more:${id}`).setLabel("Ask More Info").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`paradise_application_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
-      )]
+      components: applicationReviewComponents(id)
     }).catch(() => null);
     if (reviewMessage) {
       await saveState(next => {
@@ -4835,6 +4859,11 @@ async function handleApplicationCommand(interaction) {
         : "You have not submitted an application in this server.",
       ephemeral: true
     });
+  }
+  if (sub === "continue") {
+    const pendingMoreInfo = records.find(item => item.status === "more_info");
+    if (!pendingMoreInfo) return interaction.reply({ content: "You do not have an application waiting for more information.", ephemeral: true });
+    return interaction.showModal(applicationMoreInfoModal(pendingMoreInfo, guildLanguage(configForGuild(state, interaction.guildId))));
   }
   if (state.blacklists?.[interaction.guildId]?.[interaction.user.id]?.status === "active") {
     return interaction.reply({ content: "Active blacklist records block applications. Use the appeal flow first.", ephemeral: true });
@@ -4949,11 +4978,7 @@ async function handleApplicationModal(interaction) {
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application - ${applicationLabel(type)}`)
         .setDescription(`Applicant: ${interaction.user}\nApplication ID: \`${id.slice(0, 8)}\``)
         .addFields(fields).setFooter(paradiseFooter("Pending review")).setTimestamp()],
-      components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`paradise_application_approve:${id}`).setLabel("Approve").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`paradise_application_more:${id}`).setLabel("Ask More Info").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`paradise_application_deny:${id}`).setLabel("Deny").setStyle(ButtonStyle.Danger)
-      )]
+      components: applicationReviewComponents(id)
     });
     await saveState(next => {
       next.applications = next.applications || {};
@@ -4989,6 +5014,47 @@ async function handleApplicationContinueButton(interaction) {
   return interaction.showModal(applicationModal(draft.type, draft.nextStep, draftId));
 }
 
+async function handleApplicationMoreInfoModal(interaction) {
+  const id = interaction.customId.split(":")[1];
+  const response = maskApplicationReviewText(interaction.fields.getTextInputValue("more_info_response"), 700);
+  const state = await loadState();
+  const record = state.applications?.[interaction.guildId]?.[id];
+  if (!record || record.userId !== interaction.user.id || record.status !== "more_info") {
+    return interaction.reply({ content: "This application is not waiting for your clarification.", ephemeral: true });
+  }
+  const updatedRecord = {
+    ...record,
+    status: "pending",
+    moreInfoResponse: response,
+    moreInfoRespondedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  await saveState(next => {
+    next.applications = next.applications || {};
+    next.applications[interaction.guildId] = next.applications[interaction.guildId] || {};
+    next.applications[interaction.guildId][id] = updatedRecord;
+    return next;
+  });
+  const review = record.reviewChannelId ? await interaction.guild.channels.fetch(record.reviewChannelId).catch(() => null) : null;
+  const message = review?.isTextBased?.() && record.reviewMessageId
+    ? await review.messages.fetch(record.reviewMessageId).catch(() => null)
+    : null;
+  if (message) {
+    const embed = message.embeds?.[0]
+      ? EmbedBuilder.from(message.embeds[0])
+      : new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(record.type)}`);
+    embed
+      .setTitle(`Application · ${applicationLabel(record.type)} · FOLLOW-UP RECEIVED`)
+      .addFields({ name: "Applicant clarification", value: response, inline: false })
+      .setFooter(paradiseFooter("Awaiting private re-review"))
+      .setTimestamp();
+    await message.edit({ embeds: [embed], components: applicationReviewComponents(id) }).catch(() => null);
+  }
+  await logParadiseAction(interaction.guild, "application_logs_channel", "application-logs", "Application clarification submitted",
+    `Application \`${id.slice(0, 8)}\` was returned to private review.`, { safe: true }).catch(() => null);
+  return interaction.reply({ content: "Your clarification was sent back to the private review queue.", ephemeral: true });
+}
+
 async function handleApplicationCancelButton(interaction) {
   const draftId = interaction.customId.split(":")[1];
   const state = await loadState();
@@ -5016,7 +5082,8 @@ async function handleApplicationReview(interaction) {
   if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
   const [action, id] = interaction.customId.replace("paradise_application_", "").split(":");
   if (["deny", "more"].includes(action)) {
-    return interaction.showModal(applicationReviewReasonModal(action, id));
+    const language = guildLanguage(configForGuild(await loadState(), interaction.guildId));
+    return interaction.showModal(applicationReviewReasonModal(action, id, language));
   }
   return finalizeApplicationReview(interaction, action, id);
 }
@@ -8184,6 +8251,10 @@ async function handleParadiseInteractionInner(interaction) {
   }
   if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_review_reason:")) {
     await handleApplicationReviewReasonModal(interaction);
+    return true;
+  }
+  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_more_info:")) {
+    await handleApplicationMoreInfoModal(interaction);
     return true;
   }
   if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_modal:")) {

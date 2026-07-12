@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ChannelType } from "discord.js";
 import {
-  canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  applicationQuestionChunks, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
@@ -183,6 +183,26 @@ test("application panel follows the selected server language and defaults to Tur
   assert.match(source, /paradiseApplicationPanelPayload\(await paradiseBrandColor\(\), language\)/);
 });
 
+test("application forms stay within Discord's five-input modal limit and retain the required role-specific scenario", () => {
+  const macroChunks = applicationQuestionChunks("macro_staff");
+  assert.ok(macroChunks.length >= 2);
+  assert.ok(macroChunks.every(chunk => chunk.length > 0 && chunk.length <= 5));
+  const trainingPrompts = applicationQuestionChunks("training_hoster").flat().map(question => question[2]).join(" ");
+  assert.match(trainingPrompts, /Sunucuda 10 kişi var, takımları nasıl dengeli kurarsın\?/);
+  assert.doesNotMatch(trainingPrompts, /5v5 takımları/i);
+});
+
+test("application more-info follow-up returns the same record to private review without creating a duplicate", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /setName\("continue"\)/);
+  assert.match(source, /paradise_application_more_info:/);
+  assert.match(source, /record\.status !== "more_info"/);
+  assert.match(source, /status: "pending"/);
+  assert.match(source, /applicationReviewComponents\(id\)/);
+  const application = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "application");
+  assert.ok(application.options.some(option => option.name === "continue"));
+});
+
 test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);
@@ -275,7 +295,7 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(commands.find(command => command.name === "setlogchannel").options.length <= 25);
   assert.deepEqual(commands.find(command => command.name === "lineup").options.map(option => option.name), ["add", "remove", "move", "edit", "clear", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "roster").options.map(option => option.name), ["add", "update", "remove", "panel", "repost"]);
-  assert.deepEqual(commands.find(command => command.name === "application").options.map(option => option.name), ["panel", "apply", "status"]);
+  assert.deepEqual(commands.find(command => command.name === "application").options.map(option => option.name), ["panel", "apply", "status", "continue"]);
   assert.deepEqual(commands.find(command => command.name === "training").options.map(option => option.name), ["setup", "create", "start", "result"]);
   assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "kick-request"));
   assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "ban-request"));
