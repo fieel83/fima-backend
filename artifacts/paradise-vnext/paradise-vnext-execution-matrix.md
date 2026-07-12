@@ -1,18 +1,18 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-12T08:37:51.961Z
+Generated: 2026-07-12T08:54:17.888Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
 ## Current status summary
 
 - Total accepted requirements: 47
-- SOURCE ONLY: 26
-- LOCAL VERIFIED: 20
+- SOURCE ONLY: 24
+- LOCAL VERIFIED: 22
 - DEPLOYED: 1
 - LIVE DISCORD VERIFIED: 1
 - DASHBOARD VERIFIED: 0
-- BLOCKED rows: 16
+- BLOCKED rows: 18
 - FAILED rows: 0
 
 | ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |
@@ -38,7 +38,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | NAMING-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deferred until compact template foundation and owner branding decision. |
 | LANG-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after component/config foundation. |
 | PANEL-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until component and language foundations are complete. |
-| PROFILE-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until database migration preview is ready. |
+| PROFILE-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; verify a duplicate Roblox identity denial, per-guild completion/privacy behavior and profile lookup by user/profile ID/Roblox name. |
 | PROFILE-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until verified profile storage exists. |
 | CHALLENGE-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after profile/database foundation. |
 | CHALLENGE-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until ticket and persisted leaderboard foundations exist. |
@@ -46,7 +46,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | TICKET-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove Claim → Close → Reopen → Close → typed Delete and transcript-failure channel preservation with staff and member personas. |
 | TICKET-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after ticket state machine. |
 | VOICE-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; verify Join to Create, Community Voice and AFK are GuildVoice, then test move, control panel, empty cleanup and wrong-type repair preview. |
-| APP-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after persistent component and DB foundation. |
+| APP-001 | P2 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove multi-step Continue/Cancel, duplicate denial, More Info follow-up, approval/role grant and website-to-review-queue delivery without testing against a production guild. |
 | RESELL-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until billing/legal owner decision. |
 | ROBUX-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until ticket transaction and owner policy. |
 | LINEUP-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until persisted board foundation. |
