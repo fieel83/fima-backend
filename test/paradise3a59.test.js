@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
+  canViewParadiseLogEvent, localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, paradiseLogPolicy, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -92,6 +92,17 @@ test("Paradise log envelopes classify events and redact private credential mater
   assert.doesNotMatch(`${event.description} ${JSON.stringify(event.metadata)}`, /person@example\.test|FIMA-ABCD|mfa\.abcdefghijklmnopqrstuv|webhooks\/123|device-123456789/);
   assert.equal(event.metadata.masked, "[masked]");
   assert.equal(event.metadata.allowed, true);
+});
+
+test("Paradise log policy enforces bounded retention and private viewer scopes", () => {
+  assert.deepEqual(paradiseLogPolicy({ logSettings: { retentionDays: 9000, viewerScope: "invalid" } }, "ticket"), {
+    retentionDays: 3650, viewerScope: "staff"
+  });
+  const event = buildParadiseSafeLogEvent({ guildId: "guild", type: "security", viewerScope: "managers" });
+  assert.equal(canViewParadiseLogEvent({ event, roleKeys: ["moderator"] }), false);
+  assert.equal(canViewParadiseLogEvent({ event, roleKeys: ["manager"] }), true);
+  assert.equal(canViewParadiseLogEvent({ event: { ...event, viewerScope: "owners" }, roleKeys: ["manager"] }), false);
+  assert.equal(canViewParadiseLogEvent({ event: { ...event, viewerScope: "owners" }, roleKeys: ["owner"] }), true);
 });
 
 test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {

@@ -34,7 +34,7 @@ const CONFIG_KEYS_BY_ROUTE = Object.freeze({
   ai: ["aiSettings"],
   commands: ["commandVisibility", "commandChannels"],
   branding: ["brandColor", "dashboardTheme", "messageDensity", "separatorStyle", "footerStyle", "language"],
-  logs: ["channelMappings", "operations"],
+  logs: ["channelMappings", "logSettings"],
   premium: ["plan"],
   audit: []
 });
@@ -167,7 +167,8 @@ export function normalizeParadiseCustomerWorkspacePatch({ route, value } = {}) {
     voice: ["voiceSettings", { enabled: { type: "boolean" }, defaultLimit: { type: "integer", min: 0, max: 99, fallback: 0 }, autoDelete: { type: "boolean" }, safeNames: { type: "boolean" } }],
     security: ["automod", { enabled: { type: "boolean" }, blockInvites: { type: "boolean" }, blockScamKeywords: { type: "boolean" }, mentionSpamLimit: { type: "integer", min: 3, max: 50, fallback: 8 } }],
     social: ["socialSettings", { enabled: { type: "boolean" }, delaySeconds: { type: "integer", min: 0, max: 3600, fallback: 60 } }],
-    ai: ["aiSettings", { enabled: { type: "boolean" }, ticketAssistant: { type: "boolean" }, communityAssistant: { type: "boolean" } }]
+    ai: ["aiSettings", { enabled: { type: "boolean" }, ticketAssistant: { type: "boolean" }, communityAssistant: { type: "boolean" } }],
+    logs: ["logSettings", { retentionDays: { type: "integer", min: 1, max: 3650, fallback: 180 }, viewerScope: { type: "enum", values: ["staff", "managers", "owners"] } }]
   };
   const definition = optionRoutes[selectedRoute];
   if (!definition) throw workspaceError("workspace_route_read_only");

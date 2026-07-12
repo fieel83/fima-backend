@@ -6548,6 +6548,11 @@ async function runParadiseMaintenance(guild) {
   await saveState(async state => {
     const now = Date.now();
     const config = configForGuild(state, guild.id);
+    const storedLogs = Array.isArray(state.paradiseLogs?.[guild.id]) ? state.paradiseLogs[guild.id] : [];
+    state.paradiseLogs[guild.id] = storedLogs.filter(event => {
+      const expiresAt = Date.parse(event?.createdAt || 0) + (Math.max(1, Number(event?.retentionDays) || 180) * 86_400_000);
+      return Number.isFinite(expiresAt) && expiresAt > now;
+    });
     for (const [userId, item] of Object.entries(state.whitelists)) {
       if (!belongsToGuild(item, guild.id)) continue;
       if (item.expiresAt && Date.parse(item.expiresAt) <= now) {
@@ -8084,16 +8089,39 @@ export function buildParadiseSafeLogEvent({
   });
 }
 
+export function paradiseLogPolicy(config = {}, type = "setup") {
+  const settings = config?.logSettings && typeof config.logSettings === "object" ? config.logSettings : {};
+  const perType = settings.eventPolicies?.[type] && typeof settings.eventPolicies[type] === "object" ? settings.eventPolicies[type] : {};
+  const retentionDays = Math.max(1, Math.min(3650, Number(perType.retentionDays ?? settings.retentionDays ?? 180) || 180));
+  const viewerScope = ["staff", "managers", "owners"].includes(perType.viewerScope || settings.viewerScope)
+    ? (perType.viewerScope || settings.viewerScope)
+    : "staff";
+  return Object.freeze({ retentionDays, viewerScope });
+}
+
+export function canViewParadiseLogEvent({ event, roleKeys = [], isOwner = false, isAdministrator = false } = {}) {
+  if (isOwner || isAdministrator) return true;
+  const roles = new Set((roleKeys || []).map(value => String(value).toLowerCase()));
+  const owner = roles.has("owner") || roles.has("overseer");
+  if (event?.viewerScope === "owners") return owner;
+  const manager = owner || ["admin", "manager", "moderator_manager", "referee_manager", "training_manager", "tryout_manager"].some(key => roles.has(key));
+  if (event?.viewerScope === "managers") return manager;
+  return manager || ["moderator", "support", "fima_support", "security", "referee", "training_hoster", "tryout_hoster", "application_reviewer"].some(key => roles.has(key));
+}
+
 async function logParadiseAction(guild, mappingKey, fallbackName, title, description, options = {}) {
+  const state = await loadState();
+  const type = options.type || paradiseLogTypeForMapping(mappingKey);
+  const policy = paradiseLogPolicy(configForGuild(state, guild?.id), type);
   const event = buildParadiseSafeLogEvent({
     guildId: guild?.id,
-    type: options.type || paradiseLogTypeForMapping(mappingKey),
+    type,
     title,
     description,
     metadata: options.metadata || {},
     correlationId: options.correlationId,
-    retentionDays: options.retentionDays,
-    viewerScope: options.viewerScope
+    retentionDays: options.retentionDays ?? policy.retentionDays,
+    viewerScope: options.viewerScope ?? policy.viewerScope
   });
   if (guild?.id) {
     await saveState(next => {
