@@ -1903,14 +1903,15 @@ async function ensureCommunityProgressionPermissions(guild, channel, channelName
   const linkTrusted = guild.roles.cache.find(role => role.name === "Link Trusted");
   const mediaApproved = guild.roles.cache.find(role => role.name === "Media Approved");
   const linksApproved = guild.roles.cache.find(role => role.name === "Links Approved");
+  const legacyApproved = guild.roles.cache.find(role => role.name === "Media & Links Approved");
   // Members may share media only in the dedicated media channel until their
   // level/manual trust role opens it elsewhere. Links remain protected by the
   // runtime scam/invite guard even once Link Trusted is granted.
   await channel.permissionOverwrites.edit(everyone, { AttachFiles: mediaChannel ? true : false, EmbedLinks: false }, { reason: "Paradise level-based media/link baseline" }).catch(() => {});
-  for (const role of [mediaTrusted, mediaApproved].filter(Boolean)) {
+  for (const role of [mediaTrusted, mediaApproved, legacyApproved].filter(Boolean)) {
     await channel.permissionOverwrites.edit(role, { AttachFiles: true }, { reason: "Paradise Media Trusted progression" }).catch(() => {});
   }
-  for (const role of [linkTrusted, linksApproved].filter(Boolean)) {
+  for (const role of [linkTrusted, linksApproved, legacyApproved].filter(Boolean)) {
     await channel.permissionOverwrites.edit(role, { EmbedLinks: true }, { reason: "Paradise Link Trusted progression" }).catch(() => {});
   }
 }
