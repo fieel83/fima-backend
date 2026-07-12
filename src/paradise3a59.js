@@ -1850,7 +1850,9 @@ async function ensureParadiseAutoMod(guild) {
     }
     return { status: "disabled" };
   }
-  const exemptRoleIds = ["Owner", "Admin", "Overseer", "Media & Links Approved"]
+  // Approval/trusted roles may unlock ordinary media/link posting, but they do
+  // not bypass the server-wide invite and scam guard.
+  const exemptRoleIds = ["Owner", "Admin", "Overseer"]
     .map(name => guild.roles.cache.find(role => role.name === name)?.id).filter(Boolean);
   const logChannel = guild.channels.cache.find(channel => channel.name === "mod-logs");
   const actions = [{ type: AutoModerationActionType.BlockMessage, metadata: { customMessage: "That link is not allowed here. Use an approved media/ticket channel or ask staff." } }];
@@ -8690,12 +8692,65 @@ async function handleBranding(interaction) {
   });
 }
 
+const PARADISE_HIGH_RISK_LINK_TERMS = Object.freeze([
+  "free nitro", "steam gift", "claim reward", "verify account here", "limited gift", "discord.gift/"
+]);
+const PARADISE_RISKY_ATTACHMENT_TYPES = Object.freeze([
+  "text/html", "application/javascript", "application/x-msdownload", "application/x-sh", "image/svg+xml"
+]);
+
+export function evaluateParadiseContentSafety({
+  content = "",
+  attachments = [],
+  roleKeys = [],
+  isOwner = false,
+  config = {}
+} = {}) {
+  const text = String(content || "").replace(/[\u200B-\u200D\uFEFF\s]+/g, "").toLowerCase();
+  const roles = new Set((roleKeys || []).map(key => String(key).toLowerCase()));
+  const isInviteApproved = isOwner || roles.has("invite_approved") || roles.has("owner") || roles.has("admin");
+  const hasInvite = /discord\.gg\/|discord(?:app)?\.com\/invite\//i.test(text);
+  const highRiskText = PARADISE_HIGH_RISK_LINK_TERMS.some(term => text.includes(term.replace(/\s+/g, "")));
+  const riskyAttachment = (attachments || []).some(attachment => {
+    const type = String(attachment?.contentType || attachment?.content_type || "").toLowerCase();
+    const name = String(attachment?.name || attachment?.filename || "").toLowerCase();
+    return PARADISE_RISKY_ATTACHMENT_TYPES.includes(type) || /\.(?:exe|msi|bat|cmd|ps1|js|html?|svg)$/i.test(name);
+  });
+  const blocked = highRiskText || riskyAttachment || (hasInvite && config.blockInvites !== false && !isInviteApproved);
+  const reason = highRiskText ? "scam_pattern" : riskyAttachment ? "unsafe_attachment" : hasInvite && !isInviteApproved ? "invite_not_approved" : null;
+  return Object.freeze({
+    blocked,
+    reason,
+    hasInvite,
+    highRiskText,
+    riskyAttachment,
+    // Trusted media/link roles intentionally never clear high-risk content.
+    trustedRolePresent: roles.has("media_trusted") || roles.has("link_trusted") || roles.has("media_approved") || roles.has("links_approved")
+  });
+}
+
 async function handleParadiseMessageInner(message) {
   if (!message.guild || message.author.bot) return false;
   const state = await loadState();
+  const guildConfig = configForGuild(state, message.guild.id);
+  const safety = evaluateParadiseContentSafety({
+    content: message.content,
+    attachments: [...(message.attachments?.values?.() || [])],
+    roleKeys: [...(message.member?.roles?.cache?.values?.() || [])].map(role => role.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")),
+    isOwner: message.guild.ownerId === message.author.id,
+    config: guildConfig.automod || {}
+  });
+  if (safety.blocked && guildConfig.automod?.runtimeSafety !== false) {
+    await message.delete().catch(() => null);
+    await logParadiseAction(message.guild, "security_logs_channel", "security-logs", "Message safety action",
+      `A message was quarantined by the runtime safety policy. Reason: **${safety.reason}**.`, {
+        type: "security",
+        metadata: { channelId: message.channelId, authorId: message.author.id, reason: safety.reason }
+      }).catch(() => null);
+    return true;
+  }
   const qotdWon = await handleQotdAnswer(message, state);
   await handleMemberLevelMessage(message);
-  const guildConfig = configForGuild(state, message.guild.id);
   const sticky = guildConfig.stickies?.[message.channelId];
   if (!sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return qotdWon;
   if (sticky.messageId) await message.channel.messages.delete(sticky.messageId).catch(() => {});

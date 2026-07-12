@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  canViewParadiseLogEvent, localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, paradiseLogPolicy, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
+  canViewParadiseLogEvent, evaluateParadiseContentSafety, localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, paradiseLogPolicy, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -103,6 +103,21 @@ test("Paradise log policy enforces bounded retention and private viewer scopes",
   assert.equal(canViewParadiseLogEvent({ event, roleKeys: ["manager"] }), true);
   assert.equal(canViewParadiseLogEvent({ event: { ...event, viewerScope: "owners" }, roleKeys: ["manager"] }), false);
   assert.equal(canViewParadiseLogEvent({ event: { ...event, viewerScope: "owners" }, roleKeys: ["owner"] }), true);
+});
+
+test("invite, scam and unsafe attachment policy does not let trusted roles bypass high-risk content", () => {
+  assert.deepEqual(evaluateParadiseContentSafety({ content: "join discord.gg/example", config: { blockInvites: true } }), {
+    blocked: true, reason: "invite_not_approved", hasInvite: true, highRiskText: false, riskyAttachment: false, trustedRolePresent: false
+  });
+  assert.equal(evaluateParadiseContentSafety({
+    content: "claim reward at discord.gg/example", roleKeys: ["link_trusted"], config: { blockInvites: false }
+  }).blocked, true);
+  assert.equal(evaluateParadiseContentSafety({
+    attachments: [{ name: "proof.svg", contentType: "image/svg+xml" }], roleKeys: ["media_approved"]
+  }).reason, "unsafe_attachment");
+  assert.equal(evaluateParadiseContentSafety({
+    content: "discord.gg/official", roleKeys: ["invite_approved"], config: { blockInvites: true }
+  }).blocked, false);
 });
 
 test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {
