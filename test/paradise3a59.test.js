@@ -7,7 +7,7 @@ import {
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
-  maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls,
+  maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
@@ -56,11 +56,37 @@ test("Paradise support panel has state-aware transcript-first ticket controls", 
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /paradise_support_delete_confirm:/);
   assert.match(source, /saveParadiseSupportTranscript\(interaction\.guild, interaction\.channel, locked, "delete"\)/);
-  assert.match(source, /deletionState: "transcript_failed"/);
+  assert.match(source, /action: "transcript_failed"/);
   assert.match(source, /await interaction\.channel\.delete\("Paradise transcript-first support ticket deletion"\)/);
   assert.match(source, /const canDelete = canApproveModeration\(interaction\.member\)/);
   assert.match(source, /\["support_logs_channel", "Private support ticket logs"\]/);
   assert.doesNotMatch(source.slice(source.indexOf("export function paradiseSupportTicketControls"), source.indexOf("function supportTicketStatusLabel")), /paradise_support_transcript/);
+});
+
+test("support ticket transitions prevent stale actions and keep transcript failure retryable", () => {
+  const base = { id: "ticket-1", status: "open", auditTrail: [] };
+  const claimed = transitionParadiseSupportTicket(base, { action: "claim", actorId: "staff-1", now: "2026-07-12T12:00:00.000Z" });
+  assert.equal(claimed.status, "claimed");
+  assert.equal(claimed.claimedBy, "staff-1");
+  const closed = transitionParadiseSupportTicket(claimed, { action: "close", actorId: "staff-1" });
+  assert.equal(closed.status, "closed");
+  const pending = transitionParadiseSupportTicket(closed, { action: "begin_delete", actorId: "admin-1" });
+  const failed = transitionParadiseSupportTicket(pending, { action: "transcript_failed", actorId: "admin-1" });
+  assert.equal(failed.status, "transcript_failed");
+  assert.deepEqual(paradiseSupportTicketControls("ticket-id", failed.status)[0].toJSON().components.map(item => item.custom_id), [
+    "paradise_support_reopen:ticket-id", "paradise_support_delete:ticket-id"
+  ]);
+  assert.throws(() => transitionParadiseSupportTicket(base, { action: "reopen", actorId: "staff-1" }), { code: "support_ticket_invalid_transition" });
+  assert.throws(() => transitionParadiseSupportTicket(pending, { action: "close", actorId: "staff-1" }), { code: "support_ticket_invalid_transition" });
+});
+
+test("ticket slash commands exist and dispatch to the same lifecycle transition gate", () => {
+  const command = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "ticket");
+  assert.ok(command);
+  const names = command.options.map(option => option.name);
+  for (const required of ["open", "info", "claim", "unclaim", "close", "reopen", "delete", "rename", "add", "remove", "escalate", "transcript", "panel", "config", "repair", "logs"]) {
+    assert.ok(names.includes(required), `missing /ticket ${required}`);
+  }
 });
 
 test("support ticket heading and state text follow the configured guild language", async () => {

@@ -1049,6 +1049,27 @@ export function paradiseCommands() {
       .addStringOption(setupAction),
     new SlashCommandBuilder().setName("help").setDescription("Open or search the complete Paradise command manual.")
       .addStringOption(option => option.setName("query").setDescription("Optional command or system to search for").setRequired(false)),
+    new SlashCommandBuilder().setName("ticket").setDescription("Paradise support ticket lifecycle")
+      .addSubcommand(s => s.setName("open").setDescription("Open your private support ticket"))
+      .addSubcommand(s => s.setName("info").setDescription("Show safe status for this ticket"))
+      .addSubcommand(s => s.setName("claim").setDescription("Staff: claim this ticket"))
+      .addSubcommand(s => s.setName("unclaim").setDescription("Staff: release this claimed ticket"))
+      .addSubcommand(s => s.setName("close").setDescription("Close this ticket and save a transcript"))
+      .addSubcommand(s => s.setName("reopen").setDescription("Staff: reopen this closed ticket"))
+      .addSubcommand(s => s.setName("delete").setDescription("Staff: securely delete a closed ticket"))
+      .addSubcommand(s => s.setName("rename").setDescription("Staff: rename this ticket")
+        .addStringOption(o => o.setName("name").setDescription("Safe channel name").setRequired(true).setMaxLength(90)))
+      .addSubcommand(s => s.setName("add").setDescription("Staff: add a member to this ticket")
+        .addUserOption(o => o.setName("user").setDescription("Member to add").setRequired(true)))
+      .addSubcommand(s => s.setName("remove").setDescription("Staff: remove a member from this ticket")
+        .addUserOption(o => o.setName("user").setDescription("Member to remove").setRequired(true)))
+      .addSubcommand(s => s.setName("escalate").setDescription("Staff: mark this ticket for escalation")
+        .addStringOption(o => o.setName("note").setDescription("Safe escalation note").setMaxLength(300)))
+      .addSubcommand(s => s.setName("transcript").setDescription("Staff: save a redacted transcript"))
+      .addSubcommand(s => s.setName("panel").setDescription("Staff: post the support ticket panel"))
+      .addSubcommand(s => s.setName("config").setDescription("Admin: show the customer dashboard settings route"))
+      .addSubcommand(s => s.setName("repair").setDescription("Admin: repair this ticket header in place"))
+      .addSubcommand(s => s.setName("logs").setDescription("Staff: show safe lifecycle metadata")),
     new SlashCommandBuilder().setName("sendlanguagequestion").setDescription("Post English/Turkish language buttons."),
     new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post Paradise notification-role selector."),
     new SlashCommandBuilder().setName("sendregionroleselector").setDescription("Post Paradise region-role selector."),
@@ -4020,7 +4041,8 @@ export function paradiseSupportPanelPayload(color) {
 
 export function paradiseSupportTicketControls(ticketId, status = "open") {
   const normalized = String(status || "open").toLowerCase();
-  if (normalized === "closed") {
+  if (normalized === "delete_pending" || normalized === "deleted") return [];
+  if (["closed", "transcript_failed"].includes(normalized)) {
     return [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`paradise_support_reopen:${ticketId}`).setLabel("Yeniden aç").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`paradise_support_delete:${ticketId}`).setLabel("Sil").setStyle(ButtonStyle.Danger)
@@ -4038,17 +4060,68 @@ export function paradiseSupportTicketControls(ticketId, status = "open") {
   )];
 }
 
+export const PARADISE_SUPPORT_TICKET_STATES = Object.freeze([
+  "open", "claimed", "closed", "delete_pending", "deleted", "transcript_failed"
+]);
+
+const SUPPORT_TICKET_TRANSITIONS = Object.freeze({
+  claim: { open: "claimed" },
+  unclaim: { claimed: "open" },
+  close: { open: "closed", claimed: "closed" },
+  reopen: { closed: "open", transcript_failed: "open" },
+  begin_delete: { closed: "delete_pending", transcript_failed: "delete_pending" },
+  transcript_saved: { delete_pending: "deleted" },
+  transcript_failed: { delete_pending: "transcript_failed" },
+  channel_delete_failed: { deleted: "closed" }
+});
+
+// Button and slash-command paths share this gate. Discord side effects occur
+// around it, so stale requests cannot mutate a ticket to an invalid state.
+export function transitionParadiseSupportTicket(record, { action, actorId, now = new Date(), metadata = {} } = {}) {
+  const from = String(record?.status || "open").toLowerCase();
+  const normalizedAction = String(action || "").toLowerCase();
+  const to = SUPPORT_TICKET_TRANSITIONS[normalizedAction]?.[from];
+  if (!to) {
+    const error = new Error("support_ticket_invalid_transition");
+    error.code = "support_ticket_invalid_transition";
+    error.from = from;
+    error.action = normalizedAction;
+    throw error;
+  }
+  const updated = {
+    ...record,
+    status: to,
+    updatedAt: new Date(now).toISOString(),
+    updatedBy: String(actorId || "system")
+  };
+  if (normalizedAction === "claim") updated.claimedBy = String(actorId || "");
+  if (["unclaim", "close", "reopen"].includes(normalizedAction)) updated.claimedBy = null;
+  if (normalizedAction === "begin_delete") updated.deletionState = "transcript_pending";
+  if (normalizedAction === "transcript_failed") updated.deletionState = "transcript_failed";
+  if (normalizedAction === "transcript_saved") {
+    updated.deletionState = "ready";
+    updated.deletedAt = new Date(now).toISOString();
+    updated.deletedBy = String(actorId || "system");
+  }
+  if (normalizedAction === "channel_delete_failed") updated.deletionState = "channel_delete_failed";
+  return supportTicketAudit(updated, normalizedAction, actorId, metadata);
+}
+
 function supportTicketStatusLabel(status = "open", language = "tr") {
   const normalized = String(status || "open").toLowerCase();
   if (language === "en") {
     if (normalized === "closed") return "CLOSED";
     if (normalized === "claimed") return "CLAIMED";
     if (normalized === "deleted") return "DELETED";
+    if (normalized === "transcript_failed") return "TRANSCRIPT FAILED";
+    if (normalized === "delete_pending") return "DELETE PENDING";
     return "OPEN";
   }
   if (normalized === "closed") return "KAPALI";
   if (normalized === "claimed") return "ÜSTLENİLDİ";
   if (normalized === "deleted") return "SİLİNDİ";
+  if (normalized === "transcript_failed") return "TRANSCRIPT BAŞARISIZ";
+  if (normalized === "delete_pending") return "SİLME BEKLİYOR";
   return "AÇIK";
 }
 
@@ -4065,6 +4138,8 @@ function paradiseSupportTicketDescription(record, language = "tr") {
   if (String(record.status || "open").toLowerCase() === "open") lines.push(tr ? "Kapatıldığında transcript otomatik kaydedilir ve üye erişimi kaldırılır." : "Closing automatically saves a transcript and removes member access.");
   else if (String(record.status || "").toLowerCase() === "claimed") lines.push(tr ? "Bu ticket bir yetkili tarafından üstlenildi. Kapatma transcript'i otomatik kaydeder." : "A staff member claimed this ticket. Closing automatically saves a transcript.");
   else if (String(record.status || "").toLowerCase() === "closed") lines.push(tr ? "Ticket kapalı. Yeniden açabilir veya güvenli silme akışını başlatabilirsin. Silme, transcript kaydedilmeden devam etmez." : "This ticket is closed. You can reopen it or start the secure deletion flow. Deletion never continues without a transcript.");
+  else if (String(record.status || "").toLowerCase() === "transcript_failed") lines.push(tr ? "Transcript kaydedilemedi. Ticket korunuyor; ayar düzeltildikten sonra silmeyi güvenle tekrar deneyebilirsin." : "Transcript delivery failed. The ticket is protected; fix the destination and retry deletion safely.");
+  else if (String(record.status || "").toLowerCase() === "delete_pending") lines.push(tr ? "Silme için transcript hazırlanıyor. Ticket işlemleri geçici olarak kilitli." : "A transcript is being prepared for deletion. Ticket changes are temporarily locked.");
   else lines.push(tr ? "Ticket silindi. Transcript ve güvenli denetim kaydı saklandı." : "The ticket was deleted. The transcript and safe audit record were retained.");
   return lines.join("\n");
 }
@@ -4203,11 +4278,8 @@ async function runParadiseSupportTicketLifecycleSmoke(guild, ticket) {
     throw error;
   }
   const closed = {
-    ...record,
-    status: "closed",
-    ...transcriptMetadataFromMessage(transcript, "smoke-close"),
-    updatedAt: new Date().toISOString(),
-    updatedBy: "system-test"
+    ...transitionParadiseSupportTicket(record, { action: "close", actorId: "system-test" }),
+    ...transcriptMetadataFromMessage(transcript, "smoke-close")
   };
   await channel.permissionOverwrites.edit(record.userId, { ViewChannel: false });
   await channel.setName(`closed-${channel.name.replace(/^closed-/, "")}`.slice(0, 90));
@@ -4224,7 +4296,7 @@ async function runParadiseSupportTicketLifecycleSmoke(guild, ticket) {
     return next;
   });
 
-  const reopened = { ...closed, status: "open", updatedAt: new Date().toISOString(), updatedBy: "system-test" };
+  const reopened = transitionParadiseSupportTicket(closed, { action: "reopen", actorId: "system-test" });
   await channel.permissionOverwrites.edit(record.userId, {
     ViewChannel: true,
     SendMessages: true,
@@ -4257,7 +4329,7 @@ function transcriptMetadataFromMessage(message, trigger) {
 }
 
 async function showParadiseSupportDeleteConfirmation(interaction, record, ticketId) {
-  if (String(record.status || "").toLowerCase() !== "closed") {
+  if (!["closed", "transcript_failed"].includes(String(record.status || "").toLowerCase())) {
     return interaction.reply({ content: "Yalnız kapalı ticket silinebilir.", ephemeral: true });
   }
   const modal = new ModalBuilder()
@@ -4284,35 +4356,38 @@ async function handleParadiseSupportDeleteModal(interaction) {
   const state = await loadState();
   const record = state.supportTickets?.[interaction.guildId]?.[ticketId];
   const canDelete = canApproveModeration(interaction.member);
-  if (!record || record.channelId !== interaction.channelId || !canDelete || String(record.status || "").toLowerCase() !== "closed") {
+  if (!record || record.channelId !== interaction.channelId || !canDelete || !["closed", "transcript_failed"].includes(String(record.status || "").toLowerCase())) {
     return interaction.editReply({ content: "Bu kapalı ticketı silme yetkin yok veya ticket artık geçerli değil." });
   }
-  const locked = supportTicketAudit({ ...record, deletionState: "transcript_pending" }, "delete_requested", interaction.user.id);
+  const locked = transitionParadiseSupportTicket(record, { action: "begin_delete", actorId: interaction.user.id });
   await saveState(next => {
     next.supportTickets[interaction.guildId] = next.supportTickets[interaction.guildId] || {};
     next.supportTickets[interaction.guildId][ticketId] = locked;
     return next;
   });
+  await refreshParadiseSupportTicketHeader(interaction.channel, locked).catch(() => null);
   const transcript = await saveParadiseSupportTranscript(interaction.guild, interaction.channel, locked, "delete").catch(() => null);
   if (!transcript) {
+    let failedRecord = null;
     await saveState(next => {
       const current = next.supportTickets?.[interaction.guildId]?.[ticketId] || locked;
-      next.supportTickets[interaction.guildId][ticketId] = supportTicketAudit({ ...current, deletionState: "transcript_failed" }, "delete_blocked", interaction.user.id, { reason: "transcript_unavailable" });
+      failedRecord = transitionParadiseSupportTicket(current, {
+        action: "transcript_failed",
+        actorId: interaction.user.id,
+        metadata: { reason: "transcript_unavailable" }
+      });
+      next.supportTickets[interaction.guildId][ticketId] = failedRecord;
       return next;
     });
+    await refreshParadiseSupportTicketHeader(interaction.channel, failedRecord).catch(() => null);
     await logParadiseAction(interaction.guild, "support_logs_channel", "support-logs", "Support ticket deletion blocked", `Ticket \`${record.id.slice(0, 8)}\` transcript could not be saved; the channel was kept.`).catch(() => null);
     return interaction.editReply({ content: "Transcript kaydedilemedi; ticket silinmedi ve yönetilebilir durumda bırakıldı." });
   }
   let deletedRecord = null;
   await saveState(next => {
     const current = next.supportTickets?.[interaction.guildId]?.[ticketId] || locked;
-    deletedRecord = supportTicketAudit({
-      ...persistSupportTranscript(next, interaction.guildId, ticketId, current, transcript, "delete", interaction.user.id),
-      status: "deleted",
-      deletedAt: new Date().toISOString(),
-      deletedBy: interaction.user.id,
-      deletionState: "ready"
-    }, "deleted", interaction.user.id);
+    const transcribed = persistSupportTranscript(next, interaction.guildId, ticketId, current, transcript, "delete", interaction.user.id);
+    deletedRecord = transitionParadiseSupportTicket(transcribed, { action: "transcript_saved", actorId: interaction.user.id });
     next.supportTickets[interaction.guildId][ticketId] = deletedRecord;
     return next;
   });
@@ -4323,11 +4398,167 @@ async function handleParadiseSupportDeleteModal(interaction) {
   } catch {
     await saveState(next => {
       const current = next.supportTickets?.[interaction.guildId]?.[ticketId] || deletedRecord || locked;
-      next.supportTickets[interaction.guildId][ticketId] = supportTicketAudit({ ...current, status: "closed", deletionState: "channel_delete_failed" }, "delete_channel_failed", interaction.user.id);
+      const recovered = transitionParadiseSupportTicket(current, { action: "channel_delete_failed", actorId: interaction.user.id });
+      next.supportTickets[interaction.guildId][ticketId] = recovered;
+      deletedRecord = recovered;
       return next;
     });
+    await refreshParadiseSupportTicketHeader(interaction.channel, deletedRecord).catch(() => null);
     return interaction.editReply({ content: "Transcript kaydedildi fakat kanal silinemedi; ticket kapalı ve yönetilebilir bırakıldı." });
   }
+}
+
+async function refreshParadiseSupportTicketHeader(channel, record) {
+  if (!record?.headerMessageId || !channel?.isTextBased?.()) return null;
+  const header = await channel.messages.fetch(record.headerMessageId).catch(() => null);
+  if (!header) return null;
+  await header.edit({
+    embeds: [await paradiseSupportTicketEmbed(record)],
+    components: paradiseSupportTicketControls(record.id, record.status)
+  });
+  return header;
+}
+
+async function mutateParadiseSupportTicketLifecycle({ guild, channel, record, ticketId, action, actorId }) {
+  const normalizedAction = String(action || "").toLowerCase();
+  let updated = transitionParadiseSupportTicket(record, { action: normalizedAction, actorId });
+  let transcript = null;
+
+  if (normalizedAction === "close") {
+    transcript = await saveParadiseSupportTranscript(guild, channel, updated, "closed").catch(() => null);
+    if (!transcript) {
+      const error = new Error("support_ticket_transcript_required");
+      error.code = "support_ticket_transcript_required";
+      throw error;
+    }
+    updated = { ...updated, ...transcriptMetadataFromMessage(transcript, "closed") };
+    await channel.permissionOverwrites.edit(record.userId, { ViewChannel: false }).catch(() => {});
+    await channel.setName(`closed-${channel.name.replace(/^closed-/, "")}`.slice(0, 90)).catch(() => {});
+  } else if (normalizedAction === "reopen") {
+    await channel.permissionOverwrites.edit(record.userId, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true
+    }).catch(() => {});
+    await channel.setName(channel.name.replace(/^closed-/, "").slice(0, 90)).catch(() => {});
+  }
+
+  await saveState(next => {
+    next.supportTickets[guild.id] = next.supportTickets[guild.id] || {};
+    if (normalizedAction === "close" && transcript) {
+      updated = persistSupportTranscript(next, guild.id, ticketId, updated, transcript, "closed", actorId);
+    } else {
+      next.supportTickets[guild.id][ticketId] = updated;
+    }
+    return next;
+  });
+  await logParadiseAction(guild, "support_logs_channel", "support-logs", `Support ticket ${updated.status}`,
+    `Ticket \`${record.id.slice(0, 8)}\` was **${updated.status}** by <@${actorId}>.${transcript ? " Transcript saved." : ""}`).catch(() => null);
+  return updated;
+}
+
+function supportTicketRecordForChannel(state, guildId, channelId) {
+  return Object.values(state.supportTickets?.[guildId] || {}).find(item => item.channelId === channelId) || null;
+}
+
+function safeSupportTicketChannelName(value) {
+  const normalized = String(value || "").toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 90);
+  return normalized || null;
+}
+
+async function handleParadiseTicketCommand(interaction) {
+  const sub = interaction.options.getSubcommand();
+  if (sub === "open") {
+    const created = await createParadiseSupportTicket(interaction.guild, interaction.user, interaction.channel);
+    return interaction.reply({ content: created.existing ? `You already have an open ticket: ${created.channel}` : `Support ticket opened: ${created.channel}`, ephemeral: true });
+  }
+  if (sub === "panel") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Ticket Manager authority required.", ephemeral: true });
+    await interaction.channel.send(paradiseSupportPanelPayload(await paradiseBrandColor()));
+    return interaction.reply({ content: "Support panel posted.", ephemeral: true });
+  }
+  if (sub === "config") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Ticket Manager authority required.", ephemeral: true });
+    return interaction.reply({ content: "Configure ticket lifecycle, transcript retention and private log channels in Paradise Dashboard → Tickets.", ephemeral: true });
+  }
+  const state = await loadState();
+  const record = supportTicketRecordForChannel(state, interaction.guildId, interaction.channelId);
+  if (!record) return interaction.reply({ content: "Use this command inside a Paradise support ticket.", ephemeral: true });
+  const isStaff = canModerate(interaction.member) || canApproveModeration(interaction.member);
+  const isManager = canApproveModeration(interaction.member);
+  const canClose = isStaff || record.userId === interaction.user.id;
+
+  if (sub === "info") {
+    if (!isStaff && record.userId !== interaction.user.id) return interaction.reply({ content: "You cannot view this ticket's status.", ephemeral: true });
+    return interaction.reply({ embeds: [await paradiseSupportTicketEmbed(record)], ephemeral: true });
+  }
+  if (sub === "delete") {
+    if (!isManager) return interaction.reply({ content: "Ticket deletion requires owner or senior admin authority.", ephemeral: true });
+    return showParadiseSupportDeleteConfirmation(interaction, record, record.id);
+  }
+  if (["claim", "unclaim", "reopen", "transcript", "escalate", "logs"].includes(sub) && !isStaff) {
+    return interaction.reply({ content: "Staff authority required.", ephemeral: true });
+  }
+  if (["rename", "add", "remove", "repair"].includes(sub) && !isManager) {
+    return interaction.reply({ content: "Ticket Manager authority required.", ephemeral: true });
+  }
+  if (sub === "close" && !canClose) return interaction.reply({ content: "You cannot close this ticket.", ephemeral: true });
+
+  if (["claim", "unclaim", "close", "reopen"].includes(sub)) {
+    try {
+      const updated = await mutateParadiseSupportTicketLifecycle({
+        guild: interaction.guild, channel: interaction.channel, record, ticketId: record.id, action: sub, actorId: interaction.user.id
+      });
+      await refreshParadiseSupportTicketHeader(interaction.channel, updated);
+      return interaction.reply({ content: `Ticket is now ${updated.status}.`, ephemeral: true });
+    } catch (error) {
+      const message = error.code === "support_ticket_transcript_required"
+        ? "Transcript could not be saved; the ticket was not closed. Configure the transcript channel and retry."
+        : "This ticket action is no longer valid for its current state.";
+      return interaction.reply({ content: message, ephemeral: true });
+    }
+  }
+  if (sub === "transcript") {
+    const transcript = await saveParadiseSupportTranscript(interaction.guild, interaction.channel, record, "manual").catch(() => null);
+    if (!transcript) return interaction.reply({ content: "Transcript could not be saved; no ticket state was changed.", ephemeral: true });
+    let updated = record;
+    await saveState(next => { updated = persistSupportTranscript(next, interaction.guildId, record.id, record, transcript, "manual", interaction.user.id); return next; });
+    await refreshParadiseSupportTicketHeader(interaction.channel, updated);
+    return interaction.reply({ content: "Redacted transcript saved to the private transcript channel.", ephemeral: true });
+  }
+  if (sub === "rename") {
+    const name = safeSupportTicketChannelName(interaction.options.getString("name"));
+    if (!name) return interaction.reply({ content: "Use a readable channel name with letters, numbers, - or _.", ephemeral: true });
+    await interaction.channel.setName(name, "Paradise ticket manager rename");
+    const updated = supportTicketAudit({ ...record, channelName: name, updatedAt: new Date().toISOString() }, "renamed", interaction.user.id);
+    await saveState(next => { next.supportTickets[interaction.guildId][record.id] = updated; return next; });
+    return interaction.reply({ content: `Ticket renamed to ${name}.`, ephemeral: true });
+  }
+  if (sub === "add" || sub === "remove") {
+    const member = interaction.options.getUser("user", true);
+    if (sub === "add") await interaction.channel.permissionOverwrites.edit(member.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true });
+    else await interaction.channel.permissionOverwrites.delete(member.id).catch(() => {});
+    const updated = supportTicketAudit(record, sub === "add" ? "member_added" : "member_removed", interaction.user.id, { memberId: member.id });
+    await saveState(next => { next.supportTickets[interaction.guildId][record.id] = updated; return next; });
+    return interaction.reply({ content: sub === "add" ? `Added ${member}.` : `Removed ${member}.`, ephemeral: true });
+  }
+  if (sub === "escalate") {
+    const note = String(interaction.options.getString("note") || "Staff escalation requested.").slice(0, 300);
+    const updated = supportTicketAudit({ ...record, escalatedAt: new Date().toISOString(), escalatedBy: interaction.user.id }, "escalated", interaction.user.id, { note });
+    await saveState(next => { next.supportTickets[interaction.guildId][record.id] = updated; return next; });
+    await logParadiseAction(interaction.guild, "support_logs_channel", "support-logs", "Support ticket escalated", `Ticket \`${record.id.slice(0, 8)}\` was escalated.`, { safe: true }).catch(() => null);
+    return interaction.reply({ content: "Ticket escalation was recorded for staff review.", ephemeral: true });
+  }
+  if (sub === "repair") {
+    await refreshParadiseSupportTicketHeader(interaction.channel, record);
+    return interaction.reply({ content: "Canonical ticket header repaired in place.", ephemeral: true });
+  }
+  if (sub === "logs") {
+    const actions = (record.auditTrail || []).slice(-8).map(item => `- ${item.action} · <t:${Math.floor(new Date(item.at).getTime() / 1000)}:R>`);
+    return interaction.reply({ content: actions.join("\n") || "No safe lifecycle metadata is stored yet.", ephemeral: true });
+  }
+  return interaction.reply({ content: "This ticket command is not available yet.", ephemeral: true });
 }
 
 async function handleParadiseSupportButton(interaction) {
@@ -4344,11 +4575,7 @@ async function handleParadiseSupportButton(interaction) {
   if (action === "delete" && !canApproveModeration(interaction.member)) return interaction.reply({ content: "Ticket silme işlemi yalnız owner veya senior admin yetkisiyle yapılabilir.", ephemeral: true });
   if (action === "claim") {
     if (String(record.status || "open").toLowerCase() !== "open") return interaction.reply({ content: "Bu ticket artık üstlenilemez.", ephemeral: true });
-    const claimed = supportTicketAudit({ ...record, status: "claimed", claimedBy: interaction.user.id, updatedAt: new Date().toISOString() }, "claimed", interaction.user.id);
-    await saveState(next => {
-      next.supportTickets[interaction.guildId][ticketId] = claimed;
-      return next;
-    });
+    const claimed = await mutateParadiseSupportTicketLifecycle({ guild: interaction.guild, channel: interaction.channel, record, ticketId, action: "claim", actorId: interaction.user.id });
     return interaction.update({
       embeds: [await paradiseSupportTicketEmbed(claimed)],
       components: paradiseSupportTicketControls(ticketId, "claimed")
@@ -4356,8 +4583,7 @@ async function handleParadiseSupportButton(interaction) {
   }
   if (action === "unclaim") {
     if (String(record.status || "").toLowerCase() !== "claimed") return interaction.reply({ content: "Bu ticket üstlenilmiş durumda değil.", ephemeral: true });
-    const reopened = supportTicketAudit({ ...record, status: "open", claimedBy: null, updatedAt: new Date().toISOString() }, "unclaimed", interaction.user.id);
-    await saveState(next => { next.supportTickets[interaction.guildId][ticketId] = reopened; return next; });
+    const reopened = await mutateParadiseSupportTicketLifecycle({ guild: interaction.guild, channel: interaction.channel, record, ticketId, action: "unclaim", actorId: interaction.user.id });
     return interaction.update({ embeds: [await paradiseSupportTicketEmbed(reopened)], components: paradiseSupportTicketControls(ticketId, "open") });
   }
   if (action === "delete") return showParadiseSupportDeleteConfirmation(interaction, record, ticketId);
@@ -4365,36 +4591,18 @@ async function handleParadiseSupportButton(interaction) {
   if (action === "close" && !["open", "claimed"].includes(String(record.status || "open").toLowerCase())) {
     return interaction.reply({ content: "Bu ticket zaten kapalı veya silinmiş durumda.", ephemeral: true });
   }
-  if (action === "reopen" && String(record.status || "").toLowerCase() !== "closed") return interaction.reply({ content: "Yalnız kapalı ticket yeniden açılabilir.", ephemeral: true });
-  const status = action === "reopen" ? "open" : "closed";
-  let transcriptMeta = {};
-  if (status === "closed") {
-    const transcript = await saveParadiseSupportTranscript(interaction.guild, interaction.channel, { ...record, status }, "closed").catch(() => null);
-    if (!transcript) {
-      return interaction.reply({
-        content: "Transcript kaydedilemedi; ticket kapatılmadı. Transcript/log kanalını ayarlayıp tekrar dene.",
-        ephemeral: true
-      });
-    }
-    transcriptMeta = transcriptMetadataFromMessage(transcript, "closed");
+  if (action === "reopen" && !["closed", "transcript_failed"].includes(String(record.status || "").toLowerCase())) return interaction.reply({ content: "Yalnız kapalı ticket yeniden açılabilir.", ephemeral: true });
+  let updatedRecord;
+  try {
+    updatedRecord = await mutateParadiseSupportTicketLifecycle({ guild: interaction.guild, channel: interaction.channel, record, ticketId, action, actorId: interaction.user.id });
+  } catch (error) {
+    if (error.code === "support_ticket_transcript_required") return interaction.reply({ content: "Transcript kaydedilemedi; ticket kapatılmadı. Transcript/log kanalını ayarlayıp tekrar dene.", ephemeral: true });
+    return interaction.reply({ content: "Bu ticket işlemi artık geçerli değil.", ephemeral: true });
   }
-  await interaction.channel.permissionOverwrites.edit(record.userId, { ViewChannel: status === "open" }).catch(() => {});
-  await interaction.channel.setName(status === "open" ? interaction.channel.name.replace(/^closed-/, "") : `closed-${interaction.channel.name}`.slice(0, 90)).catch(() => {});
-  let updatedRecord = supportTicketAudit({ ...record, status, ...transcriptMeta, updatedAt: new Date().toISOString(), updatedBy: interaction.user.id }, status === "closed" ? "closed" : "reopened", interaction.user.id);
-  await saveState(next => {
-    if (status === "closed" && transcriptMeta.transcriptMessageId) {
-      updatedRecord = persistSupportTranscript(next, interaction.guildId, ticketId, updatedRecord, { channelId: transcriptMeta.transcriptChannelId, id: transcriptMeta.transcriptMessageId, url: transcriptMeta.transcriptUrl }, "closed", interaction.user.id);
-    } else {
-      next.supportTickets[interaction.guildId][ticketId] = updatedRecord;
-    }
-    return next;
-  });
-  await logParadiseAction(interaction.guild, "support_logs_channel", "support-logs", `Support ticket ${status}`,
-    `Ticket \`${record.id.slice(0, 8)}\` was **${status}** by <@${interaction.user.id}>.${transcriptMeta.transcriptMessageId ? " Transcript saved." : ""}`).catch(() => null);
-  if (!interaction.message) return interaction.reply({ content: `Ticket ${status === "closed" ? "kapatıldı" : "yeniden açıldı"}.`, ephemeral: true });
+  if (!interaction.message) return interaction.reply({ content: `Ticket ${action === "close" ? "kapatıldı" : "yeniden açıldı"}.`, ephemeral: true });
   return interaction.update({
     embeds: [await paradiseSupportTicketEmbed(updatedRecord)],
-    components: paradiseSupportTicketControls(ticketId, status)
+    components: paradiseSupportTicketControls(ticketId, updatedRecord.status)
   });
 }
 
@@ -6297,7 +6505,7 @@ function staffGuideCategory(entry) {
   if (command === "tryout") return "tryout";
   if (["challenge", "referee", "availability"].includes(command)) return "referee";
   if (["mod", "modcase", "moderation", "security", "blacklist", "appeal", "bail"].includes(command)) return "moderation";
-  if (command.startsWith("fima_") || ["application"].includes(command)) return "support";
+  if (command.startsWith("fima_") || ["application", "ticket"].includes(command)) return "support";
   return "setup";
 }
 
@@ -8190,6 +8398,7 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "setupfieelstsbtr") { await handleSetupAction(interaction, "tsbtr"); return true; }
   if (interaction.commandName === "setup") { await handleSetupAction(interaction, interaction.options.getString("mode") || "community"); return true; }
   if (interaction.commandName === "help") { await handleRegistryHelp(interaction); return true; }
+  if (interaction.commandName === "ticket") { await handleParadiseTicketCommand(interaction); return true; }
   if (interaction.commandName === "verifyroblox") { await verifyStart(interaction); return true; }
   if (interaction.commandName === "verifyrobloxcheck") { await verifyCheck(interaction); return true; }
   if (interaction.commandName === "profile") { await handleProfile(interaction); return true; }
