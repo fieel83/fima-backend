@@ -140,6 +140,7 @@ const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
 const usedRobloxOAuthStates = new Map();
+const usedDiscordOAuthStates = new Map();
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 const REFERRAL_REWARD_VALID_INVITES = 3;
 const REFERRAL_REWARD_DAYS = 7;
@@ -1515,6 +1516,7 @@ app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
 app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
   try {
     const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "discord");
+    rememberUsedDiscordOAuthState(String(req.query?.state || ""));
     const code = String(req.query?.code || "").trim();
     if (!code) throw new Error("missing_discord_code");
 
@@ -5045,7 +5047,15 @@ function oauthCookieDomain() {
 }
 
 function oauthSecret() {
-  return env("SESSION_SECRET") || env("ADMIN_PASSWORD") || env("APP_ENCRYPTION_KEY") || "fima-dev-oauth-state";
+  const configured = env("SESSION_SECRET") || env("ADMIN_PASSWORD") || env("APP_ENCRYPTION_KEY");
+  if (configured) return configured;
+  const runtime = String(process.env.RUNTIME_ENV || process.env.NODE_ENV || "development").toLowerCase();
+  if (["production", "prod", "staging"].includes(runtime)) {
+    const error = new Error("oauth_state_secret_missing");
+    error.code = "oauth_state_secret_missing";
+    throw error;
+  }
+  return "fima-dev-oauth-state";
 }
 
 function createOAuthState(provider, data = {}) {
@@ -5129,17 +5139,25 @@ async function finishRobloxOAuth(req, res, input) {
 }
 
 function rememberUsedRobloxOAuthState(state) {
+  return rememberUsedOAuthState(usedRobloxOAuthStates, state);
+}
+
+function rememberUsedDiscordOAuthState(state) {
+  return rememberUsedOAuthState(usedDiscordOAuthStates, state);
+}
+
+function rememberUsedOAuthState(store, state) {
   const now = Date.now();
-  for (const [key, expiresAt] of usedRobloxOAuthStates) {
-    if (expiresAt <= now) usedRobloxOAuthStates.delete(key);
+  for (const [key, expiresAt] of store) {
+    if (expiresAt <= now) store.delete(key);
   }
   const digest = crypto.createHash("sha256").update(state).digest("hex");
-  if (usedRobloxOAuthStates.has(digest)) {
+  if (store.has(digest)) {
     const error = new Error("duplicate_oauth_callback");
     error.code = "duplicate_oauth_callback";
     throw error;
   }
-  usedRobloxOAuthStates.set(digest, now + 10 * 60 * 1000);
+  store.set(digest, now + 10 * 60 * 1000);
 }
 
 async function exchangeDiscordCode(code) {
