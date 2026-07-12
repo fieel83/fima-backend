@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-11T22:10:25.842Z",
+  "capturedAt": "2026-07-12T07:47:14.442Z",
   "status": "LOCAL VERIFIED",
   "repository": {
-    "localCommit": "d7f3faa9e746542ce4af399618911c4cc18b4dc8",
+    "localCommit": "e65278100a09f3e7b39e9d3977c424e8101c9146",
     "dirtyWorktree": true,
     "note": "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work."
   },
@@ -18,8 +18,10 @@
     },
     "productionScan": "BLOCKED",
     "browserCopyReveal": "BLOCKED",
-    "testGuildSmoke": "LIVE DISCORD VERIFIED",
-    "currentLocalTestCount": 104
+    "testGuildSmoke": "SOURCE ONLY",
+    "currentLocalTestCount": 115,
+    "latestJsonChanged": false,
+    "productionGuildsChanged": false
   },
   "database": {
     "provider": "PostgreSQL via Prisma",

@@ -1,8 +1,63 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-11T22:10:25.842Z",
+  "generatedAt": "2026-07-12T07:47:14.442Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
+  "statusSummary": {
+    "totalAcceptedRequirements": 47,
+    "sourceStatus": {
+      "SOURCE ONLY": 27,
+      "LOCAL VERIFIED": 19,
+      "DEPLOYED": 1,
+      "LIVE VERIFIED": 0,
+      "BLOCKED": 0,
+      "FAILED": 0
+    },
+    "localTestStatus": {
+      "SOURCE ONLY": 27,
+      "LOCAL VERIFIED": 20,
+      "BLOCKED": 0,
+      "FAILED": 0
+    },
+    "deployStatus": {
+      "SOURCE ONLY": 46,
+      "DEPLOYED": 1,
+      "LIVE VERIFIED": 0,
+      "BLOCKED": 0,
+      "FAILED": 0
+    },
+    "liveDiscordStatus": {
+      "SOURCE ONLY": 46,
+      "LIVE DISCORD VERIFIED": 1,
+      "BLOCKED": 0,
+      "FAILED": 0
+    },
+    "dashboardBrowserStatus": {
+      "SOURCE ONLY": 45,
+      "DASHBOARD VERIFIED": 0,
+      "BROWSER VERIFIED": 0,
+      "BLOCKED": 2,
+      "FAILED": 0
+    },
+    "blockedRows": [
+      "LIC-001",
+      "ENV-002",
+      "FLAG-001",
+      "DB-001",
+      "DB-002",
+      "OPS-001",
+      "CMD-001",
+      "RBAC-001",
+      "COMP-001",
+      "SETUP-001",
+      "DASH-001",
+      "TEST-001",
+      "TPL-001",
+      "SESSION-001",
+      "TICKET-001",
+      "VOICE-001"
+    ]
+  },
   "rows": [
     {
       "requirementId": "LIC-001",

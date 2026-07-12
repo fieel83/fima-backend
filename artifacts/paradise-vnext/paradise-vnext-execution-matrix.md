@@ -1,8 +1,19 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-11T22:10:25.842Z
+Generated: 2026-07-12T07:47:14.442Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
+
+## Current status summary
+
+- Total accepted requirements: 47
+- SOURCE ONLY: 27
+- LOCAL VERIFIED: 19
+- DEPLOYED: 1
+- LIVE DISCORD VERIFIED: 1
+- DASHBOARD VERIFIED: 0
+- BLOCKED rows: 16
+- FAILED rows: 0
 
 | ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |
 |---|---|---|---|---|---|---|---|---|

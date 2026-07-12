@@ -212,6 +212,15 @@ const matrix = {
   generatedAt: now,
   progressRule: "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   selectionRule: "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
+  statusSummary: {
+    totalAcceptedRequirements: executionRows.length,
+    sourceStatus: Object.fromEntries(["SOURCE ONLY", "LOCAL VERIFIED", "DEPLOYED", "LIVE VERIFIED", "BLOCKED", "FAILED"].map(status => [status, executionRows.filter(row => row.sourceStatus === status).length])),
+    localTestStatus: Object.fromEntries(["SOURCE ONLY", "LOCAL VERIFIED", "BLOCKED", "FAILED"].map(status => [status, executionRows.filter(row => row.localTestStatus === status).length])),
+    deployStatus: Object.fromEntries(["SOURCE ONLY", "DEPLOYED", "LIVE VERIFIED", "BLOCKED", "FAILED"].map(status => [status, executionRows.filter(row => row.deployStatus === status).length])),
+    liveDiscordStatus: Object.fromEntries(["SOURCE ONLY", "LIVE DISCORD VERIFIED", "BLOCKED", "FAILED"].map(status => [status, executionRows.filter(row => row.liveDiscordStatus === status).length])),
+    dashboardBrowserStatus: Object.fromEntries(["SOURCE ONLY", "DASHBOARD VERIFIED", "BROWSER VERIFIED", "BLOCKED", "FAILED"].map(status => [status, executionRows.filter(row => row.dashboardBrowserStatus === status).length])),
+    blockedRows: executionRows.filter(row => row.sourceStatus === "BLOCKED" || row.localTestStatus === "BLOCKED" || row.deployStatus === "BLOCKED" || row.liveDiscordStatus === "BLOCKED" || row.dashboardBrowserStatus === "BLOCKED" || row.blocker).map(row => row.requirementId)
+  },
   rows: executionRows
 };
 
@@ -235,7 +244,7 @@ const inventory = {
   capturedAt: now,
   status: "LOCAL VERIFIED",
   repository: { localCommit, dirtyWorktree: true, note: "Existing user changes in dashboard/public files and prior artifacts are preserved; this inventory does not claim they are part of the new foundation work." },
-  runtimeEvidence: { deployedLicenseHotfix: "DEPLOYED", deployedLicenseHotfixCommitFromEvidence: "77fb4e7ceee322ae135b570602a7cdd86fae2ea3", observedProductionVersion, productionScan: "BLOCKED", browserCopyReveal: "BLOCKED", testGuildSmoke: "LIVE DISCORD VERIFIED", currentLocalTestCount: 104 },
+  runtimeEvidence: { deployedLicenseHotfix: "DEPLOYED", deployedLicenseHotfixCommitFromEvidence: "77fb4e7ceee322ae135b570602a7cdd86fae2ea3", observedProductionVersion, productionScan: "BLOCKED", browserCopyReveal: "BLOCKED", testGuildSmoke: "SOURCE ONLY", currentLocalTestCount: 115, latestJsonChanged: false, productionGuildsChanged: false },
   database: { provider: "PostgreSQL via Prisma", migrationState: "not queried in this local inventory", paradiseState: "Stored primarily in Setting key paradise_3a59_state_v1 with artifact JSON fallback", risk: "Critical Paradise state remains partly opaque JSON/fallback-based." },
   commandRegistration: { status: "LOCAL VERIFIED", evidence: ["src/paradiseCommandRegistry.js", "registry-backed guild command filtering", "registry-backed member /help and runtime denial"], gap: "Staging/test-guild command re-registration and real interaction proof remain BLOCKED until a safe deployment path exists." },
   rbac: { status: "LOCAL VERIFIED", evidence: ["src/paradiseRbac.js", "challenge autowin and approval now use shared referee permissions"], gap: "Role-persona proof in the exact test guild remains BLOCKED until a safe deployment path exists." },
@@ -276,7 +285,7 @@ const legacyMigrationPreview = {
 };
 
 const mdRows = executionRows.map(row => `| ${row.requirementId} | ${row.priority} | ${row.milestone} | ${row.sourceStatus} | ${row.localTestStatus} | ${row.deployStatus} | ${row.liveDiscordStatus} | ${row.dashboardBrowserStatus} | ${row.nextExactAction.replace(/\|/g, "/")} |`).join("\n");
-const markdown = `# Paradise vNext Execution Matrix\n\nGenerated: ${now}\n\nThis file is a readable view of \`paradise-vnext-execution-matrix.json\`. The JSON matrix is authoritative.\n\n| ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |\n|---|---|---|---|---|---|---|---|---|\n${mdRows}\n\n## Milestone 1 frozen scope\n\n${included.map(id => `- ${id}`).join("\n")}\n\n## Blocking owner decisions\n\n${milestone.blockingOwnerDecisions.map(id => { const d = decisions.find(x => x.decisionId === id); return `- ${id}: ${d.title}`; }).join("\n")}\n\n## Progress rule\n\nBefore work, read the JSON matrix, select the oldest incomplete unblocked dependency in Milestone 1, update the same row and avoid duplicate proof artifacts.\n`;
+const markdown = `# Paradise vNext Execution Matrix\n\nGenerated: ${now}\n\nThis file is a readable view of \`paradise-vnext-execution-matrix.json\`. The JSON matrix is authoritative.\n\n## Current status summary\n\n- Total accepted requirements: ${matrix.statusSummary.totalAcceptedRequirements}\n- SOURCE ONLY: ${matrix.statusSummary.sourceStatus["SOURCE ONLY"]}\n- LOCAL VERIFIED: ${matrix.statusSummary.sourceStatus["LOCAL VERIFIED"]}\n- DEPLOYED: ${matrix.statusSummary.sourceStatus.DEPLOYED}\n- LIVE DISCORD VERIFIED: ${matrix.statusSummary.liveDiscordStatus["LIVE DISCORD VERIFIED"]}\n- DASHBOARD VERIFIED: ${matrix.statusSummary.dashboardBrowserStatus["DASHBOARD VERIFIED"]}\n- BLOCKED rows: ${matrix.statusSummary.blockedRows.length}\n- FAILED rows: ${matrix.statusSummary.sourceStatus.FAILED + matrix.statusSummary.localTestStatus.FAILED + matrix.statusSummary.deployStatus.FAILED + matrix.statusSummary.liveDiscordStatus.FAILED + matrix.statusSummary.dashboardBrowserStatus.FAILED}\n\n| ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |\n|---|---|---|---|---|---|---|---|---|\n${mdRows}\n\n## Milestone 1 frozen scope\n\n${included.map(id => `- ${id}`).join("\n")}\n\n## Blocking owner decisions\n\n${milestone.blockingOwnerDecisions.map(id => { const d = decisions.find(x => x.decisionId === id); return `- ${id}: ${d.title}`; }).join("\n")}\n\n## Progress rule\n\nBefore work, read the JSON matrix, select the oldest incomplete unblocked dependency in Milestone 1, update the same row and avoid duplicate proof artifacts.\n`;
 
 await fs.mkdir(outDir, { recursive: true });
 await Promise.all([
