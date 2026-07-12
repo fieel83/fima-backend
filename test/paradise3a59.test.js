@@ -7,7 +7,7 @@ import {
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
-  maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls, transitionParadiseSupportTicket,
+  maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
@@ -77,7 +77,8 @@ test("challenge autowin uses shared referee-work RBAC instead of a separate role
 
 test("Paradise support panel has state-aware transcript-first ticket controls", async () => {
   const launcher = paradiseSupportPanelPayload(0).components[0].toJSON();
-  assert.equal(launcher.components[0].custom_id, "paradise_support_open");
+  assert.equal(launcher.components[0].custom_id, "paradise_support_category");
+  assert.ok(launcher.components[0].options.some(option => option.value === "payment_license"));
   const open = paradiseSupportTicketControls("ticket-id", "open")[0].toJSON().components;
   assert.deepEqual(open.map(item => item.custom_id), [
     "paradise_support_claim:ticket-id",
@@ -101,6 +102,20 @@ test("Paradise support panel has state-aware transcript-first ticket controls", 
   assert.match(source, /const canDelete = canApproveModeration\(interaction\.member\)/);
   assert.match(source, /\["support_logs_channel", "Private support ticket logs"\]/);
   assert.doesNotMatch(source.slice(source.indexOf("export function paradiseSupportTicketControls"), source.indexOf("function supportTicketStatusLabel")), /paradise_support_transcript/);
+});
+
+test("ticket categories remain template-scoped and lifecycle names never expose private account data", () => {
+  assert.deepEqual(paradiseTicketCategoriesForMode("community").map(([id]) => id), ["support", "payment_license", "app_problem", "application", "security_report", "other"]);
+  assert.equal(normalizeParadiseTicketCategory("community", "payment_license"), "payment_license");
+  assert.equal(normalizeParadiseTicketCategory("clan", "payment_license"), null);
+  assert.equal(normalizeParadiseTicketCategory("tsbtr", "leaderboard_profile"), "leaderboard_profile");
+  const name = renderParadiseTicketChannelName({
+    format: "{status}-{category}-{username}-{number}", status: "closed", category: "payment_license",
+    username: "Fieel@example.test", number: 42
+  });
+  assert.equal(name, "closed-payment_license-fieel-example-test-42");
+  assert.ok(name.length <= 90);
+  assert.doesNotMatch(name, /@|\./);
 });
 
 test("support ticket transitions prevent stale actions and keep transcript failure retryable", () => {

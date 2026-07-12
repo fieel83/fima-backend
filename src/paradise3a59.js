@@ -1056,7 +1056,9 @@ export function paradiseCommands() {
     new SlashCommandBuilder().setName("help").setDescription("Open or search the complete Paradise command manual.")
       .addStringOption(option => option.setName("query").setDescription("Optional command or system to search for").setRequired(false)),
     new SlashCommandBuilder().setName("ticket").setDescription("Paradise support ticket lifecycle")
-      .addSubcommand(s => s.setName("open").setDescription("Open your private support ticket"))
+      .addSubcommand(s => s.setName("open").setDescription("Open your private support ticket")
+        .addStringOption(o => o.setName("category").setDescription("Support category for this server")
+          .addChoices(...[...new Set(Object.values(PARADISE_TICKET_CATEGORY_DEFAULTS).flat().map(([id, label]) => ({ name: label, value: id })))])))
       .addSubcommand(s => s.setName("info").setDescription("Show safe status for this ticket"))
       .addSubcommand(s => s.setName("claim").setDescription("Staff: claim this ticket"))
       .addSubcommand(s => s.setName("unclaim").setDescription("Staff: release this claimed ticket"))
@@ -2360,8 +2362,11 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   const applicationPanel = applicationChannel
     ? await upsertSmokePanel("application", applicationChannel, paradiseApplicationPanelPayload(await paradiseBrandColor()))
     : null;
+  const supportConfig = configForGuild(await loadState(), guild.id);
   const supportPanel = supportChannel
-    ? await upsertSmokePanel("support", supportChannel, paradiseSupportPanelPayload(await paradiseBrandColor()))
+    ? await upsertSmokePanel("support", supportChannel, paradiseSupportPanelPayload(
+      await paradiseBrandColor(), guildLanguage(supportConfig), supportConfig.activeSetupMode || "community"
+    ))
     : null;
   const supportTicket = owner && supportChannel
     ? await createParadiseSupportTicket(guild, owner.user, supportChannel, { test: true })
@@ -4191,12 +4196,105 @@ function paradiseApplicationPanelPayload(color, language = "tr") {
   };
 }
 
-export function paradiseSupportPanelPayload(color) {
+export const PARADISE_TICKET_CATEGORY_DEFAULTS = Object.freeze({
+  community: Object.freeze([
+    ["support", "Genel destek", "Hesap, topluluk veya genel yardım"],
+    ["payment_license", "Ödeme / lisans", "Ödeme, lisans ve My Products yardımı"],
+    ["app_problem", "Fima uygulama sorunu", "Uygulama hata veya teknik destek"],
+    ["application", "Başvuru", "Başvuru veya inceleme sorusu"],
+    ["security_report", "Güvenlik bildirimi", "Scam, hesap güvenliği veya ciddi risk"],
+    ["other", "Diğer", "Diğer özel destek konusu"]
+  ]),
+  clan: Object.freeze([
+    ["clan_support", "Klan desteği", "Klan veya üye desteği"],
+    ["challenge_problem", "Challenge sorunu", "Açık maç veya rank challenge sorunu"],
+    ["lineup_mainer", "Lineup / Mainer", "Lineup, mainer veya roster desteği"],
+    ["training_tryout", "Training / Tryout", "Oturum veya hoster desteği"],
+    ["blacklist_appeal", "Blacklist / itiraz", "İtiraz ve güvenli inceleme"],
+    ["other", "Diğer", "Diğer özel destek konusu"]
+  ]),
+  tsbtr: Object.freeze([
+    ["challenge", "Challenge", "Challenge veya maç ticketı"],
+    ["leaderboard_profile", "Leaderboard / profil", "Profil veya sıralama desteği"],
+    ["referee_report", "Referee bildirimi", "Referee veya skor bildirimi"],
+    ["training_tryout", "Training / Tryout", "Oturum veya hoster desteği"],
+    ["blacklist_appeal", "Blacklist / itiraz", "İtiraz ve güvenli inceleme"],
+    ["other", "Diğer", "Diğer özel destek konusu"]
+  ])
+});
+
+export function paradiseTicketCategoriesForMode(mode = "community") {
+  return PARADISE_TICKET_CATEGORY_DEFAULTS[mode] || PARADISE_TICKET_CATEGORY_DEFAULTS.community;
+}
+
+export function normalizeParadiseTicketCategory(mode, category) {
+  const normalized = String(category || "").trim().toLowerCase();
+  return paradiseTicketCategoriesForMode(mode).some(([id]) => id === normalized) ? normalized : null;
+}
+
+function paradiseTicketCategoryLabel(mode, category, language = "tr") {
+  const row = paradiseTicketCategoriesForMode(mode).find(([id]) => id === category);
+  if (!row) return language === "en" ? "Support" : "Destek";
+  if (language !== "en") return row[1];
   return {
-    embeds: [new EmbedBuilder().setColor(color).setTitle("PARADISE DESTEK")
-      .setDescription("# Özel destek ticketı\nHesap, başvuru, ödeme, moderasyon veya sunucu yardımı için tek bir özel ticket aç.\n\n- Önce ticket kapatılır; transcript otomatik kaydedilir\n- Kapanınca üye erişimi kaldırılır, yetkililer erişimi korur\n- Silme yalnız güvenli transcript akışıyla yapılır\n- Şifre, cookie, token veya tam lisans anahtarı paylaşma\n\n-# Her üye aynı anda bir aktif destek ticketı açabilir.")],
+    support: "General support", payment_license: "Payment / license", app_problem: "Fima app issue", application: "Application", security_report: "Security report", other: "Other",
+    clan_support: "Clan support", challenge_problem: "Challenge issue", lineup_mainer: "Lineup / Mainer", training_tryout: "Training / Tryout", blacklist_appeal: "Blacklist / appeal",
+    challenge: "Challenge", leaderboard_profile: "Leaderboard / profile", referee_report: "Referee report"
+  }[category] || row[1];
+}
+
+function paradiseTicketCategoryDescription(category, language = "tr") {
+  if (language !== "en") return paradiseTicketCategoriesForMode("community").find(([id]) => id === category)?.[2]
+    || paradiseTicketCategoriesForMode("clan").find(([id]) => id === category)?.[2]
+    || paradiseTicketCategoriesForMode("tsbtr").find(([id]) => id === category)?.[2]
+    || "Özel destek konusu";
+  return {
+    support: "Account, community or general help", payment_license: "Payment, license or My Products help", app_problem: "App error or technical support",
+    application: "Application or review question", security_report: "Scam, account safety or serious risk", other: "Another private support issue",
+    clan_support: "Clan or member support", challenge_problem: "Open match or ranked challenge issue", lineup_mainer: "Lineup, mainer or roster support",
+    training_tryout: "Session or hoster support", blacklist_appeal: "Appeal and safe review", challenge: "Challenge or match ticket",
+    leaderboard_profile: "Profile or leaderboard support", referee_report: "Referee or score report"
+  }[category] || "Private support issue";
+}
+
+export function renderParadiseTicketChannelName({
+  format = "{category}-{username}",
+  number = 1,
+  username = "member",
+  displayName = "member",
+  category = "support",
+  status = "open",
+  claimedBy = ""
+} = {}) {
+  const safeToken = value => String(value || "")
+    .toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-_]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "member";
+  const rendered = String(format || "{category}-{username}")
+    .replaceAll("{number}", String(Math.max(1, Number(number) || 1)))
+    .replaceAll("{username}", safeToken(username))
+    .replaceAll("{display_name}", safeToken(displayName))
+    .replaceAll("{category}", safeToken(category))
+    .replaceAll("{status}", safeToken(status))
+    .replaceAll("{claimed_by}", safeToken(claimedBy || "staff"));
+  return safeSupportTicketChannelName(rendered) || `support-${safeToken(username)}`;
+}
+
+export function paradiseSupportPanelPayload(color, language = "tr", mode = "community") {
+  const tr = language !== "en";
+  const categories = paradiseTicketCategoriesForMode(mode);
+  return {
+    embeds: [new EmbedBuilder().setColor(color).setTitle(tr ? "PARADISE DESTEK" : "PARADISE SUPPORT")
+      .setDescription(tr
+        ? "# Özel destek ticketı\nKonuna en uygun kategoriyi seç; aynı anda yalnızca bir aktif ticket açabilirsin.\n\n- Ticket kapanırken transcript otomatik kaydedilir\n- Kapanınca üye erişimi kaldırılır, yetkililer erişimi korur\n- Silme yalnız güvenli transcript akışıyla yapılır\n- Şifre, cookie, token veya tam lisans anahtarı paylaşma"
+        : "# Private support ticket\nChoose the category that fits your issue; you can have one active ticket at a time.\n\n- Closing saves a transcript automatically\n- Member access is removed after close while staff retain access\n- Deletion only uses the secure transcript-first flow\n- Never share passwords, cookies, tokens or a full license key")],
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("paradise_support_open").setLabel("Destek Ticketı Aç").setStyle(ButtonStyle.Primary)
+      new StringSelectMenuBuilder().setCustomId("paradise_support_category")
+        .setPlaceholder(tr ? "Destek kategorisi seç" : "Choose a support category")
+        .addOptions(categories.map(([id, label, description]) => ({
+          value: id,
+          label: tr ? label : paradiseTicketCategoryLabel(mode, id, "en"),
+          description: (tr ? description : paradiseTicketCategoryDescription(id, "en")).slice(0, 100)
+        })))
     )]
   };
 }
@@ -4293,6 +4391,7 @@ function paradiseSupportTicketDescription(record, language = "tr") {
   const lines = [
     `${tr ? "Üye" : "Member"}: <@${record.userId}>`,
     `Ticket: \`${record.id.slice(0, 8)}\``,
+    `${tr ? "Kategori" : "Category"}: **${record.categoryLabel || record.category || (tr ? "Destek" : "Support")}**`,
     `${tr ? "Durum" : "Status"}: **${status}**`
   ];
   if (record.claimedBy) lines.push(`${tr ? "Üstlenen" : "Claimed by"}: <@${record.claimedBy}>`);
@@ -4342,8 +4441,16 @@ export function maskParadiseTranscriptText(value) {
     .slice(0, 1800);
 }
 
-async function createParadiseSupportTicket(guild, user, sourceChannel, { test = false } = {}) {
+async function createParadiseSupportTicket(guild, user, sourceChannel, { test = false, category = null } = {}) {
   const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  const mode = config.activeSetupMode || "community";
+  const selectedCategory = normalizeParadiseTicketCategory(mode, category || (mode === "community" ? "support" : "other"));
+  if (!selectedCategory) {
+    const error = new Error("invalid_support_ticket_category");
+    error.code = "invalid_support_ticket_category";
+    throw error;
+  }
   const existing = Object.values(state.supportTickets?.[guild.id] || {})
     .find(item => item.userId === user.id && ["open", "claimed"].includes(String(item.status || "open").toLowerCase()));
   if (existing) {
@@ -4351,7 +4458,16 @@ async function createParadiseSupportTicket(guild, user, sourceChannel, { test = 
     if (channel) return { channel, record: existing, existing: true };
   }
   const ticketId = crypto.randomUUID();
-  const safeName = String(user.username || "member").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 24) || "member";
+  const existingCount = Object.keys(state.supportTickets?.[guild.id] || {}).length + 1;
+  const openFormat = String(config.ticketSettings?.openNameFormat || "{category}-{username}");
+  const safeName = renderParadiseTicketChannelName({
+    format: openFormat,
+    number: existingCount,
+    username: user.username,
+    displayName: user.globalName || user.username,
+    category: selectedCategory,
+    status: "open"
+  });
   const staffRoles = [...guild.roles.cache.values()].filter(role => ["Owner", "Admin", "Overseer", "Manager", "Moderator", "Support Staff"].includes(role.name));
   const overwrites = [
     { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
@@ -4360,7 +4476,7 @@ async function createParadiseSupportTicket(guild, user, sourceChannel, { test = 
     ...staffRoles.map(role => ({ id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] }))
   ];
   const channel = await guild.channels.create({
-    name: `${test ? "smoke-" : ""}support-${safeName}`.slice(0, 90),
+    name: `${test ? "smoke-" : ""}${safeName}`.slice(0, 90),
     type: ChannelType.GuildText,
     parent: sourceChannel?.parentId || undefined,
     topic: `Paradise support ticket ${ticketId.slice(0, 8)}. Keep secrets masked.`,
@@ -4368,7 +4484,9 @@ async function createParadiseSupportTicket(guild, user, sourceChannel, { test = 
     reason: test ? "Paradise live support-ticket smoke test" : "Paradise support ticket opened"
   });
   const record = {
-    id: ticketId, guildId: guild.id, channelId: channel.id, userId: user.id,
+    id: ticketId, guildId: guild.id, channelId: channel.id, userId: user.id, username: String(user.username || "member").slice(0, 64),
+    category: selectedCategory, categoryLabel: paradiseTicketCategoryLabel(mode, selectedCategory, guildLanguage(config)),
+    nameFormat: openFormat, channelName: channel.name,
     status: "open", test, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   await saveState(next => {
@@ -4583,6 +4701,8 @@ async function refreshParadiseSupportTicketHeader(channel, record) {
 
 async function mutateParadiseSupportTicketLifecycle({ guild, channel, record, ticketId, action, actorId }) {
   const normalizedAction = String(action || "").toLowerCase();
+  const state = await loadState();
+  const ticketSettings = configForGuild(state, guild.id).ticketSettings || {};
   let updated = transitionParadiseSupportTicket(record, { action: normalizedAction, actorId });
   let transcript = null;
 
@@ -4595,14 +4715,32 @@ async function mutateParadiseSupportTicketLifecycle({ guild, channel, record, ti
     }
     updated = { ...updated, ...transcriptMetadataFromMessage(transcript, "closed") };
     await channel.permissionOverwrites.edit(record.userId, { ViewChannel: false }).catch(() => {});
-    await channel.setName(`closed-${channel.name.replace(/^closed-/, "")}`.slice(0, 90)).catch(() => {});
   } else if (normalizedAction === "reopen") {
     await channel.permissionOverwrites.edit(record.userId, {
       ViewChannel: true,
       SendMessages: true,
       ReadMessageHistory: true
     }).catch(() => {});
-    await channel.setName(channel.name.replace(/^closed-/, "").slice(0, 90)).catch(() => {});
+  }
+  const lifecycleFormat = normalizedAction === "claim" ? ticketSettings.claimedNameFormat
+    : normalizedAction === "close" ? ticketSettings.closedNameFormat
+      : ["unclaim", "reopen"].includes(normalizedAction) ? ticketSettings.openNameFormat
+        : null;
+  if (lifecycleFormat !== null || ["claim", "close", "unclaim", "reopen"].includes(normalizedAction)) {
+    const defaultFormat = normalizedAction === "claim" ? "claimed-{category}-{username}"
+      : normalizedAction === "close" ? "closed-{category}-{username}"
+        : "{category}-{username}";
+    const channelName = renderParadiseTicketChannelName({
+      format: lifecycleFormat || defaultFormat,
+      number: Object.keys(state.supportTickets?.[guild.id] || {}).length,
+      username: record.username || channel.name,
+      displayName: record.username || channel.name,
+      category: record.category || "support",
+      status: updated.status,
+      claimedBy: updated.claimedBy || "staff"
+    });
+    await channel.setName(channelName, `Paradise ticket ${normalizedAction} lifecycle name`).catch(() => null);
+    updated = { ...updated, channelName };
   }
 
   await saveState(next => {
@@ -4632,12 +4770,17 @@ function safeSupportTicketChannelName(value) {
 async function handleParadiseTicketCommand(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "open") {
-    const created = await createParadiseSupportTicket(interaction.guild, interaction.user, interaction.channel);
+    const created = await createParadiseSupportTicket(interaction.guild, interaction.user, interaction.channel, {
+      category: interaction.options.getString("category")
+    }).catch(error => ({ error }));
+    if (created.error) return interaction.reply({ content: "This ticket category is not enabled for the selected server template.", ephemeral: true });
     return interaction.reply({ content: created.existing ? `You already have an open ticket: ${created.channel}` : `Support ticket opened: ${created.channel}`, ephemeral: true });
   }
   if (sub === "panel") {
     if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Ticket Manager authority required.", ephemeral: true });
-    await interaction.channel.send(paradiseSupportPanelPayload(await paradiseBrandColor()));
+    const state = await loadState();
+    const config = configForGuild(state, interaction.guildId);
+    await interaction.channel.send(paradiseSupportPanelPayload(await paradiseBrandColor(), guildLanguage(config), config.activeSetupMode || "community"));
     return interaction.reply({ content: "Support panel posted.", ephemeral: true });
   }
   if (sub === "config") {
@@ -8601,6 +8744,19 @@ async function handleParadiseInteractionInner(interaction) {
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_application_type") {
     await interaction.showModal(applicationModal(interaction.values[0], 0, "new"));
+    return true;
+  }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_support_category") {
+    const category = interaction.values[0];
+    const created = await createParadiseSupportTicket(interaction.guild, interaction.user, interaction.channel, { category }).catch(error => ({ error }));
+    if (created.error) {
+      await interaction.reply({ content: "This ticket category is not enabled for the selected server template.", ephemeral: true });
+      return true;
+    }
+    await interaction.reply({
+      content: created.existing ? `You already have an open ticket: ${created.channel}` : `Support ticket opened: ${created.channel}`,
+      ephemeral: true
+    });
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_challenge_target") {
