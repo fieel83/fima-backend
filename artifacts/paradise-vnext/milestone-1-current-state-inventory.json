@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-07-12T09:46:42.062Z",
+  "capturedAt": "2026-07-12T09:55:10.129Z",
   "status": "LOCAL VERIFIED",
   "repository": {
     "localCommit": "unavailable",
@@ -19,7 +19,7 @@
     "productionScan": "BLOCKED",
     "browserCopyReveal": "BLOCKED",
     "testGuildSmoke": "SOURCE ONLY",
-    "currentLocalTestCount": 140,
+    "currentLocalTestCount": 142,
     "latestJsonChanged": false,
     "productionGuildsChanged": false
   },

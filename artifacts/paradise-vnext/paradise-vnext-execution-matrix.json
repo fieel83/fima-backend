@@ -1,21 +1,21 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-12T09:46:42.062Z",
+  "generatedAt": "2026-07-12T09:55:10.129Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "statusSummary": {
     "totalAcceptedRequirements": 47,
     "sourceStatus": {
-      "SOURCE ONLY": 17,
-      "LOCAL VERIFIED": 29,
+      "SOURCE ONLY": 15,
+      "LOCAL VERIFIED": 31,
       "DEPLOYED": 1,
       "LIVE VERIFIED": 0,
       "BLOCKED": 0,
       "FAILED": 0
     },
     "localTestStatus": {
-      "SOURCE ONLY": 18,
-      "LOCAL VERIFIED": 29,
+      "SOURCE ONLY": 16,
+      "LOCAL VERIFIED": 31,
       "BLOCKED": 0,
       "FAILED": 0
     },
@@ -63,6 +63,8 @@
       "TICKET-001",
       "VOICE-001",
       "APP-001",
+      "LINEUP-001",
+      "XP-001",
       "SEC-001",
       "LOG-001"
     ]
@@ -1265,17 +1267,18 @@
         "PANEL-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
         "src/paradise3a59.js",
+        "src/paradiseCommandRegistry.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Main/War lineup, roster, relations and the canonical pinned mainer notice are local. Implement the remaining safe War/Spar ticket/result state with audit before this combined requirement can be LOCAL VERIFIED.",
+      "blocker": "No isolated staging/test-guild runtime is available for stored-message, mainer pin and role-persona proof.",
+      "nextExactAction": "Deploy only to the exact test guild; verify Main/Roster/War boards edit stored IDs in place, the canonical mainer message pins/edits in place, and Community denies war/spar at runtime.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1298,14 +1301,17 @@
         "OPS-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until scheduler/persistence base.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging/test-guild runtime exists for actual Discord permission overwrite, voice activity and scheduled daily-question proof.",
+      "nextExactAction": "Deploy only to the exact test guild; verify level 5/10 role grants, media/link channel overwrites, AFK voice exclusion, one-minute level notice deletion and manual-only Daily Question payout queue.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],

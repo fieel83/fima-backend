@@ -1,18 +1,18 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-12T09:46:42.062Z
+Generated: 2026-07-12T09:55:10.129Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
 ## Current status summary
 
 - Total accepted requirements: 47
-- SOURCE ONLY: 17
-- LOCAL VERIFIED: 29
+- SOURCE ONLY: 15
+- LOCAL VERIFIED: 31
 - DEPLOYED: 1
 - LIVE DISCORD VERIFIED: 1
 - DASHBOARD VERIFIED: 0
-- BLOCKED rows: 25
+- BLOCKED rows: 27
 - FAILED rows: 0
 
 | ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |
@@ -49,8 +49,8 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | APP-001 | P2 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove multi-step Continue/Cancel, duplicate denial, More Info follow-up, approval/role grant and website-to-review-queue delivery without testing against a production guild. |
 | RESELL-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until billing/legal owner decision. |
 | ROBUX-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until ticket transaction and owner policy. |
-| LINEUP-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Main/War lineup, roster, relations and the canonical pinned mainer notice are local. Implement the remaining safe War/Spar ticket/result state with audit before this combined requirement can be LOCAL VERIFIED. |
-| XP-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until scheduler/persistence base. |
+| LINEUP-001 | P2 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to the exact test guild; verify Main/Roster/War boards edit stored IDs in place, the canonical mainer message pins/edits in place, and Community denies war/spar at runtime. |
+| XP-001 | P2 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to the exact test guild; verify level 5/10 role grants, media/link channel overwrites, AFK voice exclusion, one-minute level notice deletion and manual-only Daily Question payout queue. |
 | EVENT-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until shared event state and components exist. |
 | SOCIAL-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer pending provider selection and release policy. |
 | AI-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until AI provider/consent owner decision. |
