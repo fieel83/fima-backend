@@ -8,7 +8,7 @@ import {
   canViewParadiseLogEvent, evaluateParadiseContentSafety, localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, paradiseLogPolicy, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
-  paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
+  paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, transitionParadiseWar, tryoutAnnouncementMarkdown,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
@@ -204,6 +204,23 @@ test("canonical mainer copy uses a safe fallback and a localized stored-message 
   const command = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "mainer");
   assert.ok(command.options.some(option => option.name === "panel"));
   assert.ok(command.options.find(option => option.name === "set").options.some(option => option.name === "main-channel"));
+});
+
+test("war and spar state is guild-scoped, audited and requires safe evidence before completion", () => {
+  const open = { id: "war-1", guildId: "guild-a", kind: "war", status: "open", auditTrail: [] };
+  const assigned = transitionParadiseWar(open, { action: "assign_referee", actorId: "manager", refereeId: "referee", now: "2026-07-12T12:00:00.000Z" });
+  const scored = transitionParadiseWar(assigned, { action: "score", actorId: "referee", score: "3-1", now: "2026-07-12T12:01:00.000Z" });
+  const completed = transitionParadiseWar(scored, { action: "result", actorId: "manager", winner: "paradise", proof: "https://discord.com/channels/1/2/3", now: "2026-07-12T12:02:00.000Z" });
+  assert.equal(open.status, "open");
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.score, "3-1");
+  assert.equal(completed.auditTrail.length, 3);
+  assert.throws(() => transitionParadiseWar(scored, { action: "result", actorId: "manager", winner: "paradise", proof: "http://unsafe.example" }), { code: "war_result_invalid" });
+  assert.throws(() => transitionParadiseWar(completed, { action: "cancel", actorId: "manager", reason: "late" }), { code: "war_not_open" });
+  const commands = paradiseCommands().map(item => item.toJSON());
+  assert.ok(commands.some(command => command.name === "spar"));
+  assert.deepEqual(commands.find(command => command.name === "war").options.map(option => option.name), ["create", "referee", "score", "result", "cancel", "logs"]);
+  assert.equal(paradiseCommandAllowedForMode("war", "community"), false);
 });
 
 test("support ticket transitions prevent stale actions and keep transcript failure retryable", () => {

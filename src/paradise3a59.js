@@ -394,7 +394,7 @@ const EMPTY_STATE = Object.freeze({
   tournaments: {}, leaderboard: {}, leaderboards: {}, leaderboardHistory: {}, staffActivity: {}, activityChecks: {},
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
-  rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
+  rosters: {}, lineups: {}, wars: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
   applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}, paradiseLogs: {}, challengeAudits: {}
@@ -907,6 +907,7 @@ export const PARADISE_SETUP_SCHEMAS = Object.freeze({
 
 const COMMUNITY_HIDDEN_COMMANDS = new Set([
   "challenge", "referee", "lineup", "roster", "mainer", "findfcw", "relation",
+  "war", "spar",
   "blacklist", "appeal", "bail", "availability", "tryout", "paradisetraining",
   "whitelist", "handbook", "qotd", "answer"
 ]);
@@ -1252,6 +1253,30 @@ export function paradiseCommands() {
         .addChannelOption(o => o.setName("main-channel").setDescription("Official Roblox/TSB main channel")))
       .addSubcommand(s => s.setName("panel").setDescription("Create or update the canonical pinned mainer notice"))
       .addSubcommand(s => s.setName("guide").setDescription("Show the current maining guide")),
+    new SlashCommandBuilder().setName("spar").setDescription("Create a controlled spar request")
+      .addSubcommand(s => s.setName("request").setDescription("Request a spar against a clan or contact")
+        .addStringOption(o => o.setName("opponent").setDescription("Opponent clan or contact").setRequired(true).setMaxLength(80))
+        .addStringOption(o => o.setName("format").setDescription("Requested format, e.g. 5v5 FT3").setRequired(true).setMaxLength(80))
+        .addStringOption(o => o.setName("region").setDescription("Preferred region").addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))),
+    new SlashCommandBuilder().setName("war").setDescription("Manage Paradise war state and results")
+      .addSubcommand(s => s.setName("create").setDescription("Create an auditable war record")
+        .addStringOption(o => o.setName("opponent").setDescription("Opponent clan").setRequired(true).setMaxLength(80))
+        .addStringOption(o => o.setName("format").setDescription("War format").setRequired(true).setMaxLength(80))
+        .addStringOption(o => o.setName("region").setDescription("War region").addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" })))
+      .addSubcommand(s => s.setName("referee").setDescription("Assign a referee to an open war")
+        .addStringOption(o => o.setName("id").setDescription("War ID").setRequired(true))
+        .addUserOption(o => o.setName("user").setDescription("Referee").setRequired(true)))
+      .addSubcommand(s => s.setName("score").setDescription("Record an interim war score")
+        .addStringOption(o => o.setName("id").setDescription("War ID").setRequired(true))
+        .addStringOption(o => o.setName("score").setDescription("Score, e.g. 3-1").setRequired(true)))
+      .addSubcommand(s => s.setName("result").setDescription("Close a war with evidence")
+        .addStringOption(o => o.setName("id").setDescription("War ID").setRequired(true))
+        .addStringOption(o => o.setName("winner").setDescription("Winning side").setRequired(true).addChoices({ name: "Paradise", value: "paradise" }, { name: "Opponent", value: "opponent" }))
+        .addStringOption(o => o.setName("proof").setDescription("Evidence message or image URL").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("cancel").setDescription("Cancel an open war with an audit reason")
+        .addStringOption(o => o.setName("id").setDescription("War ID").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Cancellation reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("logs").setDescription("Show safe recent war lifecycle metadata")),
     new SlashCommandBuilder().setName("report").setNameLocalizations({ tr: "rapor" }).setDescription("Report a staff member or hoster privately").setDescriptionLocalizations({ tr: "Personel veya hosteri özel olarak raporla" })
       .addSubcommand(s => s.setName("staff").setDescription("Open a private staff report")
         .addUserOption(o => o.setName("user").setDescription("Reported staff member").setRequired(true))
@@ -6926,6 +6951,112 @@ async function handleMainer(interaction) {
   return interaction.reply({ content: paradiseMainerAnnouncement({ code: config.mainerCode, region: config.mainerRegion || "EU", mainChannelId: config.mainChannelId, language: paradiseGuildContentLanguage(config) }), ephemeral: true });
 }
 
+export function transitionParadiseWar(record, { action, actorId, now = new Date().toISOString(), refereeId = null, score = null, winner = null, proof = null, reason = null } = {}) {
+  const current = structuredClone(record || {});
+  if (!current.id || !current.guildId) throw Object.assign(new Error("war_not_found"), { code: "war_not_found" });
+  if (!["open", "requested"].includes(current.status) && action !== "logs") throw Object.assign(new Error("war_not_open"), { code: "war_not_open" });
+  const next = { ...current, updatedAt: now, updatedBy: actorId };
+  if (action === "assign_referee") {
+    if (!refereeId) throw Object.assign(new Error("war_referee_required"), { code: "war_referee_required" });
+    next.refereeId = refereeId;
+    next.status = "open";
+  } else if (action === "score") {
+    if (!/^\d{1,2}-\d{1,2}$/.test(String(score || ""))) throw Object.assign(new Error("war_score_invalid"), { code: "war_score_invalid" });
+    next.score = String(score);
+    next.status = "open";
+  } else if (action === "result") {
+    if (!["paradise", "opponent"].includes(winner) || !/^https:\/\//i.test(String(proof || ""))) throw Object.assign(new Error("war_result_invalid"), { code: "war_result_invalid" });
+    next.winner = winner;
+    next.proof = String(proof).slice(0, 500);
+    next.status = "completed";
+    next.completedAt = now;
+  } else if (action === "cancel") {
+    if (!String(reason || "").trim()) throw Object.assign(new Error("war_cancel_reason_required"), { code: "war_cancel_reason_required" });
+    next.status = "cancelled";
+    next.cancelReason = String(reason).slice(0, 500);
+    next.cancelledAt = now;
+  } else {
+    throw Object.assign(new Error("war_action_invalid"), { code: "war_action_invalid" });
+  }
+  next.auditTrail = [...(current.auditTrail || []), { action, actorId, at: now }].slice(-50);
+  return next;
+}
+
+function findParadiseWar(state, guildId, prefix) {
+  return Object.values(state.wars?.[guildId] || {}).find(record => record.id.startsWith(String(prefix || ""))) || null;
+}
+
+async function handleSpar(interaction) {
+  if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
+  const record = {
+    id: crypto.randomUUID(), guildId: interaction.guildId, kind: "spar", status: "requested",
+    opponent: interaction.options.getString("opponent").trim(), format: interaction.options.getString("format").trim(),
+    region: interaction.options.getString("region") || "EU", createdBy: interaction.user.id, createdAt: new Date().toISOString(), auditTrail: []
+  };
+  await saveState(state => {
+    state.wars[interaction.guildId] = state.wars[interaction.guildId] || {};
+    state.wars[interaction.guildId][record.id] = record;
+    return state;
+  });
+  await logParadiseAction(interaction.guild, "war_logs_channel", "war-logs", "Spar request created",
+    `${interaction.user} created a spar request against **${record.opponent}** · ${record.format} · ${record.region}.`, { type: "war", metadata: { warId: record.id, kind: "spar" } });
+  return interaction.reply({ content: `Spar request saved as \`${record.id.slice(0, 8)}\`. Staff can convert it into an approved war record after review.`, ephemeral: true });
+}
+
+async function handleWar(interaction) {
+  if (!canManageClan(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  if (sub === "logs") {
+    const records = Object.values((await loadState()).wars?.[interaction.guildId] || {}).sort((a, b) => Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt)).slice(0, 10);
+    const lines = records.length ? records.map(record => `- \`${record.id.slice(0, 8)}\` **${record.kind}** · ${record.opponent} · **${record.status}**${record.score ? ` · ${record.score}` : ""}`).join("\n") : "No Paradise war or spar records yet.";
+    return interaction.reply({ content: lines, ephemeral: true });
+  }
+  if (sub === "create") {
+    const record = {
+      id: crypto.randomUUID(), guildId: interaction.guildId, kind: "war", status: "open",
+      opponent: interaction.options.getString("opponent").trim(), format: interaction.options.getString("format").trim(),
+      region: interaction.options.getString("region") || "EU", createdBy: interaction.user.id, createdAt: new Date().toISOString(), auditTrail: []
+    };
+    await saveState(state => {
+      state.wars[interaction.guildId] = state.wars[interaction.guildId] || {};
+      state.wars[interaction.guildId][record.id] = record;
+      return state;
+    });
+    await logParadiseAction(interaction.guild, "war_logs_channel", "war-logs", "War created",
+      `${interaction.user} created a war against **${record.opponent}** · ${record.format} · ${record.region}.`, { type: "war", metadata: { warId: record.id } });
+    return interaction.reply({ content: `War record created: \`${record.id.slice(0, 8)}\`. Use /war referee, /war score and /war result in order.`, ephemeral: true });
+  }
+  const id = interaction.options.getString("id");
+  const state = await loadState();
+  const current = findParadiseWar(state, interaction.guildId, id);
+  if (!current) return interaction.reply({ content: "Open war record not found.", ephemeral: true });
+  let action;
+  let payload = { actorId: interaction.user.id };
+  if (sub === "referee") {
+    const referee = await interaction.guild.members.fetch(interaction.options.getUser("user").id).catch(() => null);
+    if (!referee || !await canWorkReferee(referee)) return interaction.reply({ content: "Choose a configured referee role.", ephemeral: true });
+    action = "assign_referee"; payload.refereeId = referee.id;
+  } else if (sub === "score") {
+    action = "score"; payload.score = interaction.options.getString("score");
+  } else if (sub === "result") {
+    action = "result"; payload.winner = interaction.options.getString("winner"); payload.proof = interaction.options.getString("proof");
+  } else {
+    action = "cancel"; payload.reason = interaction.options.getString("reason");
+  }
+  let updated;
+  try { updated = transitionParadiseWar(current, { action, ...payload }); } catch (error) {
+    return interaction.reply({ content: `War update blocked: \`${error.code || "invalid_war_update"}\`.`, ephemeral: true });
+  }
+  await saveState(next => {
+    next.wars[interaction.guildId] = next.wars[interaction.guildId] || {};
+    next.wars[interaction.guildId][updated.id] = updated;
+    return next;
+  });
+  await logParadiseAction(interaction.guild, "war_logs_channel", "war-logs", "War updated",
+    `${interaction.user} used **/war ${sub}** on \`${updated.id.slice(0, 8)}\` · **${updated.status}**.`, { type: "war", metadata: { warId: updated.id, action: sub, status: updated.status } });
+  return interaction.reply({ content: `War \`${updated.id.slice(0, 8)}\` is now **${updated.status}**.`, ephemeral: true });
+}
+
 async function handleReferee(interaction) {
   if (interaction.options.getSubcommand() === "works") {
     const count = weekActivityCount((await loadState()).staffActivity[interaction.user.id], "referee");
@@ -9417,6 +9548,8 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "activity") { await handleActivity(interaction); return true; }
   if (interaction.commandName === "whitelist") { await handleWhitelist(interaction); return true; }
   if (interaction.commandName === "mainer") { await handleMainer(interaction); return true; }
+  if (interaction.commandName === "spar") { await handleSpar(interaction); return true; }
+  if (interaction.commandName === "war") { await handleWar(interaction); return true; }
   if (interaction.commandName === "report") { await handleStaffReport(interaction); return true; }
   if (interaction.commandName === "findfcw") { await handleFindFcw(interaction); return true; }
   if (interaction.commandName === "commandchannel") { await handleCommandChannel(interaction); return true; }
