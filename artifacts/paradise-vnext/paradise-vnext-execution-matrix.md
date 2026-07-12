@@ -1,18 +1,18 @@
 # Paradise vNext Execution Matrix
 
-Generated: 2026-07-12T08:54:17.888Z
+Generated: 2026-07-12T09:14:32.071Z
 
 This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON matrix is authoritative.
 
 ## Current status summary
 
 - Total accepted requirements: 47
-- SOURCE ONLY: 24
-- LOCAL VERIFIED: 22
+- SOURCE ONLY: 23
+- LOCAL VERIFIED: 23
 - DEPLOYED: 1
 - LIVE DISCORD VERIFIED: 1
 - DASHBOARD VERIFIED: 0
-- BLOCKED rows: 18
+- BLOCKED rows: 19
 - FAILED rows: 0
 
 | ID | Priority | Milestone | Source | Local | Deploy | Live Discord | Dashboard/Browser | Next action |
@@ -36,15 +36,15 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | TEST-001 | P0 | Milestone 1 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy current code only to the exact test guild, then record guard denial, restart and no-duplicate proof; do not rebuild the lab for artifact-only work. |
 | TPL-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild, install each compact template, verify channel type/count/mapping/role visibility, and capture no-duplicate repair proof before any production migration preview. |
 | NAMING-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deferred until compact template foundation and owner branding decision. |
-| LANG-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after component/config foundation. |
+| LANG-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Translate the remaining canonical guide bodies and add a complete TR/EN panel snapshot test; personal help no longer edits the public canonical message. |
 | PANEL-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until component and language foundations are complete. |
 | PROFILE-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; verify a duplicate Roblox identity denial, per-guild completion/privacy behavior and profile lookup by user/profile ID/Roblox name. |
 | PROFILE-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until verified profile storage exists. |
-| CHALLENGE-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after profile/database foundation. |
-| CHALLENGE-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until ticket and persisted leaderboard foundations exist. |
+| CHALLENGE-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to the exact test guild and verify Top 10/20/30 message IDs edit in place, with no raw IDs or default public notes. |
+| CHALLENGE-002 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Add co-referee/strike-reason fields and a dedicated approval audit envelope; the validated core result snapshot already prevents partial leaderboard/ticket/cooldown writes. |
 | SESSION-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; create Turkish and English training/tryout posts, press Lock/Unlock/End as authorized and unauthorized personas, then verify reply placement and no active-session footer. |
 | TICKET-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove Claim → Close → Reopen → Close → typed Delete and transcript-failure channel preservation with staff and member personas. |
-| TICKET-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer after ticket state machine. |
+| TICKET-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Template ticket categories and lifecycle naming are local; keep the dedicated cross-guild appeal bridge disabled until the owner explicitly chooses it, then add its isolated audit/visibility tests. |
 | VOICE-001 | P1 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; verify Join to Create, Community Voice and AFK are GuildVoice, then test move, control panel, empty cleanup and wrong-type repair preview. |
 | APP-001 | P2 | Milestone 2 | LOCAL VERIFIED | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Deploy only to isolated staging/the exact test guild; prove multi-step Continue/Cancel, duplicate denial, More Info follow-up, approval/role grant and website-to-review-queue delivery without testing against a production guild. |
 | RESELL-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until billing/legal owner decision. |
@@ -56,7 +56,7 @@ This file is a readable view of `paradise-vnext-execution-matrix.json`. The JSON
 | AI-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until AI provider/consent owner decision. |
 | AI-002 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until AI mode foundation. |
 | SEC-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until RBAC/log base is integrated. |
-| LOG-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Create shared safe audit/log event envelope after config versioning. |
+| LOG-001 | P1 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Wire the new redacted event envelope to per-guild viewer/retention configuration and scheduled retention cleanup; it now masks sensitive log text before local storage or Discord delivery. |
 | BLACKLIST-001 | P2 | Milestone 2 | LOCAL VERIFIED | SOURCE ONLY | SOURCE ONLY | LIVE DISCORD VERIFIED | SOURCE ONLY | Re-test after RBAC migration; preserve known behavior. |
 | WEB-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Defer until command registry and dashboard auth are reliable. |
 | BILLING-001 | P2 | Milestone 2 | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | SOURCE ONLY | Blocked pending owner legal/tax and product activation decision. |

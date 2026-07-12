@@ -392,6 +392,14 @@ test("ranked leaderboard keeps public notes opt-in and exposes audited edit/clea
   assert.match(source, /Type `CLEAR` exactly to confirm/);
 });
 
+test("Top 10/20/30 cards retain stored IDs and edit in place", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /rankedLeaderboardMessageIds/);
+  assert.match(source, /message\.edit\(\{ content: boardContent, embeds: cards\.slice\(0, 10\) \}\)/);
+  assert.match(source, /setTitle\(language === "tr" \? `✦ #\$\{rank\} — Boş`/);
+  assert.match(source, /Bağışıklık bitiyor: <t:\$\{stamp\}:R>/);
+});
+
 test("temporary voice names reject explicit and scam-like names", () => {
   assert.equal(sanitizeTemporaryVoiceName("Fieel's Arena", "Fieel's room"), "Fieel's Arena");
   assert.equal(sanitizeTemporaryVoiceName("PORNO room", "Fieel's room"), "Fieel's room");

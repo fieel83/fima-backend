@@ -1,21 +1,21 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-12T08:54:17.888Z",
+  "generatedAt": "2026-07-12T09:14:32.071Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "statusSummary": {
     "totalAcceptedRequirements": 47,
     "sourceStatus": {
-      "SOURCE ONLY": 24,
-      "LOCAL VERIFIED": 22,
+      "SOURCE ONLY": 23,
+      "LOCAL VERIFIED": 23,
       "DEPLOYED": 1,
       "LIVE VERIFIED": 0,
       "BLOCKED": 0,
       "FAILED": 0
     },
     "localTestStatus": {
-      "SOURCE ONLY": 25,
-      "LOCAL VERIFIED": 22,
+      "SOURCE ONLY": 24,
+      "LOCAL VERIFIED": 23,
       "BLOCKED": 0,
       "FAILED": 0
     },
@@ -54,6 +54,7 @@
       "TEST-001",
       "TPL-001",
       "PROFILE-001",
+      "CHALLENGE-001",
       "SESSION-001",
       "TICKET-001",
       "VOICE-001",
@@ -815,9 +816,12 @@
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
       "blocker": null,
-      "nextExactAction": "Defer after component/config foundation.",
+      "nextExactAction": "Translate the remaining canonical guide bodies and add a complete TR/EN panel snapshot test; personal help no longer edits the public canonical message.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -940,14 +944,17 @@
         "RBAC-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer after profile/database foundation.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging/test-guild runtime is available for stored-message edit proof.",
+      "nextExactAction": "Deploy only to the exact test guild and verify Top 10/20/30 message IDs edit in place, with no raw IDs or default public notes.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -977,9 +984,12 @@
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
       "blocker": null,
-      "nextExactAction": "Defer until ticket and persisted leaderboard foundations exist.",
+      "nextExactAction": "Add co-referee/strike-reason fields and a dedicated approval audit envelope; the validated core result snapshot already prevents partial leaderboard/ticket/cooldown writes.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1079,9 +1089,12 @@
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
       "blocker": null,
-      "nextExactAction": "Defer after ticket state machine.",
+      "nextExactAction": "Template ticket categories and lifecycle naming are local; keep the dedicated cross-guild appeal bridge disabled until the owner explicitly chooses it, then add its isolated audit/visibility tests.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1456,9 +1469,12 @@
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
       "blocker": null,
-      "nextExactAction": "Create shared safe audit/log event envelope after config versioning.",
+      "nextExactAction": "Wire the new redacted event envelope to per-guild viewer/retention configuration and scheduled retention cleanup; it now masks sensitive log text before local storage or Discord delivery.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
