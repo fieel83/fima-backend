@@ -489,9 +489,15 @@ function paradiseFooter(context = "", guildId = paradiseGuildContext.getStore())
   return { text: `${context ? `${context} • ` : ""}${footerBrand}` };
 }
 
-function guildLanguage(config = {}) {
-  const raw = String(config.language || config.locale || config.dashboardLanguage || "tr").toLowerCase();
+export function paradiseGuildContentLanguage(config = {}) {
+  // Guild content is a server choice.  A dashboard visitor's personal theme or
+  // language must never silently rewrite the canonical Discord panel locale.
+  const raw = String(config.language || config.locale || "tr").toLowerCase();
   return raw.startsWith("en") ? "en" : "tr";
+}
+
+function guildLanguage(config = {}) {
+  return paradiseGuildContentLanguage(config);
 }
 
 export function sessionLanguageCopy(language = "tr", type = "training") {
@@ -6822,7 +6828,7 @@ async function publishSetupGuides(guild, mode) {
   let message = storedMessageId ? await channel.messages.fetch(storedMessageId).catch(() => null) : null;
   const payload = memberHelpPayload(
     memberHelpEntries({ template: mode, enabledModules: null, roleKeys: [], plan: "free", isOwner: false }),
-    guild.preferredLocale || "tr"
+    guildLanguage(configForGuild(state, guild.id))
   );
   payload.embeds[0].setColor(await paradiseBrandColor());
   if (message) await message.edit(payload);
@@ -8440,7 +8446,10 @@ async function handleParadiseInteractionInner(interaction) {
       const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
       const payload = memberHelpPayload(entries, locale, selectedId === "overview" ? null : selectedId);
       payload.embeds[0].setColor(await paradiseBrandColor());
-      await interaction.update(payload);
+      // This control may live on the canonical public help panel.  A personal
+      // translation belongs to the clicker, not to everyone reading that
+      // channel, so never edit or repost the stored panel here.
+      await interaction.reply({ ...payload, ephemeral: true });
       return true;
     }
     if (String(interaction.customId || "").startsWith("pv:")) {
@@ -8567,7 +8576,9 @@ async function handleParadiseInteractionInner(interaction) {
     }
     const payload = memberHelpPayload(entries, interaction.locale, selectedId);
     payload.embeds[0].setColor(await paradiseBrandColor());
-    await interaction.update(payload);
+    // Command detail is role/personal-plan aware; keep the canonical panel
+    // unchanged and show it privately.
+    await interaction.reply({ ...payload, ephemeral: true });
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_staff_guide_category") {

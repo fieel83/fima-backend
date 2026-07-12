@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger,
+  normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -463,6 +463,16 @@ test("staff command guide is a single role-aware panel and language details are 
   assert.match(source, /visibleParadiseStaffCommands\(paradiseRegistryContextForInteraction/);
   assert.match(source, /interaction\.reply\(\{ \.\.\.staffGuidePayload\(language\), ephemeral: true \}\)/);
   assert.match(source, /definition\.key === "staff_command_guide"\s*\? staffGuidePayload/);
+});
+
+test("guild panel language stays separate from a visitor dashboard preference and public member help remains private", async () => {
+  assert.equal(paradiseGuildContentLanguage({ language: "tr", dashboardLanguage: "en" }), "tr");
+  assert.equal(paradiseGuildContentLanguage({ locale: "en", dashboardLanguage: "tr" }), "en");
+  assert.equal(paradiseGuildContentLanguage({ dashboardLanguage: "en" }), "tr");
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  const languageHandler = source.slice(source.indexOf('if (interaction.customId.startsWith("paradise_member_help_lang:"))'), source.indexOf('if (String(interaction.customId || "").startsWith("pv:"))'));
+  assert.match(languageHandler, /interaction\.reply\(\{ \.\.\.payload, ephemeral: true \}\)/);
+  assert.doesNotMatch(languageHandler, /interaction\.update\(payload\)/);
 });
 
 test("availability board separates timed entries and active tickets", () => {
