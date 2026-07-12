@@ -75,3 +75,20 @@ test("customer workspace patch rejects owner-only, unsafe and read-only settings
     value: { enabled: true }
   }), { code: "workspace_route_read_only" });
 });
+
+test("ticket and session route views return the same customer-safe settings their write routes persist", () => {
+  const ticketPatch = normalizeParadiseCustomerWorkspacePatch({
+    route: "tickets",
+    value: { enabled: true, autoTranscript: true, deleteDelayMinutes: 15 }
+  });
+  const sessionPatch = normalizeParadiseCustomerWorkspacePatch({
+    route: "sessions",
+    value: { trainingEnabled: true, tryoutEnabled: true, resultApprovalRequired: true }
+  });
+  const config = applyParadiseCustomerWorkspacePatch(
+    applyParadiseCustomerWorkspacePatch({}, ticketPatch),
+    sessionPatch
+  );
+  assert.equal(customerWorkspaceConfigView(config, "tickets").ticketSettings.deleteDelayMinutes, 15);
+  assert.equal(customerWorkspaceConfigView(config, "sessions").sessionSettings.tryoutEnabled, true);
+});
