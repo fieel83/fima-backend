@@ -92,6 +92,20 @@ test("customer workspace route remains guild-scoped and never reuses the owner c
   assert.match(serverSource, /buildParadiseCustomerWorkspaceView/);
 });
 
+test("customer workspace write is guild-scoped, CSRF-protected by the shared middleware and persists state/version/audit atomically", () => {
+  const route = serverSource.match(/app\.patch\("\/api\/paradise\/customer\/workspaces\/:guildId\/config"[\s\S]{0,4400}/)?.[0] || "";
+  assert.match(route, /requireUser/);
+  assert.doesNotMatch(route, /requireParadiseOwner/);
+  assert.match(route, /workspaceAccess\.cards\.find/);
+  assert.match(route, /guild_not_authorized/);
+  assert.match(route, /bot_invite_required/);
+  assert.match(route, /normalizeParadiseCustomerWorkspacePatch/);
+  assert.match(route, /createParadiseConfigVersion/);
+  assert.match(route, /prisma\.\$transaction/);
+  assert.match(route, /paradise_customer_workspace_saved/);
+  assert.match(serverSource, /requireCsrfForCookieMutations/);
+});
+
 test("Paradise dashboard is noindex and never renders a bot token", () => {
   assert.match(htmlSource, /noindex,nofollow,noarchive/);
   assert.doesNotMatch(htmlSource, /DISCORD_BOT_TOKEN|botToken|token\s*:/i);

@@ -38,7 +38,11 @@ import { adminPage, loginPage } from "./adminHtml.js";
 import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
-import { buildParadiseCustomerWorkspaceView } from "./paradiseDashboardWorkspace.js";
+import {
+  applyParadiseCustomerWorkspacePatch,
+  buildParadiseCustomerWorkspaceView,
+  normalizeParadiseCustomerWorkspacePatch
+} from "./paradiseDashboardWorkspace.js";
 import { normalizeParadiseFeatureFlags } from "./paradiseFeatureFlags.js";
 import { buildParadiseReconciliation, summarizeParadiseReconciliation } from "./paradiseReconciliation.js";
 import { adminRbacSummary } from "./adminRbac.js";
@@ -792,6 +796,76 @@ app.get("/api/paradise/customer/workspaces/:guildId", requireUser, async (req, r
   } catch (error) {
     console.error("Paradise customer workspace read failed", publicError(error));
     return res.status(503).json({ success: false, error: error.code || "paradise_workspace_unavailable" });
+  }
+});
+
+// Customer writes use the same state/version/audit transaction as the owner
+// console, but only after Discord OAuth proves the current user can manage the
+// selected guild. The normalizer rejects owner-only, billing and provider data.
+app.patch("/api/paradise/customer/workspaces/:guildId/config", requireUser, async (req, res) => {
+  try {
+    const origin = String(req.get("origin") || "");
+    if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ success: false, error: "origin_mismatch" });
+    const guildId = String(req.params.guildId || "");
+    const workspaceAccess = await paradiseCustomerWorkspaceAccess(req.user);
+    if (!workspaceAccess.ready) return res.status(409).json({ success: false, error: workspaceAccess.code });
+    const card = workspaceAccess.cards.find(item => item.guildId === guildId);
+    if (!card) return res.status(403).json({ success: false, error: "guild_not_authorized" });
+    if (!card.botInstalled) return res.status(409).json({ success: false, error: "bot_invite_required" });
+
+    const normalized = normalizeParadiseCustomerWorkspacePatch({ route: req.body?.route, value: req.body?.value });
+    const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+    const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
+    state.guildConfigs = state.guildConfigs && typeof state.guildConfigs === "object" ? state.guildConfigs : {};
+    const previous = structuredClone(state.guildConfigs[guildId] || {});
+    const next = applyParadiseCustomerWorkspacePatch(previous, normalized);
+    state.guildConfigs[guildId] = next;
+    const correlationId = crypto.randomUUID();
+    const configVersion = createParadiseConfigVersion({
+      guildId,
+      previous,
+      next,
+      actorId: req.user.id,
+      source: "paradise_customer_dashboard"
+    });
+
+    await prisma.$transaction(async tx => {
+      await tx.setting.upsert({
+        where: { key: "paradise_3a59_state_v1" },
+        update: { value: state },
+        create: { key: "paradise_3a59_state_v1", value: state }
+      });
+      await tx.setting.create({
+        data: { key: `paradise_config_version_${guildId}_${configVersion.versionId}`, value: configVersion }
+      });
+      await tx.auditLog.create({
+        data: {
+          action: "paradise_customer_workspace_saved",
+          targetType: "discord_guild",
+          targetId: guildId,
+          metadata: {
+            actorUserId: req.user.id,
+            route: normalized.route,
+            correlationId,
+            configVersionId: configVersion.versionId,
+            schemaVersion: configVersion.schemaVersion,
+            changedPaths: configVersion.diff.map(item => item.path)
+          }
+        }
+      });
+    });
+
+    const workspace = buildParadiseCustomerWorkspaceView({ card, config: next, route: normalized.route });
+    return res.json({
+      success: true,
+      correlationId,
+      workspace,
+      configVersion: summarizeParadiseConfigVersion(configVersion)
+    });
+  } catch (error) {
+    const status = error.code?.startsWith("invalid_") || error.code === "workspace_route_read_only" ? 400 : 503;
+    if (status >= 500) console.error("Paradise customer workspace write failed", publicError(error));
+    return res.status(status).json({ success: false, error: error.code || "paradise_workspace_save_failed" });
   }
 });
 

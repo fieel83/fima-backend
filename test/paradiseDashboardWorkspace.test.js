@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyParadiseCustomerWorkspacePatch,
   buildParadiseCustomerWorkspaceView,
   customerWorkspaceConfigView,
+  normalizeParadiseCustomerWorkspacePatch,
   normalizeParadiseWorkspaceRoute,
   PARADISE_CUSTOMER_WORKSPACE_ROUTES
 } from "../src/paradiseDashboardWorkspace.js";
@@ -38,4 +40,38 @@ test("customer workspace route selection is allowlisted and uninstalled guilds e
   assert.equal(view.inviteRequired, true);
   assert.deepEqual(view.config, {});
   assert.ok(PARADISE_CUSTOMER_WORKSPACE_ROUTES.length >= 20);
+});
+
+test("customer workspace patch is route-scoped, validates Discord mappings and increments a local config version", () => {
+  const normalized = normalizeParadiseCustomerWorkspacePatch({
+    route: "channels",
+    value: { channelMappings: { support_ticket_channel: "123456789012345678" } }
+  });
+  const next = applyParadiseCustomerWorkspacePatch({ customerWorkspaceVersion: 3 }, normalized);
+  assert.equal(normalized.route, "channels");
+  assert.equal(next.channelMappings.support_ticket_channel, "123456789012345678");
+  assert.equal(next.customerWorkspaceVersion, 4);
+  assert.throws(() => normalizeParadiseCustomerWorkspacePatch({
+    route: "channels",
+    value: { channelMappings: { provider_token: "123456789012345678" } }
+  }), { code: "invalid_channel_mappings" });
+  assert.throws(() => normalizeParadiseCustomerWorkspacePatch({
+    route: "roles",
+    value: { roleMappings: { moderator: "not-a-discord-id" } }
+  }), { code: "invalid_role_mappings" });
+});
+
+test("customer workspace patch rejects owner-only, unsafe and read-only settings", () => {
+  assert.throws(() => normalizeParadiseCustomerWorkspacePatch({
+    route: "modules",
+    value: { modules: { tickets: true, owner: true } }
+  }), { code: "invalid_workspace_modules" });
+  assert.throws(() => normalizeParadiseCustomerWorkspacePatch({
+    route: "branding",
+    value: { brandColor: "not-a-color" }
+  }), { code: "invalid_brand_color" });
+  assert.throws(() => normalizeParadiseCustomerWorkspacePatch({
+    route: "audit",
+    value: { enabled: true }
+  }), { code: "workspace_route_read_only" });
 });
