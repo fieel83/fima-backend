@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ChannelType } from "discord.js";
 import {
-  applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, recordParadiseLeaderboardAudit,
@@ -67,6 +67,19 @@ test("leaderboard manual audit is guild-scoped and bounded", () => {
   assert.equal(state.leaderboardHistory["guild-a"].length, 1);
   assert.equal(state.leaderboardHistory["guild-a"][0].metadata.rank, 8);
   assert.equal(state.leaderboardHistory["guild-b"][0].action, "clear");
+});
+
+test("Paradise log envelopes classify events and redact private credential material", () => {
+  const event = buildParadiseSafeLogEvent({
+    guildId: "guild", type: "payment_license", title: "License check", correlationId: "case-1",
+    description: "person@example.test FIMA-ABCD-EFGH-IJKL mfa.abcdefghijklmnopqrstuv https://discord.com/api/webhooks/123/secret",
+    metadata: { customerEmail: "person@example.test", hwid: "device-123456789", allowed: true }
+  });
+  assert.equal(event.type, "payment_license");
+  assert.equal(event.correlationId, "case-1");
+  assert.doesNotMatch(`${event.description} ${JSON.stringify(event.metadata)}`, /person@example\.test|FIMA-ABCD|mfa\.abcdefghijklmnopqrstuv|webhooks\/123|device-123456789/);
+  assert.equal(event.metadata.masked, "[masked]");
+  assert.equal(event.metadata.allowed, true);
 });
 
 test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {

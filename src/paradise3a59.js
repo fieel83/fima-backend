@@ -397,7 +397,7 @@ const EMPTY_STATE = Object.freeze({
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
-  applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}
+  applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}, paradiseLogs: {}
 });
 let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_PARADISE_FOOTER_BRAND } });
 
@@ -7830,12 +7830,89 @@ function normalizeLineupEntries(entries = []) {
     .filter(entry => entry?.userId);
 }
 
-async function logParadiseAction(guild, mappingKey, fallbackName, title, description) {
+export const PARADISE_LOG_EVENT_TYPES = Object.freeze([
+  "message", "member", "role", "channel", "webhook", "invite", "voice", "moderation", "ticket", "transcript",
+  "application", "payment_license", "profile_transfer", "leaderboard_challenge", "ai", "security", "setup", "dashboard", "premium_billing"
+]);
+
+export function redactParadiseLogValue(value) {
+  if (typeof value === "string") {
+    return maskParadiseTranscriptText(value)
+      .replace(/https?:\/\/(?:canary\.)?discord(?:app)?\.com\/api\/webhooks\/[^\s)]+/gi, "[masked-webhook]");
+  }
+  if (Array.isArray(value)) return value.slice(0, 25).map(redactParadiseLogValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).slice(0, 30).map(([key, item]) => [
+      String(key).replace(/(?:secret|token|password|cookie|license.?key|hwid|webhook|authorization)/i, "masked"),
+      /(?:secret|token|password|cookie|license.?key|hwid|webhook|authorization)/i.test(key) ? "[masked]" : redactParadiseLogValue(item)
+    ]));
+  }
+  return value == null || ["number", "boolean"].includes(typeof value) ? value : String(value).slice(0, 120);
+}
+
+function paradiseLogTypeForMapping(mappingKey = "") {
+  const key = String(mappingKey).toLowerCase();
+  if (key.includes("transcript")) return "transcript";
+  if (key.includes("ticket") || key.includes("support")) return "ticket";
+  if (key.includes("application")) return "application";
+  if (key.includes("payment") || key.includes("license")) return "payment_license";
+  if (key.includes("moderation") || key.includes("mod_")) return "moderation";
+  if (key.includes("blacklist") || key.includes("quarantine") || key.includes("security")) return "security";
+  if (key.includes("voice")) return "voice";
+  if (key.includes("roster") || key.includes("war") || key.includes("challenge")) return "leaderboard_challenge";
+  return "setup";
+}
+
+export function buildParadiseSafeLogEvent({
+  guildId,
+  type = "setup",
+  title = "Paradise event",
+  description = "",
+  metadata = {},
+  correlationId = crypto.randomUUID(),
+  retentionDays = 180,
+  viewerScope = "staff",
+  createdAt = new Date().toISOString()
+} = {}) {
+  const safeType = PARADISE_LOG_EVENT_TYPES.includes(type) ? type : "setup";
+  return Object.freeze({
+    id: crypto.randomUUID(),
+    guildId: String(guildId || ""),
+    type: safeType,
+    title: redactParadiseLogValue(String(title || "Paradise event")).slice(0, 256),
+    description: redactParadiseLogValue(String(description || "")).slice(0, 1800),
+    metadata: redactParadiseLogValue(metadata),
+    correlationId: String(correlationId || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96),
+    retentionDays: Math.max(1, Math.min(3650, Number(retentionDays) || 180)),
+    viewerScope: ["staff", "managers", "owners"].includes(viewerScope) ? viewerScope : "staff",
+    createdAt: new Date(createdAt).toISOString()
+  });
+}
+
+async function logParadiseAction(guild, mappingKey, fallbackName, title, description, options = {}) {
+  const event = buildParadiseSafeLogEvent({
+    guildId: guild?.id,
+    type: options.type || paradiseLogTypeForMapping(mappingKey),
+    title,
+    description,
+    metadata: options.metadata || {},
+    correlationId: options.correlationId,
+    retentionDays: options.retentionDays,
+    viewerScope: options.viewerScope
+  });
+  if (guild?.id) {
+    await saveState(next => {
+      const previous = Array.isArray(next.paradiseLogs?.[guild.id]) ? next.paradiseLogs[guild.id].slice(-199) : [];
+      next.paradiseLogs[guild.id] = [...previous, event];
+      return next;
+    });
+  }
   const channel = await configuredChannel(guild, mappingKey, fallbackName);
   if (!channel?.isTextBased?.()) return null;
   return channel.send({
-    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(title)
-      .setDescription(description).setFooter(paradiseFooter("Private operations log")).setTimestamp()]
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(event.title)
+      .setDescription(event.description || "—")
+      .setFooter(paradiseFooter(`Private ${event.type} log · ${event.correlationId.slice(0, 8)}`)).setTimestamp()]
   }).catch(() => null);
 }
 
