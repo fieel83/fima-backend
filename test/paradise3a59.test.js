@@ -356,6 +356,14 @@ test("canonical handbooks are pinned and operational guides do not receive the g
   assert.doesNotMatch(source, /\*\*SERVER LOCKED\*\*, \*\*UNLOCK\*\*, \*\*END\*\*/);
 });
 
+test("staff command guide is a single role-aware panel and language details are ephemeral", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /setCustomId\("paradise_staff_guide_category"\)/);
+  assert.match(source, /visibleParadiseStaffCommands\(paradiseRegistryContextForInteraction/);
+  assert.match(source, /interaction\.reply\(\{ \.\.\.staffGuidePayload\(language\), ephemeral: true \}\)/);
+  assert.match(source, /definition\.key === "staff_command_guide"\s*\? staffGuidePayload/);
+});
+
 test("availability board separates timed entries and active tickets", () => {
   const state = {
     leaderboard: {

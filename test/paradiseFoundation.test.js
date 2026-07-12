@@ -4,7 +4,7 @@ import { buildParadiseConfigRollbackPreview, canRollbackParadiseConfig, createPa
 import { assertParadiseFeatureEnabled, normalizeParadiseFeatureFlags, resolveParadiseFeatureFlag } from "../src/paradiseFeatureFlags.js";
 import { assertParadiseGuildWorkspaceAccess, paradiseGuildWorkspaceAccess } from "../src/paradiseGuildScope.js";
 import { PARADISE_PERMISSIONS, assertParadisePermission, hasParadisePermission, paradiseRoleKeysForMember } from "../src/paradiseRbac.js";
-import { paradiseCommandAccess, paradiseCommandChannelContext, paradiseCommandRegistrationAllowed, visibleParadiseCommands } from "../src/paradiseCommandRegistry.js";
+import { paradiseCommandAccess, paradiseCommandChannelContext, paradiseCommandRegistrationAllowed, visibleParadiseCommands, visibleParadiseStaffCommands } from "../src/paradiseCommandRegistry.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "../src/paradiseComponentProtocol.js";
 import { PARADISE_TEST_GUILD_ID } from "../src/runtimeEnvironment.js";
 
@@ -78,6 +78,27 @@ test("central command registry filters help and runtime access by template, modu
   assert.equal(paradiseCommandAccess({ command: "challenge", subcommand: "create", template: "community", enabledModules: ["challenge"] }).code, "command_not_available_for_template");
   assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], channelKey: "training_channel" }).allowed, true);
   assert.equal(paradiseCommandAccess({ command: "challenge", subcommand: "close", template: "tsbtr", enabledModules: ["challenge"], roleKeys: ["Trial Referee"], channelKey: "challenge_ticket" }).code, "command_permission_denied");
+});
+
+test("private staff guide filtering never promotes commands outside the viewer's RBAC", () => {
+  const modules = ["training", "tryout", "challenge", "referee", "moderation", "applications", "fima_support"];
+  const training = visibleParadiseStaffCommands({ template: "clan", enabledModules: modules, roleKeys: ["Training Hoster"], plan: "free" });
+  assert.equal(training.some(item => item.command === "training"), true);
+  assert.equal(training.some(item => item.command === "tryout"), false);
+  assert.equal(training.some(item => item.command === "challenge"), false);
+  assert.equal(training.some(item => item.command === "mod"), false);
+  const tryout = visibleParadiseStaffCommands({ template: "clan", enabledModules: modules, roleKeys: ["Tryout Hoster"], plan: "free" });
+  assert.equal(tryout.some(item => item.command === "tryout"), true);
+  assert.equal(tryout.some(item => item.command === "training"), false);
+  assert.equal(tryout.some(item => item.command === "challenge"), false);
+  const referee = visibleParadiseStaffCommands({ template: "tsbtr", enabledModules: modules, roleKeys: ["Trial Referee"], plan: "free" });
+  assert.equal(referee.some(item => item.command === "challenge" && item.subcommand === "result"), true);
+  assert.equal(referee.some(item => item.command === "challenge" && item.subcommand === "close"), false);
+  const moderator = visibleParadiseStaffCommands({ template: "community", enabledModules: modules, roleKeys: ["Moderator"], plan: "free" });
+  assert.equal(moderator.some(item => item.command === "mod" && item.subcommand === "warn"), true);
+  assert.equal(moderator.some(item => item.command === "fima_license_check"), false);
+  const support = visibleParadiseStaffCommands({ template: "community", enabledModules: modules, roleKeys: ["Fima Support"], plan: "free" });
+  assert.equal(support.some(item => item.command === "fima_license_check"), true);
 });
 
 test("registry controls guild command scope, channel mappings and plan denial without hiding legacy commands", () => {

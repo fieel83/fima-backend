@@ -17,7 +17,8 @@ import {
   paradiseCommandAccess,
   paradiseCommandChannelContext,
   paradiseCommandRegistrationAllowed,
-  visibleParadiseCommands
+  visibleParadiseCommands,
+  visibleParadiseStaffCommands
 } from "./paradiseCommandRegistry.js";
 import { resolveParadiseFeatureFlag } from "./paradiseFeatureFlags.js";
 import {
@@ -6285,6 +6286,62 @@ function memberHelpPayload(entries, locale = "en", selectedId = null) {
   };
 }
 
+const STAFF_GUIDE_CATEGORIES = Object.freeze([
+  ["training", "Training"], ["tryout", "Tryout"], ["referee", "Referee / Challenge"],
+  ["moderation", "Moderation / Security"], ["support", "Support / License"], ["setup", "Setup / Owner"]
+]);
+
+function staffGuideCategory(entry) {
+  const command = String(entry?.command || "");
+  if (["training", "paradisetraining"].includes(command)) return "training";
+  if (command === "tryout") return "tryout";
+  if (["challenge", "referee", "availability"].includes(command)) return "referee";
+  if (["mod", "modcase", "moderation", "security", "blacklist", "appeal", "bail"].includes(command)) return "moderation";
+  if (command.startsWith("fima_") || ["application"].includes(command)) return "support";
+  return "setup";
+}
+
+function staffGuidePayload(language = "tr") {
+  const tr = language !== "en";
+  return {
+    embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR)
+      .setTitle(tr ? "◆ PERSONEL KOMUT REHBERİ" : "◆ STAFF COMMAND GUIDE")
+      .setDescription(tr
+        ? "Rolüne uygun komutları seçmek için aşağıdaki kategoriyi kullan. Ayrıntılar yalnız sana özel görünür; görünmeyen komutlar için yetkin yoktur."
+        : "Choose a category to see only commands your current role can use. Details are private to you; unavailable commands are not authorized.")],
+    components: [
+      new ActionRowBuilder().addComponents(new StringSelectMenuBuilder()
+        .setCustomId("paradise_staff_guide_category")
+        .setPlaceholder(tr ? "Yetkili komut kategorisi seç" : "Select a staff command category")
+        .addOptions(STAFF_GUIDE_CATEGORIES.map(([value, label]) => ({ value, label })))),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("paradise_staff_guide_lang:tr").setLabel("Türkçe").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("paradise_staff_guide_lang:en").setLabel("English").setStyle(ButtonStyle.Secondary)
+      )
+    ]
+  };
+}
+
+function staffGuideDetailPayload(entries, category, locale = "tr") {
+  const tr = String(locale || "").toLowerCase().startsWith("tr");
+  const categoryLabel = STAFF_GUIDE_CATEGORIES.find(([key]) => key === category)?.[1] || category;
+  const visible = entries.filter(entry => staffGuideCategory(entry) === category);
+  const lines = visible.length
+    ? visible.map(entry => [
+      `## ${registryCommandLabel(entry)}`,
+      entry.description,
+      `**${tr ? "Gerekli Paradise yetkisi" : "Required Paradise permission"}:** ${entry.requiredParadisePermission || (tr ? "Yapılandırılmış staff yetkisi" : "Configured staff permission")}`,
+      entry.examples?.[0] ? `**${tr ? "Örnek" : "Example"}:** \`${entry.examples[0]}\`` : null,
+      `**${tr ? "Kayıt" : "Audit"}:** ${entry.auditEvent || (tr ? "Yok" : "None")}`
+    ].filter(Boolean).join("\n")).join("\n\n")
+    : tr ? "Bu kategoride rolüne açık bir komut yok." : "Your current role has no available command in this category.";
+  return {
+    embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR)
+      .setTitle(`${tr ? "◆ YETKİLİ REHBERİ" : "◆ STAFF GUIDE"} — ${categoryLabel}`)
+      .setDescription(lines.slice(0, 4096))]
+  };
+}
+
 async function handleRegistryHelp(interaction) {
   const state = await loadState();
   const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
@@ -6617,10 +6674,17 @@ async function publishGuidePost(guild, definition) {
   const state = await loadState();
   const oldId = configForGuild(state, guild.id).guideMessageIds?.[definition.key];
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(definition.title)
-    .setDescription(definition.body.slice(0, 4096)).setTimestamp();
-  if (GUIDE_FOOTER_KEYS.has(definition.key)) embed.setFooter(paradiseFooter("TR / EN handbook"));
-  const payload = { embeds: [embed] };
+  const language = guildLanguage(configForGuild(state, guild.id));
+  const color = await paradiseBrandColor();
+  const payload = definition.key === "staff_command_guide"
+    ? staffGuidePayload(language)
+    : (() => {
+      const embed = new EmbedBuilder().setColor(color).setTitle(definition.title)
+        .setDescription(definition.body.slice(0, 4096)).setTimestamp();
+      if (GUIDE_FOOTER_KEYS.has(definition.key)) embed.setFooter(paradiseFooter("TR / EN handbook"));
+      return { embeds: [embed] };
+    })();
+  payload.embeds[0].setColor(color);
   if (message) await message.edit(payload); else message = await channel.send(payload);
   await message.pin?.("Paradise canonical channel handbook").catch(() => null);
   await saveState(next => {
@@ -7931,6 +7995,11 @@ async function handleParadiseInteractionInner(interaction) {
     return true;
   }
   if (interaction.isButton?.()) {
+    if (interaction.customId.startsWith("paradise_staff_guide_lang:")) {
+      const language = interaction.customId.split(":")[1] === "en" ? "en" : "tr";
+      await interaction.reply({ ...staffGuidePayload(language), ephemeral: true });
+      return true;
+    }
     if (interaction.customId.startsWith("paradise_member_help_lang:")) {
       const [, locale, selectedId] = interaction.customId.split(":");
       const state = await loadState();
@@ -8065,6 +8134,12 @@ async function handleParadiseInteractionInner(interaction) {
     const payload = memberHelpPayload(entries, interaction.locale, selectedId);
     payload.embeds[0].setColor(await paradiseBrandColor());
     await interaction.update(payload);
+    return true;
+  }
+  if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_staff_guide_category") {
+    const state = await loadState();
+    const entries = visibleParadiseStaffCommands(paradiseRegistryContextForInteraction(interaction, state));
+    await interaction.reply({ ...staffGuideDetailPayload(entries, interaction.values[0], interaction.locale), ephemeral: true });
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId.startsWith("paradise_help_category")) {

@@ -30,6 +30,9 @@ export const PARADISE_COMMAND_REGISTRY = Object.freeze([
   entry("CMD-TRYOUT-START", "tryout", { subcommand: "start", description: "Posts an active tryout announcement.", templateScope: ["clan", "tsbtr"], requiredModule: "tryout", requiredParadisePermission: PARADISE_PERMISSIONS.TRYOUT_HOST, allowedChannels: ["tryout_channel"], examples: ["/tryout start link:<private-server-link>"], auditEvent: "tryout_started", relatedGuideMessage: "tryout-hoster-guide" }),
   entry("CMD-TRYOUT-RESULT", "tryout", { subcommand: "result", description: "Submits an authorized tryout result.", templateScope: ["clan", "tsbtr"], requiredModule: "tryout", requiredParadisePermission: PARADISE_PERMISSIONS.TRYOUT_HOST, allowedChannels: ["tryout_results_channel"], examples: ["/tryout result user:@player stage:2 level:High strength:Strong"], auditEvent: "tryout_result_submitted", relatedGuideMessage: "tryout-hoster-guide" }),
   entry("CMD-REFEREE-GUIDE", "referee", { description: "Shows referee operations permitted by the selected template.", templateScope: ["clan", "tsbtr"], requiredModule: "referee", requiredParadisePermission: PARADISE_PERMISSIONS.REFEREE_WORK, examples: ["/referee works"], relatedGuideMessage: "referee-guide" }),
+  entry("CMD-MOD-WARN", "mod", { subcommand: "warn", description: "Records a proportionate staff warning.", requiredModule: "moderation", requiredParadisePermission: PARADISE_PERMISSIONS.MODERATE, examples: ["/mod warn user:@member reason:spam"], auditEvent: "moderation_warned", relatedGuideMessage: "mod-command-guide" }),
+  entry("CMD-MOD-MUTE", "mod", { subcommand: "mute", description: "Applies a configured timeout with an audit record.", requiredModule: "moderation", requiredParadisePermission: PARADISE_PERMISSIONS.MODERATE, examples: ["/mod mute user:@member preset:spam reason:repeat spam"], auditEvent: "moderation_timed_out", relatedGuideMessage: "mod-command-guide" }),
+  entry("CMD-APPLICATION-REVIEW", "application", { subcommand: "panel", description: "Posts or refreshes the configured application entry panel.", requiredModule: "applications", requiredParadisePermission: PARADISE_PERMISSIONS.APPLICATION_REVIEW, examples: ["/application panel"], auditEvent: "application_panel_updated", relatedGuideMessage: "application-guide" }),
   entry("CMD-LEADERBOARD-ADD", "leaderboard", { subcommand: "add", description: "Adds a profile to a leaderboard position.", templateScope: ["clan", "tsbtr"], requiredModule: "leaderboard", requiredParadisePermission: PARADISE_PERMISSIONS.PROFILE_MANAGE, examples: ["/leaderboard add user:@player rank:25"], auditEvent: "leaderboard_added", relatedDashboardPage: "leaderboard", relatedGuideMessage: "leaderboard-guide" }),
   entry("CMD-LINEUP-ADD", "lineup", { subcommand: "add", description: "Adds a member to a configured lineup board.", templateScope: ["clan"], requiredModule: "lineups", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/lineup add board:main user:@player"], auditEvent: "lineup_updated", relatedDashboardPage: "roster" }),
   entry("CMD-ROSTER", "roster", { description: "Manages the competitive roster board.", templateScope: ["clan"], requiredModule: "roster", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/roster panel"], auditEvent: "roster_updated", relatedDashboardPage: "roster" }),
@@ -111,4 +114,11 @@ export function paradiseCommandAccess({ command, subcommand = null, template, en
 
 export function visibleParadiseCommands(context = {}) {
   return PARADISE_COMMAND_REGISTRY.filter(item => paradiseCommandAccess({ ...context, command: item.command, subcommand: item.subcommand }).allowed);
+}
+
+// Public /help is intentionally member-safe only.  The private staff guide
+// consumes this separate view so hiding a command in Discord UI is never the
+// authorization boundary; paradiseCommandAccess still runs at interaction time.
+export function visibleParadiseStaffCommands(context = {}) {
+  return visibleParadiseCommands({ ...context, channelConstraintConfigured: false }).filter(item => !item.memberSafe);
 }
