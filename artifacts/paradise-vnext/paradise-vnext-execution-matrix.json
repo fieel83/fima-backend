@@ -1,21 +1,21 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-12T09:14:32.071Z",
+  "generatedAt": "2026-07-12T09:46:42.062Z",
   "progressRule": "This is the only progress source of truth. Previous artifacts are evidence only and do not override a matrix row without re-verification.",
   "selectionRule": "Before work, select the oldest incomplete unblocked dependency in Milestone 1; update the same row and avoid duplicate status artifacts.",
   "statusSummary": {
     "totalAcceptedRequirements": 47,
     "sourceStatus": {
-      "SOURCE ONLY": 23,
-      "LOCAL VERIFIED": 23,
+      "SOURCE ONLY": 17,
+      "LOCAL VERIFIED": 29,
       "DEPLOYED": 1,
       "LIVE VERIFIED": 0,
       "BLOCKED": 0,
       "FAILED": 0
     },
     "localTestStatus": {
-      "SOURCE ONLY": 24,
-      "LOCAL VERIFIED": 23,
+      "SOURCE ONLY": 18,
+      "LOCAL VERIFIED": 29,
       "BLOCKED": 0,
       "FAILED": 0
     },
@@ -42,6 +42,7 @@
     "blockedRows": [
       "LIC-001",
       "ENV-002",
+      "AUTH-002",
       "FLAG-001",
       "DB-001",
       "DB-002",
@@ -53,12 +54,17 @@
       "DASH-001",
       "TEST-001",
       "TPL-001",
+      "LANG-001",
+      "PANEL-001",
       "PROFILE-001",
       "CHALLENGE-001",
+      "CHALLENGE-002",
       "SESSION-001",
       "TICKET-001",
       "VOICE-001",
-      "APP-001"
+      "APP-001",
+      "SEC-001",
+      "LOG-001"
     ]
   },
   "rows": [
@@ -226,14 +232,20 @@
         "ENV-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Design after the shared guild authorization foundation is established.",
+      "evidencePath": [
+        "src/server.js",
+        "src/csrf.js",
+        "src/adminAuth.js",
+        "test/oauthStateSafety.test.js",
+        "test/paradise-dashboard.test.js"
+      ],
+      "blocker": "No owner-controlled browser session exists for real OAuth callback/session proof.",
+      "nextExactAction": "Run a real authorized browser OAuth callback in staging, then verify single-use state rejection, CSRF retry, session revocation and guild-scope denial without retaining provider tokens in browser artifacts.",
       "affectedFiles": [
         "src/server.js",
         "src/csrf.js",
@@ -811,8 +823,8 @@
         "COMP-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
@@ -820,8 +832,8 @@
         "src/paradise3a59.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Translate the remaining canonical guide bodies and add a complete TR/EN panel snapshot test; personal help no longer edits the public canonical message.",
+      "blocker": "No isolated staging/test-guild runtime is available for canonical message-ID edit proof.",
+      "nextExactAction": "Deploy only to the exact test guild, switch the guild language, and verify each stored guide/panel edits in place while personal help remains ephemeral.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -845,14 +857,17 @@
         "TPL-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until component and language foundations are complete.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging/test-guild runtime is available for message deletion/repair and pin proof.",
+      "nextExactAction": "Deploy only to the exact test guild, delete one canonical handbook, run repair, then verify the replacement is pinned and no duplicate remains.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -979,8 +994,8 @@
         "OPS-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
@@ -988,8 +1003,8 @@
         "src/paradise3a59.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Add co-referee/strike-reason fields and a dedicated approval audit envelope; the validated core result snapshot already prevents partial leaderboard/ticket/cooldown writes.",
+      "blocker": "No isolated staging/test-guild runtime is available for a real referee-persona and result-post proof.",
+      "nextExactAction": "Deploy only to the exact test guild and verify Referee/Trial Referee/Experienced Referee approval boundaries, co-ref display, transcript and edit-in-place result update.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1255,9 +1270,12 @@
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "test/paradise3a59.test.js"
+      ],
       "blocker": null,
-      "nextExactAction": "Defer until persisted board foundation.",
+      "nextExactAction": "Main/War lineup, roster, relations and the canonical pinned mainer notice are local. Implement the remaining safe War/Spar ticket/result state with audit before this combined requirement can be LOCAL VERIFIED.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1433,14 +1451,18 @@
         "FLAG-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
-      "evidencePath": [],
-      "blocker": null,
-      "nextExactAction": "Defer until RBAC/log base is integrated.",
+      "evidencePath": [
+        "src/paradise3a59.js",
+        "src/paradiseCommandRegistry.js",
+        "test/paradise3a59.test.js"
+      ],
+      "blocker": "No isolated staging/test-guild runtime is available for Discord permission, AutoMod and quarantine proof.",
+      "nextExactAction": "Deploy only to the exact test guild and verify member/moderator/senior personas for invite blocking, risky attachment quarantine, case review, purge bounds and channel lock/hide without any automatic ban.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
@@ -1464,17 +1486,18 @@
         "CFG-001"
       ],
       "ownerDecision": null,
-      "sourceStatus": "SOURCE ONLY",
-      "localTestStatus": "SOURCE ONLY",
+      "sourceStatus": "LOCAL VERIFIED",
+      "localTestStatus": "LOCAL VERIFIED",
       "deployStatus": "SOURCE ONLY",
       "liveDiscordStatus": "SOURCE ONLY",
       "dashboardBrowserStatus": "SOURCE ONLY",
       "evidencePath": [
         "src/paradise3a59.js",
+        "src/paradiseDashboardWorkspace.js",
         "test/paradise3a59.test.js"
       ],
-      "blocker": null,
-      "nextExactAction": "Wire the new redacted event envelope to per-guild viewer/retention configuration and scheduled retention cleanup; it now masks sensitive log text before local storage or Discord delivery.",
+      "blocker": "No isolated staging/test-guild runtime is available to prove private channel overwrites and scheduled cleanup against real Discord logs.",
+      "nextExactAction": "Deploy only to the exact test guild, verify a sensitive ticket/payment-style log is redacted, manager/owner visibility is enforced and expired local log metadata is removed without deleting transcript records.",
       "affectedFiles": [],
       "affectedDatabaseTables": [],
       "affectedDiscordObjects": [],
