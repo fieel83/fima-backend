@@ -391,7 +391,7 @@ const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-ba
 const STATE_KEY = "paradise_3a59_state_v1";
 const EMPTY_STATE = Object.freeze({
   profiles: {}, verificationChallenges: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
-  tournaments: {}, leaderboard: {}, leaderboards: {}, staffActivity: {}, activityChecks: {},
+  tournaments: {}, leaderboard: {}, leaderboards: {}, leaderboardHistory: {}, staffActivity: {}, activityChecks: {},
   whitelists: {}, giveaways: {}, rsvps: {}, relations: {}, loa: {},
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
@@ -436,6 +436,25 @@ function ensureLeaderboardForGuild(state, guildId) {
   state.leaderboards[guildId] = state.leaderboards[guildId]
     || (guildId === PARADISE_TEST_GUILD_ID ? structuredClone(state.leaderboard || {}) : {});
   return state.leaderboards[guildId];
+}
+
+export function recordParadiseLeaderboardAudit(state, {
+  guildId,
+  action,
+  actorId,
+  metadata = {},
+  now = new Date().toISOString()
+} = {}) {
+  if (!state || !guildId || !action) return state;
+  state.leaderboardHistory = state.leaderboardHistory || {};
+  const previous = Array.isArray(state.leaderboardHistory[guildId]) ? state.leaderboardHistory[guildId].slice(-99) : [];
+  state.leaderboardHistory[guildId] = [...previous, {
+    action: String(action).slice(0, 48),
+    actorId: String(actorId || "system").slice(0, 32),
+    at: new Date(now).toISOString(),
+    metadata: structuredClone(metadata && typeof metadata === "object" ? metadata : {})
+  }];
+  return state;
 }
 
 async function loadState() {
@@ -1465,12 +1484,18 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("move").setDescription("Move a fighter to an empty position")
         .addUserOption(o => o.setName("user").setDescription("Fighter").setRequired(true))
         .addIntegerOption(o => o.setName("rank").setDescription("New position").setRequired(true).setMinValue(1).setMaxValue(100)))
+      .addSubcommand(s => s.setName("edit").setDescription("Edit a fighter's leaderboard position")
+        .addUserOption(o => o.setName("user").setDescription("Fighter").setRequired(true))
+        .addIntegerOption(o => o.setName("rank").setDescription("New position").setRequired(true).setMinValue(1).setMaxValue(100)))
       .addSubcommand(s => s.setName("swap").setDescription("Swap two fighters")
         .addUserOption(o => o.setName("user1").setDescription("First fighter").setRequired(true))
         .addUserOption(o => o.setName("user2").setDescription("Second fighter").setRequired(true)))
       .addSubcommand(s => s.setName("repost").setDescription("Update Top 10/20/30 boards in place"))
       .addSubcommand(s => s.setName("panel").setDescription("Post or update Top 10/20/30 boards"))
       .addSubcommand(s => s.setName("export").setDescription("Export ranked leaderboard JSON privately"))
+      .addSubcommand(s => s.setName("history").setDescription("Show recent private leaderboard audit entries"))
+      .addSubcommand(s => s.setName("clear").setDescription("Clear ranked leaderboard after typed confirmation")
+        .addStringOption(o => o.setName("confirm").setDescription("Type CLEAR to confirm").setRequired(true).setMaxLength(8)))
       .addSubcommand(s => s.setName("import").setDescription("Import ranked leaderboard JSON")
         .addStringOption(o => o.setName("json").setDescription("Array of {userId,rank}").setRequired(true).setMaxLength(4000))),
     (() => {
@@ -6029,6 +6054,7 @@ async function updateRankedLeaderboardBoards(guild) {
   const state = await loadState();
   const guildConfig = configForGuild(state, guild.id);
   const language = guildLanguage(guildConfig);
+  const showPublicNotes = guildConfig.leaderboard?.showPublicNotes === true;
   const color = await paradiseBrandColor();
   const leaderboard = leaderboardForGuild(state, guild.id);
   const topSize = Math.min(100, Math.max(2, Number(guildConfig.challenge?.topSize) || 30));
@@ -6077,7 +6103,9 @@ async function updateRankedLeaderboardBoards(guild) {
       const region = compactText(profile?.region || row.region || (language === "tr" ? "Ayarlanmadı" : "Not set"), 60);
       const wins = Number(row.wins || 0);
       const losses = Number(row.losses || 0);
-      const shortNote = compactText(row.publicNote || row.shortNote || row.boardNote || "", 80);
+      // Notes/feats are staff or profile detail by default.  A guild can opt
+      // into a compact public note, but a board never leaks it accidentally.
+      const shortNote = showPublicNotes ? compactText(row.publicNote || row.shortNote || row.boardNote || "", 80) : "";
       const description = language === "tr"
         ? [
           `◆ ${member ? `${member}` : `<@${userId}>`}`,
@@ -6163,6 +6191,31 @@ async function handleLeaderboardCommand(interaction) {
       .filter(row => Number.isInteger(Number(row.rank))).sort((a, b) => a.rank - b.rank);
     return interaction.reply({ content: `\`\`\`json\n${JSON.stringify(rows, null, 2).slice(0, 3800)}\n\`\`\``, ephemeral: true });
   }
+  if (sub === "history") {
+    const rows = (state.leaderboardHistory?.[interaction.guildId] || []).slice(-12).reverse();
+    const text = rows.length
+      ? rows.map(item => `- **${item.action}** · <t:${Math.floor(Date.parse(item.at) / 1000)}:R> · <@${item.actorId}>`).join("\n")
+      : "No ranked leaderboard audit entries are stored yet.";
+    return interaction.reply({ content: text, ephemeral: true });
+  }
+  if (sub === "clear") {
+    if (String(interaction.options.getString("confirm") || "").trim().toUpperCase() !== "CLEAR") {
+      return interaction.reply({ content: "Leaderboard was not changed. Type `CLEAR` exactly to confirm.", ephemeral: true });
+    }
+    await saveState(next => {
+      next.leaderboards[interaction.guildId] = {};
+      recordParadiseLeaderboardAudit(next, {
+        guildId: interaction.guildId,
+        action: "clear",
+        actorId: interaction.user.id,
+        metadata: { previousCount: Object.keys(leaderboard).length }
+      });
+      return next;
+    });
+    const posted = await updateRankedLeaderboardBoards(interaction.guild);
+    await logParadiseAction(interaction.guild, "roster_logs_channel", "roster-logs", "Ranked leaderboard cleared", "A manager cleared the ranked leaderboard after typed confirmation.", { safe: true }).catch(() => null);
+    return interaction.reply({ content: `Ranked leaderboard cleared and **${posted.length}** board(s) refreshed.`, ephemeral: true });
+  }
   if (sub === "import") {
     let rows;
     try { rows = JSON.parse(interaction.options.getString("json")); } catch { rows = null; }
@@ -6174,6 +6227,12 @@ async function handleLeaderboardCommand(interaction) {
     await saveState(next => {
       const target = ensureLeaderboardForGuild(next, interaction.guildId);
       for (const row of rows) target[String(row.userId)] = { ...(target[String(row.userId)] || {}), spot: Number(row.rank) };
+      recordParadiseLeaderboardAudit(next, {
+        guildId: interaction.guildId,
+        action: "import",
+        actorId: interaction.user.id,
+        metadata: { count: rows.length }
+      });
       return next;
     });
   } else if (sub === "swap") {
@@ -6183,12 +6242,27 @@ async function handleLeaderboardCommand(interaction) {
     await saveState(next => {
       const target = ensureLeaderboardForGuild(next, interaction.guildId);
       [target[user1.id].spot, target[user2.id].spot] = [target[user2.id].spot, target[user1.id].spot];
+      recordParadiseLeaderboardAudit(next, {
+        guildId: interaction.guildId,
+        action: "swap",
+        actorId: interaction.user.id,
+        metadata: { user1Id: user1.id, user2Id: user2.id }
+      });
       return next;
     });
   } else {
     const user = interaction.options.getUser("user");
     if (sub === "remove") {
-      await saveState(next => { delete ensureLeaderboardForGuild(next, interaction.guildId)[user.id]; return next; });
+      await saveState(next => {
+        delete ensureLeaderboardForGuild(next, interaction.guildId)[user.id];
+        recordParadiseLeaderboardAudit(next, {
+          guildId: interaction.guildId,
+          action: "remove",
+          actorId: interaction.user.id,
+          metadata: { userId: user.id }
+        });
+        return next;
+      });
     } else {
       const rank = interaction.options.getInteger("rank");
       const occupied = Object.entries(leaderboard).find(([id, row]) => id !== user.id && Number(row.spot) === rank);
@@ -6196,6 +6270,12 @@ async function handleLeaderboardCommand(interaction) {
       await saveState(next => {
         const target = ensureLeaderboardForGuild(next, interaction.guildId);
         target[user.id] = { ...(target[user.id] || {}), spot: rank, updatedAt: new Date().toISOString(), updatedBy: interaction.user.id };
+        recordParadiseLeaderboardAudit(next, {
+          guildId: interaction.guildId,
+          action: sub === "edit" ? "edit" : sub,
+          actorId: interaction.user.id,
+          metadata: { userId: user.id, rank }
+        });
         return next;
       });
     }

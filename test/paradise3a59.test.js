@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage,
+  normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -58,6 +58,15 @@ test("challenge result rejects a closed or mismatched ticket without changing st
     code: "challenge_ticket_not_open"
   });
   assert.equal(input.pendingChallenges.submission.status, "pending");
+});
+
+test("leaderboard manual audit is guild-scoped and bounded", () => {
+  const state = { leaderboardHistory: {} };
+  recordParadiseLeaderboardAudit(state, { guildId: "guild-a", action: "move", actorId: "staff-a", metadata: { userId: "user", rank: 8 }, now: "2026-07-12T12:00:00.000Z" });
+  recordParadiseLeaderboardAudit(state, { guildId: "guild-b", action: "clear", actorId: "staff-b", metadata: { previousCount: 3 }, now: "2026-07-12T12:01:00.000Z" });
+  assert.equal(state.leaderboardHistory["guild-a"].length, 1);
+  assert.equal(state.leaderboardHistory["guild-a"][0].metadata.rank, 8);
+  assert.equal(state.leaderboardHistory["guild-b"][0].action, "clear");
 });
 
 test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {
@@ -357,6 +366,17 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.deepEqual(commands.find(command => command.name === "training").options.map(option => option.name), ["setup", "create", "start", "result"]);
   assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "kick-request"));
   assert.ok(commands.find(command => command.name === "mod").options.some(option => option.name === "ban-request"));
+});
+
+test("ranked leaderboard keeps public notes opt-in and exposes audited edit/clear/history operations", async () => {
+  const command = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "leaderboard");
+  for (const required of ["add", "edit", "move", "swap", "remove", "clear", "repost", "import", "export", "history"]) {
+    assert.ok(command.options.some(option => option.name === required), `missing /leaderboard ${required}`);
+  }
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /const showPublicNotes = guildConfig\.leaderboard\?\.showPublicNotes === true/);
+  assert.match(source, /recordParadiseLeaderboardAudit\(next/);
+  assert.match(source, /Type `CLEAR` exactly to confirm/);
 });
 
 test("temporary voice names reject explicit and scam-like names", () => {
