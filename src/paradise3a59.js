@@ -7292,6 +7292,114 @@ const GUIDE_POSTS = Object.freeze([
   }
 ]);
 
+// Canonical guide messages are not a word-for-word machine translation.  The
+// Turkish copy is intentionally compact for Discord/mobile, while the source
+// definitions remain the English canonical counterpart.
+export const PARADISE_GUIDE_TR_COPY = Object.freeze({
+  rules: {
+    title: "✦ PARADISE KURALLARI",
+    body: "# Herkese açık ve saygılı kal\n- Spam, toxic davranış, hakaret, scam ve hesap paylaşımı yasaktır.\n- Cookie, şifre, token, tam lisans anahtarı veya özel hesap verisi istemeyin/paylaşmayın.\n- Staff kararına itirazın varsa public tartışma yerine destek ticketı aç.\n\n## Kısa yol\nRollerini seç, kuralları oku ve yardıma ihtiyacın varsa destek panelini kullan."
+  },
+  challenge_rules: {
+    title: "✦ CHALLENGE KURALLARI",
+    body: "# Challenge açmadan önce\n- İki oyuncunun da doğrulanmış profili olmalı.\n- Cooldown, immunity, LOA ve açık ticket kontrol edilir.\n- Hedef rank, sunucunun izin verdiği aralıkta olmalı.\n\n## Maç sırasında\n- Referee tarafsız kalır; skor ve kanıt ticketa girilir.\n- Sonuç onaylanmadan leaderboard değişmez."
+  },
+  referee_guide: {
+    title: "✦ REFEREE REHBERİ",
+    body: "# Referee görevi\nTarafsız ol, ticket başlığındaki oyuncu/rank bilgilerini kontrol et ve maç boyunca kanıtı koru.\n\n## Sonuç akışı\n1. Ticketın açık olduğunu doğrula.\n2. `/challenge post` veya `/challenge autowin` kullan.\n3. Skoru yalnız `10-5` ya da `Auto` formatında yaz.\n4. Gerekirse co-ref ve not ekle.\n5. Yetkili onayını bekle."
+  },
+  referee_rules: {
+    title: "✦ REFEREE KURALLARI",
+    body: "# Temel sınırlar\n- Trial Referee skor onaylayamaz.\n- Normal Referee yalnız ayarda izin varsa onay verir.\n- Experienced Referee / Referee Manager kendi yetki sınırında işlem yapar.\n- Top rank maçlarında kayıt, ticket ve kanıt zorunludur.\n\nTaraf tutma, kanıtsız auto-win ve gizli skor değişikliği yasaktır."
+  },
+  referee_post_quick: {
+    title: "✦ /POST HIZLI REHBERİ",
+    body: "# Doğru post\n`/challenge post winner:@kazanan loser:@kaybeden score:10-5`\n\n- Oyuncular mevcut ticketın iki tarafı olmalı.\n- `to @oyuncu` yazma; final metni bot tarafından oluşturulur.\n- Auto/strike durumunda sebebi not olarak ekle.\n- Sonuç onay bekler; hemen rank verme."
+  },
+  referee_works: {
+    title: "✦ REFEREE AKTİVİTESİ",
+    body: "# Aktivite nasıl sayılır?\nOnaylanan maç sonucu referee aktivitesine eklenir. Haftalık kota, LOA ve whitelist durumuyla birlikte değerlendirilir.\n\nEksik aktivite otomatik ceza değildir; önce manager incelemesi ve gerekirse uyarı/öneri oluşturulur."
+  },
+  training_rules: {
+    title: "✦ TRAINING HOSTER REHBERİ",
+    body: "# Training başlat\n`/training start link:<roblox-link>` ile temiz Markdown duyurusu aç.\n\n## Oturum\n- Takımları dengeli kur ve sırayı koru.\n- Kilitle/Aç/Bitir kontrollerini yalnız yetkili hoster kullanır.\n- Sonuçta skor, kazanan taraf, MVP ve kanıtı kaydet.\n- Aktif duyurunun altında marka footerı kullanma."
+  },
+  tryout_rules: {
+    title: "✦ TRYOUT HOSTER REHBERİ",
+    body: "# Oyuncuyu bütün olarak değerlendir\nRC timing, catch, dash tepkisi, hareket, baskı, adaptasyon ve game sense birlikte değerlendirilir; yalnız kazanmak yeterli değildir.\n\n## Sonuç\nStage → Level → Strength sırasını kullan. Kendi yetki tavanının üstünde rank veremezsin; manager onayı bekleyen sonucu manuel rol ile verme."
+  },
+  role_guide: {
+    title: "✦ ROL VE YETKİ REHBERİ",
+    body: "# Roller\nDil, ping, bölge ve ilgili topluluk rolleri `roller` kanalından seçilir. Aynı butona tekrar basmak rolü kaldırır.\n\n## Yetki\nStaff yetkileri yazıdan değil, bot RBAC ve Discord hiyerarşisinden uygulanır. Trial roller yüksek etkili onaylara erişemez."
+  },
+  faq_trust: {
+    title: "✦ GÜVENLİK VE GÜVEN",
+    body: "# Paradise / Fima güvenliği\n- Bot veya Fima asla cookie, şifre, token ya da Roblox parolası istemez.\n- Dosyaları yalnız resmi bağlantılardan indir.\n- Şüpheli linkleri açma; destek ticketı ile bildir.\n- Ekran görüntüsü tek başına ödeme veya hesap sahipliği kanıtı değildir."
+  },
+  mainer_guide: {
+    title: "✦ MAINER REHBERİ",
+    body: "# Main clan bilgisi\nGüncel kod ve bölge sadece canonical mainer mesajından alınır. Kod değişirse aynı mesaj yerinde güncellenir.\n\n- Kanıtı `mainer-kanıt` kanalına gönder.\n- `/mainclan code:<kod> region:<bölge>` formatını kullan.\n- Hesap bilgisi, cookie veya şifre paylaşma."
+  },
+  availability_guide: {
+    title: "✦ MÜSAİTLİK REHBERİ",
+    body: "# Panel neyi gösterir?\n- **Cooldown:** oyuncu challenge başlatamaz.\n- **Immunity:** oyuncuya challenge atılamaz.\n- **Meydan okunuyor:** açık ticket ikinci maçı engeller.\n- **LOA:** aktiflik durumunu ayrıca belirtir.\n\nSüreler herkese kendi saatine göre görünen Discord zaman damgalarıdır."
+  },
+  loa_guide: {
+    title: "✦ LOA REHBERİ",
+    body: "# İzin / LOA\n`/loa request` ile süre ve kısa sebep gir. Manager onayından sonra durum aktif olur.\n\nLOA, challenge cooldown veya immunity ile aynı şey değildir. Süre dolunca sistem durumu otomatik olarak günceller."
+  },
+  profile_guide: {
+    title: "✦ PROFİL VE ROBLOX DOĞRULAMA",
+    body: "# Güvenli doğrulama\n1. `/profile create` çalıştır.\n2. Kısa kodu Roblox About alanına koy.\n3. Süresi dolmadan doğrula.\n4. Bölge/gizlilik ayarını profilden düzenle.\n\nParadise Roblox şifresi, cookie veya token istemez. Aynı Roblox hesabı ikinci aktif profile bağlanamaz."
+  },
+  application_guide: {
+    title: "✦ BAŞVURU REHBERİ",
+    body: "# Ekibe katıl\n`/application apply` ile doğru pozisyonu seç ve soruları dürüstçe yanıtla.\n\n- Aynı anda bir aktif başvuru tutulur.\n- İstenen ek bilgi aynı başvuruya eklenir; yeni kayıt açılmaz.\n- Onay, red veya ek-bilgi sonucu özel olarak bildirilir.\n- Rol yalnız hiyerarşi uygunsa verilir."
+  },
+  mod_command_guide: {
+    title: "✦ MODERASYON REHBERİ",
+    body: "# Orantılı işlem\n- İlk düşük etkili ihlalde uyarı ve kanıtla başla.\n- Spam/disrupt için sınırlı timeout kullan.\n- Kick/ban talebi ayar açıksa üst yetkili onayına gider.\n- Scam/raid durumunda önce quarantine veya lockdown değerlendirilir.\n\nHer işlem case ve güvenli log kaydı oluşturur."
+  },
+  training_hoster_guide: {
+    title: "✦ TRAINING HOSTER KOMUTLARI",
+    body: "# Başlat\n`/training start link:<roblox-link>`\n\n# Bitir\n`/training result score:3-1 winner:<taraf> mvps:<üyeler> proof:<url>`\n\nOturum bitince bot orijinal duyuruya yanıt verir, kontrolleri kapatır ve aktiviteyi kaydeder. Varsayılan kota haftada iki trainingdir; LOA/whitelist incelemeyi duraklatır."
+  },
+  tryout_hoster_guide: {
+    title: "✦ TRYOUT HOSTER KOMUTLARI",
+    body: "# Başlat\n`/tryout start link:<roblox-link>`\n\n# Sonuç\n`/tryout result user:@oyuncu stage:2 level:High strength:Strong`\n\nBot profil doğrulamasını, minimum rankı ve hoster yetki tavanını kontrol eder. Sonucu manuel rol vererek atlama; manager onayı gerekiyorsa bekle."
+  },
+  giveaway_event_guide: {
+    title: "✦ ETKİNLİK VE ÇEKİLİŞ REHBERİ",
+    body: "# Çekiliş\n`/giveaway create` ile ödül, süre, kazanan sayısı ve gereksinimleri tanımla. Reroll geçmişi loglanır.\n\n# Etkinlik / Game Night\nBaşlık, saat, ping rolü ve görsel önizlemeyi net gir. Teslim edemeyeceğin ödülü duyurma; şüpheli alt hesapları review kuyruğuna bırak."
+  },
+  hoster_rules: {
+    title: "✦ HOSTER KURALLARI",
+    body: "# Beklenti\nDuyuruları bot komutlarıyla aç, sırayı ve katılımcıları düzenli tut, kanıt/sonuç bilgisini doğru gir. Sorunda üst staffa haber ver.\n\nToxic davranış, yarım bırakılan oturum veya kanıtsız sonuç hoster yetkisinin incelenmesine neden olur."
+  },
+  dashboard_guide: {
+    title: "✦ DASHBOARD REHBERİ",
+    body: "# Güvenli ayar sırası\n1. Yönetilen sunucuyu seç.\n2. Template seç veya mevcut templatei incele.\n3. Kanal/rol eşlemelerini kontrol et.\n4. Önizleme yap, kaydet ve gerekirse yerinde repost et.\n5. Rebuild yalnız yedek, preview ve yazılı owner onayıyla kullanılabilir."
+  },
+  moderation_policy: {
+    title: "✦ MODERASYON VE QUARANTINE POLİTİKASI",
+    body: "# Güvenli sıra\n1. Bağlamı ve kanıtı koru.\n2. Hafif ihlalde orantılı uyarı ver.\n3. Spam için makul timeout kullan.\n4. Şüpheli link/hesabı review için quarantine et.\n5. Ağır işlemde üst onay akışını kullan.\n\nİlk ihlalde otomatik ban yoktur; yanlış işlem incelenebilir olmalıdır."
+  },
+  ticket_guide: {
+    title: "✦ TICKET VE TRANSCRIPT REHBERİ",
+    body: "# Doğru kategori\nDestek, ödeme/lisans, başvuru, challenge, report ve itirazlar kendi güvenli akışını kullanır.\n\n## Yaşam döngüsü\n- Staff ticketı üstlenir ve kapatır.\n- Kapatma transcript kaydetmeden başarılı olmaz.\n- Kapalı ticketta yalnız yeniden açma veya güvenli silme görünür.\n- Silme transcript + log sonrası olur; hata varsa kanal korunur."
+  },
+  report_guide: {
+    title: "✦ REPORT REHBERİ",
+    body: "# Report açarken\nOlay özeti, tarih/kanal, ilgili kişi ve güvenli kanıtı ekle. İntikam veya sahte report yasaktır.\n\nStaff-only notlar üyeye görünmez. Düşük yetkili staff kick/ban talebi açabilir; üst onay olmadan uygulanmaz. Acil scam/raid durumunda kişisel veriyi public kanala yazma."
+  }
+});
+
+export function localizeParadiseGuide(definition, language = "tr") {
+  if (language === "en") return definition;
+  const localized = PARADISE_GUIDE_TR_COPY[definition?.key];
+  return localized ? { ...definition, ...localized } : definition;
+}
+
 const GUIDE_MAPPING_KEYS = Object.freeze({
   rules: "rules_channel",
   challenge_rules: "challenge_rules_channel",
@@ -7334,12 +7442,13 @@ async function publishGuidePost(guild, definition) {
   const oldId = configForGuild(state, guild.id).guideMessageIds?.[definition.key];
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
   const language = guildLanguage(configForGuild(state, guild.id));
+  const localizedDefinition = localizeParadiseGuide(definition, language);
   const color = await paradiseBrandColor();
   const payload = definition.key === "staff_command_guide"
     ? staffGuidePayload(language)
     : (() => {
-      const embed = new EmbedBuilder().setColor(color).setTitle(definition.title)
-        .setDescription(definition.body.slice(0, 4096)).setTimestamp();
+      const embed = new EmbedBuilder().setColor(color).setTitle(localizedDefinition.title)
+        .setDescription(localizedDefinition.body.slice(0, 4096)).setTimestamp();
       if (GUIDE_FOOTER_KEYS.has(definition.key)) embed.setFooter(paradiseFooter("TR / EN handbook"));
       return { embeds: [embed] };
     })();

@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, recordParadiseLeaderboardAudit,
+  localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, PARADISE_GUIDE_TR_COPY, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -529,6 +529,21 @@ test("guild panel language stays separate from a visitor dashboard preference an
   const languageHandler = source.slice(source.indexOf('if (interaction.customId.startsWith("paradise_member_help_lang:"))'), source.indexOf('if (String(interaction.customId || "").startsWith("pv:"))'));
   assert.match(languageHandler, /interaction\.reply\(\{ \.\.\.payload, ephemeral: true \}\)/);
   assert.doesNotMatch(languageHandler, /interaction\.update\(payload\)/);
+});
+
+test("canonical guide text has Turkish copy for every non-dynamic handbook", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  const guideSection = source.slice(source.indexOf("const GUIDE_POSTS"), source.indexOf("const GUIDE_MAPPING_KEYS"));
+  const guideKeys = [...guideSection.matchAll(/key: "([a-z_]+)"/g)].map(match => match[1]);
+  const expected = guideKeys.filter(key => key !== "staff_command_guide");
+  for (const key of expected) {
+    assert.ok(PARADISE_GUIDE_TR_COPY[key], `missing Turkish copy for ${key}`);
+    const localized = localizeParadiseGuide({ key, title: "English", body: "English body" }, "tr");
+    assert.notEqual(localized.title, "English");
+    assert.notEqual(localized.body, "English body");
+  }
+  const english = localizeParadiseGuide({ key: "rules", title: "English", body: "English body" }, "en");
+  assert.equal(english.title, "English");
 });
 
 test("availability board separates timed entries and active tickets", () => {
