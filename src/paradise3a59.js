@@ -1456,7 +1456,31 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("approve").setDescription("Senior: approve a pending kick/ban request")
         .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true)))
       .addSubcommand(s => s.setName("deny").setDescription("Senior: deny a pending kick/ban request")
-        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true))),
+        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true)))
+      .addSubcommand(s => s.setName("purge").setDescription("Delete a bounded number of recent messages")
+        .addIntegerOption(o => o.setName("amount").setDescription("Messages to delete (1-100)").setRequired(true).setMinValue(1).setMaxValue(100)))
+      .addSubcommand(s => s.setName("slowmode").setDescription("Set this channel's slowmode")
+        .addIntegerOption(o => o.setName("seconds").setDescription("Seconds; 0 disables slowmode").setRequired(true).setMinValue(0).setMaxValue(21600)))
+      .addSubcommand(s => s.setName("nick-reset").setDescription("Restore a member's Discord nickname")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Audit reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("timeout-remove").setDescription("End a member's active timeout")
+        .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Review reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("warn-remove").setDescription("Senior: revoke a recorded warning")
+        .addStringOption(o => o.setName("id").setDescription("Warning case ID").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Review reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("case-edit").setDescription("Senior: correct the safe reason on a case")
+        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Corrected reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("case-revoke").setDescription("Senior: revoke a case without deleting its audit history")
+        .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Review reason").setRequired(true).setMaxLength(500))),
+    new SlashCommandBuilder().setName("channel").setDescription("Paradise safe channel operations")
+      .addSubcommand(s => s.setName("lock").setDescription("Lock this channel for @everyone"))
+      .addSubcommand(s => s.setName("unlock").setDescription("Unlock this channel for @everyone"))
+      .addSubcommand(s => s.setName("hide").setDescription("Hide this channel from @everyone"))
+      .addSubcommand(s => s.setName("unhide").setDescription("Show this channel to @everyone")),
     new SlashCommandBuilder().setName("modcase").setDescription("Review Paradise moderation case history")
       .addSubcommand(s => s.setName("user").setDescription("Show recent cases for a member")
         .addUserOption(o => o.setName("user").setDescription("Moderated member").setRequired(true)))
@@ -5600,6 +5624,38 @@ async function recordModerationCase(interaction, action, target, reason, extra =
   return record;
 }
 
+async function updateModerationCaseByPrefix(interaction, idOrPrefix, mutate) {
+  let updated = null;
+  await saveState(state => {
+    const cases = state.moderationCases?.[interaction.guildId] || {};
+    const [id, record] = Object.entries(cases).find(([key]) => key.startsWith(String(idOrPrefix || "").trim())) || [];
+    if (!record) return state;
+    updated = { ...record, ...mutate(record), updatedBy: interaction.user.id, updatedAt: new Date().toISOString() };
+    state.moderationCases[interaction.guildId][id] = updated;
+    return state;
+  });
+  return updated;
+}
+
+async function handleChannelCommand(interaction) {
+  if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+  const everyone = interaction.guild.roles.everyone;
+  const overwrite = sub === "lock" ? { SendMessages: false }
+    : sub === "unlock" ? { SendMessages: null }
+      : sub === "hide" ? { ViewChannel: false }
+        : { ViewChannel: null };
+  try {
+    await interaction.channel.permissionOverwrites.edit(everyone, overwrite, { reason: `Paradise channel ${sub} by ${interaction.user.id}` });
+  } catch {
+    return interaction.reply({ content: "Paradise could not update this channel. Check the bot's Manage Channels permission and role position.", ephemeral: true });
+  }
+  await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Channel operation",
+    `${interaction.user} used **/channel ${sub}** in ${interaction.channel}.`, { type: "moderation", metadata: { operation: sub, channelId: interaction.channelId } });
+  const label = { lock: "locked", unlock: "unlocked", hide: "hidden", unhide: "visible" }[sub] || "updated";
+  return interaction.reply({ content: `This channel is now **${label}**.`, ephemeral: true });
+}
+
 async function handleModCommand(interaction) {
   if (!canModerate(interaction.member)) return interaction.reply({ content: "Moderation authority required.", ephemeral: true });
   const sub = interaction.options.getSubcommand();
@@ -5636,6 +5692,40 @@ async function handleModCommand(interaction) {
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Channel lockdown", `${interaction.user} set ${interaction.channel} lockdown to **${enabled}**.`);
     return interaction.reply({ content: `This channel is now **${enabled ? "locked" : "unlocked"}**.`, ephemeral: true });
   }
+  if (sub === "purge") {
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return interaction.reply({ content: "Manage Messages permission required for purge.", ephemeral: true });
+    const amount = interaction.options.getInteger("amount");
+    const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
+    if (!deleted) return interaction.reply({ content: "Paradise could not purge these messages. Discord only permits recent bulk deletions.", ephemeral: true });
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Messages purged",
+      `${interaction.user} purged **${deleted.size}** recent message(s) in ${interaction.channel}.`, { type: "moderation", metadata: { count: deleted.size, channelId: interaction.channelId } });
+    return interaction.reply({ content: `Purged **${deleted.size}** recent message(s).`, ephemeral: true });
+  }
+  if (sub === "slowmode") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+    const seconds = interaction.options.getInteger("seconds");
+    try { await interaction.channel.setRateLimitPerUser(seconds, `Paradise slowmode by ${interaction.user.id}`); } catch {
+      return interaction.reply({ content: "Paradise could not change slowmode. Check the bot's Manage Channels permission.", ephemeral: true });
+    }
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Slowmode changed",
+      `${interaction.user} set ${interaction.channel} slowmode to **${seconds} seconds**.`, { type: "moderation", metadata: { seconds, channelId: interaction.channelId } });
+    return interaction.reply({ content: seconds ? `Slowmode set to **${seconds} seconds**.` : "Slowmode disabled.", ephemeral: true });
+  }
+  if (sub === "warn-remove" || sub === "case-edit" || sub === "case-revoke") {
+    if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
+    const id = interaction.options.getString("id");
+    const reason = interaction.options.getString("reason");
+    const record = await updateModerationCaseByPrefix(interaction, id, current => {
+      if (sub === "warn-remove" && current.action !== "warn") return {};
+      if (sub === "case-edit") return { reason, correctionReason: reason, correctedAt: new Date().toISOString() };
+      return { status: "revoked", revokeReason: reason, revokedAt: new Date().toISOString() };
+    });
+    if (!record || (sub === "warn-remove" && record.action !== "warn")) return interaction.reply({ content: sub === "warn-remove" ? "Active warning case not found." : "Case not found.", ephemeral: true });
+    if (sub === "warn-remove") await updateModerationCaseByPrefix(interaction, id, () => ({ status: "revoked", revokeReason: reason, revokedAt: new Date().toISOString() }));
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Moderation case updated",
+      `${interaction.user} used **/mod ${sub}** on case \`${record.id.slice(0, 8)}\`.`, { type: "moderation", metadata: { action: sub, caseId: record.id } });
+    return interaction.reply({ content: `Case \`${record.id.slice(0, 8)}\` updated safely; its audit history remains preserved.`, ephemeral: true });
+  }
   const user = interaction.options.getUser("user");
   const target = user ? await interaction.guild.members.fetch(user.id).catch(() => null) : null;
   if (!moderationTargetAllowed(interaction.member, target)) return interaction.reply({ content: "Target is invalid or above your role hierarchy.", ephemeral: true });
@@ -5666,6 +5756,20 @@ async function handleModCommand(interaction) {
     }
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Timeout applied", `${target} timed out for **${minutes} minutes** by ${interaction.user}.\n**Reason:** ${reason}`);
     return interaction.reply({ content: `Timeout applied · case \`${record.id.slice(0, 8)}\`${warning ? ` · automatic warning \`${warning.id.slice(0, 8)}\`` : ""}.`, ephemeral: true });
+  }
+  if (sub === "timeout-remove") {
+    if (!target.moderatable) return interaction.reply({ content: "Paradise cannot change this member's timeout because of Discord role hierarchy.", ephemeral: true });
+    await target.timeout(null, reason);
+    const record = await recordModerationCase(interaction, "timeout_removed", target, reason);
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Timeout removed", `${target} timeout removed by ${interaction.user}.`, { type: "moderation", metadata: { caseId: record.id } });
+    return interaction.reply({ content: `Timeout removed · case \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
+  }
+  if (sub === "nick-reset") {
+    if (!target.manageable) return interaction.reply({ content: "Paradise cannot reset this nickname because of Discord role hierarchy.", ephemeral: true });
+    await target.setNickname(null, reason);
+    const record = await recordModerationCase(interaction, "nickname_reset", target, reason);
+    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Nickname reset", `${target} nickname reset by ${interaction.user}.`, { type: "moderation", metadata: { caseId: record.id } });
+    return interaction.reply({ content: `Nickname reset · case \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
   }
   if (sub === "quarantine" || sub === "unquarantine") {
     const role = await ensureRole(interaction.guild, "Muted / Quarantined");
@@ -9270,6 +9374,7 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "answer") { await handleQotdSlashAnswer(interaction); return true; }
   if (interaction.commandName === "application") { await handleApplicationCommand(interaction); return true; }
   if (interaction.commandName === "mod") { await handleModCommand(interaction); return true; }
+  if (interaction.commandName === "channel") { await handleChannelCommand(interaction); return true; }
   if (interaction.commandName === "modcase") { await handleModCaseCommand(interaction); return true; }
   if (interaction.commandName === "moderation") { await handleModerationStatsCommand(interaction); return true; }
   if (interaction.commandName === "security") { await handleSecurityCommand(interaction); return true; }

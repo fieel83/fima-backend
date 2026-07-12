@@ -120,6 +120,20 @@ test("invite, scam and unsafe attachment policy does not let trusted roles bypas
   }).blocked, false);
 });
 
+test("daily moderation utilities are bounded, audited and routed through the moderation handlers", async () => {
+  const mod = paradiseCommands().map(command => command.toJSON()).find(command => command.name === "mod");
+  const names = mod.options.map(option => option.name);
+  for (const name of ["purge", "slowmode", "nick-reset", "timeout-remove", "warn-remove", "case-edit", "case-revoke"]) assert.ok(names.includes(name), `missing /mod ${name}`);
+  const channel = paradiseCommands().map(command => command.toJSON()).find(command => command.name === "channel");
+  assert.deepEqual(channel.options.map(option => option.name), ["lock", "unlock", "hide", "unhide"]);
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /async function handleChannelCommand/);
+  assert.match(source, /if \(sub === "purge"\)/);
+  assert.match(source, /Manage Messages permission required for purge/);
+  assert.match(source, /Moderation case updated/);
+  assert.match(source, /if \(interaction\.commandName === "channel"\)/);
+});
+
 test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /paradiseRoleKeysForMember/);
