@@ -9,7 +9,7 @@ import {
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, transitionParadiseWar, tryoutAnnouncementMarkdown,
-  timedAvailabilityLines
+  timedAvailabilityLines, paradiseXpPolicy
 } from "../src/paradise3a59.js";
 
 test("score approval excludes Trial Referee and Referee by default", () => {
@@ -221,6 +221,24 @@ test("war and spar state is guild-scoped, audited and requires safe evidence bef
   assert.ok(commands.some(command => command.name === "spar"));
   assert.deepEqual(commands.find(command => command.name === "war").options.map(option => option.name), ["create", "referee", "score", "result", "cancel", "logs"]);
   assert.equal(paradiseCommandAllowedForMode("war", "community"), false);
+});
+
+test("XP defaults grant separate progression roles without weakening link or scam safety", async () => {
+  assert.ok(PARADISE_COMMUNITY_ROLES.includes("Media Trusted"));
+  assert.ok(PARADISE_COMMUNITY_ROLES.includes("Link Trusted"));
+  const defaults = paradiseXpPolicy();
+  assert.equal(defaults.roleRewards["5"], "Media Trusted");
+  assert.equal(defaults.roleRewards["10"], "Link Trusted");
+  const overridden = paradiseXpPolicy({ xpSettings: { chatCooldownSeconds: 1, levelUpDeleteSeconds: 99999, roleRewards: { "5": "Manual Media" } } });
+  assert.equal(overridden.chatCooldownSeconds, 15);
+  assert.equal(overridden.levelUpDeleteSeconds, 3600);
+  assert.equal(overridden.roleRewards["5"], "Manual Media");
+  assert.equal(overridden.roleRewards["10"], "Link Trusted");
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /ensureCommunityProgressionPermissions/);
+  assert.match(source, /AttachFiles: mediaChannel \? true : false/);
+  assert.match(source, /EmbedLinks: false/);
+  assert.match(source, /Trusted media\/link roles intentionally never clear high-risk content/);
 });
 
 test("support ticket transitions prevent stale actions and keep transcript failure retryable", () => {

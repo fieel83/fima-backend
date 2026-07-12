@@ -724,7 +724,7 @@ export const PARADISE_COMMUNITY_ROLES = [
   "━━━━━ STAFF ━━━━━", "Admin", "Manager", "Moderator", "Support Staff", "Trial Support",
   "Bot Manager", "Developer", "Security Staff", "Macro Staff", "FFlag Staff",
   "━━━━━ PRODUCT ACCESS ━━━━━", "Buyer", "Trial User", "Lifetime Buyer",
-  "━━━━━ COMMUNITY ━━━━━", "Creator", "Partner / Reseller", "Reseller", "Media & Links Approved", "Verified",
+  "━━━━━ COMMUNITY ━━━━━", "Creator", "Partner / Reseller", "Reseller", "Media Trusted", "Link Trusted", "Media Approved", "Links Approved", "Invite Approved", "Verified",
   "━━━━━ PING ROLES ━━━━━",
   "Update Ping", "Training Ping", "Tournament Ping", "Giveaway Ping",
   "Event Ping", "Game Night Ping", "Security Alert Ping", "Robux Payment Ping",
@@ -733,6 +733,21 @@ export const PARADISE_COMMUNITY_ROLES = [
   "━━━━━ REGION ROLES ━━━━━",
   "Europe", "Asia", "North America", "South America", "Oceania"
 ];
+
+export const PARADISE_DEFAULT_XP_ROLE_REWARDS = Object.freeze({
+  "5": "Media Trusted",
+  "10": "Link Trusted"
+});
+
+export function paradiseXpPolicy(config = {}) {
+  const settings = config.xpSettings && typeof config.xpSettings === "object" ? config.xpSettings : {};
+  const configuredRewards = settings.roleRewards && typeof settings.roleRewards === "object" ? settings.roleRewards : {};
+  return Object.freeze({
+    chatCooldownSeconds: Math.max(15, Math.min(3600, Number(settings.chatCooldownSeconds) || 60)),
+    levelUpDeleteSeconds: Math.max(10, Math.min(3600, Number(settings.levelUpDeleteSeconds) || 60)),
+    roleRewards: Object.freeze({ ...PARADISE_DEFAULT_XP_ROLE_REWARDS, ...configuredRewards })
+  });
+}
 
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
 
@@ -1879,6 +1894,27 @@ async function ensureBlacklistVisibility(guild, channel, channelName, roleNames 
   }
 }
 
+async function ensureCommunityProgressionPermissions(guild, channel, channelName, { mode, privateCategory = false } = {}) {
+  if (mode !== "community" || privateCategory || !channel?.isTextBased?.()) return;
+  const normalized = String(channelName || channel.name || "").toLowerCase();
+  const mediaChannel = /(?:^|[-_・])(?:media|medya|uploads?)(?:$|[-_・])/.test(normalized);
+  const everyone = guild.roles.everyone;
+  const mediaTrusted = guild.roles.cache.find(role => role.name === "Media Trusted");
+  const linkTrusted = guild.roles.cache.find(role => role.name === "Link Trusted");
+  const mediaApproved = guild.roles.cache.find(role => role.name === "Media Approved");
+  const linksApproved = guild.roles.cache.find(role => role.name === "Links Approved");
+  // Members may share media only in the dedicated media channel until their
+  // level/manual trust role opens it elsewhere. Links remain protected by the
+  // runtime scam/invite guard even once Link Trusted is granted.
+  await channel.permissionOverwrites.edit(everyone, { AttachFiles: mediaChannel ? true : false, EmbedLinks: false }, { reason: "Paradise level-based media/link baseline" }).catch(() => {});
+  for (const role of [mediaTrusted, mediaApproved].filter(Boolean)) {
+    await channel.permissionOverwrites.edit(role, { AttachFiles: true }, { reason: "Paradise Media Trusted progression" }).catch(() => {});
+  }
+  for (const role of [linkTrusted, linksApproved].filter(Boolean)) {
+    await channel.permissionOverwrites.edit(role, { EmbedLinks: true }, { reason: "Paradise Link Trusted progression" }).catch(() => {});
+  }
+}
+
 async function organizeRoleHierarchy(guild, roleNames) {
   const me = guild.members.me || await guild.members.fetchMe();
   const highestAllowed = Math.max(1, me.roles.highest.position - 1);
@@ -1988,6 +2024,7 @@ async function applyServerSetup(interaction, mode, destructive = true) {
         });
       } else if (channel.parentId !== category.id) await channel.setParent(category.id, { lockPermissions: privateCategory });
       await ensureBlacklistVisibility(interaction.guild, channel, channelName, selected.roles).catch(() => {});
+      await ensureCommunityProgressionPermissions(interaction.guild, channel, channelName, { mode, privateCategory });
     }
   }
   const removableChannels = [...interaction.guild.channels.cache.values()]
@@ -2093,6 +2130,7 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
         await channel.setParent(category.id, { lockPermissions: privateCategory }).catch(() => {});
       }
       await ensureBlacklistVisibility(guild, channel, channelName, selected.roles).catch(() => {});
+      if (repairPermissions) await ensureCommunityProgressionPermissions(guild, channel, channelName, { mode, privateCategory });
     }
   }
 
@@ -6190,6 +6228,8 @@ async function addMemberXp(guild, member, amount, source, sourceChannel = null) 
   const priorLevel = levelFromXp(result.xp - amount);
   if (result.level > priorLevel) {
     const state = await loadState();
+    const guildConfig = configForGuild(state, guild.id);
+    const policy = paradiseXpPolicy(guildConfig);
     const levelChannel = await configuredChannel(guild, "level_channel", "level-leaderboard")
       || guild.channels.cache.find(channel => channel.name === "level-logs" && channel.isTextBased?.())
       || sourceChannel;
@@ -6198,11 +6238,14 @@ async function addMemberXp(guild, member, amount, source, sourceChannel = null) 
       .sort((a, b) => Number(b.xp || 0) - Number(a.xp || 0))
       .findIndex(item => item.userId === member.id) + 1;
     if (levelChannel?.isTextBased?.()) {
-      const notice = await levelChannel.send(`${member} is now **Level ${result.level}**. Your activity rank is **#${Math.max(1, position)}**.`).catch(() => null);
-      const deleteSeconds = Math.min(3600, Math.max(10, Number(configForGuild(state, guild.id).xpSettings?.levelUpDeleteSeconds || 60)));
+      const tr = paradiseGuildContentLanguage(guildConfig) === "tr";
+      const notice = await levelChannel.send(tr
+        ? `${member} artık **Seviye ${result.level}**! Sunucu sıralaması: **#${Math.max(1, position)}**.`
+        : `${member} is now **Level ${result.level}**! Your server rank is **#${Math.max(1, position)}**.`).catch(() => null);
+      const deleteSeconds = policy.levelUpDeleteSeconds;
       if (notice) setTimeout(() => notice.delete().catch(() => {}), deleteSeconds * 1000).unref?.();
     }
-    const rewardName = configForGuild(state, guild.id).xpSettings?.roleRewards?.[String(result.level)];
+    const rewardName = policy.roleRewards[String(result.level)];
     const rewardRole = rewardName ? guild.roles.cache.find(role => role.name === rewardName || role.id === rewardName) : null;
     if (rewardRole && guild.members.me?.roles.highest.comparePositionTo(rewardRole) > 0) {
       await member.roles.add(rewardRole, `Paradise level ${result.level} reward`).catch(() => {});
@@ -6248,7 +6291,7 @@ async function handleMemberLevelMessage(message) {
     || /(?:^|[-_])(bot|spam|logs?|transcripts?)(?:$|[-_])/i.test(message.channel.name || "")) return false;
   const key = guildUserKey(message.guild.id, message.author.id);
   const last = levelMessageCooldowns.get(key) || 0;
-  const cooldownMs = Math.max(15, Number(config.xpSettings?.chatCooldownSeconds || 60)) * 1000;
+  const cooldownMs = paradiseXpPolicy(config).chatCooldownSeconds * 1000;
   if (Date.now() - last < cooldownMs) return false;
   levelMessageCooldowns.set(key, Date.now());
   await addMemberXp(message.guild, message.member, Number(config.xpSettings?.chatXp || 10), "chat", message.channel);
