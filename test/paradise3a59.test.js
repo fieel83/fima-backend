@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  normalizeParadiseBrandColor, paradiseBrandColorInteger,
+  normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, paradiseSupportPanelPayload, paradiseSupportTicketControls, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -482,6 +482,17 @@ test("challenge creation explains cooldown, immunity and active ticket blocks", 
     status: "open", ticketId: "123456789012345678", challengerId: "other", opponentId: "opponent"
   };
   assert.match(challengeBlockReason(base, "challenger", "opponent", now), /already in a challenge.*<#123456789012345678>/);
+});
+
+test("challenge score submissions require a referee, valid score and the open ticket participants", async () => {
+  assert.equal(normalizeParadiseChallengeScore("10 - 5"), "10-5");
+  assert.equal(normalizeParadiseChallengeScore("auto"), "Auto");
+  assert.throws(() => normalizeParadiseChallengeScore("10 to 5"), { code: "invalid_challenge_score" });
+  assert.throws(() => normalizeParadiseChallengeScore("10-10"), { code: "invalid_challenge_score" });
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /if \(!await canWorkReferee\(interaction\.member\)\) return interaction\.reply/);
+  assert.match(source, /Submit the score inside an open Paradise challenge ticket/);
+  assert.match(source, /Winner and loser must be the two fighters recorded in this challenge ticket/);
 });
 
 test("challenge tickets and leaderboards stay isolated between managed guilds", () => {

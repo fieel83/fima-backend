@@ -3368,9 +3368,25 @@ async function handleChallenge(interaction) {
       components: [approvalRow]
     });
   }
+  if (!await canWorkReferee(interaction.member)) return interaction.reply({ content: "Referee role required.", ephemeral: true });
   const submittedWinner = interaction.options.getUser("winner");
   const submittedLoser = interaction.options.getUser("loser");
-  const submittedScore = interaction.options.getString("score").trim().replace(/\s+to\s+to\s+/gi, " to ");
+  const ticketId = sub === "post" ? (interaction.options.getString("ticket_id") || interaction.channelId) : interaction.channelId;
+  const state = await loadState();
+  const ticket = state.pendingChallenges?.[ticketId];
+  if (!ticket || !belongsToGuild(ticket, interaction.guildId) || ticket.status !== "open") {
+    return interaction.reply({ content: "Submit the score inside an open Paradise challenge ticket.", ephemeral: true });
+  }
+  const participants = new Set([ticket.challengerId, ticket.opponentId]);
+  if (submittedWinner.id === submittedLoser.id || !participants.has(submittedWinner.id) || !participants.has(submittedLoser.id)) {
+    return interaction.reply({ content: "Winner and loser must be the two fighters recorded in this challenge ticket.", ephemeral: true });
+  }
+  let submittedScore;
+  try {
+    submittedScore = normalizeParadiseChallengeScore(interaction.options.getString("score"));
+  } catch {
+    return interaction.reply({ content: "Use a score such as `10-5` or `Auto`; do not include player names or `to`.", ephemeral: true });
+  }
   if (!await completedProfile(submittedWinner.id, interaction.guildId) || !await completedProfile(submittedLoser.id, interaction.guildId)) {
     return interaction.reply({ content: "Winner and loser must both have completed Paradise fighter profiles.", ephemeral: true });
   }
@@ -3378,10 +3394,10 @@ async function handleChallenge(interaction) {
   const submission = {
     status: "pending", guildId: interaction.guildId, winnerId: submittedWinner.id, loserId: submittedLoser.id, score: submittedScore,
     refereeId: interaction.user.id,
-    winnerSpot: sub === "post" ? interaction.options.getInteger("winner_spot") : null,
-    loserSpot: sub === "post" ? interaction.options.getInteger("loser_spot") : null,
+    winnerSpot: sub === "post" ? (interaction.options.getInteger("winner_spot") ?? (submittedWinner.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot)) : (submittedWinner.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot),
+    loserSpot: sub === "post" ? (interaction.options.getInteger("loser_spot") ?? (submittedLoser.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot)) : (submittedLoser.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot),
     note: sub === "post" ? interaction.options.getString("note") : null,
-    ticketId: sub === "post" ? (interaction.options.getString("ticket_id") || interaction.channelId) : interaction.channelId,
+    ticketId,
     createdAt: new Date().toISOString()
   };
   pendingChallenges.set(submissionId, submission);
@@ -3399,18 +3415,31 @@ async function handleChallenge(interaction) {
       { name: "Ticket ID", value: submission.ticketId || "—", inline: true },
       { name: "Status", value: "Pending Referee Manager / Experienced Referee approval", inline: false }
     ).setFooter({ text: "Made By Fieel" })], components: [approvalRow] });
-  const winner = interaction.options.getUser("winner");
-  const loser = interaction.options.getUser("loser");
-  const score = interaction.options.getString("score").trim().replace(/\s+to\s+to\s+/gi, " to ");
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Challenge Result — Pending Approval")
-    .setDescription(`${winner} defeated ${loser}`)
-    .addFields({ name: "Score", value: score }, { name: "Referee", value: `${interaction.user}` })] });
 }
 
 export function canRoleNamesApproveScore(roleNames = [], isAdministrator = false) {
   return isAdministrator || roleNames.some(name =>
     ["Owner", "Overseer", "Referee Manager", "Head Referee", "Experienced Referee"].includes(name)
   );
+}
+
+export function normalizeParadiseChallengeScore(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "auto") return "Auto";
+  const match = raw.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+  if (!match) {
+    const error = new Error("invalid_challenge_score");
+    error.code = "invalid_challenge_score";
+    throw error;
+  }
+  const left = Number(match[1]);
+  const right = Number(match[2]);
+  if (left === right || left > 99 || right > 99) {
+    const error = new Error("invalid_challenge_score");
+    error.code = "invalid_challenge_score";
+    throw error;
+  }
+  return `${left}-${right}`;
 }
 
 async function memberHasParadisePermission(member, permission) {
