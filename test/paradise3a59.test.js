@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ChannelType } from "discord.js";
 import {
-  applicationQuestionChunks, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger,
@@ -18,6 +18,46 @@ test("score approval excludes Trial Referee and Referee by default", () => {
   assert.equal(canRoleNamesApproveScore(["Experienced Referee"]), true);
   assert.equal(canRoleNamesApproveScore(["Referee Manager"]), true);
   assert.equal(canRoleNamesApproveScore([], true), true);
+});
+
+test("approved challenge results validate first and commit leaderboard, ticket and availability together", () => {
+  const input = {
+    config: {}, guildConfigs: { guild: { challenge: { cooldownDays: 3, immunityDays: 3, top10CooldownDays: 7 } } },
+    leaderboard: {}, leaderboards: { guild: {
+      winner: { spot: 12, wins: 3, losses: 1 },
+      loser: { spot: 11, wins: 4, losses: 2 }
+    } },
+    pendingChallenges: {
+      ticket: { guildId: "guild", status: "open", challengerId: "winner", opponentId: "loser", challengerSpot: 12, opponentSpot: 11 },
+      submission: { guildId: "guild", status: "pending", ticketId: "ticket", winnerId: "winner", loserId: "loser", winnerSpot: 12, loserSpot: 11, score: "10-4", refereeId: "ref" }
+    },
+    staffActivity: {}
+  };
+  const result = applyApprovedParadiseChallengeResult(input, {
+    submissionId: "submission", approvedBy: "manager", now: Date.UTC(2026, 6, 12, 12, 0, 0)
+  });
+  assert.equal(input.pendingChallenges.ticket.status, "open", "input remains untouched if a caller needs to abort");
+  assert.equal(result.state.pendingChallenges.ticket.status, "closed");
+  assert.equal(result.state.pendingChallenges.submission.status, "approved");
+  assert.equal(result.state.leaderboards.guild.winner.wins, 4);
+  assert.equal(result.state.leaderboards.guild.loser.losses, 3);
+  assert.match(String(result.state.leaderboards.guild.winner.availability.immunityUntil), /^178/);
+  assert.match(String(result.state.leaderboards.guild.loser.availability.cooldownUntil), /^178/);
+  assert.equal(result.state.staffActivity.ref.referee.length, 1);
+});
+
+test("challenge result rejects a closed or mismatched ticket without changing state", () => {
+  const input = {
+    config: {}, guildConfigs: { guild: {} }, leaderboard: {}, leaderboards: { guild: {} }, staffActivity: {},
+    pendingChallenges: {
+      ticket: { guildId: "guild", status: "closed", challengerId: "winner", opponentId: "loser" },
+      submission: { guildId: "guild", status: "pending", ticketId: "ticket", winnerId: "winner", loserId: "loser", score: "3-1", refereeId: "ref" }
+    }
+  };
+  assert.throws(() => applyApprovedParadiseChallengeResult(input, { submissionId: "submission", approvedBy: "manager" }), {
+    code: "challenge_ticket_not_open"
+  });
+  assert.equal(input.pendingChallenges.submission.status, "pending");
 });
 
 test("score approval routes configured Discord role IDs through the shared Paradise RBAC vocabulary", async () => {

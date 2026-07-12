@@ -3442,6 +3442,89 @@ export function normalizeParadiseChallengeScore(value) {
   return `${left}-${right}`;
 }
 
+// Keep the persistent part of an approved challenge result together.  The
+// Discord posts, header refresh and transcript happen afterwards and are
+// deliberately not allowed to leave a half-written leaderboard/ticket state.
+// `saveState` persists this returned snapshot as one Setting value today; this
+// pure helper also gives a future relational migration one place to wrap in a
+// database transaction.
+export function applyApprovedParadiseChallengeResult(state, {
+  submissionId,
+  approvedBy,
+  now = Date.now()
+} = {}) {
+  const source = state && typeof state === "object" ? state : null;
+  const record = source?.pendingChallenges?.[submissionId];
+  if (!record || record.status !== "pending") {
+    const error = new Error("challenge_submission_not_pending");
+    error.code = "challenge_submission_not_pending";
+    throw error;
+  }
+  const ticket = source.pendingChallenges?.[record.ticketId];
+  if (!ticket || ticket.status !== "open" || !belongsToGuild(ticket, record.guildId)) {
+    const error = new Error("challenge_ticket_not_open");
+    error.code = "challenge_ticket_not_open";
+    throw error;
+  }
+  const ticketParticipants = new Set([ticket.challengerId, ticket.opponentId]);
+  if (!ticketParticipants.has(record.winnerId) || !ticketParticipants.has(record.loserId) || record.winnerId === record.loserId) {
+    const error = new Error("challenge_ticket_participant_mismatch");
+    error.code = "challenge_ticket_participant_mismatch";
+    throw error;
+  }
+  const normalizedScore = normalizeParadiseChallengeScore(record.score);
+  const next = structuredClone(source);
+  const challengeConfig = configForGuild(next, record.guildId).challenge || {};
+  const leaderboard = ensureLeaderboardForGuild(next, record.guildId);
+  const normalCooldownDays = Math.max(0, Number(challengeConfig.cooldownDays || 3));
+  const top10CooldownDays = Math.max(0, Number(challengeConfig.top10CooldownDays || 7));
+  const immunityDays = Math.max(0, Number(challengeConfig.immunityDays || normalCooldownDays));
+  const timestamp = new Date(now).toISOString();
+  const winner = { ...(leaderboard[record.winnerId] || { wins: 0, losses: 0, history: [] }) };
+  const loser = { ...(leaderboard[record.loserId] || { wins: 0, losses: 0, history: [] }) };
+  const history = {
+    resultId: submissionId,
+    winnerId: record.winnerId,
+    loserId: record.loserId,
+    score: normalizedScore,
+    at: timestamp
+  };
+  winner.wins = Number(winner.wins || 0) + 1;
+  loser.losses = Number(loser.losses || 0) + 1;
+  winner.spot = record.winnerSpot || winner.spot || null;
+  loser.spot = record.loserSpot || loser.spot || null;
+  winner.history = [...(winner.history || []), history].slice(-50);
+  loser.history = [...(loser.history || []), history].slice(-50);
+  loser.availability = {
+    ...(loser.availability || {}),
+    cooldownUntil: now + ((record.loserSpot && record.loserSpot <= 10 ? top10CooldownDays : normalCooldownDays) * 86_400_000)
+  };
+  winner.availability = {
+    ...(winner.availability || {}),
+    immunityUntil: now + ((record.winnerSpot && record.winnerSpot <= 10 ? top10CooldownDays : immunityDays) * 86_400_000)
+  };
+  leaderboard[record.winnerId] = winner;
+  leaderboard[record.loserId] = loser;
+  const closedTicket = {
+    ...ticket,
+    status: "closed",
+    resultType: record.resultType || "score",
+    winnerId: record.winnerId,
+    loserId: record.loserId,
+    finalScore: normalizedScore,
+    refereeId: record.refereeId,
+    approvedBy,
+    closedAt: timestamp
+  };
+  next.pendingChallenges[record.ticketId] = closedTicket;
+  const approvedRecord = { ...record, score: normalizedScore, status: "approved", approvedBy, decidedAt: timestamp };
+  next.pendingChallenges[submissionId] = approvedRecord;
+  const activity = next.staffActivity[record.refereeId] || {};
+  activity.referee = [...(activity.referee || []), timestamp];
+  next.staffActivity[record.refereeId] = activity;
+  return { state: next, record: approvedRecord, ticket: closedTicket, history };
+}
+
 async function memberHasParadisePermission(member, permission) {
   const administrator = member.permissions.has(PermissionsBitField.Flags.Administrator);
   const state = await loadState();
@@ -3481,55 +3564,27 @@ async function handleChallengeApproval(interaction) {
     return interaction.update({ embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setColor(await paradiseBrandColor())
       .setTitle("Challenge Score — Denied").setFooter({ text: `Denied by ${interaction.user.username} • Made By Fieel` })], components: [] });
   }
-  const now = Date.now();
-  await saveState(state => {
-    const challengeConfig = configForGuild(state, interaction.guildId).challenge || {};
-    const leaderboard = ensureLeaderboardForGuild(state, interaction.guildId);
-    const normalCooldownDays = Number(challengeConfig.cooldownDays || 3);
-    const top10CooldownDays = Number(challengeConfig.top10CooldownDays || 7);
-    const immunityDays = Number(challengeConfig.immunityDays || normalCooldownDays);
-    const winner = leaderboard[record.winnerId] || { wins: 0, losses: 0, history: [] };
-    const loser = leaderboard[record.loserId] || { wins: 0, losses: 0, history: [] };
-    winner.wins = Number(winner.wins || 0) + 1;
-    loser.losses = Number(loser.losses || 0) + 1;
-    winner.spot = record.winnerSpot || winner.spot || null;
-    loser.spot = record.loserSpot || loser.spot || null;
-    const history = { resultId: id, winnerId: record.winnerId, loserId: record.loserId, score: record.score, at: new Date().toISOString() };
-    winner.history = [...(winner.history || []), history].slice(-50);
-    loser.history = [...(loser.history || []), history].slice(-50);
-    loser.availability = {
-      ...(loser.availability || {}),
-      cooldownUntil: now + (record.loserSpot && record.loserSpot <= 10 ? top10CooldownDays : normalCooldownDays) * 86_400_000
-    };
-    winner.availability = {
-      ...(winner.availability || {}),
-      immunityUntil: now + (record.winnerSpot && record.winnerSpot <= 10 ? top10CooldownDays : immunityDays) * 86_400_000
-    };
-    leaderboard[record.winnerId] = winner;
-    leaderboard[record.loserId] = loser;
-    if (state.pendingChallenges[record.ticketId]?.status === "open") {
-      state.pendingChallenges[record.ticketId] = {
-        ...state.pendingChallenges[record.ticketId],
-        status: "closed",
-        resultType: record.resultType || "score",
-        winnerId: record.winnerId,
-        loserId: record.loserId,
-        finalScore: record.score,
-        refereeId: record.refereeId,
-        approvedBy: interaction.user.id,
-        closedAt: new Date().toISOString()
-      };
-    }
-    state.pendingChallenges[id] = { ...record, status: "approved", approvedBy: interaction.user.id, decidedAt: new Date().toISOString() };
-    const activity = state.staffActivity[record.refereeId] || {};
-    activity.referee = [...(activity.referee || []), history.at];
-    state.staffActivity[record.refereeId] = activity;
-    return state;
-  });
+  let applied;
+  try {
+    await saveState(state => {
+      applied = applyApprovedParadiseChallengeResult(state, {
+        submissionId: id,
+        approvedBy: interaction.user.id
+      });
+      return applied.state;
+    });
+  } catch (error) {
+    return interaction.reply({
+      content: error?.code === "challenge_ticket_not_open"
+        ? "This challenge ticket is no longer open; the result was not applied."
+        : "The result could not be applied safely. No leaderboard changes were saved.",
+      ephemeral: true
+    });
+  }
   pendingChallenges.delete(id);
   await updateAvailabilityPanel(interaction.guild).catch(() => {});
   const finalState = await loadState();
-  const closedTicket = finalState.pendingChallenges[record.ticketId];
+  const closedTicket = finalState.pendingChallenges[record.ticketId] || applied?.ticket;
   const ticketChannel = interaction.guild.channels.cache.get(record.ticketId);
   if (ticketChannel && closedTicket) {
     await ticketChannel.permissionOverwrites.edit(closedTicket.challengerId, { ViewChannel: false }).catch(() => {});
