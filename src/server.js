@@ -38,6 +38,7 @@ import { adminPage, loginPage } from "./adminHtml.js";
 import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
+import { buildParadiseCustomerWorkspaceView } from "./paradiseDashboardWorkspace.js";
 import { normalizeParadiseFeatureFlags } from "./paradiseFeatureFlags.js";
 import { buildParadiseReconciliation, summarizeParadiseReconciliation } from "./paradiseReconciliation.js";
 import { adminRbacSummary } from "./adminRbac.js";
@@ -762,6 +763,34 @@ app.get("/api/paradise/customer/workspaces", requireUser, async (req, res) => {
     return res.json({ success: true, workspaces: workspaceAccess.cards });
   } catch (error) {
     console.error("Paradise customer workspace lookup failed", publicError(error));
+    return res.status(503).json({ success: false, error: error.code || "paradise_workspace_unavailable" });
+  }
+});
+
+// Customer workspaces intentionally remain separate from the Fieel owner
+// console.  A Discord OAuth membership with Manage Guild/Admin is required on
+// every request; a guessed guild ID cannot reveal another guild's config.
+app.get("/api/paradise/customer/workspaces/:guildId", requireUser, async (req, res) => {
+  try {
+    const guildId = String(req.params.guildId || "");
+    const workspaceAccess = await paradiseCustomerWorkspaceAccess(req.user);
+    if (!workspaceAccess.ready) return res.status(409).json({ success: false, error: workspaceAccess.code });
+    const card = workspaceAccess.cards.find(item => item.guildId === guildId);
+    if (!card) return res.status(403).json({ success: false, error: "guild_not_authorized" });
+    const row = card.botInstalled
+      ? await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } })
+      : null;
+    const state = row?.value && typeof row.value === "object" ? row.value : {};
+    const config = state.guildConfigs?.[guildId] || {};
+    const workspace = buildParadiseCustomerWorkspaceView({ card, config, route: req.query?.route });
+    await createAuditLog("paradise_customer_workspace_opened", "discord_guild", guildId, {
+      actorUserId: req.user.id,
+      route: workspace.route,
+      installed: workspace.workspace.botInstalled
+    });
+    return res.json({ success: true, ...workspace });
+  } catch (error) {
+    console.error("Paradise customer workspace read failed", publicError(error));
     return res.status(503).json({ success: false, error: error.code || "paradise_workspace_unavailable" });
   }
 });

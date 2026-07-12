@@ -83,6 +83,15 @@ test("customer workspace discovery is separate from the owner console and requir
   assert.match(serverSource, /buildParadiseCustomerWorkspaceCards/);
 });
 
+test("customer workspace route remains guild-scoped and never reuses the owner console guard", () => {
+  const route = serverSource.match(/app\.get\("\/api\/paradise\/customer\/workspaces\/:guildId"[\s\S]{0,1700}/)?.[0] || "";
+  assert.match(route, /requireUser/);
+  assert.doesNotMatch(route, /requireParadiseOwner/);
+  assert.match(route, /workspaceAccess\.cards\.find/);
+  assert.match(route, /guild_not_authorized/);
+  assert.match(serverSource, /buildParadiseCustomerWorkspaceView/);
+});
+
 test("Paradise dashboard is noindex and never renders a bot token", () => {
   assert.match(htmlSource, /noindex,nofollow,noarchive/);
   assert.doesNotMatch(htmlSource, /DISCORD_BOT_TOKEN|botToken|token\s*:/i);
