@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ChannelType } from "discord.js";
 import {
-  applicationQuestionChunks, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
+  applicationQuestionChunks, assertUniqueParadiseRobloxIdentity, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   normalizeParadiseBrandColor, paradiseBrandColorInteger,
@@ -291,7 +291,7 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "post"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
-  assert.deepEqual(commands.find(command => command.name === "profile").options.map(option => option.name), ["create", "view", "edit", "verify-status"]);
+  assert.deepEqual(commands.find(command => command.name === "profile").options.map(option => option.name), ["create", "view", "edit", "privacy", "verify-status"]);
   const mappingCommands = ["set", "setlogchannel"].flatMap(name => commands.find(command => command.name === name).options);
   assert.equal(mappingCommands.length, PARADISE_CHANNEL_MAPPINGS.length);
   assert.ok(commands.find(command => command.name === "set").options.length <= 25);
@@ -324,6 +324,18 @@ test("Roblox verification codes stay short and avoid ambiguous filtered characte
     assert.match(code, /^P[A-HJ-NP-Z2-9]{5}$/);
     assert.doesNotMatch(code, /[IO01-]/);
   }
+});
+
+test("profile identity rejects duplicate Roblox verification and keeps completion guild-scoped", async () => {
+  assert.equal(assertUniqueParadiseRobloxIdentity({ "discord-a": { robloxId: "roblox-a" } }, "discord-a", "roblox-a"), true);
+  assert.equal(assertUniqueParadiseRobloxIdentity({ "discord-a": { robloxId: "roblox-a" } }, "discord-b", "roblox-b"), true);
+  assert.throws(() => assertUniqueParadiseRobloxIdentity({ "discord-a": { robloxId: "roblox-a" } }, "discord-b", "roblox-a"), { code: "roblox_identity_already_verified" });
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /state\.guildProfiles\[interaction\.guildId\]/);
+  assert.match(source, /setName\("privacy"\)/);
+  assert.match(source, /visibility === "private"/);
+  const profile = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "profile");
+  assert.ok(profile.options.some(option => option.name === "privacy"));
 });
 
 test("Discord command options never put required inputs after optional inputs", () => {

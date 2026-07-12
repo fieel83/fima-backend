@@ -1096,6 +1096,9 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("roblox_name").setDescription("Exact Roblox username"))
         .addStringOption(o => o.setName("query").setDescription("Display name, nickname or Roblox name")))
       .addSubcommand(s => s.setName("edit").setDescription("Edit your profile region without changing Profile ID"))
+      .addSubcommand(s => s.setName("privacy").setDescription("Choose whether other members can open your profile")
+        .addStringOption(o => o.setName("visibility").setDescription("Profile visibility").setRequired(true)
+          .addChoices({ name: "Public", value: "public" }, { name: "Private", value: "private" })))
       .addSubcommand(s => s.setName("verify-status").setDescription("Show your Roblox verification and profile-completion status")),
     new SlashCommandBuilder().setName("tryout").setNameLocalizations({ tr: "deneme" }).setDescription("Paradise tryout system").setDescriptionLocalizations({ tr: "Paradise deneme ve sonuç sistemi" })
       .addSubcommand(s => s.setName("start").setDescription("Start a tryout")
@@ -1539,9 +1542,21 @@ async function loadProfileStore() {
   return (await loadState()).profiles;
 }
 
+export function assertUniqueParadiseRobloxIdentity(profiles = {}, discordId, robloxId) {
+  const conflict = Object.entries(profiles || {}).find(([storedDiscordId, storedProfile]) =>
+    storedDiscordId !== String(discordId)
+    && robloxId
+    && String(storedProfile?.robloxId || "") === String(robloxId));
+  if (!conflict) return true;
+  const error = new Error("roblox_identity_already_verified");
+  error.code = "roblox_identity_already_verified";
+  throw error;
+}
+
 async function saveVerifiedProfile(discordId, profile) {
   let saved = null;
   await saveState(state => {
+    assertUniqueParadiseRobloxIdentity(state.profiles, discordId, profile.robloxId);
     const existing = state.profiles[discordId] || {};
     saved = {
       ...existing,
@@ -1553,7 +1568,13 @@ async function saveVerifiedProfile(discordId, profile) {
     state.profiles[discordId] = saved;
     return state;
   });
-  await writeArtifact("3a59-verified-roblox-profiles.json", (await loadState()).profiles);
+  const profileCount = Object.keys((await loadState()).profiles || {}).length;
+  await writeArtifact("3a59-verified-roblox-profiles.json", {
+    status: "LOCAL VERIFIED",
+    generatedAt: new Date().toISOString(),
+    profileCount,
+    outputPolicy: "Identity records are intentionally not written to artifacts."
+  });
   return saved;
 }
 
@@ -2646,9 +2667,17 @@ async function verifyCheck(interaction) {
       ephemeral: true
     });
   }
-  const savedProfile = await saveVerifiedProfile(interaction.user.id, {
-    robloxId: String(challenge.robloxId), robloxUsername: challenge.username, verifiedAt: new Date().toISOString()
-  });
+  let savedProfile;
+  try {
+    savedProfile = await saveVerifiedProfile(interaction.user.id, {
+      robloxId: String(challenge.robloxId), robloxUsername: challenge.username, verifiedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    if (error.code === "roblox_identity_already_verified") {
+      return interaction.reply({ content: "This Roblox account is already verified to another Paradise profile. Use the profile-transfer support flow instead.", ephemeral: true });
+    }
+    throw error;
+  }
   verifiedProfiles.set(interaction.user.id, savedProfile);
   const role = await ensureRole(interaction.guild, "Verified Fighter");
   await interaction.member.roles.add(role);
@@ -2673,9 +2702,15 @@ async function verifiedProfile(discordId) {
   return profile;
 }
 
-async function completedProfile(discordId) {
+async function completedProfile(discordId, guildId = null) {
   const profile = await verifiedProfile(discordId);
-  return profile?.profileId && profile?.region ? profile : null;
+  if (!profile) return null;
+  const state = await loadState();
+  const guildProfile = guildId ? state.guildProfiles?.[guildId]?.[discordId] || {} : {};
+  // Legacy profileId/region is read only as a compatibility fallback. New
+  // profile state is guild-scoped so one server cannot overwrite another.
+  const merged = { ...profile, ...guildProfile };
+  return merged.profileId && merged.region ? merged : null;
 }
 
 function fighterRank(member) {
@@ -2693,9 +2728,10 @@ async function robloxHeadshot(robloxId) {
   return payload.data?.[0]?.imageUrl || null;
 }
 
-async function profileEmbed(guild, discordId) {
-  const profile = await completedProfile(discordId);
+async function profileEmbed(guild, discordId, viewer = {}) {
+  const profile = await completedProfile(discordId, guild.id);
   if (!profile) return null;
+  if (profile.visibility === "private" && viewer.userId && viewer.userId !== discordId && viewer.isStaff !== true) return null;
   const member = await guild.members.fetch(discordId).catch(() => null);
   const thumbnail = await robloxHeadshot(profile.robloxId);
   const state = await loadState();
@@ -2755,10 +2791,11 @@ async function beginProfileCreation(interaction) {
       ephemeral: true
     });
   }
-  if (existing.profileId && existing.region) {
-    const embed = await profileEmbed(interaction.guild, interaction.user.id);
+  const currentGuildProfile = await completedProfile(interaction.user.id, interaction.guildId);
+  if (currentGuildProfile) {
+    const embed = await profileEmbed(interaction.guild, interaction.user.id, { userId: interaction.user.id });
     return interaction.reply({
-      content: `You already have a Paradise fighter profile (ID: **#${existing.profileId}**).`,
+      content: `You already have a Paradise fighter profile (ID: **#${currentGuildProfile.profileId}**).`,
       embeds: embed ? [embed] : [],
       components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId("paradise_profile_region_change").setLabel("Change Region").setStyle(ButtonStyle.Secondary)
@@ -2787,19 +2824,36 @@ async function handleProfile(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "create") return beginProfileCreation(interaction);
   if (sub === "edit") {
-    if (!await completedProfile(interaction.user.id)) return beginProfileCreation(interaction);
+    if (!await completedProfile(interaction.user.id, interaction.guildId)) return beginProfileCreation(interaction);
     return beginProfileRegionChange(interaction);
+  }
+  if (sub === "privacy") {
+    const verified = await verifiedProfile(interaction.user.id);
+    if (!verified) return beginProfileCreation(interaction);
+    const visibility = interaction.options.getString("visibility") === "private" ? "private" : "public";
+    await saveState(state => {
+      state.guildProfiles = state.guildProfiles || {};
+      state.guildProfiles[interaction.guildId] = state.guildProfiles[interaction.guildId] || {};
+      state.guildProfiles[interaction.guildId][interaction.user.id] = {
+        ...(state.guildProfiles[interaction.guildId][interaction.user.id] || {}),
+        visibility,
+        privacyUpdatedAt: new Date().toISOString()
+      };
+      return state;
+    });
+    return interaction.reply({ content: visibility === "private" ? "Your Paradise profile is now private to other members; staff may still view it for moderation/support." : "Your Paradise profile is now visible to members in this server.", ephemeral: true });
   }
   if (sub === "verify-status") {
     const profile = await verifiedProfile(interaction.user.id);
-    const complete = Boolean(profile?.profileId && profile?.region);
+    const guildProfile = await completedProfile(interaction.user.id, interaction.guildId);
+    const complete = Boolean(guildProfile);
     return interaction.reply({
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PROFILE VERIFICATION STATUS")
         .addFields(
           { name: "Roblox linked", value: profile?.robloxId ? "✓ Yes" : "✗ No", inline: true },
           { name: "Profile complete", value: complete ? "✓ Yes" : "✗ No", inline: true },
-          { name: "Profile ID", value: profile?.profileId ? `#${profile.profileId}` : "Not assigned", inline: true },
-          { name: "Region", value: profile?.region || "Not selected", inline: true }
+          { name: "Profile ID", value: guildProfile?.profileId ? `#${guildProfile.profileId}` : "Not assigned", inline: true },
+          { name: "Region", value: guildProfile?.region || "Not selected", inline: true }
         ).setFooter(paradiseFooter("Use /profile create or /profile edit"))],
       ephemeral: true
     });
@@ -2811,9 +2865,13 @@ async function handleProfile(interaction) {
   const requestedQuery = String(interaction.options.getString("query") || "").trim().toLowerCase();
   let targetId = selectedUser?.id || (/^\d{16,22}$/.test(requestedUserId) ? requestedUserId : null);
   if (!targetId && (requestedProfileId || requestedRoblox || requestedQuery)) {
-    const profiles = (await loadState()).profiles || {};
+    const profileState = await loadState();
+    const profiles = profileState.profiles || {};
+    const guildProfiles = profileState.guildProfiles?.[interaction.guildId] || {};
     const matches = [];
-    for (const [discordId, profile] of Object.entries(profiles)) {
+    for (const [discordId, identity] of Object.entries(profiles)) {
+      const profile = { ...identity, ...(guildProfiles[discordId] || {}) };
+      if (!profile.profileId || !profile.region) continue;
       const member = interaction.guild.members.cache.get(discordId);
       const exactProfile = requestedProfileId && Number(profile.profileId) === Number(requestedProfileId);
       const exactRoblox = requestedRoblox && String(profile.robloxUsername || "").toLowerCase() === requestedRoblox;
@@ -2825,12 +2883,12 @@ async function handleProfile(interaction) {
       if (exactProfile || exactRoblox || queryMatch) matches.push(discordId);
     }
     if (matches.length > 1) {
-      const profilesById = (await loadState()).profiles || {};
+      const profilesById = profiles;
       const menu = new StringSelectMenuBuilder().setCustomId("paradise_profile_lookup")
         .setPlaceholder("Choose the matching Paradise profile")
         .addOptions(...matches.slice(0, 25).map(id => {
           const member = interaction.guild.members.cache.get(id);
-          const profile = profilesById[id] || {};
+          const profile = { ...(profilesById[id] || {}), ...(guildProfiles[id] || {}) };
           return {
             label: String(member?.displayName || profile.robloxUsername || `Profile ${profile.profileId || id}`).slice(0, 100),
             description: `#${profile.profileId || "—"} · Roblox: ${profile.robloxUsername || "Not linked"}`.slice(0, 100),
@@ -2846,14 +2904,14 @@ async function handleProfile(interaction) {
     targetId = matches[0] || null;
   }
   targetId ||= interaction.user.id;
-  const embed = await profileEmbed(interaction.guild, targetId);
+  const embed = await profileEmbed(interaction.guild, targetId, { userId: interaction.user.id, isStaff: canModerate(interaction.member) });
   if (!embed) return interaction.reply({ content: `<@${targetId}> has not completed a Paradise fighter profile.`, ephemeral: true });
   return interaction.reply({ embeds: [embed] });
 }
 
 async function handleProfileLookupSelect(interaction) {
   const targetId = interaction.values[0];
-  const embed = await profileEmbed(interaction.guild, targetId);
+  const embed = await profileEmbed(interaction.guild, targetId, { userId: interaction.user.id, isStaff: canModerate(interaction.member) });
   if (!embed) return interaction.update({ content: "That profile is no longer available.", embeds: [], components: [] });
   return interaction.update({ content: "", embeds: [embed], components: [] });
 }
@@ -2862,22 +2920,35 @@ async function handleProfileRegion(interaction) {
   const region = interaction.values[0];
   let saved = null;
   await saveState(state => {
-    const current = state.profiles[interaction.user.id];
-    if (!current) return state;
-    if (!current.profileId) {
-      state.config.nextProfileId = Number(state.config.nextProfileId || 100) + 1;
-      current.profileId = state.config.nextProfileId;
+    const identity = state.profiles[interaction.user.id];
+    if (!identity) return state;
+    state.guildProfiles = state.guildProfiles || {};
+    state.guildProfiles[interaction.guildId] = state.guildProfiles[interaction.guildId] || {};
+    state.guildProfileMeta = state.guildProfileMeta || {};
+    state.guildProfileMeta[interaction.guildId] = state.guildProfileMeta[interaction.guildId] || { nextProfileId: 100 };
+    const existing = state.guildProfiles[interaction.guildId][interaction.user.id] || {};
+    if (!existing.profileId) {
+      const legacyId = Number(identity.profileId || 0);
+      if (legacyId > 0) existing.profileId = legacyId;
+      else {
+        state.guildProfileMeta[interaction.guildId].nextProfileId = Number(state.guildProfileMeta[interaction.guildId].nextProfileId || 100) + 1;
+        existing.profileId = state.guildProfileMeta[interaction.guildId].nextProfileId;
+      }
     }
-    current.region = region;
-    current.profileUpdatedAt = new Date().toISOString();
-    current.updatedAt = current.profileUpdatedAt;
-    state.profiles[interaction.user.id] = current;
-    saved = current;
+    const updatedAt = new Date().toISOString();
+    saved = {
+      ...existing,
+      profileId: existing.profileId,
+      region,
+      visibility: existing.visibility === "private" ? "private" : "public",
+      profileUpdatedAt: updatedAt,
+      updatedAt
+    };
+    state.guildProfiles[interaction.guildId][interaction.user.id] = saved;
     return state;
   });
   if (!saved) return interaction.reply({ content: "Verify Roblox first.", ephemeral: true });
-  verifiedProfiles.set(interaction.user.id, saved);
-  const embed = await profileEmbed(interaction.guild, interaction.user.id);
+  const embed = await profileEmbed(interaction.guild, interaction.user.id, { userId: interaction.user.id });
   return interaction.update({ embeds: [embed], components: [] });
 }
 
@@ -2982,7 +3053,7 @@ async function handleTryout(interaction) {
     return interaction.editReply(`${copy.started}: ${announcement.url}`);
   }
   const target = interaction.options.getUser("user");
-  if (!await completedProfile(target.id)) return interaction.reply({ content: "Target must complete `/profile create` first.", ephemeral: true });
+  if (!await completedProfile(target.id, interaction.guildId)) return interaction.reply({ content: "Target must complete `/profile create` first.", ephemeral: true });
   const rank = {
     stage: interaction.options.getInteger("stage"),
     level: interaction.options.getString("level"),
@@ -3076,7 +3147,7 @@ function challengeRangeText(currentSpot, spots) {
 }
 
 async function presentChallengeTargetMenu(interaction, region = null) {
-  if (!await completedProfile(interaction.user.id)) {
+  if (!await completedProfile(interaction.user.id, interaction.guildId)) {
     return interaction.reply({ content: "Complete `/profile create` before opening a challenge.", ephemeral: true });
   }
   const state = await loadState();
@@ -3099,7 +3170,7 @@ async function presentChallengeTargetMenu(interaction, region = null) {
     .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
   const candidates = [];
   for (const [discordId, row] of entries) {
-    if (!await completedProfile(discordId)) continue;
+    if (!await completedProfile(discordId, interaction.guildId)) continue;
     const member = await interaction.guild.members.fetch(discordId).catch(() => null);
     if (!member) continue;
     const block = challengeBlockReason(state, interaction.user.id, discordId, Date.now(), interaction.guildId);
@@ -3155,7 +3226,7 @@ async function refreshChallengeHeader(guild, record) {
 }
 
 async function createChallengeTicket(interaction, opponent, region = null) {
-  if (!await completedProfile(interaction.user.id) || !await completedProfile(opponent.id)) {
+  if (!await completedProfile(interaction.user.id, interaction.guildId) || !await completedProfile(opponent.id, interaction.guildId)) {
     return interaction.reply({ content: "Both fighters must complete `/profile create` first.", ephemeral: true });
   }
   const state = await loadState();
@@ -3300,7 +3371,7 @@ async function handleChallenge(interaction) {
   const submittedWinner = interaction.options.getUser("winner");
   const submittedLoser = interaction.options.getUser("loser");
   const submittedScore = interaction.options.getString("score").trim().replace(/\s+to\s+to\s+/gi, " to ");
-  if (!await completedProfile(submittedWinner.id) || !await completedProfile(submittedLoser.id)) {
+  if (!await completedProfile(submittedWinner.id, interaction.guildId) || !await completedProfile(submittedLoser.id, interaction.guildId)) {
     return interaction.reply({ content: "Winner and loser must both have completed Paradise fighter profiles.", ephemeral: true });
   }
   const submissionId = crypto.randomUUID();
@@ -3540,7 +3611,7 @@ async function handleTraining(interaction) {
     || Object.values((await loadState()).trainings).find(item => belongsToGuild(item, interaction.guildId) && item.hosterId === interaction.user.id && item.status !== "ended");
   if (!owned) return interaction.reply({ content: "You have no active training session.", ephemeral: true });
   const state = await loadState();
-  if (configForGuild(state, interaction.guildId).verification?.requireProfileForTrainingResult !== false && !await completedProfile(interaction.user.id)) {
+  if (configForGuild(state, interaction.guildId).verification?.requireProfileForTrainingResult !== false && !await completedProfile(interaction.user.id, interaction.guildId)) {
     return interaction.reply({ content: "Complete `/profile create` before submitting a training result.", ephemeral: true });
   }
   const result = {
