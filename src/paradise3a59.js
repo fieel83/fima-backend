@@ -1247,7 +1247,10 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("list").setDescription("List active whitelists")),
     new SlashCommandBuilder().setName("mainer").setDescription("Paradise clan mainer code and guide")
       .addSubcommand(s => s.setName("set").setDescription("Set the official clan mainer code")
-        .addStringOption(o => o.setName("code").setDescription("TSBCC clan mainer code").setRequired(true)))
+        .addStringOption(o => o.setName("code").setDescription("TSBCC clan mainer code").setRequired(true))
+        .addStringOption(o => o.setName("region").setDescription("Official mainer region").addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))
+        .addChannelOption(o => o.setName("main-channel").setDescription("Official Roblox/TSB main channel")))
+      .addSubcommand(s => s.setName("panel").setDescription("Create or update the canonical pinned mainer notice"))
       .addSubcommand(s => s.setName("guide").setDescription("Show the current maining guide")),
     new SlashCommandBuilder().setName("report").setNameLocalizations({ tr: "rapor" }).setDescription("Report a staff member or hoster privately").setDescriptionLocalizations({ tr: "Personel veya hosteri özel olarak raporla" })
       .addSubcommand(s => s.setName("staff").setDescription("Open a private staff report")
@@ -6848,22 +6851,79 @@ async function handleActivityResponse(interaction) {
   return interaction.reply({ content: "Activity response recorded. / Aktivite yanıtın kaydedildi.", ephemeral: true });
 }
 
+export function paradiseMainerAnnouncement({ code = null, region = "EU", mainChannelId = null, language = "tr" } = {}) {
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  const normalizedRegion = String(region || "EU").trim().toUpperCase();
+  const mainChannel = mainChannelId ? `<#${mainChannelId}>` : (language === "tr" ? "_Henüz main kanalı seçilmedi._" : "_No main channel has been selected yet._");
+  if (!normalizedCode) {
+    return language === "tr"
+      ? "# ⚠️ Mainer kodu henüz ayarlanmadı\n\n> Owner, Paradise Dashboard veya `/mainer set` üzerinden kodu ve bölgeyi ayarladığında bu mesaj aynı yerde otomatik güncellenir."
+      : "# ⚠️ Mainer code has not been configured yet\n\n> Once the owner sets the code and region in Paradise Dashboard or with `/mainer set`, this same message updates automatically.";
+  }
+  return language === "tr"
+    ? `# 🌴 Mainer kodumuz hazır!\n\nParadise'ı main klanın olarak ayarlamak için aşağıdaki bilgileri kullanabilirsin.\n\n### Kod\n\`${normalizedCode}\`\n\n### Main kanalı\n${mainChannel}\n\n### Kullanacağın komut\n\`/mainclan code:${normalizedCode} region:${normalizedRegion}\`\n\n> Bir sorun yaşarsan destek kanalından bize ulaş. Hesap şifresi, cookie veya token paylaşma.`
+    : `# 🌴 Our mainer code is ready!\n\nUse the details below to set Paradise as your main clan.\n\n### Code\n\`${normalizedCode}\`\n\n### Main channel\n${mainChannel}\n\n### Command to use\n\`/mainclan code:${normalizedCode} region:${normalizedRegion}\`\n\n> If you need help, contact support. Never share a password, cookie or token.`;
+}
+
+async function updateParadiseMainerAnnouncement(guild) {
+  const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  const channel = config.mainerAnnouncementChannelId
+    ? await guild.channels.fetch(config.mainerAnnouncementChannelId).catch(() => null)
+    : await configuredChannel(guild, "mainer_proof_channel", "mainer-proof");
+  if (!channel?.isTextBased?.()) return null;
+  const content = paradiseMainerAnnouncement({
+    code: config.mainerCode,
+    region: config.mainerRegion || "EU",
+    mainChannelId: config.mainChannelId || null,
+    language: paradiseGuildContentLanguage(config)
+  });
+  let message = config.mainerAnnouncementMessageId
+    ? await channel.messages.fetch(config.mainerAnnouncementMessageId).catch(() => null)
+    : null;
+  if (message) await message.edit({ content, embeds: [], components: [] });
+  else message = await channel.send({ content });
+  await message.pin().catch(() => null);
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].mainerAnnouncementMessageId = message.id;
+    next.guildConfigs[guild.id].mainerAnnouncementChannelId = channel.id;
+    return next;
+  });
+  return message;
+}
+
 async function handleMainer(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "set") {
     if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
     const code = interaction.options.getString("code").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
     if (!code) return interaction.reply({ content: "Invalid mainer code.", ephemeral: true });
+    const region = interaction.options.getString("region") || "EU";
+    const mainChannel = interaction.options.getChannel("main-channel");
     await saveState(state => {
       state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
-      state.guildConfigs[interaction.guildId].mainerCode = code;
+      const config = state.guildConfigs[interaction.guildId];
+      config.mainerEnabled = true;
+      config.mainerCode = code;
+      config.mainerRegion = region;
+      if (mainChannel?.isTextBased?.()) config.mainChannelId = mainChannel.id;
+      config.mainerCodeUpdatedAt = new Date().toISOString();
+      config.mainerCodeUpdatedBy = interaction.user.id;
       return state;
     });
+    const panel = await updateParadiseMainerAnnouncement(interaction.guild);
+    await logParadiseAction(interaction.guild, "roster_logs_channel", "roster-logs", "Mainer code updated",
+      `${interaction.user} updated the canonical mainer code notice.`, { type: "configuration", metadata: { region, announcementMessageId: panel?.id || null } });
+    return interaction.reply({ content: panel ? `Mainer code saved and canonical notice updated: ${panel.url}` : "Mainer code saved. Map a mainer proof/announcement channel, then run /mainer panel.", ephemeral: true });
   }
-  const code = configForGuild(await loadState(), interaction.guildId).mainerCode || "Not configured";
-  return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE MAINING GUIDE")
-    .setDescription(`# Official code\n\`${code}\`\n\n## ◆ How to main Paradise\n1. Open the **official TSBCC maining channel**.\n2. Run \`/mainclan code:${code} region:EU\`.\n3. Choose only your **approved staff role**.\n4. Keep proof in **mainer-proof** for review.\n\n> **Security:** Paradise never asks for cookies, passwords or tokens.\n\n-# Use only official Discord and Roblox links.`)
-    .setFooter(paradiseFooter("Clan operations"))] });
+  if (sub === "panel") {
+    if (!canManageCompetitiveBoards(interaction.member)) return interaction.reply({ content: "Clan management role required.", ephemeral: true });
+    const panel = await updateParadiseMainerAnnouncement(interaction.guild);
+    return interaction.reply({ content: panel ? `Canonical mainer notice updated: ${panel.url}` : "Map a mainer proof/announcement channel first.", ephemeral: true });
+  }
+  const config = configForGuild(await loadState(), interaction.guildId);
+  return interaction.reply({ content: paradiseMainerAnnouncement({ code: config.mainerCode, region: config.mainerRegion || "EU", mainChannelId: config.mainChannelId, language: paradiseGuildContentLanguage(config) }), ephemeral: true });
 }
 
 async function handleReferee(interaction) {

@@ -8,7 +8,7 @@ import {
   canViewParadiseLogEvent, evaluateParadiseContentSafety, localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, paradiseLogPolicy, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
-  sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
+  paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
   timedAvailabilityLines
 } from "../src/paradise3a59.js";
 
@@ -190,6 +190,20 @@ test("ticket categories remain template-scoped and lifecycle names never expose 
   assert.equal(name, "closed-payment_license-fieel-example-test-42");
   assert.ok(name.length <= 90);
   assert.doesNotMatch(name, /@|\./);
+});
+
+test("canonical mainer copy uses a safe fallback and a localized stored-message design", () => {
+  const missing = paradiseMainerAnnouncement({ language: "tr" });
+  assert.match(missing, /henüz ayarlanmadı/i);
+  assert.doesNotMatch(missing, /CODE_HERE|Not configured/i);
+  const configured = paradiseMainerAnnouncement({ code: "PMSBXHWM", region: "EU", mainChannelId: "123", language: "tr" });
+  assert.match(configured, /Mainer kodumuz hazır/);
+  assert.match(configured, /`PMSBXHWM`/);
+  assert.match(configured, /<#123>/);
+  assert.match(configured, /\/mainclan code:PMSBXHWM region:EU/);
+  const command = paradiseCommands().map(item => item.toJSON()).find(item => item.name === "mainer");
+  assert.ok(command.options.some(option => option.name === "panel"));
+  assert.ok(command.options.find(option => option.name === "set").options.some(option => option.name === "main-channel"));
 });
 
 test("support ticket transitions prevent stale actions and keep transcript failure retryable", () => {
