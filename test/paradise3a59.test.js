@@ -5,7 +5,7 @@ import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
-  localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, PARADISE_GUIDE_TR_COPY, recordParadiseLeaderboardAudit,
+  localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, tryoutAnnouncementMarkdown,
@@ -44,6 +44,8 @@ test("approved challenge results validate first and commit leaderboard, ticket a
   assert.match(String(result.state.leaderboards.guild.winner.availability.immunityUntil), /^178/);
   assert.match(String(result.state.leaderboards.guild.loser.availability.cooldownUntil), /^178/);
   assert.equal(result.state.staffActivity.ref.referee.length, 1);
+  assert.equal(result.state.challengeAudits.guild[0].action, "approved");
+  assert.equal(result.state.challengeAudits.guild[0].ticketId, "ticket");
 });
 
 test("challenge result rejects a closed or mismatched ticket without changing state", () => {
@@ -67,6 +69,16 @@ test("leaderboard manual audit is guild-scoped and bounded", () => {
   assert.equal(state.leaderboardHistory["guild-a"].length, 1);
   assert.equal(state.leaderboardHistory["guild-a"][0].metadata.rank, 8);
   assert.equal(state.leaderboardHistory["guild-b"][0].action, "clear");
+});
+
+test("challenge approval audit is guild-scoped and redacts sensitive metadata", () => {
+  const state = { challengeAudits: {} };
+  recordParadiseChallengeAudit(state, {
+    guildId: "guild", action: "denied", actorId: "manager", submissionId: "submission", ticketId: "ticket",
+    metadata: { note: "FIMA-ABCD-EFGH-IJKL" }, now: "2026-07-12T12:00:00.000Z"
+  });
+  assert.equal(state.challengeAudits.guild[0].action, "denied");
+  assert.doesNotMatch(JSON.stringify(state.challengeAudits.guild[0]), /FIMA-ABCD/);
 });
 
 test("Paradise log envelopes classify events and redact private credential material", () => {
@@ -614,6 +626,8 @@ test("challenge score submissions require a referee, valid score and the open ti
   assert.match(source, /if \(!await canWorkReferee\(interaction\.member\)\) return interaction\.reply/);
   assert.match(source, /Submit the score inside an open Paradise challenge ticket/);
   assert.match(source, /Winner and loser must be the two fighters recorded in this challenge ticket/);
+  assert.match(source, /resolveParadiseChallengeCoReferee/);
+  assert.match(source, /recordParadiseChallengeAudit/);
 });
 
 test("challenge tickets and leaderboards stay isolated between managed guilds", () => {

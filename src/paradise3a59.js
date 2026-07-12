@@ -397,7 +397,7 @@ const EMPTY_STATE = Object.freeze({
   rosters: {}, lineups: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
-  applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}, paradiseLogs: {}
+  applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}, paradiseLogs: {}, challengeAudits: {}
 });
 let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_PARADISE_FOOTER_BRAND } });
 
@@ -1142,7 +1142,8 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("result").setDescription("Submit a challenge result for approval")
         .addUserOption(o => o.setName("winner").setDescription("Winner").setRequired(true))
         .addUserOption(o => o.setName("loser").setDescription("Loser").setRequired(true))
-        .addStringOption(o => o.setName("score").setDescription("Score, e.g. 10-4 or Auto").setRequired(true)))
+        .addStringOption(o => o.setName("score").setDescription("Score, e.g. 10-4 or Auto").setRequired(true))
+        .addUserOption(o => o.setName("co_ref").setDescription("Optional co-referee")))
       .addSubcommand(s => s.setName("post").setDescription("Post a referee score for manager approval")
         .addUserOption(o => o.setName("winner").setDescription("Winner").setRequired(true))
         .addUserOption(o => o.setName("loser").setDescription("Loser").setRequired(true))
@@ -1150,6 +1151,7 @@ export function paradiseCommands() {
         .addIntegerOption(o => o.setName("winner_spot").setDescription("Winner leaderboard spot").setMinValue(1).setMaxValue(30))
         .addIntegerOption(o => o.setName("loser_spot").setDescription("Loser leaderboard spot").setMinValue(1).setMaxValue(30))
         .addStringOption(o => o.setName("note").setDescription("Optional referee note"))
+        .addUserOption(o => o.setName("co_ref").setDescription("Optional co-referee"))
         .addStringOption(o => o.setName("ticket_id").setDescription("Challenge ticket ID")))
       .addSubcommand(s => s.setName("autowin").setDescription("Submit an in-ticket automatic win for approval")
         .addUserOption(o => o.setName("winner").setDescription("Automatic winner").setRequired(true))
@@ -1161,7 +1163,8 @@ export function paradiseCommands() {
             { name: "Disqualified", value: "disqualified" },
             { name: "Closed by staff", value: "closed" }
           ))
-        .addStringOption(o => o.setName("note").setDescription("Optional staff note")))
+        .addStringOption(o => o.setName("note").setDescription("Optional staff note"))
+        .addUserOption(o => o.setName("co_ref").setDescription("Optional co-referee")))
       .addSubcommand(s => s.setName("close").setDescription("Close this challenge and remove player access")
         .addStringOption(o => o.setName("reason").setDescription("Closure reason").setRequired(true))),
     new SlashCommandBuilder().setName("paradisetraining").setNameLocalizations({ tr: "antrenman" }).setDescription("Paradise training lifecycle").setDescriptionLocalizations({ tr: "Paradise antrenman başlatma ve bitirme sistemi" })
@@ -3329,6 +3332,23 @@ async function createChallengeTicket(interaction, opponent, region = null) {
   return interaction.reply({ content: `Challenge ticket created: ${channel}`, ephemeral: true });
 }
 
+async function resolveParadiseChallengeCoReferee(interaction) {
+  const coReferee = interaction.options.getUser("co_ref");
+  if (!coReferee) return null;
+  if (coReferee.id === interaction.user.id) {
+    const error = new Error("challenge_co_referee_must_differ");
+    error.code = "challenge_co_referee_must_differ";
+    throw error;
+  }
+  const member = await interaction.guild.members.fetch(coReferee.id).catch(() => null);
+  if (!member || !await canWorkReferee(member)) {
+    const error = new Error("challenge_co_referee_not_authorized");
+    error.code = "challenge_co_referee_not_authorized";
+    throw error;
+  }
+  return coReferee;
+}
+
 async function handleChallenge(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "create") {
@@ -3372,6 +3392,12 @@ async function handleChallenge(interaction) {
     const loser = await interaction.client.users.fetch(loserId);
     const submissionId = crypto.randomUUID();
     const reason = interaction.options.getString("reason");
+    let coReferee;
+    try {
+      coReferee = await resolveParadiseChallengeCoReferee(interaction);
+    } catch {
+      return interaction.reply({ content: "Co-referee must be another authorized referee.", ephemeral: true });
+    }
     const submission = {
       status: "pending",
       guildId: interaction.guildId,
@@ -3383,6 +3409,8 @@ async function handleChallenge(interaction) {
       winnerSpot: winner.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot,
       loserSpot: loserId === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot,
       note: `${reason}${interaction.options.getString("note") ? ` — ${interaction.options.getString("note")}` : ""}`,
+      strikeReason: reason,
+      coRefereeId: coReferee?.id || null,
       ticketId: interaction.channelId,
       createdAt: new Date().toISOString()
     };
@@ -3399,6 +3427,7 @@ async function handleChallenge(interaction) {
           { name: "Winner", value: `${winner}`, inline: true },
           { name: "Result", value: `**Auto — ${reason}**`, inline: true },
           { name: "Referee", value: `${interaction.user}`, inline: true },
+          ...(coReferee ? [{ name: "Co-referee", value: `${coReferee}`, inline: true }] : []),
           { name: "Ticket ID", value: interaction.channelId, inline: false }
         ).setFooter(paradiseFooter("Senior referee approval required"))],
       components: [approvalRow]
@@ -3426,6 +3455,12 @@ async function handleChallenge(interaction) {
   if (!await completedProfile(submittedWinner.id, interaction.guildId) || !await completedProfile(submittedLoser.id, interaction.guildId)) {
     return interaction.reply({ content: "Winner and loser must both have completed Paradise fighter profiles.", ephemeral: true });
   }
+  let coReferee;
+  try {
+    coReferee = await resolveParadiseChallengeCoReferee(interaction);
+  } catch {
+    return interaction.reply({ content: "Co-referee must be another authorized referee.", ephemeral: true });
+  }
   const submissionId = crypto.randomUUID();
   const submission = {
     status: "pending", guildId: interaction.guildId, winnerId: submittedWinner.id, loserId: submittedLoser.id, score: submittedScore,
@@ -3433,6 +3468,8 @@ async function handleChallenge(interaction) {
     winnerSpot: sub === "post" ? (interaction.options.getInteger("winner_spot") ?? (submittedWinner.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot)) : (submittedWinner.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot),
     loserSpot: sub === "post" ? (interaction.options.getInteger("loser_spot") ?? (submittedLoser.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot)) : (submittedLoser.id === ticket.challengerId ? ticket.challengerSpot : ticket.opponentSpot),
     note: sub === "post" ? interaction.options.getString("note") : null,
+    strikeReason: submittedScore === "Auto" ? (sub === "post" ? interaction.options.getString("note") : null) : null,
+    coRefereeId: coReferee?.id || null,
     ticketId,
     createdAt: new Date().toISOString()
   };
@@ -3447,6 +3484,7 @@ async function handleChallenge(interaction) {
     .addFields(
       { name: "Score", value: submittedScore, inline: true },
       { name: "Referee", value: `${interaction.user}`, inline: true },
+      ...(coReferee ? [{ name: "Co-referee", value: `${coReferee}`, inline: true }] : []),
       { name: "Note", value: submission.note || "—", inline: false },
       { name: "Ticket ID", value: submission.ticketId || "—", inline: true },
       { name: "Status", value: "Pending Referee Manager / Experienced Referee approval", inline: false }
@@ -3476,6 +3514,29 @@ export function normalizeParadiseChallengeScore(value) {
     throw error;
   }
   return `${left}-${right}`;
+}
+
+export function recordParadiseChallengeAudit(state, {
+  guildId,
+  action,
+  actorId,
+  submissionId = null,
+  ticketId = null,
+  metadata = {},
+  now = new Date().toISOString()
+} = {}) {
+  if (!state || !guildId || !action) return state;
+  state.challengeAudits = state.challengeAudits || {};
+  const existing = Array.isArray(state.challengeAudits[guildId]) ? state.challengeAudits[guildId].slice(-99) : [];
+  state.challengeAudits[guildId] = [...existing, {
+    action: String(action).slice(0, 48),
+    actorId: String(actorId || "system").slice(0, 32),
+    submissionId: submissionId ? String(submissionId).slice(0, 80) : null,
+    ticketId: ticketId ? String(ticketId).slice(0, 80) : null,
+    metadata: redactParadiseLogValue(metadata),
+    at: new Date(now).toISOString()
+  }];
+  return state;
 }
 
 // Keep the persistent part of an approved challenge result together.  The
@@ -3558,6 +3619,23 @@ export function applyApprovedParadiseChallengeResult(state, {
   const activity = next.staffActivity[record.refereeId] || {};
   activity.referee = [...(activity.referee || []), timestamp];
   next.staffActivity[record.refereeId] = activity;
+  recordParadiseChallengeAudit(next, {
+    guildId: record.guildId,
+    action: "approved",
+    actorId: approvedBy,
+    submissionId,
+    ticketId: record.ticketId,
+    now: timestamp,
+    metadata: {
+      resultType: record.resultType || "score",
+      winnerId: record.winnerId,
+      loserId: record.loserId,
+      score: normalizedScore,
+      refereeId: record.refereeId,
+      coRefereeId: record.coRefereeId || null,
+      strikeReason: record.strikeReason || null
+    }
+  });
   return { state: next, record: approvedRecord, ticket: closedTicket, history };
 }
 
@@ -3594,6 +3672,14 @@ async function handleChallengeApproval(interaction) {
   if (action === "deny") {
     await saveState(state => {
       state.pendingChallenges[id] = { ...record, status: "denied", deniedBy: interaction.user.id, decidedAt: new Date().toISOString() };
+      recordParadiseChallengeAudit(state, {
+        guildId: interaction.guildId,
+        action: "denied",
+        actorId: interaction.user.id,
+        submissionId: id,
+        ticketId: record.ticketId,
+        metadata: { refereeId: record.refereeId, resultType: record.resultType || "score" }
+      });
       return state;
     });
     pendingChallenges.delete(id);
