@@ -11,23 +11,24 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
   <title>Paradise Owner Console</title>
   <style>
     :root{--brand:#8b5cf6;--brand-rgb:139,92,246;--brand-soft:rgba(var(--brand-rgb),.18);--bg:#0d0914;--panel:#171121;--panel2:#20182d;--line:#392b4e;--text:#faf8ff;--muted:#b8aec8;--good:#68e6aa;--warn:#ffd171;--bad:#ff7894}
-    *{box-sizing:border-box}[hidden]{display:none!important}html{scroll-behavior:smooth;scrollbar-color:var(--brand) #100b18;scrollbar-width:thin}::-webkit-scrollbar{width:11px;height:11px}::-webkit-scrollbar-track{background:#100b18}::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--brand),#4d2d78);border:2px solid #100b18;border-radius:999px}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% -10%,var(--brand-soft),transparent 32%),radial-gradient(circle at 90% 12%,#3b1d5b33,transparent 30%),linear-gradient(145deg,var(--bg),#09070e 62%,#110a18);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif;overflow-x:hidden}body:before{content:"";position:fixed;z-index:-1;width:44vw;height:44vw;left:-16vw;top:42vh;border-radius:50%;background:radial-gradient(circle,var(--brand-soft),transparent 66%);filter:blur(10px);animation:ambientDrift 16s ease-in-out infinite alternate}@keyframes ambientDrift{to{transform:translate(24vw,-20vh) scale(1.18);opacity:.68}}
+    *{box-sizing:border-box}[hidden]{display:none!important}html{scroll-behavior:smooth;scrollbar-color:var(--brand) #100b18;scrollbar-width:thin}::-webkit-scrollbar{width:11px;height:11px}::-webkit-scrollbar-track{background:#100b18}::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--brand),#4d2d78);border:2px solid #100b18;border-radius:999px}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% -10%,var(--brand-soft),transparent 32%),radial-gradient(circle at 90% 12%,#3b1d5b33,transparent 30%),linear-gradient(145deg,var(--bg),#09070e 62%,#110a18);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif;overflow-x:hidden}body:before{content:"";position:fixed;z-index:-1;width:44vw;height:44vw;left:-16vw;top:42vh;border-radius:50%;background:radial-gradient(circle,var(--brand-soft),transparent 66%);filter:blur(10px);animation:ambientDrift 16s ease-in-out infinite alternate}body:after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(115deg,rgba(var(--brand-rgb),.14),transparent 28%,#38bdf833 52%,transparent 74%),radial-gradient(circle at 72% 18%,rgba(var(--brand-rgb),.16),transparent 34%),linear-gradient(rgba(255,255,255,.026) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:auto,auto,48px 48px,48px 48px;mix-blend-mode:screen;opacity:.72;animation:auroraPulse 22s ease-in-out infinite alternate}@keyframes ambientDrift{to{transform:translate(24vw,-20vh) scale(1.18);opacity:.68}}@keyframes auroraPulse{from{filter:hue-rotate(0deg) saturate(1);transform:translate3d(0,0,0)}to{filter:hue-rotate(18deg) saturate(1.25);transform:translate3d(-18px,12px,0)}}
     main{width:min(1460px,calc(100% - 28px));margin:22px auto 60px}.hero,.panel{border:1px solid var(--line);background:linear-gradient(145deg,rgba(31,23,44,.94),rgba(18,13,27,.97));border-radius:18px;box-shadow:0 22px 70px #0007,0 1px 0 #ffffff0b inset;backdrop-filter:blur(14px)}
-    .hero{padding:26px;border-left:5px solid var(--brand);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;inset:-80% -10% auto 55%;height:240px;background:radial-gradient(circle,var(--brand-soft),transparent 68%);pointer-events:none}.badge{color:#ddd5ea;font-weight:900;text-transform:uppercase;letter-spacing:.11em;font-size:12px}
+    .hero{padding:26px;border-left:5px solid var(--brand);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;inset:-80% -10% auto 55%;height:240px;background:radial-gradient(circle,var(--brand-soft),transparent 68%);pointer-events:none}.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,#ffffff0d,transparent 38%,var(--brand-soft));opacity:.72;pointer-events:none}.badge{color:#ddd5ea;font-weight:900;text-transform:uppercase;letter-spacing:.11em;font-size:12px}
     h1{font-size:clamp(30px,5vw,44px);margin:7px 0 4px}h2{margin:0 0 4px;font-size:21px}h3{margin:18px 0 8px;font-size:15px;color:#ddd9e3}.muted,.help{color:var(--muted)}.help{margin:4px 0 14px;font-size:13px;line-height:1.45}
     .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.chip{border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#0c0b10;color:#d8d4dd;font-size:12px}.chip.good{border-color:#23583d;color:var(--good)}.chip.bad{border-color:#6a2937;color:var(--bad)}
-    .console-shell{display:grid;grid-template-columns:255px minmax(0,1fr);gap:16px;margin-top:16px}.page-nav{position:sticky;top:14px;align-self:start;padding:12px;max-height:calc(100vh - 28px);overflow:auto;overscroll-behavior:contain}.page-nav button{margin:3px 0;text-align:left;background:transparent;border-color:transparent;color:var(--muted);font-weight:750;transition:.18s ease}.page-nav button:hover,.page-nav button.active{color:#fff;background:linear-gradient(90deg,var(--brand-soft),transparent);border-color:#ffffff12;transform:translateX(3px)}.page-nav small{display:block;padding:8px 10px;color:#7f748e;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
+    .console-shell{display:grid;grid-template-columns:255px minmax(0,1fr);gap:16px;margin-top:16px}.page-nav{position:sticky;top:14px;align-self:start;padding:12px;max-height:calc(100vh - 28px);overflow:auto;overscroll-behavior:contain;background:linear-gradient(180deg,rgba(27,19,39,.92),rgba(13,9,20,.92));box-shadow:0 18px 60px #0007}.page-nav button{margin:4px 0;text-align:left;background:transparent;border-color:transparent;color:var(--muted);font-weight:750;transition:.18s ease;border-radius:13px}.page-nav button:hover,.page-nav button.active{color:#fff;background:linear-gradient(90deg,var(--brand-soft),#ffffff06,transparent);border-color:#ffffff18;transform:translateX(3px);box-shadow:0 8px 26px #0005}.page-nav button.active{box-shadow:inset 3px 0 0 var(--brand),0 8px 26px #0005}.page-nav small{display:block;padding:8px 10px;color:#9b90ad;text-transform:uppercase;letter-spacing:.12em;font-weight:800}
     .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.stack{display:grid;gap:14px}.panel{padding:22px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}.panel:hover{border-color:color-mix(in srgb,var(--brand) 44%,var(--line));box-shadow:0 26px 80px #0008,0 0 0 1px var(--brand-soft)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
     label{display:block;margin:10px 0 6px;font-weight:800;font-size:13px}input,select,textarea,button,a.button{width:100%;border-radius:11px;border:1px solid var(--line);background:#0d0914;color:#fff;padding:11px;font:inherit;transition:border-color .18s,box-shadow .18s,transform .18s}
     input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}textarea{min-height:120px;resize:vertical}button,a.button{display:block;position:relative;overflow:hidden;text-align:center;text-decoration:none;margin-top:11px;background:linear-gradient(135deg,var(--brand),#4d2d78);border-color:#ffffff25;font-weight:900;cursor:pointer}button:after,a.button:after{content:"";position:absolute;inset:-80% auto -80% -35%;width:24%;transform:rotate(18deg);background:#ffffff22;transition:left .45s ease}button:hover:after,a.button:hover:after{left:120%}button:hover,a.button:hover{transform:translateY(-2px);filter:brightness(1.12);box-shadow:0 10px 28px var(--brand-soft)}button:active,a.button:active{transform:translateY(0) scale(.99)}button:disabled{opacity:.55;cursor:wait;transform:none}
-    button.secondary{background:linear-gradient(145deg,#251b34,#15101e)}button.audit-action{background:linear-gradient(135deg,#2563eb,#4f46e5)}button.backup-action{background:linear-gradient(135deg,#0f766e,#115e59)}button.preview-action{background:linear-gradient(135deg,#a16207,#7c2d12)}.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border:1px solid #6e607f;border-radius:50%;font-size:11px;color:#e5dcf0;cursor:help;position:relative}.tip:hover:after{content:attr(title);position:absolute;z-index:20;left:24px;top:-8px;width:240px;padding:9px 11px;border-radius:9px;background:#09070e;border:1px solid var(--line);color:#eee7f7;box-shadow:0 10px 30px #000a;font-weight:500;line-height:1.35}
+    button.primary{background:linear-gradient(135deg,var(--brand),#22d3ee)}button.success{background:linear-gradient(135deg,#10b981,#047857)}button.ghost{background:#ffffff08;border-color:#ffffff20}button.danger-button{background:linear-gradient(135deg,#ef4444,#7f1d1d)}button.secondary{background:linear-gradient(145deg,#251b34,#15101e)}button.audit-action{background:linear-gradient(135deg,#2563eb,#4f46e5)}button.backup-action{background:linear-gradient(135deg,#0f766e,#115e59)}button.preview-action{background:linear-gradient(135deg,#a16207,#7c2d12)}.tip{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:5px;border:1px solid #6e607f;border-radius:50%;font-size:11px;color:#e5dcf0;cursor:help;position:relative}.tip:hover:after{content:attr(title);position:absolute;z-index:20;left:24px;top:-8px;width:240px;padding:9px 11px;border-radius:9px;background:#09070e;border:1px solid var(--line);color:#eee7f7;box-shadow:0 10px 30px #000a;font-weight:500;line-height:1.35}
     .switch{display:flex;gap:9px;align-items:center;font-weight:700;margin:9px 0}.switch input{width:auto}.color-row{display:grid;grid-template-columns:72px 1fr;gap:10px}.color-row input[type=color]{height:45px;padding:3px}
     .mapping{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(180px,1.2fr);gap:8px;align-items:center;margin:7px 0}.mapping label{margin:0}.search-select{position:relative}.search-select input{padding-right:38px}.search-select:after{content:"⌕";position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}.mapping-status{display:block;margin-top:4px;color:var(--muted);font-size:11px}.mapping-status.missing{color:var(--bad)}.danger{border-color:#6a2937;background:linear-gradient(180deg,#241016,#110b0e)}.danger h2{color:#ff9aaa}.notice{padding:12px;border:1px solid #55451f;background:#1c170c;border-radius:10px;color:#ffe0a0;line-height:1.5}
     .status{white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;background:#0b0711;border:1px solid var(--line);border-radius:11px;padding:12px;color:#d7d3dc;font:12px ui-monospace,Consolas,monospace}.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric{padding:15px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,#21182f,#120e1a)}.metric b{display:block;font-size:25px;margin-bottom:4px}.metric span{color:var(--muted);font-size:12px}
     .toast{position:fixed;z-index:100;right:18px;bottom:18px;max-width:420px;padding:14px 17px;border-radius:12px;background:#1e162a;border:1px solid var(--line);box-shadow:0 15px 45px #0009;display:none;animation:toastIn .2s ease}.toast.ok{display:block;color:var(--good)}.toast.error{display:block;color:var(--bad)}@keyframes toastIn{from{opacity:0;transform:translateY(8px)}}
     .access{max-width:720px;margin:10vh auto 0;text-align:center;padding:34px}.access-icon{width:54px;height:54px;margin:0 auto 16px;display:grid;place-items:center;border:1px solid var(--line);border-radius:16px;background:#09090c;font-size:25px}.access-actions{display:flex;gap:10px;justify-content:center;margin-top:20px}.access-actions .button{width:auto;min-width:190px}.template-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.template-card{padding:14px;border:1px solid var(--line);border-radius:12px;background:#0b0a0e;text-align:left}.template-card strong,.template-card span{display:block}.template-card span{color:var(--muted);font-size:12px;margin-top:5px;line-height:1.4}.template-card.is-active{border-color:var(--good);box-shadow:0 0 0 1px #23583d}.preview-card{margin-top:10px;padding:15px;border-left:5px solid var(--brand);background:#09090c;border-radius:10px}.permission-list{display:grid;gap:8px}.permission-item{padding:11px;border:1px solid var(--line);border-radius:10px;background:#0a090d}.permission-item strong{display:block;margin-bottom:4px}.guide-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    .hero-actions{display:grid;grid-template-columns:minmax(220px,420px) minmax(150px,220px) auto;gap:10px;align-items:end;margin-top:17px;position:relative;z-index:1}.hero-actions label{margin:0}.dirty{color:var(--warn);font-size:12px;font-weight:800}.loading{position:fixed;z-index:90;inset:0;background:#09070ed6;display:grid;place-items:center}.spinner{width:48px;height:48px;border:4px solid #ffffff1f;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.theme-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.theme-pills button{background:#191222}.theme-pills button.is-active{box-shadow:0 0 0 2px var(--brand) inset}.operation-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.audit-summary{margin-top:12px;max-height:360px}
-    @media(max-width:980px){.console-shell{grid-template-columns:1fr}.page-nav{position:sticky;top:0;z-index:30;display:flex;overflow:auto;gap:5px;padding:8px;background:#100b19ee}.page-nav small{display:none}.page-nav button{min-width:max-content;margin:0}.metric-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){main{width:min(100% - 18px,1460px)}.grid,.grid.three,.template-cards,.guide-actions,.metric-grid,.hero-actions{grid-template-columns:1fr}.mapping{grid-template-columns:1fr}.mapping label{margin-top:8px}.access-actions{flex-direction:column}.access-actions .button{width:100%}.hero,.panel{border-radius:14px}.panel{padding:17px}}
+    .hero-toggle{position:absolute;right:18px;top:18px;z-index:3;width:auto;min-width:118px;margin:0;padding:9px 12px;background:#ffffff0b;border-color:#ffffff25}.hero.is-collapsed{padding:18px 26px}.hero.is-collapsed p,.hero.is-collapsed .chips,.hero.is-collapsed .hero-actions{display:none}.hero-actions{display:grid;grid-template-columns:minmax(220px,420px) minmax(150px,220px) auto;gap:10px;align-items:end;margin-top:17px;position:relative;z-index:1;padding:12px;border:1px solid #ffffff12;border-radius:15px;background:linear-gradient(135deg,#ffffff0b,#00000020)}.hero-actions label{margin:0}.dirty{color:var(--warn);font-size:12px;font-weight:800;align-self:center;justify-self:end;padding:9px 11px;border-radius:999px;background:#0000002d;border:1px solid #ffffff12}.loading{position:fixed;z-index:90;inset:0;background:#09070ed6;display:grid;place-items:center}.spinner{width:48px;height:48px;border:4px solid #ffffff1f;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.theme-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.theme-pills button{background:#191222}.theme-pills button.is-active{box-shadow:0 0 0 2px var(--brand) inset}.operation-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.audit-summary{margin-top:12px;max-height:360px}
+    .community-builder{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}.community-preview-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);gap:12px;margin-top:12px}.community-device{min-height:260px;padding:14px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(160deg,#111018,#08070c);overflow:auto}.community-device.mobile{max-width:360px;justify-self:stretch}.community-tree{display:grid;gap:11px}.community-category{padding:9px;border:1px solid #ffffff12;border-radius:10px;background:#ffffff05}.community-category b{display:block;margin-bottom:7px;color:#fff}.community-channel{display:block;padding:4px 7px;color:#cfc7db;font-size:12px}.community-channel.private{color:#d9a8ff}.community-channel.important{color:#ffe09a}.community-safety{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.community-safety span{padding:6px 9px;border:1px solid #24563f;border-radius:999px;background:#0e281d;color:var(--good);font-size:11px;font-weight:800}.community-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}.community-detail-grid .status{max-height:330px}.community-actions{grid-template-columns:repeat(3,minmax(0,1fr))}.community-actions button[data-safe-only="true"]{background:linear-gradient(135deg,#334155,#1e293b)}.community-operation-status{margin-top:12px;max-height:260px}
+    @media(max-width:980px){.console-shell{grid-template-columns:1fr}.page-nav{position:sticky;top:0;z-index:30;display:flex;overflow:auto;gap:5px;padding:8px;background:#100b19ee}.page-nav small{display:none}.page-nav button{min-width:max-content;margin:0}.metric-grid{grid-template-columns:repeat(2,1fr)}.community-preview-grid,.community-detail-grid{grid-template-columns:1fr}.community-device.mobile{max-width:none}}@media(max-width:700px){main{width:min(100% - 18px,1460px)}.grid,.grid.three,.template-cards,.guide-actions,.metric-grid,.hero-actions,.community-actions{grid-template-columns:1fr}.mapping{grid-template-columns:1fr}.mapping label{margin-top:8px}.access-actions{flex-direction:column}.access-actions .button{width:100%}.hero,.panel{border-radius:14px}.panel{padding:17px}}
   </style>
 </head>
 <body>
@@ -41,6 +42,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
   </section>
   <div id="console" hidden>
   <section class="hero">
+    <button class="hero-toggle ghost" id="heroToggle" type="button" aria-expanded="true">Collapse ▴</button>
     <div class="badge">Owner-only · Fima account + Discord identity protected</div>
     <h1>Paradise Operations Console</h1>
     <p class="muted">Multi-server operations, templates, transcripts, staff workflows and safe setup metadata. No bot credential is exposed here.</p>
@@ -132,12 +134,46 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         <h3>Dashboard theme</h3>
         <div class="theme-pills"><button type="button" data-theme="paradise">Paradise Purple</button><button type="button" data-theme="charcoal">Charcoal</button><button type="button" data-theme="midnight">Midnight</button></div>
         <div class="grid">
-          <label>Message density<select id="messageDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
-          <label>Separator style<select id="separatorStyle"><option value="diamond">Diamond</option><option value="line">Line</option><option value="minimal">Minimal</option></select></label>
-          <label>Footer style<select id="footerStyle"><option value="branded">Made by Paradise</option><option value="compact">Compact</option></select></label>
+          <label>Message density <span class="tip" title="Rahat görünüm daha ferah kartlar üretir; sıkı görünüm uzun listeleri daha kısa ve okunabilir tutar.">?</span><select id="messageDensity"><option value="comfortable">Rahat görünüm / Comfortable</option><option value="compact">Sıkı görünüm / Compact</option></select></label>
+          <label>Separator style <span class="tip" title="Leaderboard ve guide kartlarında kullanılan ayırıcı stilini belirler. Line seçeneği top boardlarda line GIF hissine daha yakındır.">?</span><select id="separatorStyle"><option value="diamond">Diamond</option><option value="line">Line</option><option value="minimal">Minimal</option></select></label>
+          <label>Footer style <span class="tip" title="Discord mesajlarının altındaki imza tarzı. Kısa mod kalabalık panolarda daha temiz görünür.">?</span><select id="footerStyle"><option value="branded">Made By Fieel / Paradise</option><option value="compact">Kısa footer / Compact</option></select></label>
           <label>Default language<select id="defaultLanguage"><option value="en">English</option><option value="tr">Türkçe</option></select></label>
         </div>
-        <div class="preview-card" id="brandPreview"><b>✦ Paradise premium embed</b><p class="help">Structured headings, readable spacing, a configurable accent and “Made by Paradise” footer.</p></div>
+        <div class="preview-card" id="brandPreview"><b>✦ Paradise premium embed</b><p class="help">Structured headings, readable spacing, a configurable accent and “Made By Fieel” footer.</p></div>
+        <div class="community-builder" id="communityStructureBuilder">
+          <h3>Fieel's Community — Identity &amp; Structure</h3>
+          <p class="help">Design the international server tree while preserving existing role/channel IDs. The Turkish area is language-role based, hidden from @everyone and contains only Turkish Chat, Media, Announcements and Voice.</p>
+          <div class="notice">Live production mutation is disabled. These controls save drafts and produce auditable plans only; test-guild application still stops before the final Discord mutation and requires screenshots, validation and owner confirmation.</div>
+          <div class="community-safety" id="communityStructureSafety"><span>Loading safe policy…</span></div>
+          <div class="grid three">
+            <label>Preview language<select id="communityNamingLanguage"><option value="en">English names</option><option value="tr">Türkçe adlar</option></select></label>
+            <label>Category frame<input id="communityCategoryFrame" maxlength="64" value="╾━ {name} ━╼"></label>
+            <label>Role separator<input id="communityRoleSeparatorStyle" maxlength="64" value="╺╾ {name} ╼╸"></label>
+            <label>Important marker<input id="communityImportantMarker" maxlength="8" value="⫸"></label>
+            <label>Normal marker<input id="communityNormalMarker" maxlength="8" value="⟢"></label>
+            <label>Private marker<input id="communityPrivateMarker" maxlength="8" value="⫷"></label>
+            <label>Text separator<input id="communityTextSeparator" maxlength="8" value="・"></label>
+            <label>Voice style<input id="communityVoiceStyle" maxlength="64" value="⟢ {name}"></label>
+          </div>
+          <div class="community-preview-grid">
+            <div><h3>Desktop tree</h3><div class="community-device" id="communityDesktopPreview">Loading structure…</div></div>
+            <div><h3>Mobile tree</h3><div class="community-device mobile" id="communityMobilePreview">Loading structure…</div></div>
+          </div>
+          <div class="community-detail-grid">
+            <div><h3>Current → proposed</h3><pre class="status" id="communityMappingPreview">No mapping loaded.</pre></div>
+            <div><h3>Role tree</h3><pre class="status" id="communityRolePreview">No role plan loaded.</pre></div>
+            <div><h3>Persona checks</h3><pre class="status" id="communityPersonaPreview">No persona matrix loaded.</pre></div>
+          </div>
+          <div class="operation-actions community-actions">
+            <button class="preview-action" id="previewCommunityStructure">Preview</button>
+            <button class="primary" id="saveCommunityStructureDraft">Save Draft</button>
+            <button class="success" id="applyCommunityTestGuild">Apply Test Guild</button>
+            <button class="secondary" data-safe-only="true" id="compareCommunityStructure">Compare</button>
+            <button class="secondary" data-safe-only="true" id="renameExistingCommunity">Rename Existing</button>
+            <button class="secondary" data-safe-only="true" id="rollbackCommunityStructure">Rollback</button>
+          </div>
+          <pre class="status community-operation-status" id="communityOperationStatus">All Community actions are preview-only until the safety gates are satisfied.</pre>
+        </div>
         <div class="operation-actions setup-actions">
           <button class="preview-action" id="previewSelectedSetup">Preview setup</button>
           <button class="success" id="createMissingSetup">Create missing only</button>
@@ -240,7 +276,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         </div>
       </section>
 
-      <section class="panel" data-page="security">
+      <section class="panel" data-page="moderation">
         <h2>Security boundaries</h2>
         <p class="help">Owner access requires both a valid Fima session and the linked owner Discord identity. Mutations use a short-lived CSRF token, credentialed official-origin requests and audited owner-action headers.</p>
         <div class="permission-list">
@@ -266,6 +302,8 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
       <section class="panel" data-page="guides">
         <h2>Guide & handbook repost</h2>
         <p class="help">Updates existing premium black TR/EN guide messages where possible. This sends Discord messages and is recorded in the audit log.</p>
+        <a class="button primary" href="${apiBase}/paradise/content-studio">Open Content Studio / Embed Builder</a>
+        <p class="help">Create, import, version, preview and publish multi-embed messages. Publishing is hard-limited to the isolated test guild.</p>
         <div class="guide-actions">
           <button data-guide-mode="community">Repost Community guides</button>
           <button data-guide-mode="clan">Repost Clan guides</button>
@@ -300,7 +338,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
           <label class="switch"><input id="rosterShowStage" type="checkbox"> Show Stage / Level / Strength</label>
           <label class="switch"><input id="rosterShowRegion" type="checkbox"> Show region</label>
           <label>Lineup member limit<input id="lineupLimit" type="number" min="5" max="50"></label>
-          <label>Board density<select id="rosterDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+          <label>Board density <span class="tip" title="Rahat görünüm kadro kartlarını daha ferah yapar. Sıkı görünüm uzun roster/lineup panolarında daha az yer kaplar.">?</span><select id="rosterDensity"><option value="comfortable">Rahat görünüm / Comfortable</option><option value="compact">Sıkı görünüm / Compact</option></select></label>
         </div>
         <button data-save="roster">Save roster policy</button>
       </section>
@@ -335,15 +373,23 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
 
       <section class="panel" data-page="applications">
         <h2>Application settings</h2>
-        <p class="help">Every application enters a private review queue. Role grants remain optional and are blocked above both the reviewer and Paradise bot role.</p>
+        <p class="help">Fieel’s Community exposes only the Helper entry application. Higher staff ranks are internal promotions; Partner and Reseller use the separate business workflow. Every submission enters a private review queue.</p>
         <div class="grid">
           <label class="switch"><input id="applicationsEnabled" type="checkbox"> Enable application forms</label>
           <label>Application cooldown days<input id="applicationCooldownDays" type="number" min="0" max="365"></label>
-          <label class="switch"><input id="applicationAutoGrant" type="checkbox"> Grant mapped role after safe approval</label>
+          <label class="switch"><input id="applicationAutoGrant" type="checkbox"> Grant Helper after safe approval</label>
           <label class="switch"><input id="applicationBlockBlacklisted" type="checkbox"> Block blacklisted applicants</label>
         </div>
+        <div class="grid">
+          <label>Panel title<input id="applicationPanelTitle" maxlength="80" placeholder="FIEEL’S COMMUNITY · HELPER / İŞ ORTAKLIĞI"></label>
+          <label>Panel button label<input id="applicationPanelButtonLabel" maxlength="40" placeholder="Helper / İş Ortaklığı"></label>
+        </div>
+        <label for="applicationPanelDescription">Panel description</label>
+        <textarea id="applicationPanelDescription" maxlength="1200" placeholder="Explain the Helper-only public staff entry and the separate Partner / Reseller workflow."></textarea>
         <label for="applicationQuestions">Extra question JSON <span class="tip" title="Optional advanced questions. Standard motivation, experience and availability questions always remain available.">?</span></label>
         <textarea id="applicationQuestions" spellcheck="false">{}</textarea>
+        <label for="applicationEvidenceRequirements">Question evidence JSON <span class="tip" title="Set each question to optional or required. Example: {&quot;helper&quot;:{&quot;experience&quot;:&quot;required&quot;}}">?</span></label>
+        <textarea id="applicationEvidenceRequirements" spellcheck="false">{}</textarea>
         <button data-save="applications">Save application policy</button>
       </section>
 
@@ -514,7 +560,42 @@ const UI_TR={
   ,'Require proof on configured challenge results':'Ayarlı challenge sonuçlarında kanıt zorunlu','Board density':'Pano yoğunluğu'
   ,'All settings loaded':'Tüm ayarlar yüklendi','Unsaved changes':'Kaydedilmemiş değişiklikler','Type to search channels…':'Kanal adı yazıp arayın…'
   ,'Type to search roles…':'Rol adı yazıp arayın…','Not configured':'Ayarlanmadı','Safe name fallback':'Güvenli isim yedeği'
+  ,'Paradise Purple':'Paradise Moru','Charcoal':'Kömür','Midnight':'Gece','Footer style':'Alt yazı stili','Made by Paradise':'Made By Fieel','Made By Fieel':'Made By Fieel','Collapse ▴':'Daralt ▴','Expand ▾':'Aç ▾'
+  ,'Save branding':'Markayı kaydet','Missing channel — remap required':'Kanal eksik — yeniden eşleştir','Missing role — remap required':'Rol eksik — yeniden eşleştir'
+  ,'Type to search. Stored as ':'Yazarak ara. Kayıt anahtarı: ','Board density changes how compact public board cards look.':'Pano yoğunluğu, herkese açık kartların ne kadar sıkı görüneceğini belirler.'
+  ,'Rahat görünüm':'Rahat görünüm','Sıkı görünüm':'Sıkı görünüm'
 };
+Object.assign(UI_TR,{
+  'Paradise Operations Console':'Paradise Operasyon Paneli',
+  'Multi-server operations, templates, transcripts, staff workflows and safe setup metadata. No bot credential is exposed here.':'Çoklu sunucu yönetimi, şablonlar, transcriptler, staff akışları ve güvenli kurulum ayarları. Bot gizli bilgileri burada gösterilmez.',
+  'Owner-only · Fima account + Discord identity protected':'Sadece owner · Fima hesabı + Discord kimliği korumalı',
+  'Managed server':'Yönetilen sunucu','Panel language':'Panel dili','All settings loaded':'Tüm ayarlar yüklendi','Unsaved changes':'Kaydedilmemiş değişiklikler',
+  'Operations':'Operasyonlar','Overview':'Genel Bakış','Server Selector':'Sunucu Seçici','Template Setup':'Şablon Kurulumu','Channels':'Kanallar','Roles & permissions':'Roller ve Yetkiler',
+  'Challenges':'Meydan Okumalar','Leaderboard / Profiles':'Sıralama / Profiller','Availability & LOA':'Uygunluk & LOA','Applications':'Başvurular','Tickets & Support':'Ticket & Destek',
+  'Moderation / Security':'Moderasyon / Güvenlik','Blacklist / Appeal / Bail':'Blacklist / İtiraz / Bail','Roster / Lineups / Relations':'Roster / Kadro / İlişkiler',
+  'Events / Daily Question':'Etkinlikler / Günün Sorusu','Voice / Join-to-Create':'Ses / Join-to-Create','XP / Levels':'XP / Seviye','Guides & Embeds':'Rehberler & Embedler',
+  'Branding / Theme / Language':'Marka / Tema / Dil','Logs / Backups / Restore':'Loglar / Yedek / Geri Yükleme','Advanced JSON':'Gelişmiş JSON',
+  'Operations overview':'Operasyon Özeti','Real server discovery':'Gerçek Sunucu İncelemesi','Run deep audit':'Derin Audit Çalıştır','Create structure backup':'Yapı Yedeği Al',
+  'Generate template preview':'Şablon Önizlemesi Oluştur','Identity & installation':'Kimlik & Kurulum','Invite Paradise to another server':'Paradise’ı başka sunucuya davet et',
+  'Selected template':'Seçili şablon','Save selected template':'Seçili şablonu kaydet','Preview setup':'Kurulumu önizle','Create missing only':'Sadece eksikleri oluştur',
+  'Repost guides only':'Sadece rehberleri yenile','Repair permissions':'Yetkileri onar','Start setup':'Kurulumu başlat','Message density':'Mesaj yoğunluğu',
+  'Comfortable':'Rahat görünüm','Compact':'Sıkı görünüm','Board density':'Pano yoğunluğu','Footer style':'Footer stili','Save branding':'Markayı kaydet',
+  'Auto-detect channels (preview only)':'Kanalları otomatik algıla (önizleme)','Preview panels before save':'Kaydetmeden önce panelleri önizle',
+  'Save and repost panel':'Kaydet ve paneli yenile','Open channel in Discord':'Kanalı Discord’da aç','Not configured':'Ayarlanmadı','Safe name fallback':'Güvenli isim yedeği',
+  'No managed server online':'Yönetilebilir sunucu çevrim içi değil','Loading managed servers…':'Yönetilen sunucular yükleniyor…','Checking secure session…':'Güvenli oturum kontrol ediliyor…',
+  'Your Fima login and linked Discord identity are checked without exposing account details.':'Fima girişin ve bağlı Discord kimliğin, hesap detayları gösterilmeden kontrol edilir.',
+  'Sign in to Fima':'Fima’ya giriş yap','Link Discord account':'Discord hesabını bağla','Try again':'Tekrar dene'
+});
+Object.assign(UI_TR,{
+  'Sign in with the Fima account that owns the Paradise console. You will return here after login.':'Paradise panelinin sahibi olan Fima hesabıyla giriş yap. Girişten sonra buraya geri döneceksin.',
+  'Your Fima account is signed in, but Discord is not linked. Link the owner Discord account to continue.':'Fima hesabına giriş yapılmış ama Discord bağlı değil. Devam etmek için owner Discord hesabını bağla.',
+  'This signed-in account is not authorized to open the Paradise owner console.':'Bu Fima hesabı Paradise owner panelini açmaya yetkili değil.',
+  'The secure account check could not be completed. Refresh or try again shortly.':'Güvenli hesap kontrolü tamamlanamadı. Sayfayı yenile veya birazdan tekrar dene.'
+});
+function tUi(source){
+  const language=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||byId('uiLanguage')?.value||'tr'}catch{return'tr'}})();
+  return language==='tr'?(UI_TR[source]||source):source;
+}
 function translateDirectText(element,lang){
   const node=[...element.childNodes].find(item=>item.nodeType===3&&item.nodeValue.trim());if(!node)return;
   if(!element.dataset.enDirectText)element.dataset.enDirectText=node.nodeValue.trim();
@@ -532,6 +613,14 @@ function applyUiLanguage(language){
   document.querySelectorAll('input[placeholder]').forEach(element=>{
     if(!element.dataset.enPlaceholder)element.dataset.enPlaceholder=element.placeholder;
     element.placeholder=lang==='tr'?(UI_TR[element.dataset.enPlaceholder]||element.dataset.enPlaceholder):element.dataset.enPlaceholder;
+  });
+  document.querySelectorAll('[title]').forEach(element=>{
+    if(!element.dataset.enTitle)element.dataset.enTitle=element.title;
+    element.title=lang==='tr'?(UI_TR[element.dataset.enTitle]||element.dataset.enTitle):element.dataset.enTitle;
+  });
+  document.querySelectorAll('[aria-label]').forEach(element=>{
+    if(!element.dataset.enAria)element.dataset.enAria=element.getAttribute('aria-label')||'';
+    element.setAttribute('aria-label',lang==='tr'?(UI_TR[element.dataset.enAria]||element.dataset.enAria):element.dataset.enAria);
   });
   if(byId('saveState')){
     const dirty=byId('saveState').style.color!=='var(--good)';
@@ -608,6 +697,12 @@ function showPage(page){
   document.querySelectorAll('[data-page-button]').forEach(button=>button.classList.toggle('active',button.dataset.pageButton===page));
   history.replaceState(null,'','#'+page);
 }
+function updateHeroToggleLabel(){
+  const button=byId('heroToggle');const hero=document.querySelector('.hero');if(!button||!hero)return;
+  const collapsed=hero.classList.contains('is-collapsed');const lang=byId('uiLanguage')?.value==='en'?'en':'tr';
+  button.textContent=collapsed?(lang==='tr'?'Aç ▾':'Expand ▾'):(lang==='tr'?'Daralt ▴':'Collapse ▴');
+  button.setAttribute('aria-expanded',collapsed?'false':'true');
+}
 function renderAccess(status){
   const gate=byId('accessGate'),actions=byId('accessActions');
   actions.innerHTML='';
@@ -616,21 +711,21 @@ function renderAccess(status){
   }
   gate.hidden=false;byId('console').hidden=true;
   if(status.reasonCode==='login_required'){
-    byId('accessTitle').textContent='Fima login required';
-    byId('accessMessage').textContent='Sign in with the Fima account that owns the Paradise console. You will return here after login.';
-    actions.innerHTML='<a class="button" href="/login?next=%2Fparadise">Sign in to Fima</a>';
+    byId('accessTitle').textContent=tUi('Fima login required');
+    byId('accessMessage').textContent=tUi('Sign in with the Fima account that owns the Paradise console. You will return here after login.');
+    actions.innerHTML='<a class="button" href="/login?next=%2Fparadise">'+tUi('Sign in to Fima')+'</a>';
   }else if(status.reasonCode==='discord_link_required'){
-    byId('accessTitle').textContent='Discord account required';
-    byId('accessMessage').textContent='Your Fima account is signed in, but Discord is not linked. Link the owner Discord account to continue.';
-    actions.innerHTML='<a class="button" href="'+API_BASE+'/auth/discord/start?returnTo=%2Fparadise">Link Discord account</a><a class="button secondary" href="/dashboard/connected-accounts">Account settings</a>';
+    byId('accessTitle').textContent=tUi('Discord account required');
+    byId('accessMessage').textContent=tUi('Your Fima account is signed in, but Discord is not linked. Link the owner Discord account to continue.');
+    actions.innerHTML='<a class="button" href="'+API_BASE+'/auth/discord/start?returnTo=%2Fparadise">'+tUi('Link Discord account')+'</a><a class="button secondary" href="/dashboard/connected-accounts">'+tUi('Account settings')+'</a>';
   }else if(status.reasonCode==='not_owner'){
-    byId('accessTitle').textContent='Paradise access is restricted';
-    byId('accessMessage').textContent='This signed-in account is not authorized to open the Paradise owner console.';
-    actions.innerHTML='<a class="button secondary" href="/dashboard/connected-accounts">Review linked accounts</a>';
+    byId('accessTitle').textContent=tUi('Paradise access is restricted');
+    byId('accessMessage').textContent=tUi('This signed-in account is not authorized to open the Paradise owner console.');
+    actions.innerHTML='<a class="button secondary" href="/dashboard/connected-accounts">'+tUi('Review linked accounts')+'</a>';
   }else{
-    byId('accessTitle').textContent='Session check unavailable';
-    byId('accessMessage').textContent='The secure account check could not be completed. Refresh or try again shortly.';
-    actions.innerHTML='<button onclick="start()">Try again</button>';
+    byId('accessTitle').textContent=tUi('Session check unavailable');
+    byId('accessMessage').textContent=tUi('The secure account check could not be completed. Refresh or try again shortly.');
+    actions.innerHTML='<button onclick="start()">'+tUi('Try again')+'</button>';
   }
   applyUiLanguage(byId('uiLanguage')?.value||'tr');
   return false;
@@ -670,7 +765,7 @@ async function load(){
   byId('rosterApprovalRequired').checked=roster.approvalRequired!==false;byId('rosterShowRoblox').checked=roster.showRobloxName!==false;byId('rosterShowStage').checked=roster.showStage!==false;byId('rosterShowRegion').checked=roster.showRegion!==false;byId('lineupLimit').value=roster.lineupLimit||15;byId('rosterDensity').value=roster.boardDensity==='compact'?'compact':'comfortable';
   byId('appealsEnabled').checked=blacklist.appealsEnabled!==false;byId('blacklistEvidenceRequired').checked=blacklist.evidenceRequired!==false;byId('bailEnabled').checked=blacklist.bailEnabled===true;byId('appealCooldownDays').value=blacklist.appealCooldownDays||30;byId('publicReasonMode').value=blacklist.publicReasonMode==='full'?'full':'summary';
   byId('trainingQuota').value=staff.trainingQuota??2;byId('tryoutQuota').value=staff.tryoutQuota??1;byId('refereeQuota').value=staff.refereeQuota??2;byId('managerApprovalResults').checked=staff.managerApprovalResults!==false;byId('profileRequiredResults').checked=staff.profileRequiredResults!==false;byId('activityProofRequired').checked=staff.activityProofRequired===true;
-  byId('applicationsEnabled').checked=apps.enabled!==false;byId('applicationCooldownDays').value=apps.cooldownDays??7;byId('applicationAutoGrant').checked=apps.autoGrantRole===true;byId('applicationBlockBlacklisted').checked=apps.blockBlacklisted!==false;byId('applicationQuestions').value=JSON.stringify(apps.extraQuestions||{},null,2);
+  byId('applicationsEnabled').checked=apps.enabled!==false;byId('applicationCooldownDays').value=apps.cooldownDays??7;byId('applicationAutoGrant').checked=apps.autoGrantRole===true;byId('applicationBlockBlacklisted').checked=apps.blockBlacklisted!==false;byId('applicationPanelTitle').value=apps.panelTitle||'';byId('applicationPanelDescription').value=apps.panelDescription||'';byId('applicationPanelButtonLabel').value=apps.panelButtonLabel||'';byId('applicationQuestions').value=JSON.stringify(apps.extraQuestions||{},null,2);byId('applicationEvidenceRequirements').value=JSON.stringify(apps.evidenceRequirements||{},null,2);
   byId('kickBanApprovalRequired').checked=moderation.kickBanApprovalRequired!==false;byId('quarantineEnabled').checked=moderation.quarantineEnabled!==false;byId('raidModeDefault').checked=moderation.raidModeDefault===true;byId('suspiciousAccountDays').value=moderation.suspiciousAccountDays??7;byId('defaultSpamTimeout').value=moderation.defaultSpamTimeoutMinutes??60;byId('violationThreshold').value=moderation.violationThreshold??3;
   byId('dailyQuestionEnabled').checked=events.dailyQuestionEnabled!==false;byId('dailyQuestionHour').value=events.dailyQuestionHour??13;byId('dailyQuestionReward').value=events.dailyQuestionReward||'25 Robux';byId('dailyQuestionWinners').value=events.dailyQuestionWinners??1;byId('eventImageRequired').checked=events.eventImageRequired!==false;byId('giveawayAbuseProtection').checked=events.giveawayAbuseProtection!==false;
   byId('voiceEnabled').checked=voice.enabled!==false;byId('voiceDefaultLimit').value=voice.defaultLimit??0;byId('voiceAutoDelete').checked=voice.autoDelete!==false;byId('voiceSafeNames').checked=voice.safeNames!==false;byId('voiceOwnerTransfer').checked=voice.allowTransfer!==false;byId('voiceLogActions').checked=voice.logActions!==false;
@@ -689,6 +784,7 @@ async function load(){
   const metrics=[['Managed servers',(j.servers||[]).length],['Commands',(rt.commandSync&&rt.commandSync.count)||0],['Channels',(rt.channels||[]).length],['Roles',(rt.roles||[]).length],['Profiles',j.summary?.verifiedProfiles||0],['Open challenges',j.summary?.pendingChallenges||0],['Active sessions',j.summary?.activeSessions||0],['Active LOA',j.summary?.activeLoa||0]];
   byId('metricGrid').innerHTML=metrics.map(([label,value])=>'<div class="metric"><b>'+escapeHtml(value)+'</b><span>'+escapeHtml(label)+'</span></div>').join('');
   byId('saveState').textContent='All settings loaded';byId('saveState').className='dirty';byId('saveState').style.color='var(--good)';
+  window.dispatchEvent(new CustomEvent('paradise:config-loaded',{detail:{guildId:selectedGuildId,payload:j}}));
   setLoading(false);
 }
 function valueFor(kind){
@@ -707,7 +803,7 @@ function valueFor(kind){
   if(kind==='roster')return{approvalRequired:byId('rosterApprovalRequired').checked,showRobloxName:byId('rosterShowRoblox').checked,showStage:byId('rosterShowStage').checked,showRegion:byId('rosterShowRegion').checked,lineupLimit:number('lineupLimit',15),boardDensity:byId('rosterDensity').value};
   if(kind==='blacklist')return{appealsEnabled:byId('appealsEnabled').checked,evidenceRequired:byId('blacklistEvidenceRequired').checked,bailEnabled:byId('bailEnabled').checked,appealCooldownDays:number('appealCooldownDays',30),publicReasonMode:byId('publicReasonMode').value};
   if(kind==='staffOperations')return{trainingQuota:number('trainingQuota',2),tryoutQuota:number('tryoutQuota',1),refereeQuota:number('refereeQuota',2),managerApprovalResults:byId('managerApprovalResults').checked,profileRequiredResults:byId('profileRequiredResults').checked,activityProofRequired:byId('activityProofRequired').checked};
-  if(kind==='applications')return{enabled:byId('applicationsEnabled').checked,cooldownDays:Number(byId('applicationCooldownDays').value)||0,autoGrantRole:byId('applicationAutoGrant').checked,blockBlacklisted:byId('applicationBlockBlacklisted').checked,extraQuestions:JSON.parse(byId('applicationQuestions').value||'{}')};
+  if(kind==='applications')return{enabled:byId('applicationsEnabled').checked,cooldownDays:Number(byId('applicationCooldownDays').value)||0,autoGrantRole:byId('applicationAutoGrant').checked,blockBlacklisted:byId('applicationBlockBlacklisted').checked,panelTitle:byId('applicationPanelTitle').value.trim(),panelDescription:byId('applicationPanelDescription').value.trim(),panelButtonLabel:byId('applicationPanelButtonLabel').value.trim(),extraQuestions:JSON.parse(byId('applicationQuestions').value||'{}'),evidenceRequirements:JSON.parse(byId('applicationEvidenceRequirements').value||'{}')};
   if(kind==='moderation')return{kickBanApprovalRequired:byId('kickBanApprovalRequired').checked,quarantineEnabled:byId('quarantineEnabled').checked,raidModeDefault:byId('raidModeDefault').checked,suspiciousAccountDays:Number(byId('suspiciousAccountDays').value)||0,defaultSpamTimeoutMinutes:number('defaultSpamTimeout',60),violationThreshold:number('violationThreshold',3)};
   if(kind==='events')return{dailyQuestionEnabled:byId('dailyQuestionEnabled').checked,dailyQuestionHour:Number(byId('dailyQuestionHour').value)||0,dailyQuestionReward:byId('dailyQuestionReward').value.trim(),dailyQuestionWinners:number('dailyQuestionWinners',1),eventImageRequired:byId('eventImageRequired').checked,giveawayAbuseProtection:byId('giveawayAbuseProtection').checked};
   if(kind==='voice')return{enabled:byId('voiceEnabled').checked,defaultLimit:Number(byId('voiceDefaultLimit').value)||0,autoDelete:byId('voiceAutoDelete').checked,safeNames:byId('voiceSafeNames').checked,allowTransfer:byId('voiceOwnerTransfer').checked,logActions:byId('voiceLogActions').checked};
@@ -812,8 +908,10 @@ document.querySelectorAll('[data-setup-template]').forEach(card=>card.onclick=()
 document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>save(b.dataset.save));document.querySelectorAll('[data-guide-mode]').forEach(b=>b.onclick=()=>repostGuides(b.dataset.guideMode));byId('refresh').onclick=load;
 document.querySelectorAll('[data-theme]').forEach(button=>button.onclick=()=>{currentTheme=button.dataset.theme;const accent=byId('brandHex').value||THEMES[currentTheme].accent;applyTheme(currentTheme,accent);markDirty()});
 document.querySelectorAll('[data-page-button]').forEach(button=>button.onclick=()=>showPage(button.dataset.pageButton));
+byId('heroToggle').onclick=()=>{document.querySelector('.hero')?.classList.toggle('is-collapsed');updateHeroToggleLabel()};
 byId('serverSelect').onchange=async event=>{selectedGuildId=event.target.value;await load()};
-byId('uiLanguage').onchange=event=>applyUiLanguage(event.target.value);
+byId('uiLanguage').onchange=event=>{applyUiLanguage(event.target.value);updateHeroToggleLabel()};
+byId('defaultLanguage').onchange=event=>{byId('uiLanguage').value=event.target.value;applyUiLanguage(event.target.value);updateHeroToggleLabel();markDirty()};
 byId('runRealAudit').onclick=()=>runManagedOperation('audit');byId('runStructureBackup').onclick=()=>runManagedOperation('backup');byId('runSetupPreview').onclick=()=>runManagedOperation('preview');
 byId('previewSelectedSetup').onclick=()=>runManagedOperation('preview');
 byId('startSelectedSetup').onclick=()=>runManagedOperation('preview');
@@ -831,8 +929,10 @@ byId('runTestSmoke').onclick=runSelectedTestSmoke;
 byId('autoDetectChannels').onclick=autoDetectChannels;byId('previewChallengeRange').onclick=previewChallengeRange;
 document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};
-async function start(){try{const uiLanguage=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||'tr'}catch{return'tr'}})();byId('uiLanguage').value=uiLanguage;applyUiLanguage(uiLanguage);initializePages();const status=await sessionStatus();if(renderAccess(status)){await csrfToken();await load();applyUiLanguage(byId('uiLanguage').value)}else setLoading(false)}catch{setLoading(false);renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
+async function start(){try{const uiLanguage=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||'tr'}catch{return'tr'}})();byId('uiLanguage').value=uiLanguage;applyUiLanguage(uiLanguage);updateHeroToggleLabel();initializePages();const status=await sessionStatus();if(renderAccess(status)){await csrfToken();await load();applyUiLanguage(byId('uiLanguage').value);updateHeroToggleLabel()}else setLoading(false)}catch{setLoading(false);renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
+window.__PARADISE_OWNER_CONSOLE__={apiBase:API_BASE,getSelectedGuildId:()=>selectedGuildId,mutate,show,reload:load,markDirty};
 start();
 </script>
+<script src="/assets/js/paradise-community-structure.js"></script>
 </body></html>`;
 }

@@ -78,7 +78,7 @@
         "passwordStrength": "Password strength",
         "networkError": "Could not reach the Fima API. Refresh the page or try again in a moment.",
         "saleTitle": "Current plans",
-        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleText": "Current public products are 3 Days Access, Monthly Subscription and Lifetime.",
         "saleEnds": "Sale ends in",
         "licenseKey": "License key",
         "maskedLicenseKey": "Masked license key",
@@ -108,7 +108,7 @@
         "myProductsNav": "My Products",
         "registerEyebrow": "Fima Account",
         "registerTitle": "Create your Fima account.",
-        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
         "password": "Password",
         "registerButton": "Register",
@@ -195,7 +195,7 @@
         "giftCheckoutSoon": "Gift checkout will use the selected registered account.",
         "selectedGiftRecipient": "Selected gift recipient",
         "giftRecipientReady": "Recipient selected. Choose the access plan to buy for this user.",
-        "giftBuy1day": "Gift Free Trial",
+        "giftBuy1day": "Legacy access gift",
         "giftBuy3days": "Gift 3 Days",
         "giftBuyMonthly": "Gift Monthly",
         "giftBuyLifetime": "Gift Lifetime",
@@ -223,28 +223,22 @@
         "confirmRobloxVerification": "Confirm verification",
         "openRobloxProfile": "Open Roblox profile",
         "profileSaved": "Profile saved.",
-        "freeMonthlyTrial": "Free Monthly Trial",
-        "freeTrialEyebrow": "Free trial",
-        "trialIntro": "Claim one free trial after linking Discord and verifying your Roblox profile.",
-        "trialRequirements": "Free Monthly Trial Requirements",
+        "freeMonthlyTrial": "Legacy Trial",
+        "freeTrialEyebrow": "Legacy access",
+        "trialIntro": "Existing legacy trial access remains readable until its original expiry. New claims are closed.",
+        "trialRequirements": "Legacy Trial Details",
         "accountLoggedIn": "Fima account logged in",
         "discordConnected": "Discord connected",
         "robloxConnected": "Roblox verified",
-        "claimTrial": "Claim Free Trial",
+        "claimTrial": "View Legacy Access",
         "trialActive": "Trial active",
-        "trialAvailable": "Trial available",
-        "trialLocked": "Trial locked",
-        "trialCooldown": "Trial cooldown",
-        "nextTrial": "Next free trial",
-        "connectDiscordTrial": "Connect Discord to unlock your free trial.",
-        "connectRobloxTrial": "Verify your Roblox profile to unlock your free trial.",
-        "trialClaimed": "Free trial claimed. Your Trial role is being synced.",
-        "trialReadyTitle": "Your trial key is ready",
-        "trialReadyText": "Copy your license key, then open Fima and activate it on the key screen.",
-        "trialReadyPrivacy": "For privacy, screenshots and reports show the masked key only. The Copy button copies the full key for this signed-in account.",
-        "trialAlreadyActive": "You already have an active monthly trial.",
-        "trialCooldownActive": "Your monthly trial cooldown is still active.",
-        "discordNotConnected": "Discord is only required for the free trial or optional recovery.",
+        "trialAvailable": "Legacy access active",
+        "trialLocked": "New claims closed",
+        "trialCooldown": "Legacy program ended",
+        "nextTrial": "Activity Rewards",
+        "connectDiscordTrial": "Connect Discord to receive eligible community Activity Rewards.",
+        "connectRobloxTrial": "Roblox verification is optional and does not unlock trial access.",
+        "discordNotConnected": "Discord is optional for recovery, community rewards and support.",
         "robloxNotConnected": "Roblox is optional and never blocks website access.",
         "disconnectConfirm": "Disconnect this account link?",
         "openConnect": "Open connect",
@@ -267,10 +261,10 @@
         "invalidOrExpiredVerificationCode": "Verification code is invalid or expired.",
         "referralCode": "Referral code",
         "referralOptional": "Optional invite code",
-        "referralPrefilled": "Invite code loaded. Discord or Roblox is not required unless the reward is a free trial.",
+        "referralPrefilled": "Invite code loaded. Discord and Roblox are not required unless a specific reward states otherwise.",
         "referralRewardsEyebrow": "Invite Rewards",
         "referralRewardsTitle": "Referral rewards",
-        "referralRewardsIntro": "Invite real users. Referral rewards do not require Roblox; free trial rewards may require Discord.",
+        "referralRewardsIntro": "Invite real users. Referral rewards do not require Roblox; Discord is optional unless a specific reward states otherwise.",
         "yourReferralCode": "Your invite code",
         "yourReferralLink": "Your invite link",
         "copyReferralCode": "Copy code",
@@ -284,7 +278,7 @@
         "nextReward": "Next reward",
         "referralsRemaining": "verified invites left",
         "referralApplyTitle": "Were you invited?",
-        "referralApplyIntro": "Optional invite/referral code. It does not require Discord or Roblox unless the reward is a free trial.",
+        "referralApplyIntro": "Optional invite/referral code. It does not require Discord or Roblox unless a specific reward states otherwise.",
         "applyReferral": "Apply code",
         "referralApplied": "Referral code applied.",
         "invalidReferralCode": "Referral code was not found.",
@@ -363,7 +357,7 @@
         "myProductsNav": "\u00dcr\u00fcnlerim",
         "registerEyebrow": "Fima Hesab\u0131",
         "registerTitle": "Hesab\u0131n\u0131 olu\u015ftur.",
-        "registerIntro": "Sadece kullan\u0131c\u0131 ad\u0131 ve \u015fifreyle hesap olu\u015ftur. Discord'u daha sonra hesap kurtarma veya free trial i\u00e7in ba\u011flayabilirsin.",
+        "registerIntro": "Sadece kullan\u0131c\u0131 ad\u0131 ve \u015fifreyle hesap olu\u015ftur. Discord'u daha sonra hesap kurtarma, topluluk \u00f6d\u00fclleri ve destek i\u00e7in ba\u011flayabilirsin.",
         "robloxUsername": "Roblox kullan\u0131c\u0131 ad\u0131",
         "password": "\u015eifre",
         "registerButton": "Kay\u0131t ol",
@@ -450,7 +444,7 @@
         "giftCheckoutSoon": "Hediye checkout se\u00e7ilen kay\u0131tl\u0131 hesaba ba\u011flanacak.",
         "selectedGiftRecipient": "Se\u00e7ili hediye al\u0131c\u0131s\u0131",
         "giftRecipientReady": "Al\u0131c\u0131 se\u00e7ildi. Bu kullan\u0131c\u0131ya al\u0131nacak eri\u015fim plan\u0131n\u0131 se\u00e7.",
-        "giftBuy1day": "Trial hediye et",
+        "giftBuy1day": "Eski eri\u015fim hediyesi",
         "giftBuy3days": "3 G\u00fcn hediye et",
         "giftBuyMonthly": "Ayl\u0131k hediye et",
         "giftBuyLifetime": "Lifetime hediye et",
@@ -478,28 +472,22 @@
         "confirmRobloxVerification": "Doğrulamayı onayla",
         "openRobloxProfile": "Roblox profilini aç",
         "profileSaved": "Profil kaydedildi.",
-        "freeMonthlyTrial": "Ayl\u0131k \u00dccretsiz Trial",
-        "freeTrialEyebrow": "\u00dccretsiz deneme",
-        "trialIntro": "Discord'u bağlayıp Roblox profilini doğruladıktan sonra ücretsiz trial alabilirsin.",
-        "trialRequirements": "Ayl\u0131k Trial Gereksinimleri",
+        "freeMonthlyTrial": "Eski Trial",
+        "freeTrialEyebrow": "Eski eri\u015fim",
+        "trialIntro": "Mevcut eski trial erişimi ilk bitiş tarihine kadar salt okunur gösterilir. Yeni talepler kapalıdır.",
+        "trialRequirements": "Eski Trial Bilgileri",
         "accountLoggedIn": "Fima hesab\u0131yla giri\u015f yap\u0131ld\u0131",
         "discordConnected": "Discord ba\u011fl\u0131",
         "robloxConnected": "Roblox doğrulandı",
-        "claimTrial": "Free Trial Al",
+        "claimTrial": "Eski Eri\u015fimi G\u00f6r",
         "trialActive": "Trial aktif",
-        "trialAvailable": "Trial haz\u0131r",
-        "trialLocked": "Trial kilitli",
-        "trialCooldown": "Trial bekleme s\u00fcresi",
-        "nextTrial": "Sonraki \u00fccretsiz trial",
-        "connectDiscordTrial": "Free trial i\u00e7in Discord'u ba\u011fla.",
-        "connectRobloxTrial": "Free trial için Roblox profilini doğrula.",
-        "trialClaimed": "Free trial al\u0131nd\u0131. Trial rol\u00fcn senkronize ediliyor.",
-        "trialReadyTitle": "Trial key'in haz\u0131r",
-        "trialReadyText": "License key'i kopyala, sonra Fima'y\u0131 a\u00e7\u0131p key ekran\u0131nda aktive et.",
-        "trialReadyPrivacy": "Gizlilik i\u00e7in ekran g\u00f6r\u00fcnt\u00fcleri ve raporlarda sadece maskeli key g\u00f6sterilir. Copy butonu tam key'i bu giri\u015f yapm\u0131\u015f hesap i\u00e7in kopyalar.",
-        "trialAlreadyActive": "Zaten aktif ayl\u0131k trial'\u0131n var.",
-        "trialCooldownActive": "Ayl\u0131k trial bekleme s\u00fcren h\u00e2l\u00e2 aktif.",
-        "discordNotConnected": "Discord sadece free trial veya opsiyonel kurtarma i\u00e7in gerekir.",
+        "trialAvailable": "Eski eri\u015fim aktif",
+        "trialLocked": "Yeni talepler kapal\u0131",
+        "trialCooldown": "Eski program sona erdi",
+        "nextTrial": "Aktivite \u00d6d\u00fclleri",
+        "connectDiscordTrial": "Uygun topluluk Aktivite \u00d6d\u00fcllerini almak i\u00e7in Discord'u ba\u011fla.",
+        "connectRobloxTrial": "Roblox doğrulaması opsiyoneldir ve trial erişimi açmaz.",
+        "discordNotConnected": "Discord hesap kurtarma, topluluk \u00f6d\u00fclleri ve destek i\u00e7in opsiyoneldir.",
         "robloxNotConnected": "Roblox opsiyoneldir ve site eri\u015fimini engellemez.",
         "disconnectConfirm": "Bu hesap ba\u011flant\u0131s\u0131 ayr\u0131ls\u0131n m\u0131?",
         "openConnect": "Ba\u011flant\u0131y\u0131 a\u00e7",
@@ -519,10 +507,10 @@
         "invalidOrExpiredVerificationCode": "Do\u011frulama kodu hatal\u0131 veya s\u00fcresi bitti.",
         "referralCode": "Davet kodu",
         "referralOptional": "\u0130ste\u011fe ba\u011fl\u0131 davet kodu",
-        "referralPrefilled": "Davet kodu y\u00fcklendi. \u00d6d\u00fcl free trial de\u011filse Discord veya Roblox gerekmez.",
+        "referralPrefilled": "Davet kodu y\u00fcklendi. Belirli bir \u00f6d\u00fcl aksi bir ko\u015ful belirtmedik\u00e7e Discord veya Roblox gerekmez.",
         "referralRewardsEyebrow": "Davet \u00d6d\u00fclleri",
         "referralRewardsTitle": "Referral \u00f6d\u00fclleri",
-        "referralRewardsIntro": "Ger\u00e7ek kullan\u0131c\u0131lar\u0131 davet et. Referral i\u00e7in Roblox gerekmez; free trial \u00f6d\u00fcllerinde Discord gerekebilir.",
+        "referralRewardsIntro": "Ger\u00e7ek kullan\u0131c\u0131lar\u0131 davet et. Referral i\u00e7in Roblox gerekmez; belirli bir \u00f6d\u00fcl aksi bir ko\u015ful belirtmedik\u00e7e Discord opsiyoneldir.",
         "yourReferralCode": "Davet kodun",
         "yourReferralLink": "Davet linkin",
         "copyReferralCode": "Kodu kopyala",
@@ -536,7 +524,7 @@
         "nextReward": "Sonraki \u00f6d\u00fcl",
         "referralsRemaining": "do\u011frulanm\u0131\u015f davet kald\u0131",
         "referralApplyTitle": "Davet mi ald\u0131n?",
-        "referralApplyIntro": "Opsiyonel davet/referral kodu. \u00d6d\u00fcl free trial de\u011filse Discord veya Roblox gerektirmez.",
+        "referralApplyIntro": "Opsiyonel davet/referral kodu. Belirli bir \u00f6d\u00fcl aksi bir ko\u015ful belirtmedik\u00e7e Discord veya Roblox gerektirmez.",
         "applyReferral": "Kodu uygula",
         "referralApplied": "Davet kodu uyguland\u0131.",
         "invalidReferralCode": "Davet kodu bulunamad\u0131.",
@@ -602,7 +590,7 @@
         "myProductsNav": "Meine Produkte",
         "registerEyebrow": "Fima Account",
         "registerTitle": "Account erstellen.",
-        "registerIntro": "Erstelle dein Fima Konto nur mit Benutzername und Passwort. Discord kannst du spaeter fuer Wiederherstellung oder Free Trial verbinden.",
+        "registerIntro": "Erstelle dein Fima Konto nur mit Benutzername und Passwort. Discord kannst du spaeter fuer Wiederherstellung, Community-Belohnungen und Support verbinden.",
         "robloxUsername": "Roblox Nutzername",
         "password": "Passwort",
         "registerButton": "Registrieren",
@@ -670,7 +658,7 @@
         "openMyProducts": "Ouvrir mes produits",
         "resetGeneric": "Si ce compte Fima a une recuperation e-mail ou Discord, un code de reset sera envoye.",
         "saleTitle": "Offres actuelles",
-        "saleText": "Les produits publics actuels sont Free Trial, 3 Days Access, Monthly Subscription et Lifetime.",
+        "saleText": "Les produits publics actuels sont 3 Days Access, Monthly Subscription et Lifetime.",
         "saleEnds": "Fin de l'offre dans",
         "licenseKey": "Cle de licence",
         "plan": "Plan",
@@ -691,7 +679,7 @@
         "myProductsNav": "Mes produits",
         "registerEyebrow": "Compte Fima",
         "registerTitle": "Cree ton compte.",
-        "registerIntro": "Cree ton compte avec seulement un pseudo et un mot de passe. Tu peux lier Discord plus tard pour la recuperation ou le free trial.",
+        "registerIntro": "Cree ton compte avec seulement un pseudo et un mot de passe. Tu peux lier Discord plus tard pour la recuperation, les recompenses communautaires et le support.",
         "robloxUsername": "Pseudo Roblox",
         "password": "Mot de passe",
         "registerButton": "Inscription",
@@ -759,7 +747,7 @@
         "openMyProducts": "Otvori moje proizvode",
         "resetGeneric": "Ako ovaj Fima nalog ima e-mail ili Discord oporavak, reset kod ce biti poslan.",
         "saleTitle": "Trenutni paketi",
-        "saleText": "Trenutni javni proizvodi su Free Trial, 3 Days Access, Monthly Subscription i Lifetime.",
+        "saleText": "Trenutni javni proizvodi su 3 Days Access, Monthly Subscription i Lifetime.",
         "saleEnds": "Popust zavrsava za",
         "licenseKey": "License key",
         "plan": "Plan",
@@ -848,7 +836,7 @@
         "openMyProducts": "Open My Products",
         "resetGeneric": "If that email exists, a reset request has been prepared.",
         "saleTitle": "Current plans",
-        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleText": "Current public products are 3 Days Access, Monthly Subscription and Lifetime.",
         "saleEnds": "Sale ends in",
         "licenseKey": "License key",
         "plan": "Plan",
@@ -869,7 +857,7 @@
         "myProductsNav": "My Products",
         "registerEyebrow": "Fima Account",
         "registerTitle": "Create your Fima account.",
-        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
         "password": "Password",
         "registerButton": "Register",
@@ -937,7 +925,7 @@
         "openMyProducts": "Open My Products",
         "resetGeneric": "If that email exists, a reset request has been prepared.",
         "saleTitle": "Current plans",
-        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleText": "Current public products are 3 Days Access, Monthly Subscription and Lifetime.",
         "saleEnds": "Sale ends in",
         "licenseKey": "License key",
         "plan": "Plan",
@@ -958,7 +946,7 @@
         "myProductsNav": "My Products",
         "registerEyebrow": "Fima Account",
         "registerTitle": "Create your Fima account.",
-        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
         "password": "Password",
         "registerButton": "Register",
@@ -1026,7 +1014,7 @@
         "openMyProducts": "Open My Products",
         "resetGeneric": "If that email exists, a reset request has been prepared.",
         "saleTitle": "Current plans",
-        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleText": "Current public products are 3 Days Access, Monthly Subscription and Lifetime.",
         "saleEnds": "Sale ends in",
         "licenseKey": "License key",
         "plan": "Plan",
@@ -1047,7 +1035,7 @@
         "myProductsNav": "My Products",
         "registerEyebrow": "Fima Account",
         "registerTitle": "Create your Fima account.",
-        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
         "password": "Password",
         "registerButton": "Register",
@@ -1115,7 +1103,7 @@
         "openMyProducts": "Open My Products",
         "resetGeneric": "If that email exists, a reset request has been prepared.",
         "saleTitle": "Current plans",
-        "saleText": "Current public products are Free Trial, 3 Days Access, Monthly Subscription and Lifetime.",
+        "saleText": "Current public products are 3 Days Access, Monthly Subscription and Lifetime.",
         "saleEnds": "Sale ends in",
         "licenseKey": "License key",
         "plan": "Plan",
@@ -1136,7 +1124,7 @@
         "myProductsNav": "My Products",
         "registerEyebrow": "Fima Account",
         "registerTitle": "Create your Fima account.",
-        "registerIntro": "Create an account with only a username and password. You can link Discord later for account recovery or free trial.",
+        "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
         "password": "Password",
         "registerButton": "Register",
@@ -1301,13 +1289,15 @@
       if (rows[2]) rows[2].textContent = t("stripeCustomer");
       if (rows[3]) rows[3].textContent = language() === "tr" ? "Roblox profil" : "Roblox profile";
       setText(".account-summary-card h2", t("dashboardNav"));
-      setText("#security .section-heading h2", t("emailVerificationTitle"));
-      setText("#security .section-heading p:not(.eyebrow)", t("emailVerificationIntro"));
-      setText("#security > div:not(.section-heading) h2", t("connectedAccounts"));
+      setText("#security .section-heading h2", language() === "tr" ? "Kimlik, dil ve doğrulama" : "Identity, language and verification");
+      setText("#security .section-heading p:not(.eyebrow)", language() === "tr"
+        ? "Discord ana kimlik bağlantısıdır. Tercih ettiğin dil, topluluktaki dile özel alanlara erişimi belirler."
+        : "Discord is the primary identity connection. Your preferred language controls access to language-specific community spaces.");
+      setText("#security > div:not(.section-heading) h2", language() === "tr" ? "Bağlı hesaplar ve Roblox doğrulaması" : "Connected accounts and Roblox verification");
       const accountLinksIntro = $("#security > div:not(.section-heading) p:not(.eyebrow)");
       if (accountLinksIntro) accountLinksIntro.textContent = language() === "tr"
-        ? "Discord sadece free trial veya opsiyonel kurtarma icin gerekir. Roblox web sitesinde hicbir islemi engellemez."
-        : "Discord is only required for the free trial or optional recovery. Roblox username is optional and never proves ownership.";
+        ? "Discord topluluk üyeliğini ve dil rolünü doğrular; kurtarma için de kullanılabilir. Roblox kullanıcı adı tek başına sahiplik kanıtı değildir."
+        : "Discord verifies community membership and language roles and can also be used for recovery. A Roblox username alone never proves ownership.";
       setText("#redeem .section-heading h2", t("giftSystemTitle"));
       setText("#redeem .section-heading p:not(.eyebrow)", t("giftAccessIntro"));
       setText("#referrals .section-heading h2", t("referralRewardsTitle"));
@@ -1416,6 +1406,7 @@
   };
 
   const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+  const patch = (path, body) => api(path, { method: "PATCH", body: JSON.stringify(body || {}) });
   let currentUserPromise = null;
 
   const getOptionalAccount = async () => {
@@ -1431,7 +1422,7 @@
     if (user?.username || user?.displayName) {
       return {
         label: user.username || user.displayName,
-        sub: user.discordUserId ? "Discord recovery linked" : t("recoveryNotLinked"),
+        sub: user.discordUserId ? "Discord identity linked" : t("recoveryNotLinked"),
         avatar: user.discordAvatarUrl || user.robloxAvatarUrl || "",
         fallback: String(user.username || user.displayName || "F").charAt(0).toUpperCase()
       };
@@ -1463,11 +1454,36 @@
     return { label: t("accountNavProfileFallback"), sub: "Fima", avatar: "", fallback: "F" };
   };
 
+  const safeProfileInitial = (value, backup = "F") => {
+    const normalized = String(value || "").normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "");
+    const backupNormalized = String(backup || "F").normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "");
+    return (Array.from(normalized)[0] || Array.from(backupNormalized)[0] || "F").toUpperCase();
+  };
+
+  const wireAccountProfileAvatarFallbacks = (root, fallback) => {
+    if (!root) return;
+    root.querySelectorAll("img[data-profile-avatar]").forEach((avatar) => {
+      if (avatar.dataset.avatarFallbackWired === "1") return;
+      avatar.dataset.avatarFallbackWired = "1";
+      const initial = safeProfileInitial(avatar.dataset.avatarFallback, fallback);
+      const replaceBrokenAvatar = () => {
+        if (!avatar.isConnected) return;
+        avatar.removeEventListener("error", replaceBrokenAvatar);
+        const replacement = document.createElement("span");
+        replacement.dataset.profileAvatarFallback = "true";
+        replacement.textContent = initial;
+        avatar.replaceWith(replacement);
+      };
+      avatar.addEventListener("error", replaceBrokenAvatar, { once: true });
+      if (avatar.complete && avatar.naturalWidth === 0) replaceBrokenAvatar();
+    });
+  };
+
   const profileChip = (user) => {
     const profile = accountProfile(user);
     return `
       <button class="account-nav-profile" type="button" data-account-menu-toggle aria-expanded="false" aria-label="${escapeHtml(profile.label)}">
-        ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+        ${profile.avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(profile.label)}" src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
         <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
       </button>
     `;
@@ -1484,7 +1500,7 @@
         ${profileChip(user)}
         <div class="account-profile-dropdown" data-account-menu-panel hidden>
           <div class="account-profile-summary">
-            ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+            ${profile.avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(profile.label)}" src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
             <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(planLabel)}</small></div>
           </div>
           <a class="account-dropdown-link" href="${dashboardRoute("overview")}">Account</a>
@@ -1556,6 +1572,7 @@
         ${user ? profileDropdown(user) : ""}
       </div>
     `;
+    if (user) wireAccountProfileAvatarFallbacks(nav, accountProfile(user).fallback);
     wireAccountDropdown();
   };
 
@@ -1584,8 +1601,6 @@
     not_logged_in: t("unauthorized"),
     discord_not_connected: t("discordNotConnected"),
     roblox_not_connected: t("robloxNotConnected"),
-    trial_cooldown_active: t("trialCooldownActive"),
-    trial_already_active: t("trialAlreadyActive"),
     invalid_referral_code: t("invalidReferralCode"),
     referral_already_used: t("referralAlreadyUsed"),
     self_referral_not_allowed: t("selfReferralNotAllowed"),
@@ -1712,7 +1727,8 @@
         await post(endpoint, payload);
         currentUserPromise = null;
         setMessage(endpoint.includes("register") ? t("registered") : t("loggedIn"), "good");
-        const next = new URLSearchParams(location.search).get("next") || successTarget;
+        const requestedNext = new URLSearchParams(location.search).get("next");
+        const next = safeLocalRedirect(requestedNext, successTarget);
         window.setTimeout(() => { window.location.href = next; }, 400);
       } catch (error) {
         setMessage(error.message, "error");
@@ -1972,8 +1988,9 @@
     const roblox = $("#accountRoblox");
     if (roblox) {
       roblox.innerHTML = user.robloxUsername
-        ? `<div class="mini-profile">${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span></span>`}<div><strong>${escapeHtml(user.robloxUsername)}</strong><small>${escapeHtml(user.robloxUserIdMasked || maskExternalId(user.robloxUserId))}</small></div></div>`
+        ? `<div class="mini-profile">${user.robloxAvatarUrl ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(user.robloxUsername)}" src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span>${escapeHtml(safeProfileInitial(user.robloxUsername, "R"))}</span>`}<div><strong>${escapeHtml(user.robloxUsername)}</strong><small>${escapeHtml(user.robloxUserIdMasked || maskExternalId(user.robloxUserId))}</small></div></div>`
         : t("noRoblox");
+      wireAccountProfileAvatarFallbacks(roblox, user.robloxUsername || "R");
     }
   };
 
@@ -2017,8 +2034,8 @@
         <div class="verification-status">
           <span class="status-pill">${discordLinked ? t("connected") : t("notConnected")}</span>
           <div>
-            <strong>${escapeHtml(discordLinked ? (user.discordUsername || user.discordUserId || "Discord recovery linked") : "Discord recovery not linked")}</strong>
-            <small>${discordLinked ? "The Fima bot can DM password reset codes to this Discord account." : "Link Discord to receive password reset codes by DM. Discord is also required for the free trial."}</small>
+            <strong>${escapeHtml(discordLinked ? (user.discordUsername || user.discordUserId || "Discord identity linked") : "Discord identity not linked")}</strong>
+            <small>${discordLinked ? "This Discord account is used for community identity, membership checks, language roles and optional recovery." : "Connect Discord to verify community membership and synchronize your language role."}</small>
           </div>
         </div>
         ${!discordLinked ? `
@@ -2062,12 +2079,113 @@
     `;
   };
 
+  const safeLocalRedirect = (value, fallback = "/dashboard/overview") => {
+    if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+    try {
+      const target = new URL(value, location.origin);
+      return target.origin === location.origin && target.pathname.startsWith("/") ? `${target.pathname}${target.search}${target.hash}` : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const renderCommunityProfile = (profile = {}) => {
+    const target = $("#communityProfileSettings");
+    if (!target) return;
+    const isTurkish = language() === "tr";
+    const discord = profile.discord || {};
+    const access = profile.access || {};
+    const connectedGuilds = Array.isArray(discord.connectedGuilds) ? discord.connectedGuilds : [];
+    const preferredLanguage = profile.preferredLanguage === "tr" ? "tr" : "en";
+    const timezone = profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    const membershipLabel = discord.membershipVerified
+      ? (isTurkish ? "Fieel’s Community üyeliği doğrulandı" : "Fieel’s Community membership verified")
+      : (isTurkish ? "Topluluk üyeliği doğrulanamadı" : "Community membership not verified");
+    const accessLabel = access.turkishCategoryAccess
+      ? (isTurkish ? "Türkçe kategori erişimi açık" : "Turkish category access enabled")
+      : (isTurkish ? "Uluslararası alanlar etkin" : "International spaces enabled");
+    const guildCards = connectedGuilds.slice(0, 8).map((guild) => `
+      <article class="community-guild-card">
+        ${guild.iconUrl
+          ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(guild.name || "D")}" src="${escapeHtml(guild.iconUrl)}" alt="">`
+          : `<span>${escapeHtml(String(guild.name || "D").slice(0, 1).toUpperCase())}</span>`}
+        <div>
+          <strong>${escapeHtml(guild.name || "Discord server")}</strong>
+          <small>${guild.owner ? (isTurkish ? "Sunucu sahibi" : "Server owner") : (isTurkish ? "Bağlı sunucu" : "Connected server")}</small>
+        </div>
+      </article>
+    `).join("");
+    const moreGuilds = connectedGuilds.length > 8
+      ? `<p class="community-guild-more">+${connectedGuilds.length - 8} ${isTurkish ? "sunucu daha" : "more servers"}</p>`
+      : "";
+
+    target.innerHTML = `
+      <section class="community-profile-card">
+        <div class="community-profile-heading">
+          <div>
+            <span class="pill">${isTurkish ? "Topluluk profili" : "Community profile"}</span>
+            <h3>${isTurkish ? "Dil ve bölge tercihleri" : "Language and region preferences"}</h3>
+            <p>${isTurkish
+              ? "Türkçe kategori erişimi yalnızca tercih edilen dile göre verilir. Ülke ve milliyet erişim kararı için kullanılmaz."
+              : "Turkish category access is based only on your preferred language, never your country or nationality."}</p>
+          </div>
+          <div class="community-profile-statuses">
+            <span class="status-pill ${discord.membershipVerified ? "is-good" : ""}">${escapeHtml(membershipLabel)}</span>
+            <span class="status-pill ${access.turkishCategoryAccess ? "is-good" : ""}">${escapeHtml(accessLabel)}</span>
+          </div>
+        </div>
+        <form class="community-profile-form" data-community-profile-form>
+          <label>
+            <span>${isTurkish ? "Tercih edilen dil" : "Preferred language"}</span>
+            <select name="preferredLanguage" required>
+              <option value="tr" ${preferredLanguage === "tr" ? "selected" : ""}>Türkçe</option>
+              <option value="en" ${preferredLanguage === "en" ? "selected" : ""}>English</option>
+            </select>
+          </label>
+          <label>
+            <span>${isTurkish ? "Ülke / Bölge" : "Country / Region"}</span>
+            <input name="countryRegion" maxlength="80" value="${escapeHtml(profile.countryRegion || "")}" autocomplete="country-name" required>
+          </label>
+          <label>
+            <span>${isTurkish ? "Milliyet (isteğe bağlı)" : "Nationality (optional)"}</span>
+            <input name="nationality" maxlength="80" value="${escapeHtml(profile.nationality || "")}">
+          </label>
+          <label>
+            <span>${isTurkish ? "Saat dilimi" : "Timezone"}</span>
+            <input name="timezone" maxlength="80" value="${escapeHtml(timezone)}" placeholder="Europe/Berlin" required>
+          </label>
+          <label class="community-checkbox">
+            <input name="nationalityVisible" type="checkbox" ${profile.nationalityVisible ? "checked" : ""}>
+            <span>${isTurkish ? "Milliyetimi profilimde görünür yap" : "Show my nationality on my profile"}</span>
+          </label>
+          <div class="community-profile-actions">
+            <button class="button" type="submit">${isTurkish ? "Tercihleri kaydet" : "Save preferences"}</button>
+            ${discord.code !== "ok"
+              ? `<a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("settings"))}">${isTurkish ? "Discord’u yeniden bağla" : "Reconnect Discord"}</a>`
+              : ""}
+          </div>
+        </form>
+        <div class="community-guilds">
+          <div>
+            <strong>${isTurkish ? "Bağlı Discord sunucuları" : "Connected Discord servers"}</strong>
+            <small>${isTurkish ? "Yalnızca Discord’un izin verdiği minimum üyelik bilgileri gösterilir." : "Only the minimum membership data allowed by Discord is shown."}</small>
+          </div>
+          <div class="community-guild-grid">
+            ${guildCards || `<div class="empty-state">${isTurkish ? "Sunucu listesi için Discord bağlantısını yenile." : "Reconnect Discord to load the server list."}</div>`}
+          </div>
+          ${moreGuilds}
+        </div>
+      </section>
+    `;
+    wireAccountProfileAvatarFallbacks(target, "D");
+  };
+
   const profileMini = (account, fallbackLabel) => {
     if (!account?.connected && !account?.username) {
       return `<div class="mini-profile is-missing"><div class="avatar-placeholder">!</div><div><strong>${escapeHtml(fallbackLabel)}</strong><small>${t("notConnected")}</small></div></div>`;
     }
     const sub = account.connected ? (maskExternalId(account.id) || t("connected")) : (account.pending ? t("robloxPending") : t("notConnected"));
-    return `<div class="mini-profile">${account.avatar ? `<img src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(String(account.username || fallbackLabel).slice(0, 1).toUpperCase())}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(sub)}</small></div></div>`;
+    return `<div class="mini-profile">${account.avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(account.username || fallbackLabel)}" src="${escapeHtml(account.avatar)}" alt="">` : `<span>${escapeHtml(safeProfileInitial(account.username, fallbackLabel))}</span>`}<div><strong>${escapeHtml(account.username || fallbackLabel)}</strong><small>${escapeHtml(sub)}</small></div></div>`;
   };
 
   const renderConnectedAccounts = (integrations = {}) => {
@@ -2081,7 +2199,7 @@
           <div>
             <span class="pill">${t("discord")}</span>
             ${profileMini(discord, t("discord"))}
-            <p class="integration-note">Optional for recovery. Required only for the free trial.</p>
+            <p class="integration-note">Primary community identity, membership and language-role connection. Recovery remains optional.</p>
           </div>
           <div class="integration-actions">
             <span class="status-pill">${discord.connected ? t("connected") : t("notConnected")}</span>
@@ -2103,6 +2221,7 @@
         </article>
       </div>
     `;
+    wireAccountProfileAvatarFallbacks(target, "F");
   };
 
   const renderRobloxProfileSettings = (user = {}) => {
@@ -2117,7 +2236,7 @@
     const profileUrl = roblox.profileUrl || pending?.profileUrl || "";
     const verifiedCard = verified ? `
       <div class="verified-roblox-profile">
-        ${avatar ? `<img src="${escapeHtml(avatar)}" alt="">` : `<span>R</span>`}
+        ${avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(current || roblox.username || "R")}" src="${escapeHtml(avatar)}" alt="">` : `<span>R</span>`}
         <div>
           <strong>@${escapeHtml(current || roblox.username || t("roblox"))}</strong>
           <small>${t("robloxVerified")} ${user.robloxUserIdMasked ? `- ${escapeHtml(user.robloxUserIdMasked)}` : ""}</small>
@@ -2156,57 +2275,39 @@
         </div>
       </form>
     `;
+    wireAccountProfileAvatarFallbacks(target, current || roblox.username || "R");
   };
-
-  const requirementLabel = (id) => ({
-    account: t("accountLoggedIn"),
-    discord: t("discordConnected"),
-    roblox: t("robloxConnected")
-  }[id] || id);
 
   const renderMonthlyTrial = (trial = {}) => {
     const target = $("#monthlyTrial");
     if (!target) return;
-    const requirements = trial.requirements || [];
-    const statusText = trial.active ? t("trialActive") : trial.cooldownActive ? t("trialCooldown") : trial.eligible ? t("trialAvailable") : t("trialLocked");
-    const missingDiscord = requirements.some((item) => item.id === "discord" && !item.complete);
-    const missingRoblox = requirements.some((item) => item.id === "roblox" && !item.complete);
-    const promo = trial.promo || {};
-    const trialLabel = trial.label || (promo.active ? `${promo.promoDays || promo.days || 7}-Day Free Trial` : t("claimTrial").replace(/^Claim\s+/i, ""));
-    const promoBanner = promo.active ? `
-      <div class="trial-promo-card">
-        <div>
-          <span>Limited beta offer</span>
-          <strong>Free trials are now ${escapeHtml(String(promo.promoDays || promo.days || 7))} days for the next week.</strong>
-          <p>One promotional trial per account during this event.</p>
-        </div>
-        ${promo.endAt ? `<b data-countdown="${escapeHtml(promo.endAt)}"></b>` : ""}
-      </div>
-    ` : "";
+    const program = trial.activityProgram || {};
+    const prizes = Array.isArray(program.prizes) && program.prizes.length
+      ? program.prizes
+      : [{ rank: 1, days: 15 }, { rank: 2, days: 10 }, { rank: 3, days: 7 }];
+    const legacyLicense = trial.active ? trial.activeLicense || {} : null;
     target.innerHTML = `
-      ${promoBanner}
       <div class="trial-card">
         <div class="trial-main">
           <div class="card-top">
             <div>
-              <span class="pill">${statusText}</span>
-              <h3>${t("trialRequirements")}</h3>
+              <span class="pill">FIMA ACTIVITY</span>
+              <h3>Text & voice leaderboard rewards</h3>
             </div>
-            <span class="status-pill">${statusText}</span>
+            <span class="status-pill">Monthly UTC seasons</span>
           </div>
-          <p>${promo.active ? `${escapeHtml(trialLabel)} is available during the beta promotion. Discord and verified Roblox are required for trial claims.` : t("trialIntro")}</p>
+          <p>The universal first-use trial has ended. Participate naturally in FIMA: the Top 3 text users and Top 3 voice users earn Macro time every month. Every verified active server boost adds 3 more days for that month.</p>
           <div class="requirement-list">
-            ${requirements.map((item) => `<div class="requirement ${item.complete ? "is-complete" : "is-missing"}"><span>${item.complete ? "OK" : "!"}</span><strong>${escapeHtml(requirementLabel(item.id))}</strong></div>`).join("")}
+            <div class="requirement is-complete"><span>TXT</span><strong>Text leaderboard</strong></div>
+            <div class="requirement is-complete"><span>VC</span><strong>Voice leaderboard</strong></div>
+            <div class="requirement ${program.linkedFimaAccountRequired ? "is-complete" : ""}"><span>ID</span><strong>Linked FIMA account required for delivery</strong></div>
           </div>
-          ${missingDiscord ? `<div class="trial-hint"><span>${t("connectDiscordTrial")}</span><a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a></div>` : ""}
-          ${missingRoblox ? `<div class="trial-hint"><span>${t("connectRobloxTrial")}</span><a class="button secondary" href="${dashboardRoute("overview")}#roblox-profile">${t("connectRoblox")}</a></div>` : ""}
-          ${!missingDiscord && !missingRoblox && !trial.active && !trial.cooldownActive ? `<div class="trial-hint is-ready"><span>${t("requirementsComplete")}</span></div>` : ""}
+          <div class="trial-hint is-ready"><span>Text, voice and booster rewards are separate and stack. Link the same Discord account to FIMA before delivery.</span></div>
         </div>
         <aside class="trial-side">
-          ${trial.active ? `<div><span>${t("remaining")}</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong></div>` : ""}
-          ${trial.nextTrialAvailableAt ? `<div><span>${t("nextTrial")}</span><strong>${date(trial.nextTrialAvailableAt)}</strong><small data-countdown="${escapeHtml(trial.nextTrialAvailableAt)}">${duration(trial.cooldownSeconds)}</small></div>` : ""}
-          ${trial.activeLicense?.hasLicenseKey || trial.activeLicense?.licenseKeyMasked || trial.activeLicense?.licenseKey ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(trial.activeLicense.licenseKeyMasked || maskSensitiveCode(trial.activeLicense.licenseKey))}</code></div>` : ""}
-          <button class="button" type="button" data-claim-trial ${trial.eligible ? "" : "disabled"}>Claim ${escapeHtml(trialLabel)}</button>
+          ${prizes.map((prize) => `<div><span>#${escapeHtml(String(prize.rank))}</span><strong>${escapeHtml(String(prize.days))} days</strong><small>FIMA Macro</small></div>`).join("")}
+          ${legacyLicense ? `<div><span>Legacy trial</span><strong data-countdown="${escapeHtml(trial.expiresAt || "")}">${duration(trial.activeSeconds)}</strong><small>Read-only until expiry</small></div>` : ""}
+          ${legacyLicense && (legacyLicense.hasLicenseKey || legacyLicense.licenseKeyMasked || legacyLicense.licenseKey) ? `<div class="key-box"><span>${t("licenseKey")}</span><code>${escapeHtml(legacyLicense.licenseKeyMasked || maskSensitiveCode(legacyLicense.licenseKey))}</code></div>` : ""}
         </aside>
       </div>
     `;
@@ -2347,7 +2448,7 @@
     return `
       <article class="gift-result-card" data-gift-result-id="${escapeHtml(recipient.id)}">
         <div class="mini-profile">
-          ${avatar ? `<img src="${escapeHtml(avatar)}" alt="">` : `<span>F</span>`}
+          ${avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(name)}" src="${escapeHtml(avatar)}" alt="">` : `<span>${escapeHtml(safeProfileInitial(name))}</span>`}
           <div>
             <strong>${escapeHtml(name)}</strong>
             <small>${escapeHtml(sub)}</small>
@@ -2433,6 +2534,7 @@
           results.innerHTML = recipients.length
             ? recipients.map(renderGiftResult).join("")
             : `<div class="empty-state">${t("giftSearchEmpty")}</div>`;
+          wireAccountProfileAvatarFallbacks(results, "F");
         } catch {
           results.innerHTML = `<div class="empty-state">${t("giftSearchFailed")}</div>`;
         }
@@ -2481,7 +2583,7 @@
     return `
       <article class="referral-row ${escapeHtml(referral.status || "pending")}">
         <div class="mini-profile">
-          ${user.robloxAvatarUrl ? `<img src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span>${escapeHtml(String(name).slice(0, 1).toUpperCase())}</span>`}
+          ${user.robloxAvatarUrl ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(name)}" src="${escapeHtml(user.robloxAvatarUrl)}" alt="">` : `<span>${escapeHtml(safeProfileInitial(name))}</span>`}
           <div>
             <strong>${escapeHtml(name)}</strong>
             <small>${escapeHtml([user.maskedEmail, date(referral.createdAt)].filter(Boolean).join(" / "))}</small>
@@ -2560,17 +2662,23 @@
         </div>
       </div>
     `;
+    wireAccountProfileAvatarFallbacks(target, "F");
   };
 
   const refreshDashboardAccess = async () => {
     const data = await api("/api/me/dashboard");
-    window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
+    window.fimaAccountProductContext = {
+      user: data.user || {},
+      integrations: data.integrations || {},
+      communityProfile: data.communityProfile || {}
+    };
     if (data.user) {
       renderAccountHeader(data.user);
       renderAccountSummary(data.user);
       renderEmailVerification(data.user);
       renderRobloxProfileSettings(data.user);
     }
+    renderCommunityProfile(data.communityProfile || {});
     renderConnectedAccounts(data.integrations || {});
     renderGiftClaims(data.pendingGifts || [], data.integrations || {}, data.purchasedGiftCodes || [], data.giftHistory || []);
     renderMonthlyTrial(data.trial || {});
@@ -2723,59 +2831,45 @@
     updateCountdowns();
   };
 
-  const showTrialClaimModal = (trial, license) => {
-    const existing = $(".gift-success-overlay");
-    existing?.remove();
-    const activeLicense = license || trial?.activeLicense || {};
-    const fullKey = activeLicense.licenseKey || "";
-    const maskedKey = activeLicense.licenseKeyMasked || maskSensitiveCode(fullKey);
-    const licenseRecordId = String(activeLicense.id || activeLicense.licenseId || "").trim();
-    const licenseSecretId = fullKey ? storeSensitiveSecret(fullKey, "trial-license") : "";
-    const copyAttribute = licenseRecordId
-      ? `data-copy-license-id="${escapeHtml(licenseRecordId)}"`
-      : licenseSecretId
-        ? `data-copy-secret="${escapeHtml(licenseSecretId)}"`
-        : "";
-    const overlay = document.createElement("div");
-    overlay.className = "gift-success-overlay trial-success-overlay";
-    overlay.innerHTML = `
-      <section class="gift-success-modal trial-success-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(t("trialClaimed"))}">
-        <div class="card-top">
-          <div>
-            <span class="pill">${escapeHtml(trial?.label || t("freeMonthlyTrial"))}</span>
-            <h3>${escapeHtml(t("trialReadyTitle") || "Your trial key is ready")}</h3>
-            <p>${escapeHtml(t("trialReadyText") || "Copy your license key, then open Fima and activate it on the key screen.")}</p>
-          </div>
-          <button class="link-button" type="button" data-close-gift-modal>${t("close")}</button>
-        </div>
-        <div class="gift-modal-key gift-modal-key-primary trial-license-display">
-          <span>${t("licenseKey")}</span>
-          <code>${escapeHtml(maskedKey || "FIMA-****")}</code>
-          ${copyAttribute ? `<button class="button" type="button" ${copyAttribute}>${t("copyLicenseKey")}</button>` : ""}
-        </div>
-        <div class="gift-meta-grid">
-          ${trial?.expiresAt ? `<span>${t("expires")}: <b>${date(trial.expiresAt)}</b></span>` : ""}
-          ${trial?.expiresAt ? `<span>${t("remaining")}: <b data-countdown="${escapeHtml(trial.expiresAt)}"></b></span>` : ""}
-          <span>${t("status")}: <b>${escapeHtml(t("trialActive") || "Trial active")}</b></span>
-        </div>
-        <div class="trial-success-note">
-          ${escapeHtml(t("trialReadyPrivacy") || "For privacy, screenshots and reports should show the masked key only. The Copy button copies the full key for this signed-in account.")}
-        </div>
-        <div class="gift-modal-actions">
-          <a class="button secondary" href="${dashboardRoute("products")}">${t("openMyProducts")}</a>
-          <a class="button secondary" href="/download">${t("downloadApp")}</a>
-          <button class="button" type="button" data-close-gift-modal>OK</button>
-        </div>
-      </section>
-    `;
-    document.body.appendChild(overlay);
-    document.body.classList.add("modal-open");
-    window.setTimeout(() => overlay.classList.add("is-visible"), 20);
-    updateCountdowns();
-  };
-
   const initAccountActions = () => {
     document.addEventListener("submit", async (event) => {
+      const communityProfileForm = event.target.closest("[data-community-profile-form]");
+      if (communityProfileForm) {
+        event.preventDefault();
+        const submit = communityProfileForm.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage(t("working"));
+        try {
+          const data = await patch("/api/me/profile/preferences", {
+            preferredLanguage: communityProfileForm.elements.preferredLanguage.value,
+            countryRegion: communityProfileForm.elements.countryRegion.value,
+            nationality: communityProfileForm.elements.nationality.value,
+            nationalityVisible: communityProfileForm.elements.nationalityVisible.checked,
+            timezone: communityProfileForm.elements.timezone.value
+          });
+          currentUserPromise = null;
+          window.fimaAccountProductContext = {
+            ...(window.fimaAccountProductContext || {}),
+            user: data.user || {},
+            communityProfile: data.profile || {}
+          };
+          renderAccountHeader(data.user || {});
+          renderAccountSummary(data.user || {});
+          renderCommunityProfile(data.profile || {});
+          const syncWarning = data.discordSync?.success
+            ? ""
+            : (language() === "tr"
+              ? " Profil kaydedildi; Discord dil rolü bağlantı veya rol yapılandırması tamamlanınca eşitlenecek."
+              : " Profile saved; the Discord language role will sync after the connection and role configuration are ready.");
+          setMessage(`${language() === "tr" ? "Topluluk tercihleri kaydedildi." : "Community preferences saved."}${syncWarning}`, "good");
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+        return;
+      }
+
       const robloxProfileForm = event.target.closest("[data-roblox-profile-form]");
       if (robloxProfileForm) {
         event.preventDefault();
@@ -3177,20 +3271,6 @@
         return;
       }
 
-      const trialButton = event.target.closest("[data-claim-trial]");
-      if (trialButton) {
-        trialButton.disabled = true;
-        setMessage(t("working"));
-        try {
-          const data = await post("/api/trial/monthly/claim", {});
-          await refreshDashboardAccess();
-          showTrialClaimModal(data.trial, data.license);
-          setMessage(t("trialClaimed"), "good");
-        } catch (error) {
-          setMessage(error.message, "error");
-          trialButton.disabled = false;
-        }
-      }
     });
   };
 

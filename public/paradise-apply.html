@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="tr" data-theme="violet-dragon">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Paradise ve Fima ekibine güvenli Discord üyelik doğrulamasıyla başvur.">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="theme-color" content="#160d25">
+    <title>Paradise Başvuru Merkezi | Fima</title>
+    <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="/assets/css/styles.css?v=20260621-3a50">
+    <style>
+      :root{--apply-accent:#9b6cff;--apply-panel:#171020e8;--apply-border:#ffffff18}
+      body{min-height:100vh;background:radial-gradient(circle at 14% 4%,#7c3aed38,transparent 34%),radial-gradient(circle at 88% 34%,#2563eb22,transparent 32%),#09070f;color:#f7f2ff}
+      .apply-shell{width:min(1060px,calc(100% - 32px));margin:0 auto;padding:118px 0 70px}.apply-hero{text-align:center;margin-bottom:28px}.apply-hero h1{font-size:clamp(2.5rem,7vw,5rem);margin:.2em 0}.apply-hero p{max-width:760px;margin:0 auto;color:#bdb3ca;line-height:1.7}
+      .apply-grid{display:grid;grid-template-columns:minmax(280px,310px) minmax(0,1fr);gap:18px;align-items:stretch}.apply-card{min-width:0;border:1px solid var(--apply-border);border-radius:22px;background:linear-gradient(145deg,#21152fee,#100c18f2);box-shadow:0 28px 70px #0008;padding:22px}.apply-card h2,.apply-card h3{margin-top:0}.apply-card h2{font-size:clamp(1.55rem,2.3vw,2.2rem);line-height:1.14;overflow-wrap:normal;word-break:normal}.apply-card p,.apply-card li{color:#c4b9d2;line-height:1.6}.apply-status{display:grid;gap:10px}.status-chip{padding:11px 13px;border-radius:13px;background:#0c0912;border:1px solid #ffffff12}.status-chip.good{border-color:#34d39966;color:#9af0c7}.status-chip.warn{border-color:#fbbf2466;color:#f7d788}.status-chip.bad{border-color:#fb718566;color:#ffb1bd}
+      .field{display:grid;gap:7px;margin-bottom:15px}.field label{font-weight:800}.field small{color:#9589a5}.field input,.field textarea,.field select{width:100%;box-sizing:border-box;border:1px solid #ffffff1b;border-radius:13px;background:#0b0811;color:#fff;padding:12px 13px;font:inherit}.field textarea{min-height:118px;resize:vertical}.field input:focus,.field textarea:focus,.field select:focus{outline:2px solid #9b6cff66;border-color:var(--apply-accent)}
+      .apply-actions{display:flex;gap:10px;flex-wrap:wrap}.apply-button{border:0;border-radius:13px;padding:12px 17px;font-weight:900;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;transition:.18s}.apply-button:hover{transform:translateY(-2px)}.apply-button.primary{background:linear-gradient(135deg,#8b5cf6,#4f8cff);color:#fff}.apply-button.secondary{background:#ffffff0c;border:1px solid #ffffff20;color:#fff}.apply-button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+      .notice{padding:14px 16px;border-radius:14px;background:#11101c;border:1px solid #ffffff16;margin-bottom:16px}.notice.success{border-color:#34d39970}.notice.error{border-color:#fb718570}.hidden{display:none!important}.privacy{font-size:.84rem;color:#8e829c;margin-top:18px}
+      .workflow-tabs{display:grid;grid-template-columns:1fr;gap:9px;margin-bottom:18px}.workflow-tab{border:1px solid #ffffff18;border-radius:13px;padding:11px 13px;text-align:center;color:#cfc5dc;text-decoration:none;font-weight:900;background:#0c0912}.workflow-tab.active{border-color:#9b6cff99;background:#6943b844;color:#fff}
+      .draft-state{font-size:.84rem;color:#a99db8;margin:-7px 0 16px}.evidence-box{border:1px solid #fbbf2448;background:#2a210d42;border-radius:13px;padding:12px 13px;margin-top:10px}.evidence-box strong{display:block;color:#f7d788;margin-bottom:4px}.evidence-input{padding:9px!important}.evidence-list{display:grid;gap:4px;margin-top:7px;font-size:.82rem;color:#a99db8}.question-counter{font-variant-numeric:tabular-nums}
+      @media(max-width:760px){.apply-grid{grid-template-columns:1fr}.apply-shell{padding-top:92px}.apply-card{padding:18px}}
+    </style>
+    <script src="/assets/js/config.js?v=20260717-1"></script>
+  </head>
+  <body>
+    <header class="site-header" data-header><div class="nav-shell">
+      <a class="brand" href="/"><img class="brand-logo" src="/assets/images/fima-logo.png?v=20260526-2" alt="" width="44" height="44"><span>Fima × Paradise</span></a>
+      <nav class="site-menu"><a href="/paradise-bot">Paradise Bot</a><a href="/paradise-bot#commands">Komutlar</a><a href="/support">Destek</a></nav>
+      <div class="nav-controls"><a class="nav-cta" href="/dashboard/overview">Fima Hesabı</a></div>
+    </div></header>
+
+    <main class="apply-shell">
+      <section class="apply-hero">
+        <p class="eyebrow"><span class="pulse-dot"></span> Discord üyeliği doğrulanan başvuru sistemi</p>
+        <h1>Paradise <span style="color:var(--apply-accent)">Başvuru Merkezi</span></h1>
+        <p>Fieel’s Community personel girişinde yalnızca Helper başvurusu açıktır. Üst rütbeler içeriden terfiyle kazanılır. Fima hesabın, bağlı Discord hesabın ve seçtiğin sunucuda üyeliğin gerekir.</p>
+      </section>
+
+      <div class="apply-grid">
+        <aside class="apply-card">
+          <h2>Başvuru kontrolü</h2>
+          <div class="apply-status" id="statusList">
+            <div class="status-chip" id="loginStatus">Fima oturumu kontrol ediliyor…</div>
+            <div class="status-chip" id="discordStatus">Discord bağlantısı kontrol ediliyor…</div>
+            <div class="status-chip" id="memberStatus">Sunucu üyeliği kontrol ediliyor…</div>
+          </div>
+          <div class="apply-actions" style="margin-top:16px">
+            <a class="apply-button secondary" id="loginLink" href="/login?returnTo=%2Fparadise-apply">Fima ile giriş yap</a>
+            <a class="apply-button secondary" id="discordLink" href="https://api.fimamacro.com/auth/discord/start?returnTo=%2Fparadise-apply">Discord bağla</a>
+            <a class="apply-button secondary hidden" id="joinServer" href="#">Discord sunucusuna katıl</a>
+          </div>
+        </aside>
+
+        <section class="apply-card">
+          <nav class="workflow-tabs" aria-label="Başvuru akışı">
+            <a class="workflow-tab" id="staffWorkflow" href="?workflow=staff&amp;type=helper">Helper</a>
+          </nav>
+          <div id="notice" class="notice hidden" role="status"></div>
+          <form id="applicationForm">
+            <h2 id="formTitle">Başvurunu hazırla</h2>
+            <p class="draft-state" id="draftState">Cevapların bu cihazda otomatik taslak olarak saklanır.</p>
+            <div class="field"><label for="guildSelect">Discord sunucusu</label><select id="guildSelect" required><option value="">Uygun sunucular yükleniyor…</option></select><small>Yalnızca üyesi olduğun ve Paradise'ın kurulu olduğu sunucular gösterilir.</small></div>
+            <div class="field"><label for="typeSelect">Pozisyon</label><select id="typeSelect" required><option value="">Önce sunucu seç</option></select></div>
+            <div id="questionFields"></div>
+            <div class="evidence-box">
+              <strong>Kanıt dosyası güvenliği</strong>
+              <span id="evidencePolicyText">PNG, JPEG veya WebP görselleri isteğe bağlıdır. Tarama yapılamayan dosyalar güvenli kabul edilmez ve karantinaya alınır.</span>
+            </div>
+            <div class="apply-actions"><button class="apply-button primary" id="submitButton" type="submit" disabled>Başvuruyu Discord inceleme kuyruğuna gönder</button><a class="apply-button secondary" href="/paradise-bot">İptal</a></div>
+            <p class="privacy">Başvurular özel staff kanalında incelenir. Şifre, token, cookie, tam lisans anahtarı, ödeme kartı veya özel hesap verisi yazma.</p>
+          </form>
+        </section>
+      </div>
+    </main>
+
+    <script src="/assets/js/paradise-apply.js?v=20260717-1"></script>
+  </body>
+</html>

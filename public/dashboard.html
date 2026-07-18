@@ -7,18 +7,18 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Fima Macro">
     <meta property="og:title" content="Fima Macro | Premium Macro App">
-    <meta property="og:description" content="Premium Roblox macro app with setup-aware timing, clean licenses, free trial, monthly access and lifetime access.">
+    <meta property="og:description" content="Premium Roblox macro app with secure account access, short-term, monthly and lifetime licenses.">
     <meta property="og:url" content="https://fimamacro.com/">
     <meta property="og:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Fima Macro | Premium Macro App">
-    <meta name="twitter:description" content="Premium Roblox macro app with setup-aware timing, clean licenses, free trial, monthly access and lifetime access.">
+    <meta name="twitter:description" content="Premium Roblox macro app with secure account access, short-term, monthly and lifetime licenses.">
     <meta name="twitter:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
     <title>Dashboard | Fima Macro</title>
     <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
-    <link rel="stylesheet" href="/assets/css/account.css?v=20260621-3a50">
+    <link rel="stylesheet" href="/assets/css/account.css?v=20260716-community-profile-1">
   </head>
   <body data-account-page="dashboard">
     <header class="account-header dashboard-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
@@ -38,6 +38,7 @@
             <a href="/dashboard/referrals" data-dashboard-link="referrals"><span>Referrals</span><small>Invite rewards</small></a>
             <a href="/dashboard/downloads" data-dashboard-link="downloads"><span>Downloads</span><small>Latest app</small></a>
             <a href="/dashboard/support" data-dashboard-link="support"><span>Support</span><small>Tickets and help</small></a>
+            <a href="/paradise"><span>Paradise Dashboard</span><small>Discord bot console</small></a>
           </nav>
         </aside>
 
@@ -45,7 +46,7 @@
           <section class="panel panel-pad account-summary-card" id="overview">
             <div>
               <h2>Account</h2>
-              <p>Manage your profile, recovery, Roblox verification and trial requirements from this overview.</p>
+              <p>Manage your profile, recovery, linked accounts and community reward eligibility from this overview.</p>
             </div>
             <div class="summary-grid">
               <div class="row reveal-row"><span>Username</span><strong id="accountUsername">Loading...</strong><button class="reveal-button" type="button" data-reveal-target="accountUsername" aria-label="Show username"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5c5.1 0 8.4 4.6 9.3 6.1.2.3.2.5 0 .8-.9 1.5-4.2 6.1-9.3 6.1s-8.4-4.6-9.3-6.1a.8.8 0 0 1 0-.8c.9-1.5 4.2-6.1 9.3-6.1Zm0 2c-3.7 0-6.4 3-7.3 4.5.9 1.5 3.6 4.5 7.3 4.5s6.4-3 7.3-4.5C18.4 10.5 15.7 7.5 12 7.5Zm0 2.1a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z"/></svg></button></div>
@@ -54,23 +55,24 @@
               <div class="row"><span>Roblox profile</span><strong id="accountRoblox">Loading...</strong></div>
             </div>
             <div class="trial-hint is-ready overview-trial-hint">
-              <span>Need the free trial? Verify your Roblox profile here first. Fima gives you a FIMAVERIFY code, you place it in your Roblox profile About/Description, then you can claim the trial from Redeem / Gift.</span>
-              <a class="button secondary" href="#roblox-profile">Verify Roblox profile</a>
+              <span>Activity Rewards have replaced the universal first-use trial. Every month, the Top 3 text and Top 3 voice members earn 15, 10 and 7 days of FIMA Macro access; rewards can stack. Each verified active server boost adds 3 days for that month.</span>
+              <a class="button secondary" href="#redeem">View Activity Rewards</a>
             </div>
 
             <div class="account-section email-verification-section overview-security-block" id="security">
               <div class="section-heading">
               <div>
                 <p class="eyebrow">Security / Settings</p>
-                <h2>Account setup and verification</h2>
-                <p>Connect Discord for recovery and verify Roblox with a FIMA profile code before claiming a trial.</p>
+                <h2>Identity, language and verification</h2>
+                <p>Discord is the primary identity connection. Your preferred language controls access to language-specific community spaces.</p>
               </div>
               </div>
               <div id="emailVerification">Loading...</div>
+              <div id="communityProfileSettings">Loading...</div>
               <div class="account-divider"></div>
               <div>
                 <p class="eyebrow">Account Links</p>
-                <h2>Discord recovery and Roblox verification</h2>
+                <h2>Connected accounts and Roblox verification</h2>
                 <p>Roblox is verified by placing a generated FIMA code in your Roblox profile About/Description. A typed username alone is never proof.</p>
               </div>
               <div id="connectedAccounts">Loading...</div>
@@ -162,6 +164,6 @@
       </div>
     </main>
     <script src="/assets/js/config.js?v=20260526-9"></script>
-    <script src="/assets/js/account.js?v=20260626-3a57" defer></script>
+    <script src="/assets/js/account.js?v=20260718-avatar-1" defer></script>
   </body>
 </html>

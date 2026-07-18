@@ -8,29 +8,30 @@ datasource db {
 }
 
 model License {
-  id                    String          @id @default(cuid())
-  licenseKey            String          @unique @map("license_key")
-  customerEmail         String          @map("customer_email")
+  id                    String              @id @default(cuid())
+  licenseKey            String              @unique @map("license_key")
+  customerEmail         String              @map("customer_email")
   plan                  String
-  status                String          @default("active")
+  status                String              @default("active")
   hwid                  String?
-  expiresAt             DateTime?       @map("expires_at")
-  lifetime              Boolean         @default(false)
-  stripeSessionId       String?         @unique @map("stripe_session_id")
-  stripePaymentIntentId String?         @map("stripe_payment_intent_id")
-  validationCount       Int             @default(0) @map("validation_count")
-  downloadCount         Int             @default(0) @map("download_count")
-  lastValidatedAt       DateTime?       @map("last_validated_at")
-  lastDownloadedAt      DateTime?       @map("last_downloaded_at")
+  expiresAt             DateTime?           @map("expires_at")
+  lifetime              Boolean             @default(false)
+  stripeSessionId       String?             @unique @map("stripe_session_id")
+  stripePaymentIntentId String?             @map("stripe_payment_intent_id")
+  validationCount       Int                 @default(0) @map("validation_count")
+  downloadCount         Int                 @default(0) @map("download_count")
+  lastValidatedAt       DateTime?           @map("last_validated_at")
+  lastDownloadedAt      DateTime?           @map("last_downloaded_at")
   notes                 String?
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
   orders                Order[]
   validationLogs        ValidationLog[]
   downloadLogs          DownloadLog[]
   referralRewards       ReferralReward[]
   giftRedemptions       GiftRedemption[]
   directGiftPackages    DirectGiftPackage[]
+  paymentSubmissions    PaymentSubmission[]
 
   @@index([customerEmail])
   @@index([plan, status])
@@ -80,39 +81,48 @@ model Customer {
 }
 
 model User {
-  id                     String               @id @default(cuid())
-  email                  String               @unique
-  emailNormalized        String?              @unique @map("email_normalized")
-  passwordHash           String               @map("password_hash")
-  stripeCustomerId       String?              @unique @map("stripe_customer_id")
-  discordUserId          String?              @unique @map("discord_user_id")
-  discordUsername        String?              @map("discord_username")
-  discordEmail           String?              @map("discord_email")
-  discordAvatarUrl       String?              @map("discord_avatar_url")
-  robloxUsername         String?              @map("roblox_username")
-  robloxUserId           String?              @map("roblox_user_id")
-  robloxAvatarUrl        String?              @map("roblox_avatar_url")
-  emailVerifiedAt        DateTime?            @map("email_verified_at")
-  trialUsedAt            DateTime?            @map("trial_used_at")
-  trialExpiresAt         DateTime?            @map("trial_expires_at")
-  nextTrialAvailableAt   DateTime?            @map("next_trial_available_at")
-  trialStatus            String?              @map("trial_status")
-  monthlyTrialClaimCount Int                  @default(0) @map("monthly_trial_claim_count")
-  role                   String               @default("user")
-  createdAt              DateTime             @default(now()) @map("created_at")
-  updatedAt              DateTime             @updatedAt @map("updated_at")
-  sessions               UserSession[]
-  resetTokens            PasswordResetToken[]
-  verificationTokens     EmailVerificationToken[]
-  purchases              Purchase[]
-  oauthLinks             OAuthLink[]
-  paymentSubmissions     PaymentSubmission[]
-  giftRedemptions        GiftRedemption[]
-  directGiftPackages     DirectGiftPackage[]
-  referralCode           ReferralCode?
-  referralsMade          Referral[]            @relation("ReferralReferrer")
-  referralReceived       Referral?             @relation("ReferralReferred")
-  referralRewards        ReferralReward[]
+  id                            String                   @id @default(cuid())
+  email                         String                   @unique
+  emailNormalized               String?                  @unique @map("email_normalized")
+  passwordHash                  String                   @map("password_hash")
+  stripeCustomerId              String?                  @unique @map("stripe_customer_id")
+  discordUserId                 String?                  @unique @map("discord_user_id")
+  discordUsername               String?                  @map("discord_username")
+  discordEmail                  String?                  @map("discord_email")
+  discordAvatarUrl              String?                  @map("discord_avatar_url")
+  robloxUsername                String?                  @map("roblox_username")
+  robloxUserId                  String?                  @map("roblox_user_id")
+  robloxAvatarUrl               String?                  @map("roblox_avatar_url")
+  preferredLanguage             String?                  @map("preferred_language")
+  countryRegion                 String?                  @map("country_region")
+  nationality                   String?
+  nationalityVisible            Boolean                  @default(false) @map("nationality_visible")
+  timezone                      String?
+  languageOnboardingStatus      String                   @default("pending") @map("language_onboarding_status")
+  languageOnboardingCompletedAt DateTime?                @map("language_onboarding_completed_at")
+  languageOnboardingDeferredAt  DateTime?                @map("language_onboarding_deferred_at")
+  emailVerifiedAt               DateTime?                @map("email_verified_at")
+  trialUsedAt                   DateTime?                @map("trial_used_at")
+  trialExpiresAt                DateTime?                @map("trial_expires_at")
+  nextTrialAvailableAt          DateTime?                @map("next_trial_available_at")
+  trialStatus                   String?                  @map("trial_status")
+  monthlyTrialClaimCount        Int                      @default(0) @map("monthly_trial_claim_count")
+  role                          String                   @default("user")
+  createdAt                     DateTime                 @default(now()) @map("created_at")
+  updatedAt                     DateTime                 @updatedAt @map("updated_at")
+  sessions                      UserSession[]
+  desktopLoginRequests          DesktopLoginRequest[]
+  resetTokens                   PasswordResetToken[]
+  verificationTokens            EmailVerificationToken[]
+  purchases                     Purchase[]
+  oauthLinks                    OAuthLink[]
+  paymentSubmissions            PaymentSubmission[]
+  giftRedemptions               GiftRedemption[]
+  directGiftPackages            DirectGiftPackage[]
+  referralCode                  ReferralCode?
+  referralsMade                 Referral[]               @relation("ReferralReferrer")
+  referralReceived              Referral?                @relation("ReferralReferred")
+  referralRewards               ReferralReward[]
 
   @@index([role])
   @@index([discordUserId])
@@ -204,31 +214,31 @@ model ReferralAbuseFlag {
 }
 
 model GiftCode {
-  id                  String           @id @default(cuid())
-  codeHash            String           @unique @map("code_hash")
-  codeCipher          String?          @map("code_cipher")
-  maskedCode          String           @map("masked_code")
-  plan                String
-  status              String           @default("unused")
-  maxUses             Int              @default(1) @map("max_uses")
-  usedCount           Int              @default(0) @map("used_count")
-  expiresAt           DateTime?        @map("expires_at")
-  buyerUserId         String?          @map("buyer_user_id")
-  buyerEmail          String?          @map("buyer_email")
-  buyerDiscordId      String?          @map("buyer_discord_id")
-  buyerRobloxId       String?          @map("buyer_roblox_id")
-  stripeSessionId     String?          @unique @map("stripe_session_id")
-  stripePaymentIntentId String?        @map("stripe_payment_intent_id")
-  purchasedAt         DateTime?        @map("purchased_at")
-  recipientEmail      String?          @map("recipient_email")
-  recipientUserId     String?          @map("recipient_user_id")
-  requiresDiscord     Boolean          @default(true) @map("requires_discord")
-  requiresRoblox      Boolean          @default(true) @map("requires_roblox")
-  createdByAdminId    String?          @map("created_by_admin_id")
-  notes               String?
-  createdAt           DateTime         @default(now()) @map("created_at")
-  updatedAt           DateTime         @updatedAt @map("updated_at")
-  redemptions         GiftRedemption[]
+  id                    String           @id @default(cuid())
+  codeHash              String           @unique @map("code_hash")
+  codeCipher            String?          @map("code_cipher")
+  maskedCode            String           @map("masked_code")
+  plan                  String
+  status                String           @default("unused")
+  maxUses               Int              @default(1) @map("max_uses")
+  usedCount             Int              @default(0) @map("used_count")
+  expiresAt             DateTime?        @map("expires_at")
+  buyerUserId           String?          @map("buyer_user_id")
+  buyerEmail            String?          @map("buyer_email")
+  buyerDiscordId        String?          @map("buyer_discord_id")
+  buyerRobloxId         String?          @map("buyer_roblox_id")
+  stripeSessionId       String?          @unique @map("stripe_session_id")
+  stripePaymentIntentId String?          @map("stripe_payment_intent_id")
+  purchasedAt           DateTime?        @map("purchased_at")
+  recipientEmail        String?          @map("recipient_email")
+  recipientUserId       String?          @map("recipient_user_id")
+  requiresDiscord       Boolean          @default(true) @map("requires_discord")
+  requiresRoblox        Boolean          @default(true) @map("requires_roblox")
+  createdByAdminId      String?          @map("created_by_admin_id")
+  notes                 String?
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+  redemptions           GiftRedemption[]
 
   @@index([plan])
   @@index([status])
@@ -241,20 +251,20 @@ model GiftCode {
 }
 
 model GiftRedemption {
-  id              String    @id @default(cuid())
-  giftCodeId      String    @map("gift_code_id")
-  giftCode        GiftCode  @relation(fields: [giftCodeId], references: [id], onDelete: Restrict)
-  userId          String    @map("user_id")
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  redeemedEmail   String    @map("redeemed_email")
-  discordUserId   String?   @map("discord_user_id")
-  robloxUserId    String?   @map("roblox_user_id")
-  hwid            String?
-  licenseId       String?   @map("license_id")
-  license         License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
-  result          String    @default("success")
-  reason          String?
-  createdAt       DateTime  @default(now()) @map("created_at")
+  id            String   @id @default(cuid())
+  giftCodeId    String   @map("gift_code_id")
+  giftCode      GiftCode @relation(fields: [giftCodeId], references: [id], onDelete: Restrict)
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redeemedEmail String   @map("redeemed_email")
+  discordUserId String?  @map("discord_user_id")
+  robloxUserId  String?  @map("roblox_user_id")
+  hwid          String?
+  licenseId     String?  @map("license_id")
+  license       License? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  result        String   @default("success")
+  reason        String?
+  createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([giftCodeId])
   @@index([userId])
@@ -264,28 +274,28 @@ model GiftRedemption {
 }
 
 model DirectGiftPackage {
-  id                String    @id @default(cuid())
-  recipientEmail    String    @map("recipient_email")
-  recipientUserId   String    @map("recipient_user_id")
-  recipientUser     User      @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
-  plan              String
-  status            String    @default("pending")
-  requiresDiscord   Boolean   @default(true) @map("requires_discord")
-  requiresRoblox    Boolean   @default(true) @map("requires_roblox")
-  sentByAdminId     String?   @map("sent_by_admin_id")
-  message           String?
-  notes             String?
-  claimExpiresAt    DateTime? @map("claim_expires_at")
-  claimedAt         DateTime? @map("claimed_at")
-  claimedByUserId   String?   @map("claimed_by_user_id")
-  claimedEmail      String?   @map("claimed_email")
-  claimedDiscordId  String?   @map("claimed_discord_id")
-  claimedRobloxId   String?   @map("claimed_roblox_id")
-  claimedHwid       String?   @map("claimed_hwid")
-  licenseId         String?   @map("license_id")
-  license           License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(cuid())
+  recipientEmail   String    @map("recipient_email")
+  recipientUserId  String    @map("recipient_user_id")
+  recipientUser    User      @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  plan             String
+  status           String    @default("pending")
+  requiresDiscord  Boolean   @default(true) @map("requires_discord")
+  requiresRoblox   Boolean   @default(true) @map("requires_roblox")
+  sentByAdminId    String?   @map("sent_by_admin_id")
+  message          String?
+  notes            String?
+  claimExpiresAt   DateTime? @map("claim_expires_at")
+  claimedAt        DateTime? @map("claimed_at")
+  claimedByUserId  String?   @map("claimed_by_user_id")
+  claimedEmail     String?   @map("claimed_email")
+  claimedDiscordId String?   @map("claimed_discord_id")
+  claimedRobloxId  String?   @map("claimed_roblox_id")
+  claimedHwid      String?   @map("claimed_hwid")
+  licenseId        String?   @map("license_id")
+  license          License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@index([recipientEmail])
   @@index([recipientUserId])
@@ -318,28 +328,34 @@ model OAuthLink {
 }
 
 model PaymentSubmission {
-  id              String    @id @default(cuid())
-  userId          String?   @map("user_id")
-  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  type            String    @default("robux_manual")
-  status          String    @default("pending")
-  plan            String
-  customerEmail   String?   @map("customer_email")
-  discordUserId   String?   @map("discord_user_id")
-  discordUsername String?   @map("discord_username")
-  robloxUserId    String?   @map("roblox_user_id")
-  robloxUsername  String?   @map("roblox_username")
-  premiumPlus     Boolean?  @map("premium_plus")
-  robuxAmount     Int?      @map("robux_amount")
-  proofUrl        String?   @map("proof_url")
-  proofText       String?   @map("proof_text")
-  notes           String?
-  reviewedBy      String?   @map("reviewed_by")
-  reviewedAt      DateTime? @map("reviewed_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id                 String    @id @default(cuid())
+  userId             String?   @map("user_id")
+  user               User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  licenseId          String?   @map("license_id")
+  license            License?  @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  type               String    @default("robux_manual")
+  status             String    @default("pending")
+  plan               String
+  customerEmail      String?   @map("customer_email")
+  discordUserId      String?   @map("discord_user_id")
+  discordUsername    String?   @map("discord_username")
+  robloxUserId       String?   @map("roblox_user_id")
+  robloxUsername     String?   @map("roblox_username")
+  premiumPlus        Boolean?  @map("premium_plus")
+  robuxAmount        Int?      @map("robux_amount")
+  pricingVersion     String?   @map("pricing_version")
+  idempotencyKeyHash String?   @unique @map("idempotency_key_hash")
+  pendingKey         String?   @unique @map("pending_key")
+  proofUrl           String?   @map("proof_url")
+  proofText          String?   @map("proof_text")
+  notes              String?
+  reviewedBy         String?   @map("reviewed_by")
+  reviewedAt         DateTime? @map("reviewed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   @@index([userId])
+  @@index([licenseId])
   @@index([status])
   @@index([plan])
   @@index([discordUserId])
@@ -360,6 +376,31 @@ model UserSession {
   @@index([userId])
   @@index([expiresAt])
   @@map("user_sessions")
+}
+
+model DesktopLoginRequest {
+  id             String    @id @default(cuid())
+  deviceCodeHash String    @unique @map("device_code_hash")
+  userCodeHash   String    @unique @map("user_code_hash")
+  pkceChallenge  String    @map("pkce_challenge")
+  deviceIdHash   String    @map("device_id_hash")
+  stateHash      String    @map("state_hash")
+  appVersion     String    @map("app_version")
+  deviceName     String?   @map("device_name")
+  devicePlatform String?   @map("device_platform")
+  userId         String?   @map("user_id")
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         String    @default("pending")
+  expiresAt      DateTime  @map("expires_at")
+  approvedAt     DateTime? @map("approved_at")
+  consumedAt     DateTime? @map("consumed_at")
+  cancelledAt    DateTime? @map("cancelled_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, expiresAt])
+  @@index([userId])
+  @@map("desktop_login_requests")
 }
 
 model PasswordResetToken {
@@ -509,14 +550,14 @@ model Setting {
 /// Additive Milestone 1 foundation. Existing Paradise state remains in the
 /// legacy Setting envelope until a verified count-based migration is approved.
 model ParadiseGuildConfig {
-  guildId        String   @id @map("guild_id")
-  schemaVersion  Int      @default(1) @map("schema_version")
-  revision       Int      @default(1)
-  config         Json
-  updatedByUserId String? @map("updated_by_user_id")
-  source         String   @default("unknown")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  guildId         String   @id @map("guild_id")
+  schemaVersion   Int      @default(1) @map("schema_version")
+  revision        Int      @default(1)
+  config          Json
+  updatedByUserId String?  @map("updated_by_user_id")
+  source          String   @default("unknown")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([updatedAt])
   @@map("paradise_guild_configs")
@@ -587,4 +628,229 @@ model Coupon {
 
   @@index([active])
   @@map("coupons")
+}
+
+/// Monthly UTC text/voice activity season. Activity writes are additionally
+/// restricted in application code to the owner-designated Discord test guild.
+model CommunityActivitySeason {
+  id            String                    @id @default(cuid())
+  guildId       String                    @map("guild_id")
+  startsAt      DateTime                  @map("starts_at")
+  endsAt        DateTime                  @map("ends_at")
+  status        String                    @default("active")
+  finalizedAt   DateTime?                 @map("finalized_at")
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+  members       CommunityActivityMember[]
+  textEvents    CommunityTextActivity[]
+  voiceSessions CommunityVoiceSession[]
+  rewards       CommunityActivityReward[]
+
+  @@unique([guildId, startsAt])
+  @@index([guildId, status])
+  @@index([endsAt, status])
+  @@map("community_activity_seasons")
+}
+
+model CommunityActivityMember {
+  id                    String                    @id @default(cuid())
+  seasonId              String                    @map("season_id")
+  season                CommunityActivitySeason   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  guildId               String                    @map("guild_id")
+  discordUserId         String                    @map("discord_user_id")
+  textXp                Int                       @default(0) @map("text_xp")
+  textMessages          Int                       @default(0) @map("text_messages")
+  voiceXp               Int                       @default(0) @map("voice_xp")
+  voiceSeconds          Int                       @default(0) @map("voice_seconds")
+  voiceRemainderSeconds Int                       @default(0) @map("voice_remainder_seconds")
+  lastTextAt            DateTime?                 @map("last_text_at")
+  lastVoiceAt           DateTime?                 @map("last_voice_at")
+  createdAt             DateTime                  @default(now()) @map("created_at")
+  updatedAt             DateTime                  @updatedAt @map("updated_at")
+  textEvents            CommunityTextActivity[]
+  voiceSessions         CommunityVoiceSession[]
+  rewards               CommunityActivityReward[]
+
+  @@unique([seasonId, discordUserId])
+  @@index([guildId, textXp])
+  @@index([guildId, voiceXp])
+  @@index([discordUserId])
+  @@map("community_activity_members")
+}
+
+/// Stores only a normalized content hash, never the Discord message body.
+model CommunityTextActivity {
+  id            String                  @id @default(cuid())
+  seasonId      String                  @map("season_id")
+  season        CommunityActivitySeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  memberId      String                  @map("member_id")
+  member        CommunityActivityMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  guildId       String                  @map("guild_id")
+  discordUserId String                  @map("discord_user_id")
+  messageId     String                  @unique @map("message_id")
+  channelId     String                  @map("channel_id")
+  contentHash   String                  @map("content_hash")
+  xp            Int
+  acceptedAt    DateTime                @default(now()) @map("accepted_at")
+
+  @@index([seasonId, discordUserId, acceptedAt])
+  @@index([seasonId, discordUserId, contentHash, acceptedAt])
+  @@map("community_text_activity")
+}
+
+model CommunityVoiceSession {
+  id             String                  @id @default(cuid())
+  seasonId       String                  @map("season_id")
+  season         CommunityActivitySeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  memberId       String                  @map("member_id")
+  member         CommunityActivityMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  guildId        String                  @map("guild_id")
+  discordUserId  String                  @map("discord_user_id")
+  channelId      String                  @map("channel_id")
+  joinedAt       DateTime                @map("joined_at")
+  lastAccruedAt  DateTime                @map("last_accrued_at")
+  leftAt         DateTime?               @map("left_at")
+  accruedSeconds Int                     @default(0) @map("accrued_seconds")
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  @@index([guildId, active])
+  @@index([seasonId, discordUserId, active])
+  @@index([channelId, active])
+  @@map("community_voice_sessions")
+}
+
+model CommunityActivityReward {
+  id               String                   @id @default(cuid())
+  seasonId         String                   @map("season_id")
+  season           CommunityActivitySeason  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  memberId         String?                  @map("member_id")
+  member           CommunityActivityMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  guildId          String                   @map("guild_id")
+  discordUserId    String                   @map("discord_user_id")
+  board            String
+  rank             Int
+  days             Int
+  score            Int
+  status           String                   @default("pending")
+  reason           String?
+  userId           String?                  @map("user_id")
+  licenseId        String?                  @map("license_id")
+  idempotencyKey   String                   @unique @map("idempotency_key")
+  grantedAt        DateTime?                @map("granted_at")
+  metadata         Json?
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  entitlementGrant MacroEntitlementGrant?
+
+  @@unique([seasonId, board, rank])
+  @@index([discordUserId, status])
+  @@index([seasonId, board])
+  @@map("community_activity_rewards")
+}
+
+/// Immutable entitlement ledger for activity prizes. Text and voice grants use
+/// different idempotency keys and may therefore stack for the same member.
+model MacroEntitlementGrant {
+  id                 String                  @id @default(cuid())
+  rewardId           String                  @unique @map("reward_id")
+  reward             CommunityActivityReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  idempotencyKey     String                  @unique @map("idempotency_key")
+  userId             String                  @map("user_id")
+  licenseId          String?                 @map("license_id")
+  days               Int
+  action             String
+  previousExpiresAt  DateTime?               @map("previous_expires_at")
+  resultingExpiresAt DateTime?               @map("resulting_expires_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([licenseId])
+  @@map("macro_entitlement_grants")
+}
+
+/// Current Discord boost evidence for one member. Discord exposes active boost
+/// state directly; extra boosts are counted from deduplicated system messages.
+model CommunityBoosterState {
+  id                 String                        @id @default(cuid())
+  guildId            String                        @map("guild_id")
+  discordUserId      String                        @map("discord_user_id")
+  active             Boolean                       @default(false)
+  verifiedBoostCount Int                           @default(0) @map("verified_boost_count")
+  countProvenance    String                        @map("count_provenance")
+  premiumSince       DateTime?                     @map("premium_since")
+  lastBoostEventAt   DateTime?                     @map("last_boost_event_at")
+  lastObservedAt     DateTime                      @map("last_observed_at")
+  endedAt            DateTime?                     @map("ended_at")
+  metadata           Json?
+  createdAt          DateTime                      @default(now()) @map("created_at")
+  updatedAt          DateTime                      @updatedAt @map("updated_at")
+  observations       CommunityBoosterObservation[]
+
+  @@unique([guildId, discordUserId])
+  @@index([guildId, active])
+  @@index([discordUserId])
+  @@map("community_booster_states")
+}
+
+model CommunityBoosterObservation {
+  id            String                @id @default(cuid())
+  messageId     String                @unique @map("message_id")
+  guildId       String                @map("guild_id")
+  discordUserId String                @map("discord_user_id")
+  state         CommunityBoosterState @relation(fields: [guildId, discordUserId], references: [guildId, discordUserId], onDelete: Cascade)
+  messageType   String                @map("message_type")
+  countAfter    Int                   @map("count_after")
+  observedAt    DateTime              @map("observed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+
+  @@index([guildId, discordUserId, observedAt])
+  @@map("community_booster_observations")
+}
+
+/// One row per active boost ordinal per UTC month. Per-ordinal rows make a
+/// second boost a safe 3-day top-up without reissuing the first boost reward.
+model CommunityBoosterReward {
+  id               String                        @id @default(cuid())
+  guildId          String                        @map("guild_id")
+  periodStartsAt   DateTime                      @map("period_starts_at")
+  periodEndsAt     DateTime                      @map("period_ends_at")
+  discordUserId    String                        @map("discord_user_id")
+  boostOrdinal     Int                           @map("boost_ordinal")
+  days             Int                           @default(3)
+  provenance       String
+  status           String                        @default("pending")
+  reason           String?
+  userId           String?                       @map("user_id")
+  licenseId        String?                       @map("license_id")
+  idempotencyKey   String                        @unique @map("idempotency_key")
+  grantedAt        DateTime?                     @map("granted_at")
+  metadata         Json?
+  createdAt        DateTime                      @default(now()) @map("created_at")
+  updatedAt        DateTime                      @updatedAt @map("updated_at")
+  entitlementGrant MacroBoosterEntitlementGrant?
+
+  @@unique([guildId, periodStartsAt, discordUserId, boostOrdinal])
+  @@index([guildId, periodStartsAt, status])
+  @@index([discordUserId, status])
+  @@map("community_booster_rewards")
+}
+
+model MacroBoosterEntitlementGrant {
+  id                 String                 @id @default(cuid())
+  rewardId           String                 @unique @map("reward_id")
+  reward             CommunityBoosterReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  idempotencyKey     String                 @unique @map("idempotency_key")
+  userId             String                 @map("user_id")
+  licenseId          String?                @map("license_id")
+  days               Int
+  action             String
+  previousExpiresAt  DateTime?              @map("previous_expires_at")
+  resultingExpiresAt DateTime?              @map("resulting_expires_at")
+  createdAt          DateTime               @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([licenseId])
+  @@map("macro_booster_entitlement_grants")
 }

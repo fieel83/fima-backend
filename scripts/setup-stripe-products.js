@@ -2,7 +2,14 @@ import "dotenv/config";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
-import { checkoutModeForPlan, getPlan, getPlanCommerce, publicCheckoutPlanIds } from "../src/plans.js";
+import {
+  checkoutModeForPlan,
+  getDirectGiftCommerce,
+  getGiftCodeCommerce,
+  getPlan,
+  getPlanCommerce,
+  publicCheckoutPlanIds
+} from "../src/plans.js";
 import { assertStripeSecretKeyAllowed, stripeKeyMode } from "../src/stripeSafety.js";
 
 const LIVE_ENV_MAP = Object.freeze({
@@ -17,6 +24,30 @@ const TEST_ENV_MAP = Object.freeze({
   lifetime: "STRIPE_TEST_PRICE_LIFETIME"
 });
 
+const LIVE_GIFT_ENV_MAP = Object.freeze({
+  "3days": "STRIPE_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_GIFT_PRICE_LIFETIME"
+});
+
+const TEST_GIFT_ENV_MAP = Object.freeze({
+  "3days": "STRIPE_TEST_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_TEST_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_TEST_GIFT_PRICE_LIFETIME"
+});
+
+const LIVE_DIRECT_GIFT_ENV_MAP = Object.freeze({
+  "3days": "STRIPE_DIRECT_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_DIRECT_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_DIRECT_GIFT_PRICE_LIFETIME"
+});
+
+const TEST_DIRECT_GIFT_ENV_MAP = Object.freeze({
+  "3days": "STRIPE_TEST_DIRECT_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_TEST_DIRECT_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_TEST_DIRECT_GIFT_PRICE_LIFETIME"
+});
+
 export function setupEnvScope(value = "", secretKey = process.env.STRIPE_SECRET_KEY) {
   const explicit = String(value || "").trim().toLowerCase();
   if (explicit === "live" || explicit === "test") return explicit;
@@ -26,7 +57,9 @@ export function setupEnvScope(value = "", secretKey = process.env.STRIPE_SECRET_
 export function stripeSetupTargets({ envScope = "live" } = {}) {
   const scope = setupEnvScope(envScope);
   const envMap = scope === "test" ? TEST_ENV_MAP : LIVE_ENV_MAP;
-  return publicCheckoutPlanIds().map((planId) => {
+  const giftEnvMap = scope === "test" ? TEST_GIFT_ENV_MAP : LIVE_GIFT_ENV_MAP;
+  const directGiftEnvMap = scope === "test" ? TEST_DIRECT_GIFT_ENV_MAP : LIVE_DIRECT_GIFT_ENV_MAP;
+  const plans = publicCheckoutPlanIds().map((planId) => {
     const plan = getPlan(planId);
     const commerce = getPlanCommerce(plan);
     const checkoutMode = checkoutModeForPlan(plan);
@@ -35,6 +68,7 @@ export function stripeSetupTargets({ envScope = "live" } = {}) {
       planId,
       productName: plan.name,
       envName: envMap[planId],
+      checkoutType: "license_purchase",
       currency: commerce.currency,
       amount: commerce.priceCents,
       checkoutMode,
@@ -43,10 +77,59 @@ export function stripeSetupTargets({ envScope = "live" } = {}) {
       metadata: {
         app: "fima_macro",
         fima_plan: plan.id,
+        fima_checkout_type: "license_purchase",
+        product_type: "license",
         managed_by: "fima_standalone_setup"
       }
     };
   });
+  const giftCodes = publicCheckoutPlanIds().map((planId) => {
+    const plan = getPlan(planId);
+    const commerce = getGiftCodeCommerce(plan, { test: scope === "test" });
+    return {
+      plan,
+      planId,
+      productName: commerce.productName,
+      envName: giftEnvMap[planId],
+      checkoutType: "gift_code_purchase",
+      currency: commerce.currency,
+      amount: commerce.priceCents,
+      checkoutMode: "payment",
+      priceType: "one_time",
+      interval: null,
+      metadata: {
+        app: "fima_macro",
+        fima_plan: plan.id,
+        fima_checkout_type: "gift_code_purchase",
+        product_type: "gift_code",
+        managed_by: "fima_standalone_setup"
+      }
+    };
+  });
+  const directGifts = publicCheckoutPlanIds().map((planId) => {
+    const plan = getPlan(planId);
+    const commerce = getDirectGiftCommerce(plan, { test: scope === "test" });
+    return {
+      plan,
+      planId,
+      productName: commerce.productName,
+      envName: directGiftEnvMap[planId],
+      checkoutType: "direct_gift_purchase",
+      currency: commerce.currency,
+      amount: commerce.priceCents,
+      checkoutMode: "payment",
+      priceType: "one_time",
+      interval: null,
+      metadata: {
+        app: "fima_macro",
+        fima_plan: plan.id,
+        fima_checkout_type: "direct_gift_purchase",
+        product_type: "direct_gift",
+        managed_by: "fima_standalone_setup"
+      }
+    };
+  });
+  return [...plans, ...giftCodes, ...directGifts];
 }
 
 export async function runStripeProductSetup({
@@ -75,6 +158,7 @@ export async function runStripeProductSetup({
     log(`${target.envName}=${price.price.id}`);
     rows.push({
       plan: target.planId,
+      checkoutType: target.checkoutType,
       productId: product.product.id,
       priceId: price.price.id,
       productCreated: product.created,
@@ -92,10 +176,7 @@ export async function runStripeProductSetup({
 
 async function findOrCreateProduct(stripe, target) {
   const products = await stripe.products.list({ active: true, limit: 100 });
-  const existing = products.data.find((product) =>
-    product.metadata?.fima_plan === target.planId ||
-    normalizeName(product.name) === normalizeName(target.productName)
-  );
+  const existing = products.data.find((product) => productMatchesTarget(product, target));
   if (existing) return { product: existing, created: false };
 
   const product = await stripe.products.create({
@@ -104,6 +185,21 @@ async function findOrCreateProduct(stripe, target) {
     metadata: target.metadata
   });
   return { product, created: true };
+}
+
+function productMatchesTarget(product, target) {
+  const metadata = product.metadata || {};
+  const samePlan = metadata.fima_plan === target.planId;
+  const sameApp = !metadata.app || metadata.app === "fima_macro";
+  const productCheckoutType = String(metadata.fima_checkout_type || "").trim().toLowerCase();
+  if (target.checkoutType === "gift_code_purchase" || target.checkoutType === "direct_gift_purchase") {
+    return samePlan && sameApp && productCheckoutType === target.checkoutType;
+  }
+  const isSpecialProduct = ["gift_code_purchase", "direct_gift_purchase"].includes(productCheckoutType) ||
+    ["gift_code", "direct_gift"].includes(metadata.product_type);
+  return !isSpecialProduct && sameApp && (
+    samePlan || normalizeName(product.name) === normalizeName(target.productName)
+  );
 }
 
 async function findOrCreatePrice(stripe, productId, target) {

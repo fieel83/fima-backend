@@ -16,8 +16,12 @@ import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
 import {
   PLANS,
+  DIRECT_GIFT_REQUIRED_PRICE_ENVS,
+  GIFT_CODE_REQUIRED_PRICE_ENVS,
   PUBLIC_REQUIRED_PRICE_ENVS,
   checkoutModeForPlan,
+  getDirectGiftCommerce,
+  getGiftCodeCommerce,
   getPlan,
   getPlanCommerce,
   getPlanExpiry,
@@ -37,32 +41,61 @@ import {
 import { adminPage, loginPage } from "./adminHtml.js";
 import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
+import {
+  loadParadiseContentDocument,
+  normalizeParadiseContentStudioState,
+  paradiseContentPreset,
+  paradiseContentPreview,
+  rollbackParadiseContentDocument,
+  saveParadiseContentDocument
+} from "./paradiseContentStudio.js";
 import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
+import {
+  buildFieelsCommunityStructureDraft,
+  normalizeFieelsCommunityNamingStyle,
+  validateFieelsCommunityStructureDraft
+} from "./fieelsCommunityStructure.js";
+import {
+  communityAccessForLanguage,
+  normalizeCommunityProfilePreferences
+} from "./accountProfilePreferences.js";
 import {
   applyParadiseCustomerWorkspacePatch,
   buildParadiseCustomerWorkspaceView,
   normalizeParadiseCustomerWorkspacePatch
 } from "./paradiseDashboardWorkspace.js";
 import { normalizeParadiseFeatureFlags } from "./paradiseFeatureFlags.js";
+import { PARADISE_TEST_GUILD_ID } from "./paradise3a59.js";
 import { buildParadiseReconciliation, summarizeParadiseReconciliation } from "./paradiseReconciliation.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
 import { minimumAppVersionStatus } from "./appVersionPolicy.js";
+import { registerDesktopCommerceRoutes } from "./desktopCommerceRoutes.js";
+import {
+  createManualRobuxOrder,
+  getManualRobuxOrder,
+  listManualRobuxOrders,
+  manualRobuxQuote,
+  reviewManualRobuxOrder
+} from "./manualRobuxPayments.js";
 import { runOwnerLifetimeGrantJobOnce } from "./ownerGrantJob.js";
 import { runSecurityE2EJobOnce } from "./securityE2EJob.js";
-import { buildTrialNotes, getTrialPromoConfig, isPromoTrialLicense, isTrialLicense } from "./trialPromo.js";
+import { isLegacyTrialPlan, LEGACY_TRIAL_PROGRAM_STATUS } from "./trialPromo.js";
 import {
   createMissingParadiseTemplateFromDashboard,
   discordBotHealth,
+  fimaAiSupportHealth,
   giveDiscordRole,
   paradiseDiscordAuditJobStatus,
   paradiseDiscordDeepAudit,
+  paradiseDiscordContentMessage,
   paradiseDiscordGuildsSnapshot,
   paradiseDiscordRuntimeSnapshot,
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
   paradiseWebsiteApplicationFormContext,
+  publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
   rebuildParadiseTestTemplateFromDashboard,
   runParadiseTestSmokeSuiteFromDashboard,
@@ -72,6 +105,7 @@ import {
   sendPasswordResetDm,
   sendPaymentSubmissionLog,
   submitParadiseWebsiteApplicationForm,
+  syncDiscordLanguageRole,
   startDiscordBot
 } from "./discordBot.js";
 import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeKeyMode, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
@@ -85,6 +119,10 @@ import {
   updateManifestSecretStatus,
   verifyAppEntitlement
 } from "./entitlements.js";
+import { ownerIdentityStatus } from "./ownerAccess.js";
+import { paradiseApplicationHttpError, requireParadisePrivateReviewQueued } from "./paradiseApplicationHttp.js";
+import { isStrictAccountOnlyEntitlementPayload } from "./desktopLogin.js";
+import { createDesktopLoginHandlers } from "./desktopLoginRoutes.js";
 
 const app = express();
 const port = Number(env("PORT", "8080"));
@@ -95,9 +133,13 @@ const PUBLIC_APP_PACKAGE_URL = "https://github.com/fieel83/fima-macro-releases/r
 const publicProductPlanIds = new Set(publicCheckoutPlanIds());
 const stripePriceEnvNames = [
   ...new Set(
-    Object.values(PLANS)
-      .filter((plan) => publicProductPlanIds.has(plan.id))
-      .flatMap((plan) => getPlanPriceOptions(plan).map((option) => option.priceEnv))
+    [
+      ...Object.values(PLANS)
+        .filter((plan) => publicProductPlanIds.has(plan.id))
+        .flatMap((plan) => getPlanPriceOptions(plan).map((option) => option.priceEnv)),
+      ...GIFT_CODE_REQUIRED_PRICE_ENVS,
+      ...DIRECT_GIFT_REQUIRED_PRICE_ENVS
+    ]
   )
 ];
 let lastStripePriceValidation = {
@@ -118,6 +160,8 @@ let lastEmailDeliveryState = {
 const checkoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const validateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const entitlementRefreshLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
+const desktopLoginPublicLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 90, standardHeaders: true, legacyHeaders: false });
+const desktopLoginApprovalLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false });
 const downloadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 const adminLoginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 40, standardHeaders: true, legacyHeaders: false });
@@ -126,7 +170,8 @@ const emailVerificationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8,
 const storeCheckoutLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 25, standardHeaders: true, legacyHeaders: false });
 const oauthLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const manualPaymentLimiter = rateLimit({ windowMs: 30 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
-const trialLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
+const manualPaymentReadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 150, standardHeaders: true, legacyHeaders: false });
+const deprecatedTrialEndpointLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 8, standardHeaders: true, legacyHeaders: false });
 const giftRecipientSearchLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 50, standardHeaders: true, legacyHeaders: false });
 const giftRedeemLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
@@ -136,6 +181,7 @@ const paradiseApplicationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 
 const adminFailedLoginState = new Map();
 const USER_SESSION_COOKIE = "fima_user_session";
 const PARADISE_OWNER_DISCORD_ID = "762858334440521739";
+const FIMA_OWNER_ACCOUNT_EMAIL = "oyuncukaande@gmail.com";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
@@ -175,10 +221,18 @@ const runtimeEnvCatalog = [
   ["STRIPE_TEST_PRICE_3DAYS", "stripe"],
   ["STRIPE_TEST_PRICE_MONTHLY", "stripe"],
   ["STRIPE_TEST_PRICE_LIFETIME", "stripe"],
-  ["TRIAL_PROMO_ENABLED", "trial"],
-  ["TRIAL_PROMO_DAYS", "trial"],
-  ["NORMAL_TRIAL_DAYS", "trial"],
-  ["TRIAL_PROMO_END_AT", "trial"],
+  ["STRIPE_GIFT_PRICE_3DAYS", "stripe"],
+  ["STRIPE_GIFT_PRICE_MONTHLY", "stripe"],
+  ["STRIPE_GIFT_PRICE_LIFETIME", "stripe"],
+  ["STRIPE_TEST_GIFT_PRICE_3DAYS", "stripe"],
+  ["STRIPE_TEST_GIFT_PRICE_MONTHLY", "stripe"],
+  ["STRIPE_TEST_GIFT_PRICE_LIFETIME", "stripe"],
+  ["STRIPE_DIRECT_GIFT_PRICE_3DAYS", "stripe"],
+  ["STRIPE_DIRECT_GIFT_PRICE_MONTHLY", "stripe"],
+  ["STRIPE_DIRECT_GIFT_PRICE_LIFETIME", "stripe"],
+  ["STRIPE_TEST_DIRECT_GIFT_PRICE_3DAYS", "stripe"],
+  ["STRIPE_TEST_DIRECT_GIFT_PRICE_MONTHLY", "stripe"],
+  ["STRIPE_TEST_DIRECT_GIFT_PRICE_LIFETIME", "stripe"],
   ["ENTITLEMENT_SIGNING_SECRET", "security"],
   ["DOWNLOAD_SIGNING_SECRET", "security"],
   ["UPDATE_MANIFEST_SIGNING_SECRET", "security"],
@@ -432,7 +486,13 @@ app.post(["/api/admin/stripe/setup-products", "/admin/api/stripe/setup-products"
       envMap: {
         "3days": "STRIPE_PRICE_3DAYS",
         monthly: "STRIPE_PRICE_MONTHLY",
-        lifetime: "STRIPE_PRICE_LIFETIME"
+        lifetime: "STRIPE_PRICE_LIFETIME",
+        "gift:3days": "STRIPE_GIFT_PRICE_3DAYS",
+        "gift:monthly": "STRIPE_GIFT_PRICE_MONTHLY",
+        "gift:lifetime": "STRIPE_GIFT_PRICE_LIFETIME",
+        "direct-gift:3days": "STRIPE_DIRECT_GIFT_PRICE_3DAYS",
+        "direct-gift:monthly": "STRIPE_DIRECT_GIFT_PRICE_MONTHLY",
+        "direct-gift:lifetime": "STRIPE_DIRECT_GIFT_PRICE_LIFETIME"
       },
       updateRenderEnv: req.body?.updateRenderEnv === true,
       persistRuntimeConfig: true
@@ -455,7 +515,13 @@ app.post(["/api/admin/stripe/setup-test-products", "/admin/api/stripe/setup-test
       envMap: {
         "3days": "STRIPE_TEST_PRICE_3DAYS",
         monthly: "STRIPE_TEST_PRICE_MONTHLY",
-        lifetime: "STRIPE_TEST_PRICE_LIFETIME"
+        lifetime: "STRIPE_TEST_PRICE_LIFETIME",
+        "gift:3days": "STRIPE_TEST_GIFT_PRICE_3DAYS",
+        "gift:monthly": "STRIPE_TEST_GIFT_PRICE_MONTHLY",
+        "gift:lifetime": "STRIPE_TEST_GIFT_PRICE_LIFETIME",
+        "direct-gift:3days": "STRIPE_TEST_DIRECT_GIFT_PRICE_3DAYS",
+        "direct-gift:monthly": "STRIPE_TEST_DIRECT_GIFT_PRICE_MONTHLY",
+        "direct-gift:lifetime": "STRIPE_TEST_DIRECT_GIFT_PRICE_LIFETIME"
       },
       updateRenderEnv: req.body?.updateRenderEnv === true,
       persistRuntimeConfig: false
@@ -505,6 +571,19 @@ app.use(requireCsrfForCookieMutations({
   adminCookieName: ADMIN_COOKIE_NAME,
   userCookieName: USER_SESSION_COOKIE
 }));
+
+const desktopLoginHandlers = createDesktopLoginHandlers({
+  prisma,
+  normalizeHwid,
+  hashDeviceId,
+  frontendUrl,
+  resolveEntitlementForUser: resolveDesktopEntitlementForUser
+});
+app.post("/api/desktop-login/initiate", desktopLoginPublicLimiter, desktopLoginHandlers.initiate);
+app.post("/api/desktop-login/context", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.context);
+app.post("/api/desktop-login/approve", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.approve);
+app.post("/api/desktop-login/poll", desktopLoginPublicLimiter, desktopLoginHandlers.poll);
+app.post("/api/desktop-login/cancel", desktopLoginPublicLimiter, desktopLoginHandlers.cancel);
 
 app.get("/api/public/site-settings", async (_req, res) => {
   const settings = await getSiteSettings();
@@ -634,6 +713,14 @@ app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
   }));
 });
 
+app.get("/paradise/dashboard", (_req, res) => res.redirect(302, "/paradise"));
+
+app.get("/paradise/content-studio", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.sendFile(path.join(publicDir, "paradise-content-studio.html"));
+});
+
 app.get(["/paradise/invite", "/bot/invite"], (_req, res) => {
   const clientId = env("DISCORD_CLIENT_ID", "");
   if (!/^\d{16,22}$/.test(clientId)) return res.redirect(302, "/paradise-bot#invite-unavailable");
@@ -648,19 +735,24 @@ app.get(["/paradise/commands", "/bot/commands"], (_req, res) => res.redirect(302
 app.get(["/paradise/premium", "/bot/premium"], (_req, res) => res.redirect(302, "/paradise-bot#premium"));
 app.get(["/paradise/feedback", "/bot/feedback"], (_req, res) => res.redirect(302, "/paradise-bot#feedback"));
 app.get(["/paradise/apply", "/bot/apply"], (_req, res) => res.redirect(302, "/paradise-apply"));
-app.get(["/paradise/reseller", "/bot/reseller"], (_req, res) => res.redirect(302, "/paradise-apply?type=reseller"));
+app.get(["/paradise/reseller", "/bot/reseller"], (_req, res) => res.redirect(302, "/paradise-apply"));
 
 app.get("/api/paradise/applications/context", paradiseApplicationLimiter, requireUser, async (req, res) => {
   try {
     const access = await paradiseLinkedDiscordAccess(req.user);
     if (!access.discordLinked) return res.status(409).json({ error: "discord_link_required" });
     const requestedGuildId = String(req.query?.guildId || "").trim();
+    const workflow = req.query?.workflow === "business" ? "business" : "staff";
     const guilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
     const candidates = requestedGuildId ? guilds.filter(guild => guild.id === requestedGuildId) : guilds;
     if (requestedGuildId && candidates.length === 0) return res.status(404).json({ error: "guild_not_managed" });
     const contexts = [];
     for (const guild of candidates.slice(0, 20)) {
-      const context = await paradiseWebsiteApplicationFormContext(guild.id, access.discordUserId).catch(() => null);
+      const context = await paradiseWebsiteApplicationFormContext(
+        guild.id,
+        access.discordUserId,
+        { workflow }
+      ).catch(() => null);
       if (context?.member) contexts.push(context);
     }
     return res.json({
@@ -681,31 +773,32 @@ app.post("/api/paradise/applications/submit", paradiseApplicationLimiter, requir
     if (!access.discordLinked) return res.status(409).json({ error: "discord_link_required" });
     const guildId = String(req.body?.guildId || "").trim();
     const type = String(req.body?.type || "").trim();
+    const workflow = req.body?.workflow === "business" ? "business" : "staff";
     const answers = req.body?.answers && typeof req.body.answers === "object" ? req.body.answers : {};
+    const evidence = Array.isArray(req.body?.evidence) ? req.body.evidence : [];
     const guilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
     if (!guilds.some(guild => guild.id === guildId)) return res.status(404).json({ error: "guild_not_managed" });
-    const result = await submitParadiseWebsiteApplicationForm(guildId, {
+    const result = requireParadisePrivateReviewQueued(await submitParadiseWebsiteApplicationForm(guildId, {
       userId: access.discordUserId,
       type,
+      workflow,
       answers,
+      evidence,
       siteUserId: req.user.id
-    });
+    }));
     await createAuditLog("paradise_website_application_submitted", "discord_guild", guildId, {
       userId: req.user.id,
       discordIdMasked: maskExternalId(access.discordUserId),
       type,
+      workflow,
       applicationId: result.id,
       reviewQueued: result.reviewQueued
     });
     return res.status(201).json({ success: true, application: result });
   } catch (error) {
-    const status = Number(error?.statusCode || 500);
-    if (status >= 500) console.error("Paradise website application failed", publicError(error));
-    return res.status(status).json({
-      error: error?.code || "application_submit_failed",
-      cooldownUntil: error?.cooldownUntil || null,
-      question: error?.question || null
-    });
+    const response = paradiseApplicationHttpError(error);
+    if (response.status >= 500) console.error("Paradise website application failed", publicError(error));
+    return res.status(response.status).json(response.body);
   }
 });
 
@@ -936,6 +1029,602 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
       activeLoa: Object.values(state.loa || {}).filter(item => belongsToSelectedGuild(item) && item.status === "approved" && Number(item.expiresAt) > Date.now()).length
     }
   });
+});
+
+app.get("/api/paradise/fima-ai/health", requireUser, requireParadiseOwner, async (_req, res) => {
+  const health = await fimaAiSupportHealth().catch(() => ({
+    status: "offline",
+    configured: Boolean(env("FIMA_AI_ADAPTER_URL")),
+    reason: "health_check_failed"
+  }));
+  return res.json({ success: true, health });
+});
+
+function paradiseContentStudioStateKey(guildId) {
+  return `paradise_content_studio_v1_${guildId}`;
+}
+
+function paradiseContentStudioOwnerMutationAllowed(req, res) {
+  if (req.get("x-paradise-owner-action") !== "1") {
+    res.status(403).json({ success: false, error: "owner_action_header_required" });
+    return false;
+  }
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) {
+    res.status(403).json({ success: false, error: "origin_mismatch" });
+    return false;
+  }
+  return true;
+}
+
+async function paradiseContentStudioGuild(requestedGuildId = "") {
+  const servers = await paradiseDiscordGuildsSnapshot();
+  const requested = String(requestedGuildId || "").trim();
+  if (requested && !/^\d{16,22}$/.test(requested)) {
+    const error = new Error("invalid_guild_id");
+    error.code = "invalid_guild_id";
+    throw error;
+  }
+  const guild = (requested ? servers.find(item => item.id === requested) : null)
+    || servers.find(item => item.id === PARADISE_TEST_GUILD_ID)
+    || servers.find(item => item.id === env("DISCORD_GUILD_ID"))
+    || servers[0]
+    || null;
+  if (!guild || (requested && guild.id !== requested)) {
+    const error = new Error("guild_not_managed");
+    error.code = "guild_not_managed";
+    throw error;
+  }
+  return { guild, servers };
+}
+
+async function readParadiseContentStudioState(guildId) {
+  const row = await prisma.setting.findUnique({ where: { key: paradiseContentStudioStateKey(guildId) } });
+  return normalizeParadiseContentStudioState(row?.value, guildId);
+}
+
+async function persistParadiseContentStudioState({ guildId, state, expectedStateUpdatedAt, action, targetId, actorId, metadata = {} }) {
+  const normalized = normalizeParadiseContentStudioState(state, guildId);
+  await prisma.$transaction(async tx => {
+    const currentRow = await tx.setting.findUnique({ where: { key: paradiseContentStudioStateKey(guildId) } });
+    const current = normalizeParadiseContentStudioState(currentRow?.value, guildId);
+    if (current.updatedAt !== expectedStateUpdatedAt) {
+      const error = new Error("state_changed");
+      error.code = "state_changed";
+      throw error;
+    }
+    await tx.setting.upsert({
+      where: { key: paradiseContentStudioStateKey(guildId) },
+      update: { value: normalized },
+      create: { key: paradiseContentStudioStateKey(guildId), value: normalized }
+    });
+    await tx.auditLog.create({
+      data: {
+        action,
+        targetType: "paradise_content_document",
+        targetId: targetId || guildId,
+        metadata: { guildId, actorDiscordId: actorId || null, ...metadata }
+      }
+    });
+  });
+  return normalized;
+}
+
+function requireParadiseContentStudioRevision(body, state) {
+  if (!Object.hasOwn(body || {}, "expectedStateUpdatedAt")) {
+    const error = new Error("state_revision_required");
+    error.code = "state_revision_required";
+    throw error;
+  }
+  if (body.expectedStateUpdatedAt !== state.updatedAt) {
+    const error = new Error("state_changed");
+    error.code = "state_changed";
+    throw error;
+  }
+  return state.updatedAt;
+}
+
+function paradiseContentStudioStatus(error) {
+  const code = String(error?.code || "");
+  if (["test_guild_only", "production_guild_mutation_blocked", "non_test_guild_mutation_blocked"].includes(code)) return 403;
+  if (["document_not_found", "version_not_found", "preset_not_found", "guild_not_managed", "content_message_not_found", "content_channel_not_found"].includes(code)) return 404;
+  if ([
+    "overwrite_confirmation_required", "state_changed", "state_revision_required",
+    "content_stage_transition_invalid", "imported_stage_requires_original_payload"
+  ].includes(code)) return 409;
+  if (code === "discord_not_ready" || code === "managed_webhook_channel_unsupported") return 503;
+  if (code) return 400;
+  return 503;
+}
+
+function paradiseContentStudioFailure(res, error, fallback) {
+  const status = paradiseContentStudioStatus(error);
+  if (status >= 500) console.error("Paradise Content Studio failed", publicError(error));
+  return res.status(status).json({ success: false, error: error?.code || fallback });
+}
+
+app.get("/api/paradise/content-studio", requireUser, requireParadiseOwner, async (req, res) => {
+  try {
+    const { guild, servers } = await paradiseContentStudioGuild(req.query?.guildId);
+    const state = await readParadiseContentStudioState(guild.id);
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      success: true,
+      selectedGuildId: guild.id,
+      testGuildId: PARADISE_TEST_GUILD_ID,
+      publishingAllowed: guild.id === PARADISE_TEST_GUILD_ID,
+      servers,
+      state
+    });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_studio_unavailable");
+  }
+});
+
+app.get("/api/paradise/content-studio/document/:documentId", requireUser, requireParadiseOwner, async (req, res) => {
+  try {
+    const { guild } = await paradiseContentStudioGuild(req.query?.guildId);
+    const state = await readParadiseContentStudioState(guild.id);
+    return res.json({ success: true, document: loadParadiseContentDocument(state, req.params.documentId) });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_document_load_failed");
+  }
+});
+
+app.get("/api/paradise/content-studio/preset/:preset", requireUser, requireParadiseOwner, (req, res) => {
+  try {
+    return res.json({ success: true, preset: paradiseContentPreset(req.params.preset) });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_preset_load_failed");
+  }
+});
+
+app.post("/api/paradise/content-studio/preview", requireUser, requireParadiseOwner, (req, res) => {
+  if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
+  try {
+    return res.json({ success: true, preview: paradiseContentPreview(req.body?.payload, req.body?.mode) });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_preview_failed");
+  }
+});
+
+app.post("/api/paradise/content-studio/save", requireUser, requireParadiseOwner, async (req, res) => {
+  if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
+  try {
+    const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
+    const state = await readParadiseContentStudioState(guild.id);
+    const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
+    const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
+    const saved = saveParadiseContentDocument(state, req.body?.document, { actorId });
+    await persistParadiseContentStudioState({
+      guildId: guild.id,
+      state: saved.state,
+      expectedStateUpdatedAt,
+      action: "paradise_content_document_saved",
+      targetId: saved.document.id,
+      actorId,
+      metadata: { versionId: saved.version.id, source: saved.document.source }
+    });
+    return res.json({ success: true, stateUpdatedAt: saved.state.updatedAt, document: saved.document, version: saved.version });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_document_save_failed");
+  }
+});
+
+app.post("/api/paradise/content-studio/rollback", requireUser, requireParadiseOwner, async (req, res) => {
+  if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
+  try {
+    const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
+    const state = await readParadiseContentStudioState(guild.id);
+    const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
+    const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
+    const saved = rollbackParadiseContentDocument(state, {
+      documentId: req.body?.documentId,
+      versionId: req.body?.versionId
+    }, { actorId });
+    await persistParadiseContentStudioState({
+      guildId: guild.id,
+      state: saved.state,
+      expectedStateUpdatedAt,
+      action: "paradise_content_document_rolled_back",
+      targetId: saved.document.id,
+      actorId,
+      metadata: { restoredFromVersionId: req.body?.versionId, versionId: saved.version.id }
+    });
+    return res.json({ success: true, stateUpdatedAt: saved.state.updatedAt, document: saved.document, version: saved.version });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_document_rollback_failed");
+  }
+});
+
+app.post("/api/paradise/content-studio/import", requireUser, requireParadiseOwner, async (req, res) => {
+  if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
+  try {
+    const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
+    const imported = await paradiseDiscordContentMessage(guild.id, req.body?.channelId, req.body?.messageId, {
+      importedByActorId: req.paradiseOwnerDiscord?.providerSubject || null
+    });
+    return res.json({ success: true, imported });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_message_import_failed");
+  }
+});
+
+app.post("/api/paradise/content-studio/publish", requireUser, requireParadiseOwner, async (req, res) => {
+  if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
+  try {
+    if (req.body?.confirmation !== "PUBLISH TEST CONTENT") {
+      const error = new Error("publish_confirmation_required");
+      error.code = "publish_confirmation_required";
+      throw error;
+    }
+    const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
+    if (guild.id !== PARADISE_TEST_GUILD_ID) {
+      const error = new Error("test_guild_only");
+      error.code = "test_guild_only";
+      throw error;
+    }
+    const state = await readParadiseContentStudioState(guild.id);
+    const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
+    const document = loadParadiseContentDocument(state, req.body?.documentId);
+    if (document.importStatus === "pending_source_export") {
+      const error = new Error("content_source_export_required");
+      error.code = "content_source_export_required";
+      throw error;
+    }
+    if (!["improved_draft", "production_version"].includes(document.stage)) {
+      const error = new Error("content_stage_not_publishable");
+      error.code = "content_stage_not_publishable";
+      throw error;
+    }
+    const channelId = String(req.body?.channelId || document.targetChannelId || "");
+    const messageId = Object.hasOwn(req.body || {}, "messageId") ? req.body.messageId : document.targetMessageId;
+    const published = await publishParadiseContentMessage({
+      guildId: guild.id,
+      channelId,
+      messageId,
+      payload: document.current,
+      deliveryMode: document.deliveryMode,
+      webhookUrl: req.body?.webhookUrl
+    });
+
+    const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
+    try {
+      const saved = saveParadiseContentDocument(state, {
+        id: document.id,
+        overwrite: true,
+        name: document.name,
+        payload: document.current,
+        stage: "production_version",
+        importStatus: document.importStatus,
+        metadata: document.metadata,
+        originalSnapshot: document.originalSnapshot,
+        deliveryMode: document.deliveryMode,
+        targetChannelId: published.channelId,
+        targetMessageId: published.messageId,
+        canonicalGuildId: published.guildId,
+        canonicalChannelId: published.channelId,
+        canonicalMessageId: published.messageId,
+        source: document.source
+      }, { actorId });
+      await persistParadiseContentStudioState({
+        guildId: guild.id,
+        state: saved.state,
+        expectedStateUpdatedAt,
+        action: "paradise_content_document_published",
+        targetId: document.id,
+        actorId,
+        metadata: {
+          messageId: published.messageId,
+          channelId: published.channelId,
+          operation: published.operation,
+          deliveryMode: published.deliveryMode,
+          versionId: saved.version.id
+        }
+      });
+      return res.json({ success: true, published, document: saved.document, stateUpdatedAt: saved.state.updatedAt });
+    } catch (persistenceError) {
+      console.error("Paradise Content Studio publish state persistence failed", publicError(persistenceError));
+      return res.json({
+        success: true,
+        published,
+        persistenceWarning: "published_but_state_not_persisted",
+        recovery: { channelId: published.channelId, messageId: published.messageId }
+      });
+    }
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_publish_failed");
+  }
+});
+
+const FIEELS_COMMUNITY_CHANNEL_KEYS = new Set([
+  "start_here", "rules", "announcements", "choose_language",
+  "general", "media", "events", "levels",
+  "fima_updates", "fima_support", "fima_guide",
+  "style_showcase", "creative_lab",
+  "turkish_chat", "turkish_media", "turkish_announcements", "turkish_voice",
+  "support", "support_faq",
+  "staff_hub", "staff_guides", "reviews", "transcripts", "security_logs",
+  "community_voice", "focus_voice"
+]);
+const FIEELS_COMMUNITY_ROLE_KEYS = new Set([
+  "owner", "administrator", "moderator", "junior_moderator", "helper", "member", "turkish", "english"
+]);
+const FIEELS_COMMUNITY_CHANNEL_ALIASES = Object.freeze({
+  welcome_channel: "start_here",
+  rules_channel: "rules",
+  announcement_channel: "announcements",
+  announcements_channel: "announcements",
+  general_channel: "general",
+  media_channel: "media",
+  events_channel: "events",
+  support_channel: "support",
+  support_ticket_channel: "support",
+  staff_channel: "staff_hub",
+  staff_hub_channel: "staff_hub",
+  transcript_channel: "transcripts",
+  transcripts_channel: "transcripts",
+  security_log_channel: "security_logs",
+  security_logs_channel: "security_logs"
+});
+
+function communityPurposeKey(rawKey, kind) {
+  const key = String(rawKey || "").trim();
+  if (!key) return "";
+  if (kind === "channel" && FIEELS_COMMUNITY_CHANNEL_ALIASES[key]) return FIEELS_COMMUNITY_CHANNEL_ALIASES[key];
+  return key.replace(kind === "channel" ? /_channel$/ : /_role$/, "");
+}
+
+function communityStructureResources(config = {}, runtime = {}) {
+  const channels = Array.isArray(runtime.channels) ? runtime.channels : [];
+  const roles = Array.isArray(runtime.roles) ? runtime.roles : [];
+  const configuredChannels = {
+    ...(config.channelMappings && typeof config.channelMappings === "object" ? config.channelMappings : {}),
+    ...(config.communityStructureMappings?.channels && typeof config.communityStructureMappings.channels === "object"
+      ? config.communityStructureMappings.channels
+      : {})
+  };
+  const configuredRoles = {
+    ...(config.roleMappings && typeof config.roleMappings === "object" ? config.roleMappings : {}),
+    ...(config.communityStructureMappings?.roles && typeof config.communityStructureMappings.roles === "object"
+      ? config.communityStructureMappings.roles
+      : {})
+  };
+  const seenChannelKeys = new Set();
+  const seenRoleKeys = new Set();
+  const existingChannels = [];
+  const existingRoles = [];
+  for (const [rawKey, id] of Object.entries(configuredChannels)) {
+    const purposeKey = communityPurposeKey(rawKey, "channel");
+    if (!FIEELS_COMMUNITY_CHANNEL_KEYS.has(purposeKey) || seenChannelKeys.has(purposeKey)) continue;
+    const current = channels.find(channel => String(channel.id) === String(id));
+    if (!current) continue;
+    seenChannelKeys.add(purposeKey);
+    existingChannels.push({ id: current.id, name: current.name, purposeKey, type: current.type, parentId: current.parentId || null });
+  }
+  for (const [rawKey, id] of Object.entries(configuredRoles)) {
+    const purposeKey = communityPurposeKey(rawKey, "role");
+    if (!FIEELS_COMMUNITY_ROLE_KEYS.has(purposeKey) || seenRoleKeys.has(purposeKey)) continue;
+    const current = roles.find(role => String(role.id) === String(id));
+    if (!current) continue;
+    seenRoleKeys.add(purposeKey);
+    existingRoles.push({ id: current.id, name: current.name, purposeKey, position: current.position, managed: current.managed === true });
+  }
+  return {
+    existingChannels,
+    existingRoles,
+    inventory: {
+      categories: (Array.isArray(runtime.categories) ? runtime.categories : []).map(category => ({
+        id: category.id,
+        name: category.name,
+        position: category.position
+      })),
+      channels: channels.map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type,
+        parentId: channel.parentId || null,
+        position: channel.position
+      })),
+      roles: roles.map(role => ({
+        id: role.id,
+        name: role.name,
+        position: role.position,
+        managed: role.managed === true
+      }))
+    }
+  };
+}
+
+function buildCommunityStructureResponse(config, runtime, guildId) {
+  const resources = communityStructureResources(config, runtime);
+  const saved = config.communityStructureDraft && typeof config.communityStructureDraft === "object"
+    ? config.communityStructureDraft
+    : {};
+  const draft = buildFieelsCommunityStructureDraft({
+    language: saved.language || config.language || "en",
+    style: saved.naming || {},
+    existingChannels: resources.existingChannels,
+    existingRoles: resources.existingRoles
+  });
+  return {
+    draft,
+    validation: validateFieelsCommunityStructureDraft(draft),
+    inventory: resources.inventory,
+    isTestGuild: String(guildId) === String(PARADISE_TEST_GUILD_ID),
+    mutationPolicy: {
+      discordMutationExecuted: false,
+      productionApplyAvailable: false,
+      screenshotsRequired: true,
+      finalOwnerConfirmationRequired: true
+    }
+  };
+}
+
+function communityStructurePlan(draft, inventory, operation, isTestGuild) {
+  const channels = draft.categories.flatMap(category => category.channels.map(channel => ({
+    categoryKey: category.key,
+    key: channel.key,
+    existingId: channel.existingId,
+    currentName: channel.currentName,
+    proposedName: channel.proposedName,
+    action: channel.action
+  })));
+  const roles = draft.roleReconciliation.mapped;
+  const status = operation === "apply_test_guild"
+    ? "ready_for_test_apply_confirmation"
+    : operation === "rollback"
+      ? "rollback_preview_only"
+      : "preview_only";
+  return {
+    operation,
+    status,
+    mutationExecuted: false,
+    testGuild: isTestGuild,
+    summary: {
+      categories: draft.categories.length,
+      channels: channels.length,
+      channelIdsPreserved: channels.filter(channel => channel.existingId).length,
+      channelsToCreateIfApproved: channels.filter(channel => !channel.existingId).length,
+      roleIdsPreserved: roles.filter(role => role.existingId).length,
+      rolesToCreateIfApproved: roles.filter(role => !role.existingId).length,
+      currentCategories: inventory.categories.length,
+      currentChannels: inventory.channels.length,
+      currentRoles: inventory.roles.length
+    },
+    currentToProposed: channels,
+    rolePlan: roles,
+    safeguards: {
+      deleteChannels: false,
+      deleteRoles: false,
+      productionMutation: false,
+      screenshotsRequired: true,
+      validationRequired: true,
+      finalOwnerConfirmationRequired: true
+    }
+  };
+}
+
+app.get("/api/paradise/community-structure", requireUser, requireParadiseOwner, async (req, res) => {
+  const guildId = String(req.query?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+  const state = row?.value && typeof row.value === "object" ? row.value : {};
+  const config = state.guildConfigs?.[guildId] || (guildId === env("DISCORD_GUILD_ID") ? state.config : {}) || {};
+  const runtime = await paradiseDiscordRuntimeSnapshot(guildId).catch(error => ({ status: "error", error: error.message }));
+  return res.json({ success: true, guildId, ...buildCommunityStructureResponse(config, runtime, guildId) });
+});
+
+app.patch("/api/paradise/community-structure/draft", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  const value = req.body?.value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return res.status(400).json({ error: "invalid_community_structure_draft" });
+
+  const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+  const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
+  state.guildConfigs = state.guildConfigs && typeof state.guildConfigs === "object" ? state.guildConfigs : {};
+  state.guildConfigs[guildId] = state.guildConfigs[guildId] && typeof state.guildConfigs[guildId] === "object"
+    ? state.guildConfigs[guildId]
+    : guildId === env("DISCORD_GUILD_ID") && state.config && typeof state.config === "object"
+      ? structuredClone(state.config)
+      : {};
+  const config = state.guildConfigs[guildId];
+  const previousConfig = structuredClone(config);
+  const runtime = await paradiseDiscordRuntimeSnapshot(guildId).catch(error => ({ status: "error", error: error.message }));
+  const resources = communityStructureResources(config, runtime);
+  const language = value.language === "tr" ? "tr" : "en";
+  const naming = normalizeFieelsCommunityNamingStyle(value.naming);
+  const draft = buildFieelsCommunityStructureDraft({
+    language,
+    style: naming,
+    existingChannels: resources.existingChannels,
+    existingRoles: resources.existingRoles
+  });
+  const validation = validateFieelsCommunityStructureDraft(draft);
+  if (!validation.ok) return res.status(400).json({ error: "invalid_community_structure_draft", validation });
+
+  config.communityStructureDraft = {
+    revision: draft.revision,
+    language,
+    naming,
+    updatedAt: new Date().toISOString(),
+    updatedBy: String(req.user.id)
+  };
+  if (guildId === env("DISCORD_GUILD_ID")) state.config = structuredClone(config);
+  const configVersion = createParadiseConfigVersion({
+    guildId,
+    previous: previousConfig,
+    next: config,
+    actorId: req.user.id,
+    source: "paradise_community_structure_draft"
+  });
+  await prisma.$transaction(async tx => {
+    await tx.setting.upsert({
+      where: { key: "paradise_3a59_state_v1" },
+      update: { value: state },
+      create: { key: "paradise_3a59_state_v1", value: state }
+    });
+    await tx.setting.create({
+      data: { key: `paradise_config_version_${guildId}_${configVersion.versionId}`, value: configVersion }
+    });
+    await tx.auditLog.create({
+      data: {
+        action: "paradise_community_structure_draft_saved",
+        targetType: "discord_guild",
+        targetId: guildId,
+        metadata: {
+          actorUserId: req.user.id,
+          configVersionId: configVersion.versionId,
+          changedPaths: configVersion.diff.map(item => item.path),
+          discordMutationExecuted: false
+        }
+      }
+    });
+  });
+  return res.json({
+    success: true,
+    guildId,
+    draft,
+    validation,
+    inventory: resources.inventory,
+    isTestGuild: String(guildId) === String(PARADISE_TEST_GUILD_ID),
+    mutationExecuted: false
+  });
+});
+
+app.post("/api/paradise/community-structure/plan", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  const operation = String(req.body?.operation || "preview");
+  if (!["preview", "compare", "apply_test_guild", "rename_existing", "rollback"].includes(operation)) {
+    return res.status(400).json({ error: "invalid_community_structure_operation" });
+  }
+  const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
+  if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
+  const isTestGuild = String(guildId) === String(PARADISE_TEST_GUILD_ID);
+  if (operation === "apply_test_guild" && !isTestGuild) return res.status(409).json({ error: "test_guild_required" });
+  const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+  const state = row?.value && typeof row.value === "object" ? row.value : {};
+  const config = state.guildConfigs?.[guildId] || (guildId === env("DISCORD_GUILD_ID") ? state.config : {}) || {};
+  const runtime = await paradiseDiscordRuntimeSnapshot(guildId).catch(error => ({ status: "error", error: error.message }));
+  const response = buildCommunityStructureResponse(config, runtime, guildId);
+  if (!response.validation.ok) return res.status(409).json({ error: "community_structure_validation_failed", validation: response.validation });
+  const plan = communityStructurePlan(response.draft, response.inventory, operation, isTestGuild);
+  await createAuditLog("paradise_community_structure_plan_generated", "discord_guild", guildId, {
+    actorUserId: req.user.id,
+    operation,
+    mutationExecuted: false,
+    summary: plan.summary
+  });
+  return res.json({ success: true, guildId, draft: response.draft, validation: response.validation, plan });
 });
 
 app.get("/api/paradise/config/history", requireUser, requireParadiseOwner, async (req, res) => {
@@ -1278,13 +1967,31 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
         String(question).trim().slice(0, 180)
       ]).filter(([key, question]) => key && question))
       : {};
+    const evidenceRequirements = value.evidenceRequirements
+      && typeof value.evidenceRequirements === "object"
+      && !Array.isArray(value.evidenceRequirements)
+      ? Object.fromEntries(Object.entries(value.evidenceRequirements).slice(0, 20).map(([type, requirements]) => {
+        const safeType = String(type).replace(/[^a-z0-9_]/gi, "").slice(0, 32);
+        const safeRequirements = requirements && typeof requirements === "object" && !Array.isArray(requirements)
+          ? Object.fromEntries(Object.entries(requirements).slice(0, 40).map(([questionKey, requirement]) => [
+            String(questionKey).replace(/[^a-z0-9_]/gi, "").slice(0, 32),
+            requirement === "required" ? "required" : "optional"
+          ]).filter(([questionKey]) => questionKey))
+          : {};
+        return [safeType, safeRequirements];
+      }).filter(([type, requirements]) => type && Object.keys(requirements).length))
+      : {};
     config.applicationSettings = {
       ...(config.applicationSettings || {}),
       enabled: value.enabled !== false,
       cooldownDays: Math.min(365, Math.max(0, Number(value.cooldownDays) || 0)),
       autoGrantRole: value.autoGrantRole === true,
       blockBlacklisted: value.blockBlacklisted !== false,
-      extraQuestions
+      panelTitle: String(value.panelTitle || "").trim().slice(0, 80),
+      panelDescription: String(value.panelDescription || "").trim().slice(0, 1200),
+      panelButtonLabel: String(value.panelButtonLabel || "").trim().slice(0, 40),
+      extraQuestions,
+      evidenceRequirements
     };
   } else if (kind === "moderation") {
     const value = req.body?.value || {};
@@ -1561,14 +2268,58 @@ app.post("/auth/roblox/finish", oauthLimiter, async (req, res) => {
 
 app.post("/payments/robux/manual/submit", manualPaymentLimiter, requireUser, async (req, res) => {
   try {
-    const submission = await createManualRobuxSubmission(req.user, req.body || {});
-    await sendPaymentSubmissionLog(submission).catch((error) => {
-      console.warn("Discord payment log send failed", publicError(error));
+    const result = await createManualRobuxOrder(req.user, req.body || {}, {
+      idempotencyKey: req.get("Idempotency-Key")
     });
-    return res.status(201).json({ success: true, submission: publicPaymentSubmission(submission) });
+    if (!result.replayed) {
+      await sendPaymentSubmissionLog(result.submission).catch((error) => {
+        console.warn("Discord payment log send failed", publicError(error));
+      });
+    }
+    return res.status(result.replayed ? 200 : 201).json({
+      success: true,
+      replayed: result.replayed,
+      submission: publicPaymentSubmission(result.submission)
+    });
   } catch (error) {
     console.error("Manual Robux submission failed", publicError(error));
-    return res.status(error.statusCode || 500).json({ error: error.code || "manual_payment_submit_failed" });
+    return res.status(error.statusCode || 500).json({
+      error: error.code || "manual_payment_submit_failed",
+      ...(error.programStatus ? { programStatus: error.programStatus } : {}),
+      ...(error.submissionId ? { submissionId: error.submissionId } : {})
+    });
+  }
+});
+
+app.get("/payments/robux/manual", manualPaymentReadLimiter, requireUser, async (req, res) => {
+  try {
+    const submissions = await listManualRobuxOrders(req.user.id);
+    return res.json({ success: true, submissions: submissions.map(publicPaymentSubmission) });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.code || "manual_payment_list_failed" });
+  }
+});
+
+app.get("/payments/robux/manual/quote", manualPaymentReadLimiter, requireUser, (req, res) => {
+  try {
+    const premiumPlus = req.query.premiumPlus === "true"
+      ? true
+      : req.query.premiumPlus === "false"
+        ? false
+        : null;
+    const quote = manualRobuxQuote(req.query.plan, premiumPlus);
+    return res.json({ success: true, quote });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.code || "manual_payment_quote_failed" });
+  }
+});
+
+app.get("/payments/robux/manual/:id", manualPaymentReadLimiter, requireUser, async (req, res) => {
+  try {
+    const submission = await getManualRobuxOrder(req.user.id, req.params.id);
+    return res.json({ success: true, submission: publicPaymentSubmission(submission) });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.code || "manual_payment_status_failed" });
   }
 });
 
@@ -1892,18 +2643,20 @@ app.get("/api/store/result", requireUser, async (req, res) => {
 
 app.get("/api/me/dashboard", requireUser, async (req, res) => {
   const integrations = await buildIntegrationSummary(req.user);
-  const [access, trial, referrals, pendingGifts, purchasedGiftCodes] = await Promise.all([
+  const [access, trial, referrals, pendingGifts, purchasedGiftCodes, communityProfile] = await Promise.all([
     getAccountAccess(req.user),
     buildMonthlyTrialSummary(req.user, new Date(), integrations),
     buildReferralSummary(req.user.id, { evaluate: true }),
     getPendingGiftPackagesForUser(req.user),
-    getPurchasedGiftCodesForUser(req.user)
+    getPurchasedGiftCodesForUser(req.user),
+    buildCommunityProfile(req.user)
   ]);
   const [purchases, licenses] = access;
   return res.json({
     success: true,
     user: publicUser(req.user),
     integrations,
+    communityProfile,
     trial,
     referrals,
     purchases: purchases.map(publicPurchase),
@@ -1928,6 +2681,98 @@ app.get("/api/me/integrations", requireUser, async (req, res) => {
     integrations,
     trial: await buildMonthlyTrialSummary(req.user, new Date(), integrations)
   });
+});
+
+app.get("/api/me/community-profile", requireUser, async (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      profile: await buildCommunityProfile(req.user)
+    });
+  } catch (error) {
+    console.error("Community profile load failed", publicError(error));
+    return res.status(500).json({ success: false, error: "community_profile_load_failed" });
+  }
+});
+
+app.patch("/api/me/profile/preferences", requireUser, async (req, res) => {
+  try {
+    const normalized = normalizeCommunityProfilePreferences(req.body);
+    if (!normalized.ok) {
+      return res.status(400).json({
+        success: false,
+        error: normalized.errors[0],
+        errors: normalized.errors
+      });
+    }
+
+    const membership = await buildCommunityProfile(req.user);
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        preferredLanguage: normalized.value.preferredLanguage,
+        countryRegion: normalized.value.countryRegion,
+        nationality: normalized.value.nationality,
+        nationalityVisible: normalized.value.nationalityVisible,
+        timezone: normalized.value.timezone,
+        languageOnboardingStatus: "completed",
+        languageOnboardingCompletedAt: new Date(),
+        languageOnboardingDeferredAt: null
+      }
+    });
+
+    let discordSync = {
+      success: false,
+      code: membership.discord.code,
+      roleName: null
+    };
+    if (membership.discord.membershipVerified) {
+      const link = await prisma.oAuthLink.findFirst({
+        where: { userId: user.id, provider: "discord" },
+        select: { providerSubject: true }
+      });
+      if (link?.providerSubject) {
+        try {
+          const synced = await syncDiscordLanguageRole(
+            link.providerSubject,
+            normalized.value.preferredLanguage,
+            { guildId: membership.discord.communityGuildId }
+          );
+          discordSync = {
+            success: true,
+            code: "ok",
+            roleName: synced.roleName || null
+          };
+        } catch (error) {
+          discordSync = {
+            success: false,
+            code: error?.code || "discord_language_sync_failed",
+            roleName: null
+          };
+        }
+      }
+    }
+
+    await createAuditLog("community_profile_preferences_updated", "user", user.id, {
+      preferredLanguage: normalized.value.preferredLanguage,
+      hasCountryRegion: Boolean(normalized.value.countryRegion),
+      hasNationality: Boolean(normalized.value.nationality),
+      nationalityVisible: normalized.value.nationalityVisible,
+      timezoneConfigured: Boolean(normalized.value.timezone),
+      turkishCategoryAccess: normalized.value.turkishCategoryAccess,
+      discordSyncCode: discordSync.code
+    });
+
+    return res.json({
+      success: true,
+      user: publicUser(user),
+      profile: await buildCommunityProfile(user),
+      discordSync
+    });
+  } catch (error) {
+    console.error("Community profile update failed", publicError(error));
+    return res.status(500).json({ success: false, error: "community_profile_update_failed" });
+  }
 });
 
 app.post("/api/me/profile", requireUser, async (req, res) => {
@@ -2128,19 +2973,38 @@ app.post("/api/me/roblox/clear", requireUser, async (req, res) => {
 });
 
 app.get("/api/trial-promo", async (req, res) => {
-  const promo = getTrialPromoConfig(process.env, new Date());
   return res.json({
     success: true,
     promo: {
-      active: promo.active,
-      enabled: promo.enabled,
-      campaign: promo.campaign,
-      source: promo.source,
-      days: promo.currentTrialDays,
-      promoDays: promo.promoDays,
-      normalDays: promo.normalDays,
-      endAt: promo.endAtIso,
-      label: promo.active ? `${promo.promoDays}-Day Free Trial` : `${promo.normalDays}-Day Free Trial`
+      active: false,
+      enabled: false,
+      programStatus: "replaced_by_activity_rewards",
+      campaign: null,
+      source: null,
+      days: 0,
+      promoDays: 0,
+      normalDays: 0,
+      endAt: null,
+      label: "FIMA Activity Rewards",
+      activityProgram: {
+        seasonMonths: 1,
+        timezone: "UTC",
+        boards: ["text", "voice"],
+        prizes: [
+          { rank: 1, days: 15 },
+          { rank: 2, days: 10 },
+          { rank: 3, days: 7 }
+        ],
+        rewardsStackAcrossBoards: true,
+        linkedFimaAccountRequired: true
+      },
+      boosterProgram: {
+        periodMonths: 1,
+        timezone: "UTC",
+        daysPerVerifiedActiveBoost: 3,
+        rewardsStackWithActivity: true,
+        linkedFimaAccountRequired: true
+      }
     }
   });
 });
@@ -2302,136 +3166,12 @@ app.post(["/auth/roblox/disconnect", "/api/auth/roblox/disconnect"], requireUser
   }
 });
 
-app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], trialLimiter, async (req, res) => {
-  const user = await getOptionalUser(req, res);
-  if (!user) return res.status(401).json({ error: "not_logged_in" });
-
-  try {
-    const freshUser = await prisma.user.findUnique({ where: { id: user.id } });
-    if (!freshUser) return res.status(401).json({ error: "not_logged_in" });
-    const integrations = await buildIntegrationSummary(freshUser);
-    if (!integrations.discord.connected) return res.status(403).json({ error: "discord_not_connected" });
-    if (!integrations.roblox.connected) return res.status(403).json({ error: "roblox_not_verified" });
-
-    const now = new Date();
-    const promo = getTrialPromoConfig(process.env, now);
-    const activeTrial = await findActiveMonthlyTrial(freshUser, now);
-    if (activeTrial) {
-      if (promo.active && !isPromoTrialLicense(activeTrial)) {
-        const promotedExpiresAt = new Date(now.getTime() + promo.ms);
-        const updated = await prisma.license.update({
-          where: { id: activeTrial.id },
-          data: {
-            expiresAt: activeTrial.expiresAt && activeTrial.expiresAt > promotedExpiresAt ? activeTrial.expiresAt : promotedExpiresAt,
-            notes: `${activeTrial.notes || "monthly_trial"} ${promo.source} campaign:${promo.campaign} resetReason:Beta trial/HWID/download issue compensation`
-          }
-        });
-        await prisma.auditLog.create({
-          data: {
-            action: "trial_promo_existing_trial_extended",
-            targetType: "license",
-            targetId: updated.id,
-            metadata: { userId: freshUser.id, campaign: promo.campaign, expiresAt: updated.expiresAt?.toISOString?.() || null }
-          }
-        }).catch(() => {});
-        return res.status(201).json({
-          success: true,
-          license: publicLicense(updated),
-          trial: await buildMonthlyTrialSummary(freshUser, now, integrations),
-          promo: publicTrialPromo(promo),
-          extendedExistingTrial: true
-        });
-      }
-      return res.status(409).json({
-        error: "trial_already_active",
-        trial: await buildMonthlyTrialSummary(freshUser, now, integrations),
-        promo: publicTrialPromo(promo)
-      });
-    }
-    const promoAlreadyClaimed = promo.active ? await findPromoTrial(freshUser) : null;
-    if (promoAlreadyClaimed) {
-      return res.status(409).json({
-        error: "trial_already_claimed",
-        trial: await buildMonthlyTrialSummary(freshUser, now, integrations),
-        promo: publicTrialPromo(promo)
-      });
-    }
-    if (!promo.active && freshUser.nextTrialAvailableAt && freshUser.nextTrialAvailableAt > now) {
-      return res.status(429).json({
-        error: "trial_cooldown_active",
-        nextTrialAvailableAt: freshUser.nextTrialAvailableAt.toISOString(),
-        trial: await buildMonthlyTrialSummary(freshUser, now, integrations)
-      });
-    }
-
-    const plan = getPlan("1day");
-    if (!plan) return res.status(500).json({ error: "trial_plan_missing" });
-    const expiresAt = new Date(now.getTime() + promo.ms);
-    const nextTrialAvailableAt = addCalendarMonth(now);
-    const { license, updatedUser } = await prisma.$transaction(async (tx) => {
-      const licenseKey = await generateUniqueLicenseKey(tx);
-      const createdLicense = await tx.license.create({
-        data: {
-          licenseKey,
-          customerEmail: freshUser.email,
-          plan: plan.id,
-          status: "active",
-          hwid: null,
-          expiresAt,
-          lifetime: false,
-          notes: buildTrialNotes({ user: freshUser, promoConfig: promo })
-        }
-      });
-      const nextUser = await tx.user.update({
-        where: { id: freshUser.id },
-        data: {
-          trialUsedAt: now,
-          trialExpiresAt: expiresAt,
-          nextTrialAvailableAt: promo.active ? null : nextTrialAvailableAt,
-          trialStatus: promo.active ? "promo_active" : "active",
-          monthlyTrialClaimCount: { increment: 1 }
-        }
-      });
-      await tx.analyticsEvent.create({
-        data: {
-          type: promo.active ? "trial_promo_claimed" : "monthly_trial_claimed",
-          plan: plan.id,
-          amount: 0,
-          currency: "eur",
-          mode: "trial",
-          metadata: { userId: freshUser.id, discordUserId: freshUser.discordUserId, robloxUserId: freshUser.robloxUserId, campaign: promo.active ? promo.campaign : null, trialDays: promo.currentTrialDays }
-        }
-      });
-      await tx.auditLog.create({
-        data: {
-          action: promo.active ? "trial_promo_claimed" : "monthly_trial_claimed",
-          targetType: "license",
-          targetId: createdLicense.id,
-          metadata: { userId: freshUser.id, expiresAt: expiresAt.toISOString(), nextTrialAvailableAt: promo.active ? null : nextTrialAvailableAt.toISOString(), campaign: promo.active ? promo.campaign : null, source: promo.active ? promo.source : "monthly_trial" }
-        }
-      });
-      return { license: createdLicense, updatedUser: nextUser };
-    });
-
-    const discordRole = await giveDiscordRole(freshUser.discordUserId, "trial").catch((error) => ({
-      success: false,
-      error: error.code || error.message
-    }));
-    if (discordRole?.success === false) {
-      console.warn("Discord Trial role grant failed after monthly trial claim", { userId: freshUser.id, error: discordRole.error });
-    }
-
-    return res.status(201).json({
-      success: true,
-      license: publicLicense(license),
-      trial: await buildMonthlyTrialSummary(updatedUser, new Date(), integrations),
-      promo: publicTrialPromo(promo),
-      discordRole
-    });
-  } catch (error) {
-    console.error("Monthly trial claim failed", publicError(error));
-    return res.status(500).json({ error: "trial_claim_failed" });
-  }
+app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], deprecatedTrialEndpointLimiter, async (req, res) => {
+  return res.status(410).json({
+    error: "trial_program_replaced_by_activity_rewards",
+    programStatus: "replaced_by_activity_rewards",
+    message: "The universal free-trial claim was replaced by monthly FIMA text and voice Top 3 rewards plus 3 days per verified active server boost each month."
+  });
 });
 
 app.post("/api/me/license-records/:licenseId/extend-checkout", storeCheckoutLimiter, requireUser, async (req, res) => {
@@ -2556,6 +3296,9 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
     if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
     const checkoutType = String(req.body?.checkoutType || "").trim().toLowerCase();
+    if (checkoutType && !["license_purchase", "gift_code_purchase", "direct_gift_purchase"].includes(checkoutType)) {
+      return res.status(400).json({ error: "invalid_checkout_type" });
+    }
     const isGiftCodePurchase = checkoutType === "gift_code_purchase";
     const giftRecipientUserId = String(req.body?.giftRecipientUserId || "").trim();
     let giftRecipient = null;
@@ -2565,8 +3308,15 @@ app.post("/api/checkout/create-session", checkoutLimiter, async (req, res) => {
       giftRecipient = await prisma.user.findUnique({ where: { id: giftRecipientUserId } });
       if (!giftRecipient) return res.status(404).json({ error: "gift_recipient_not_found" });
     }
+    if (checkoutType === "direct_gift_purchase" && !giftRecipient) {
+      return res.status(400).json({ error: "gift_recipient_required" });
+    }
 
-    const commerce = getPlanCommerce(plan);
+    const commerce = isGiftCodePurchase
+      ? getGiftCodeCommerce(plan)
+      : giftRecipient
+        ? getDirectGiftCommerce(plan)
+        : getPlanCommerce(plan);
     const priceId = env(commerce.priceEnv);
     const checkout = await createCheckoutSession({
       plan,
@@ -3298,7 +4048,7 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       appVersion,
       minSupportedAppVersion,
       licenseStatus: "active",
-      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid")
+      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess)
     });
 
     return res.json({
@@ -3321,7 +4071,6 @@ app.post("/api/license/validate", validateLimiter, async (req, res) => {
       robloxLinked: accountAccess.robloxLinked,
       canUseApp: true,
       hwidBoundNow,
-      missingRequirements: [],
       entitlementToken: entitlement.token,
       entitlement: publicEntitlementPayload(entitlement),
       entitlementExpiresAt: entitlement.expiresAt,
@@ -3411,6 +4160,27 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       });
     }
 
+    if (verified.payload.licenseId === null) {
+      if (!isStrictAccountOnlyEntitlementPayload(verified.payload) || !verified.payload.userId) {
+        return res.status(401).json({
+          valid: false,
+          canUseApp: false,
+          reason: "invalid_entitlement_payload",
+          message: licenseReasonMessage("invalid_entitlement_payload")
+        });
+      }
+      const user = await prisma.user.findUnique({ where: { id: verified.payload.userId } });
+      if (!user) {
+        return res.status(401).json({
+          valid: false,
+          canUseApp: false,
+          reason: "entitlement_session_revoked",
+          message: licenseReasonMessage("entitlement_session_revoked")
+        });
+      }
+      return res.json(await resolveDesktopEntitlementForUser({ user, hwid, appVersion }));
+    }
+
     let license = await prisma.license.findUnique({ where: { id: verified.payload.licenseId } });
     if (!license) {
       return res.status(404).json({
@@ -3482,7 +4252,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       appVersion,
       minSupportedAppVersion,
       licenseStatus: "active",
-      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid")
+      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess)
     });
 
     await prisma.validationLog.create({
@@ -3624,7 +4394,7 @@ app.get("/admin/api/payments/robux/manual", requireAdmin, async (req, res) => {
           : {}
       ]
     },
-    include: { user: true },
+    include: { user: true, license: true },
     orderBy: { createdAt: "desc" },
     take: 200
   });
@@ -3970,6 +4740,7 @@ app.post("/admin/api/licenses/manual", requireAdmin, async (req, res) => {
   const plan = getPlan(req.body?.plan);
   const customerEmail = String(req.body?.customerEmail || "").trim().toLowerCase();
   if (!plan) return res.status(400).json({ error: "invalid_plan" });
+  if (isLegacyTrialPlan(plan)) return rejectLegacyTrialIssuance(res);
   if (!isValidEmail(customerEmail)) return res.status(400).json({ error: "invalid_email" });
 
   const license = await prisma.license.create({
@@ -3987,6 +4758,7 @@ app.post("/admin/api/licenses/manual", requireAdmin, async (req, res) => {
 app.post(["/admin/api/licenses/:id/extend", "/api/admin/licenses/:id/extend"], requireAdmin, async (req, res) => {
   const plan = getPlan(req.body?.plan);
   if (!plan) return res.status(400).json({ error: "invalid_plan" });
+  if (isLegacyTrialPlan(plan)) return rejectLegacyTrialIssuance(res);
 
   const current = await prisma.license.findUnique({ where: { id: req.params.id } });
   if (!current) return res.status(404).json({ error: "not_found" });
@@ -4706,6 +5478,7 @@ app.post(["/admin/api/gift-codes/create", "/api/admin/gift-codes/create"], admin
     }
     const giftPlan = resolveGiftPlan(req.body);
     if (!giftPlan) return res.status(400).json({ error: "invalid_gift_plan" });
+    if (isLegacyTrialPlan(giftPlan)) return rejectLegacyTrialIssuance(res);
     if (giftPlan.id === "lifetime" && !permissions.canCreateLifetimeGifts) {
       await auditGiftPermissionDenied(req, "canCreateLifetimeGifts", { plan: giftPlan.id });
       return denyGiftPermission(res, "canCreateLifetimeGifts", "Lifetime gift creation is locked.");
@@ -4788,6 +5561,7 @@ app.post(["/admin/api/gift-codes/create-test", "/api/admin/gift-codes/create-tes
     }
     const plan = resolveGiftPlan({ plan: req.body?.plan || "3days" });
     if (!plan) return res.status(400).json({ error: "invalid_plan" });
+    if (isLegacyTrialPlan(plan)) return rejectLegacyTrialIssuance(res);
     if (plan.id === "lifetime" && !permissions.canCreateLifetimeGifts) {
       await auditGiftPermissionDenied(req, "canCreateLifetimeGifts", { plan: plan.id, disposable: true });
       return denyGiftPermission(res, "canCreateLifetimeGifts", "Lifetime test gift creation is locked.");
@@ -4893,6 +5667,7 @@ app.post(["/admin/api/direct-packages/send", "/api/admin/direct-packages/send"],
     }
     const giftPlan = resolveGiftPlan(req.body);
     if (!giftPlan) return res.status(400).json({ error: "invalid_gift_plan" });
+    if (isLegacyTrialPlan(giftPlan)) return rejectLegacyTrialIssuance(res);
     if (giftPlan.id === "lifetime" && !permissions.canCreateLifetimeGifts) {
       await auditGiftPermissionDenied(req, "canCreateLifetimeGifts", { plan: giftPlan.id, directGift: true });
       return denyGiftPermission(res, "canCreateLifetimeGifts", "Lifetime direct gift creation is locked.");
@@ -5414,47 +6189,6 @@ function decryptToken(cipherText) {
   }
 }
 
-async function createManualRobuxSubmission(user, body) {
-  const plan = getPlan(body?.plan);
-  if (!plan) {
-    const error = new Error("invalid_plan");
-    error.code = "invalid_plan";
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const premiumPlus = typeof body?.premiumPlus === "boolean" ? body.premiumPlus : null;
-  const robuxAmount = toOptionalInt(body?.robuxAmount);
-  const discordUserId = String(body?.discordUserId || user.discordUserId || "").trim() || null;
-  const robloxUsername = String(body?.robloxUsername || user.robloxUsername || "").trim().slice(0, 80) || null;
-
-  const submission = await prisma.paymentSubmission.create({
-    data: {
-      userId: user.id,
-      plan: plan.id,
-      customerEmail: user.email,
-      discordUserId,
-      discordUsername: String(body?.discordUsername || user.discordUsername || "").trim().slice(0, 80) || null,
-      robloxUserId: String(body?.robloxUserId || user.robloxUserId || "").trim().slice(0, 80) || null,
-      robloxUsername,
-      premiumPlus,
-      robuxAmount,
-      proofUrl: safeUrl(body?.proofUrl) || null,
-      proofText: String(body?.proofText || "").trim().slice(0, 3000) || null,
-      notes: String(body?.notes || "").trim().slice(0, 1000) || null
-    },
-    include: { user: true }
-  });
-
-  await createAuditLog("manual_robux_submitted", "payment_submission", submission.id, {
-    userId: user.id,
-    plan: plan.id,
-    discordLinked: Boolean(discordUserId),
-    robloxUsername
-  });
-  return submission;
-}
-
 function publicPaymentSubmission(submission) {
   return {
     id: submission.id,
@@ -5462,6 +6196,7 @@ function publicPaymentSubmission(submission) {
     type: submission.type,
     status: submission.status,
     plan: submission.plan,
+    licenseId: submission.licenseId,
     customerEmail: submission.customerEmail,
     discordUserId: submission.discordUserId,
     discordUsername: submission.discordUsername,
@@ -5469,45 +6204,53 @@ function publicPaymentSubmission(submission) {
     robloxUsername: submission.robloxUsername,
     premiumPlus: submission.premiumPlus,
     robuxAmount: submission.robuxAmount,
+    pricingVersion: submission.pricingVersion,
     proofUrl: submission.proofUrl,
     proofText: submission.proofText,
     notes: submission.notes,
     reviewedBy: submission.reviewedBy,
     reviewedAt: submission.reviewedAt,
     createdAt: submission.createdAt,
+    license: submission.license ? {
+      id: submission.license.id,
+      plan: submission.license.plan,
+      status: submission.license.status,
+      lifetime: submission.license.lifetime,
+      expiresAt: submission.license.expiresAt
+    } : null,
     user: submission.user ? publicUser(submission.user) : null
   };
 }
 
 async function reviewManualRobuxSubmission(req, res, status) {
   try {
-    const submission = await prisma.paymentSubmission.update({
-      where: { id: req.params.id },
-      data: {
-        status,
-        reviewedBy: "admin",
-        reviewedAt: new Date(),
-        notes: req.body?.notes ? String(req.body.notes).slice(0, 1000) : undefined
-      },
-      include: { user: true }
+    const result = await reviewManualRobuxOrder(req.params.id, status, {
+      reviewedBy: "admin",
+      notes: req.body?.notes
     });
 
     let roleResult = null;
-    if (status === "approved" && submission.discordUserId) {
-      roleResult = await giveDiscordRole(submission.discordUserId, "buyer").catch((error) => ({
+    if (status === "approved" && result.submission.discordUserId) {
+      roleResult = await giveDiscordRole(result.submission.discordUserId, "buyer").catch((error) => ({
         success: false,
         error: error.code || error.message
       }));
+      await createAuditLog("manual_robux_discord_role_result", "payment_submission", result.submission.id, {
+        discordRole: roleResult
+      });
     }
-
-    await createAuditLog(`manual_robux_${status}`, "payment_submission", submission.id, {
-      discordRole: roleResult,
-      plan: submission.plan
+    return res.json({
+      success: true,
+      submission: publicPaymentSubmission(result.submission),
+      fulfillment: { action: result.fulfillment.action },
+      discordRole: roleResult
     });
-    return res.json({ success: true, submission: publicPaymentSubmission(submission), discordRole: roleResult });
   } catch (error) {
     console.error("Manual Robux review failed", publicError(error));
-    return res.status(500).json({ error: error.code || "manual_payment_review_failed", message: error.message });
+    return res.status(error.statusCode || 500).json({
+      error: error.code || "manual_payment_review_failed",
+      ...(error.currentStatus ? { currentStatus: error.currentStatus } : {})
+    });
   }
 }
 
@@ -5641,6 +6384,8 @@ app.get([
   res.redirect(302, PUBLIC_APP_PACKAGE_URL);
 });
 
+registerDesktopCommerceRoutes(app);
+
 app.get(["/dashboard", "/dashboard/overview"], (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
 });
@@ -5725,7 +6470,7 @@ app.use(express.static(publicDir, {
       return;
     }
     if (extension === ".html") {
-      res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=86400");
+      res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
       return;
     }
     if ([".mp4", ".webm", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf"].includes(extension)) {
@@ -5799,18 +6544,10 @@ function versionPayload() {
 }
 
 function runtimeTrialPromoEnvStatus() {
-  const promo = getTrialPromoConfig(process.env, new Date());
   return {
-    hasTrialPromoEnabled: Boolean(env("TRIAL_PROMO_ENABLED")),
-    hasTrialPromoDays: Boolean(env("TRIAL_PROMO_DAYS")),
-    hasNormalTrialDays: Boolean(env("NORMAL_TRIAL_DAYS")),
-    hasTrialPromoEndAt: Boolean(env("TRIAL_PROMO_END_AT")),
-    parsedTrialPromoEnabled: promo.enabled,
-    parsedTrialPromoDays: promo.promoDays,
-    parsedNormalTrialDays: promo.normalDays,
-    parsedTrialPromoEndAt: promo.endAtIso,
-    active: promo.active,
-    currentTrialDays: promo.currentTrialDays,
+    programStatus: "legacy_read_only_replaced_by_activity_rewards",
+    active: false,
+    currentTrialDays: 0,
     currentServerTimeUtc: new Date().toISOString(),
     serviceVersion: backendVersion,
     commit: backendCommit,
@@ -5895,7 +6632,7 @@ function isAdminSurfacePath(routePath) {
     routePath.startsWith("/cloud-admin/") ||
     routePath === "/gift-admin" ||
     routePath.startsWith("/gift-admin/") ||
-    routePath.startsWith("/payments/robux/manual/");
+    /^\/payments\/robux\/manual\/[^/]+\/(?:approve|reject)$/.test(routePath);
 }
 
 function isAdminDebugPath(routePath) {
@@ -6291,6 +7028,8 @@ async function buildPaymentSetupStatus({ validate = false } = {}) {
   }
 
   const plans = {};
+  const giftCodePlans = {};
+  const directGiftPlans = {};
   for (const planId of publicCheckoutPlanIds()) {
     const plan = getPlan(planId);
     const commerce = getPlanCommerce(plan);
@@ -6318,6 +7057,60 @@ async function buildPaymentSetupStatus({ validate = false } = {}) {
       lastResolvedAt: runtimeRow?.lastResolvedAt || null,
       validation
     };
+
+    const giftCommerce = getGiftCodeCommerce(plan);
+    const giftEnvPriceId = env(giftCommerce.priceEnv, "");
+    const giftRuntimeRow = config.giftCodePrices?.[plan.id] || null;
+    const giftEnvState = stripePriceEnvState(giftEnvPriceId);
+    const giftRuntimeState = stripePriceEnvState(giftRuntimeRow?.priceId);
+    const giftSource = giftEnvState === "set" ? "env" : giftRuntimeState === "set" ? "db_runtime_config" : "missing";
+    let giftValidation = null;
+    if (stripeClient && giftSource !== "missing") {
+      const candidate = giftSource === "env" ? giftEnvPriceId : giftRuntimeRow.priceId;
+      giftValidation = sanitizePriceCheck(await validateStripePriceForPlan(stripeClient, plan, candidate, giftCommerce));
+    }
+    giftCodePlans[plan.id] = {
+      plan: plan.id,
+      label: giftCommerce.productName,
+      checkoutType: "gift_code_purchase",
+      envName: giftCommerce.priceEnv,
+      envPriceConfigured: giftEnvState === "set",
+      runtimeConfigPriceConfigured: giftRuntimeState === "set",
+      configured: giftEnvState === "set" || giftRuntimeState === "set",
+      source: giftSource,
+      mode: giftRuntimeRow?.mode || mode,
+      expected: expectedPriceForPlan(plan, giftCommerce),
+      maskedPriceId: giftSource === "env" ? maskStripeId(giftEnvPriceId) : maskStripeId(giftRuntimeRow?.priceId),
+      lastResolvedAt: giftRuntimeRow?.lastResolvedAt || null,
+      validation: giftValidation
+    };
+
+    const directGiftCommerce = getDirectGiftCommerce(plan);
+    const directGiftEnvPriceId = env(directGiftCommerce.priceEnv, "");
+    const directGiftRuntimeRow = config.directGiftPrices?.[plan.id] || null;
+    const directGiftEnvState = stripePriceEnvState(directGiftEnvPriceId);
+    const directGiftRuntimeState = stripePriceEnvState(directGiftRuntimeRow?.priceId);
+    const directGiftSource = directGiftEnvState === "set" ? "env" : directGiftRuntimeState === "set" ? "db_runtime_config" : "missing";
+    let directGiftValidation = null;
+    if (stripeClient && directGiftSource !== "missing") {
+      const candidate = directGiftSource === "env" ? directGiftEnvPriceId : directGiftRuntimeRow.priceId;
+      directGiftValidation = sanitizePriceCheck(await validateStripePriceForPlan(stripeClient, plan, candidate, directGiftCommerce));
+    }
+    directGiftPlans[plan.id] = {
+      plan: plan.id,
+      label: directGiftCommerce.productName,
+      checkoutType: "direct_gift_purchase",
+      envName: directGiftCommerce.priceEnv,
+      envPriceConfigured: directGiftEnvState === "set",
+      runtimeConfigPriceConfigured: directGiftRuntimeState === "set",
+      configured: directGiftEnvState === "set" || directGiftRuntimeState === "set",
+      source: directGiftSource,
+      mode: directGiftRuntimeRow?.mode || mode,
+      expected: expectedPriceForPlan(plan, directGiftCommerce),
+      maskedPriceId: directGiftSource === "env" ? maskStripeId(directGiftEnvPriceId) : maskStripeId(directGiftRuntimeRow?.priceId),
+      lastResolvedAt: directGiftRuntimeRow?.lastResolvedAt || null,
+      validation: directGiftValidation
+    };
   }
 
   return {
@@ -6327,10 +7120,21 @@ async function buildPaymentSetupStatus({ validate = false } = {}) {
     mode,
     bootstrapEnabled: stripePriceBootstrapEnabled(),
     envPriceIdsPresent: PUBLIC_REQUIRED_PRICE_ENVS.every((name) => stripePriceEnvState(env(name, "")) === "set"),
-    dbRuntimeConfigFallbackCreated: Object.values(config.prices || {}).some((row) => stripePriceEnvState(row?.priceId) === "set"),
+    giftCodeEnvPriceIdsPresent: GIFT_CODE_REQUIRED_PRICE_ENVS.every((name) => stripePriceEnvState(env(name, "")) === "set"),
+    directGiftEnvPriceIdsPresent: DIRECT_GIFT_REQUIRED_PRICE_ENVS.every((name) => stripePriceEnvState(env(name, "")) === "set"),
+    allCheckoutEnvPriceIdsPresent: [...PUBLIC_REQUIRED_PRICE_ENVS, ...GIFT_CODE_REQUIRED_PRICE_ENVS, ...DIRECT_GIFT_REQUIRED_PRICE_ENVS]
+      .every((name) => stripePriceEnvState(env(name, "")) === "set"),
+    dbRuntimeConfigFallbackCreated: [
+      ...Object.values(config.prices || {}),
+      ...Object.values(config.giftCodePrices || {}),
+      ...Object.values(config.directGiftPrices || {})
+    ]
+      .some((row) => stripePriceEnvState(row?.priceId) === "set"),
     lastBootstrapAt: config.lastBootstrapAt || null,
     lastSafeErrorCode: config.lastSafeErrorCode || null,
     prices: plans,
+    giftCodePrices: giftCodePlans,
+    directGiftPrices: directGiftPlans,
     fullSecretsExposed: false,
     fullPriceIdsExposed: false
   };
@@ -6338,6 +7142,7 @@ async function buildPaymentSetupStatus({ validate = false } = {}) {
 
 async function resolveStripePriceForCheckout(stripeClient, plan, commerce, options = {}) {
   const attempts = [];
+  const runtimeCollection = stripeRuntimeCollectionForCommerce(commerce);
   const candidatePriceId = String(options.candidatePriceId || "").trim();
   if (candidatePriceId) {
     const envCheck = await validateStripePriceForPlan(stripeClient, plan, candidatePriceId, commerce);
@@ -6353,8 +7158,9 @@ async function resolveStripePriceForCheckout(stripeClient, plan, commerce, optio
         priceCreated: false,
         amount: commerce.priceCents,
         currency: commerce.currency,
-        type: plan.subscription ? "recurring" : "one_time",
-        interval: plan.subscription ? "month" : null
+        type: commerce.priceType || (plan.subscription ? "recurring" : "one_time"),
+        interval: commerce.interval || null,
+        checkoutType: commerce.checkoutType || "license_purchase"
       }], { mode: stripeRuntimeMode(), source: "env_validated" });
       return { plan: plan.id, priceId: candidatePriceId, source: "env", check: envCheck, attempts };
     }
@@ -6373,7 +7179,7 @@ async function resolveStripePriceForCheckout(stripeClient, plan, commerce, optio
   }
 
   const runtimeConfig = await getStripeRuntimePriceConfig();
-  const runtimeRow = runtimeConfig.prices?.[plan.id] || null;
+  const runtimeRow = runtimeConfig[runtimeCollection]?.[plan.id] || null;
   if (runtimeRow?.priceId) {
     const runtimeCheck = await validateStripePriceForPlan(stripeClient, plan, runtimeRow.priceId, commerce);
     recordStripePriceCheck(runtimeCheck);
@@ -6385,9 +7191,9 @@ async function resolveStripePriceForCheckout(stripeClient, plan, commerce, optio
   }
 
   if (options.allowBootstrap !== false && stripePriceBootstrapEnabled()) {
-    return withStripePriceBootstrapLock(plan.id, async () => {
+    return withStripePriceBootstrapLock(`${runtimeCollection}:${plan.id}`, async () => {
       const afterLockConfig = await getStripeRuntimePriceConfig();
-      const afterLockRow = afterLockConfig.prices?.[plan.id] || null;
+      const afterLockRow = afterLockConfig[runtimeCollection]?.[plan.id] || null;
       if (afterLockRow?.priceId) {
         const afterLockCheck = await validateStripePriceForPlan(stripeClient, plan, afterLockRow.priceId, commerce);
         recordStripePriceCheck(afterLockCheck);
@@ -6432,19 +7238,26 @@ function stripeSetupPlanFor(plan, commerce = getPlanCommerce(plan)) {
     plan,
     commerce,
     envName: commerce.priceEnv,
-    productName: plan.name,
-    metadata: stripePlanMetadata(plan)
+    productName: commerce.productName || plan.name,
+    metadata: stripePlanMetadata(plan, commerce)
   };
 }
 
-function stripePlanMetadata(plan) {
+function stripePlanMetadata(plan, commerce = getPlanCommerce(plan)) {
+  const checkoutType = commerce.checkoutType || "license_purchase";
+  const productType = checkoutType === "gift_code_purchase"
+    ? "gift_code"
+    : checkoutType === "direct_gift_purchase"
+      ? "direct_gift"
+      : "license";
   return {
     app: "fima_macro",
     fima_plan: plan.id,
+    fima_checkout_type: checkoutType,
     managed_by: "fima_runtime_setup",
-    product_type: "license",
+    product_type: productType,
     access_days: plan.durationDays ? String(plan.durationDays) : "",
-    subscription: plan.subscription ? "monthly" : "",
+    subscription: commerce.priceType === "recurring" ? String(commerce.interval || "month") : "",
     lifetime: plan.lifetime ? "true" : ""
   };
 }
@@ -6456,6 +7269,8 @@ async function bootstrapRuntimeStripePrices({ source = "runtime_bootstrap" } = {
   for (const planId of publicCheckoutPlanIds()) {
     const plan = getPlan(planId);
     rows.push(await verifyOrCreateStripePlan(stripeClient, stripeSetupPlanFor(plan)));
+    rows.push(await verifyOrCreateStripePlan(stripeClient, stripeSetupPlanFor(plan, getGiftCodeCommerce(plan))));
+    rows.push(await verifyOrCreateStripePlan(stripeClient, stripeSetupPlanFor(plan, getDirectGiftCommerce(plan))));
   }
   const config = await persistStripeRuntimePriceRows(rows, { mode, source });
   return {
@@ -6502,26 +7317,18 @@ async function getStripeRuntimePriceConfig() {
 function normalizeStripeRuntimePriceConfig(value) {
   const input = value && typeof value === "object" ? value : {};
   const prices = {};
+  const giftCodePrices = {};
+  const directGiftPrices = {};
   for (const planId of publicCheckoutPlanIds()) {
-    const row = input.prices?.[planId] || {};
-    prices[planId] = {
-      plan: planId,
-      envName: String(row.envName || getPlanCommerce(getPlan(planId)).priceEnv || ""),
-      priceId: String(row.priceId || ""),
-      productId: String(row.productId || ""),
-      mode: ["live", "test"].includes(row.mode) ? row.mode : "unknown",
-      source: String(row.source || ""),
-      currency: String(row.currency || getPlanCommerce(getPlan(planId)).currency || "eur").toLowerCase(),
-      amount: Number.isFinite(Number(row.amount)) ? Number(row.amount) : getPlanCommerce(getPlan(planId)).priceCents,
-      type: String(row.type || (getPlan(planId)?.subscription ? "recurring" : "one_time")),
-      interval: row.interval ? String(row.interval) : null,
-      productCreated: Boolean(row.productCreated),
-      priceCreated: Boolean(row.priceCreated),
-      lastResolvedAt: row.lastResolvedAt || null
-    };
+    const plan = getPlan(planId);
+    prices[planId] = normalizeStripeRuntimePriceRow(input.prices?.[planId], plan, getPlanCommerce(plan));
+    giftCodePrices[planId] = normalizeStripeRuntimePriceRow(input.giftCodePrices?.[planId], plan, getGiftCodeCommerce(plan));
+    directGiftPrices[planId] = normalizeStripeRuntimePriceRow(input.directGiftPrices?.[planId], plan, getDirectGiftCommerce(plan));
   }
   return {
     prices,
+    giftCodePrices,
+    directGiftPrices,
     updatedAt: input.updatedAt || null,
     lastBootstrapAt: input.lastBootstrapAt || null,
     lastSafeErrorCode: input.lastSafeErrorCode || null,
@@ -6533,12 +7340,19 @@ async function persistStripeRuntimePriceRows(rows, { mode = stripeRuntimeMode(),
   const current = await getStripeRuntimePriceConfig();
   const now = new Date().toISOString();
   for (const row of rows) {
-    current.prices[row.plan] = {
-      ...(current.prices[row.plan] || {}),
+    const collectionName = row.checkoutType === "gift_code_purchase"
+      ? "giftCodePrices"
+      : row.checkoutType === "direct_gift_purchase"
+        ? "directGiftPrices"
+        : "prices";
+    const collection = current[collectionName];
+    collection[row.plan] = {
+      ...(collection[row.plan] || {}),
       plan: row.plan,
+      checkoutType: row.checkoutType || "license_purchase",
       envName: row.envName,
       priceId: row.priceId,
-      productId: row.productId || current.prices[row.plan]?.productId || "",
+      productId: row.productId || collection[row.plan]?.productId || "",
       mode,
       source,
       currency: row.currency,
@@ -6586,6 +7400,7 @@ function publicStripePriceResolution(resolution) {
 function safeStripePlanRow(row) {
   return {
     plan: row.plan,
+    checkoutType: row.checkoutType || "license_purchase",
     envName: row.envName,
     productIdMasked: maskStripeId(row.productId),
     priceIdMasked: maskStripeId(row.priceId),
@@ -6632,25 +7447,29 @@ function publicStripeSetupProductsResult(result) {
 
 function publicStripeRuntimePriceConfig(config) {
   const normalized = normalizeStripeRuntimePriceConfig(config);
+  const publicRows = (rows) => Object.fromEntries(Object.entries(rows).map(([planId, row]) => [planId, {
+    plan: row.plan,
+    checkoutType: row.checkoutType || "license_purchase",
+    envName: row.envName,
+    configured: stripePriceEnvState(row.priceId) === "set",
+    maskedPriceId: maskStripeId(row.priceId),
+    maskedProductId: maskStripeId(row.productId),
+    mode: row.mode,
+    source: row.source,
+    currency: row.currency,
+    amount: row.amount,
+    type: row.type,
+    interval: row.interval,
+    lastResolvedAt: row.lastResolvedAt
+  }]));
   return {
     updatedAt: normalized.updatedAt,
     lastBootstrapAt: normalized.lastBootstrapAt,
     lastSafeErrorCode: normalized.lastSafeErrorCode,
     lastErrorAt: normalized.lastErrorAt,
-    prices: Object.fromEntries(Object.entries(normalized.prices).map(([planId, row]) => [planId, {
-      plan: row.plan,
-      envName: row.envName,
-      configured: stripePriceEnvState(row.priceId) === "set",
-      maskedPriceId: maskStripeId(row.priceId),
-      maskedProductId: maskStripeId(row.productId),
-      mode: row.mode,
-      source: row.source,
-      currency: row.currency,
-      amount: row.amount,
-      type: row.type,
-      interval: row.interval,
-      lastResolvedAt: row.lastResolvedAt
-    }]))
+    prices: publicRows(normalized.prices),
+    giftCodePrices: publicRows(normalized.giftCodePrices),
+    directGiftPrices: publicRows(normalized.directGiftPrices)
   };
 }
 
@@ -6672,18 +7491,41 @@ function maskStripeId(value) {
   return `${text.slice(0, 6)}***${text.slice(-6)}`;
 }
 
-function stripeSetupPlans(envMap) {
-  return ["3days", "monthly", "lifetime"].map((planId) => {
+function stripeSetupPlans(envMap, { mode = "live" } = {}) {
+  const licenses = publicCheckoutPlanIds().map((planId) => {
     const plan = getPlan(planId);
     const commerce = getPlanCommerce(plan);
     return {
       plan,
       commerce,
       envName: envMap[planId],
-      productName: plan.name,
-      metadata: stripePlanMetadata(plan)
+      productName: commerce.productName,
+      metadata: stripePlanMetadata(plan, commerce)
     };
   });
+  const giftCodes = publicCheckoutPlanIds().map((planId) => {
+    const plan = getPlan(planId);
+    const commerce = getGiftCodeCommerce(plan, { test: mode === "test" });
+    return {
+      plan,
+      commerce,
+      envName: envMap[`gift:${planId}`],
+      productName: commerce.productName,
+      metadata: stripePlanMetadata(plan, commerce)
+    };
+  });
+  const directGifts = publicCheckoutPlanIds().map((planId) => {
+    const plan = getPlan(planId);
+    const commerce = getDirectGiftCommerce(plan, { test: mode === "test" });
+    return {
+      plan,
+      commerce,
+      envName: envMap[`direct-gift:${planId}`],
+      productName: commerce.productName,
+      metadata: stripePlanMetadata(plan, commerce)
+    };
+  });
+  return [...licenses, ...giftCodes, ...directGifts];
 }
 
 async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv, persistRuntimeConfig = false }) {
@@ -6695,7 +7537,7 @@ async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv, pe
     throw error;
   }
   const stripeClient = stripeWithKey(key.value, mode);
-  const planned = stripeSetupPlans(envMap);
+  const planned = stripeSetupPlans(envMap, { mode });
   const products = [];
   const envUpdates = {};
 
@@ -6728,7 +7570,8 @@ async function setupStripeProducts({ mode, keyNames, envMap, updateRenderEnv, pe
 
 async function verifyOrCreateStripePlan(stripeClient, item) {
   const { plan, commerce, envName, productName, metadata } = item;
-  let product = await findStripeProductForPlan(stripeClient, plan.id);
+  const checkoutType = commerce.checkoutType || "license_purchase";
+  let product = await findStripeProductForPlan(stripeClient, plan.id, checkoutType);
   let productCreated = false;
   if (!product) {
     product = await stripeClient.products.create({
@@ -6736,12 +7579,13 @@ async function verifyOrCreateStripePlan(stripeClient, item) {
       active: true,
       metadata
     }, {
-      idempotencyKey: `fima-product-${plan.id}`
+      idempotencyKey: `fima-product-${checkoutType}-${plan.id}`
     });
     productCreated = true;
   }
 
-  const expectedType = plan.subscription ? "recurring" : "one_time";
+  const expectedType = commerce.priceType || (plan.subscription ? "recurring" : "one_time");
+  const expectedInterval = expectedType === "recurring" ? commerce.interval || "month" : null;
   let price = await findStripePriceForPlan(stripeClient, product.id, plan, commerce);
   let priceCreated = false;
   if (!price) {
@@ -6749,10 +7593,10 @@ async function verifyOrCreateStripePlan(stripeClient, item) {
       product: product.id,
       currency: commerce.currency,
       unit_amount: commerce.priceCents,
-      ...(plan.subscription ? { recurring: { interval: "month" } } : {}),
+      ...(expectedType === "recurring" ? { recurring: { interval: expectedInterval } } : {}),
       metadata
     }, {
-      idempotencyKey: `fima-price-${plan.id}-${commerce.currency}-${commerce.priceCents}-${plan.subscription ? "month" : "one_time"}`
+      idempotencyKey: `fima-price-${checkoutType}-${plan.id}-${commerce.currency}-${commerce.priceCents}-${expectedInterval || "one_time"}`
     });
     priceCreated = true;
   }
@@ -6762,6 +7606,7 @@ async function verifyOrCreateStripePlan(stripeClient, item) {
   if (!currentMatches) process.env[envName] = price.id;
   return {
     plan: plan.id,
+    checkoutType,
     envName,
     productId: product.id,
     priceId: price.id,
@@ -6772,11 +7617,11 @@ async function verifyOrCreateStripePlan(stripeClient, item) {
     amount: commerce.priceCents,
     currency: commerce.currency,
     type: expectedType,
-    interval: plan.subscription ? "month" : null
+    interval: expectedInterval
   };
 }
 
-async function findStripeProductForPlan(stripeClient, planId) {
+async function findStripeProductForPlan(stripeClient, planId, checkoutType = "license_purchase") {
   const list = await stripeClient.products.search({
     query: `metadata['fima_plan']:'${planId}' AND metadata['app']:'fima_macro'`,
     limit: 10
@@ -6784,15 +7629,32 @@ async function findStripeProductForPlan(stripeClient, planId) {
     const fallback = await stripeClient.products.list({ active: true, limit: 100 });
     return { data: fallback.data.filter((product) => product.metadata?.fima_plan === planId && product.metadata?.app === "fima_macro") };
   });
-  return list.data?.[0] || null;
+  return list.data?.find((product) => stripeProductMatchesCheckoutType(product, planId, checkoutType)) || null;
+}
+
+function stripeProductMatchesCheckoutType(product, planId, checkoutType) {
+  const metadata = product?.metadata || {};
+  if (metadata.fima_plan !== planId || metadata.app !== "fima_macro") return false;
+  const actualCheckoutType = String(metadata.fima_checkout_type || "").trim().toLowerCase();
+  const actualProductType = String(metadata.product_type || "").trim().toLowerCase();
+  if (checkoutType === "gift_code_purchase") {
+    return actualCheckoutType === "gift_code_purchase" && actualProductType === "gift_code";
+  }
+  if (checkoutType === "direct_gift_purchase") {
+    return actualCheckoutType === "direct_gift_purchase" && actualProductType === "direct_gift";
+  }
+  return !["gift_code_purchase", "direct_gift_purchase"].includes(actualCheckoutType) &&
+    !["gift_code", "direct_gift"].includes(actualProductType);
 }
 
 async function findStripePriceForPlan(stripeClient, productId, plan, commerce) {
   const prices = await stripeClient.prices.list({ product: productId, active: true, limit: 100 });
+  const expectedType = commerce.priceType || (plan.subscription ? "recurring" : "one_time");
+  const expectedInterval = expectedType === "recurring" ? commerce.interval || "month" : null;
   return prices.data.find((price) => {
     if (String(price.currency || "").toLowerCase() !== commerce.currency) return false;
     if (price.unit_amount !== commerce.priceCents) return false;
-    if (plan.subscription) return price.type === "recurring" && price.recurring?.interval === "month";
+    if (expectedType === "recurring") return price.type === "recurring" && price.recurring?.interval === expectedInterval;
     return price.type === "one_time";
   }) || null;
 }
@@ -6973,7 +7835,7 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
     priceResolution = await resolveStripePriceForCheckout(stripeClient, plan, commerce, {
       candidatePriceId: priceId,
       candidateSource: priceId ? "env" : "env_missing",
-      allowBootstrap: true
+      allowBootstrap: (commerce.checkoutType || "license_purchase") === "license_purchase"
     });
   } catch (error) {
     if (productionMode) throw error;
@@ -7001,10 +7863,16 @@ async function createCheckoutSession({ plan, commerce, customerEmail, customerId
         unit_amount: commerce.priceCents,
         ...(subscriptionCheckout ? { recurring: { interval: "month" } } : {}),
         product_data: {
-          name: plan.name,
+          name: commerce.productName || plan.name,
           metadata: {
             fima_plan: plan.id,
-            app: env("APP_NAME", "Fima Macro")
+            app: "fima_macro",
+            fima_checkout_type: commerce.checkoutType || checkoutType || "license_purchase",
+            product_type: (commerce.checkoutType || checkoutType) === "gift_code_purchase"
+              ? "gift_code"
+              : (commerce.checkoutType || checkoutType) === "direct_gift_purchase"
+                ? "direct_gift"
+                : "license"
           }
         }
       }
@@ -7043,7 +7911,12 @@ async function validateConfiguredStripePrices() {
 
   const results = [];
   for (const plan of Object.values(PLANS).filter((item) => publicProductPlanIds.has(item.id))) {
-    for (const option of getPlanPriceOptions(plan)) {
+    const commerceOptions = [
+      ...getPlanPriceOptions(plan).map((option) => ({ ...getPlanCommerce(plan), ...option })),
+      getGiftCodeCommerce(plan),
+      getDirectGiftCommerce(plan)
+    ];
+    for (const option of commerceOptions) {
       const check = await validateStripePriceForPlan(stripeClient, plan, env(option.priceEnv), option);
       recordStripePriceCheck(check);
       results.push(sanitizePriceCheck(check));
@@ -7088,9 +7961,10 @@ async function validateStripePriceForPlan(stripeClient, plan, priceId, commerce 
     };
 
     if (actual.active === false) return { ...base, ok: false, status: "inactive_price", actual };
-    const expectedType = plan.subscription ? "recurring" : "one_time";
+    const expectedType = commerce.priceType || (plan.subscription ? "recurring" : "one_time");
+    const expectedInterval = expectedType === "recurring" ? commerce.interval || "month" : null;
     if (actual.type !== expectedType) return { ...base, ok: false, status: "price_type_mismatch", actual };
-    if (plan.subscription && price.recurring?.interval !== "month") return { ...base, ok: false, status: "recurring_interval_mismatch", actual: { ...actual, interval: price.recurring?.interval || null } };
+    if (expectedType === "recurring" && price.recurring?.interval !== expectedInterval) return { ...base, ok: false, status: "recurring_interval_mismatch", actual: { ...actual, interval: price.recurring?.interval || null } };
     if (actual.currency !== commerce.currency) return { ...base, ok: false, status: "currency_mismatch", actual };
     if (actual.unitAmount !== commerce.priceCents) return { ...base, ok: false, status: "amount_mismatch", actual };
 
@@ -7116,11 +7990,12 @@ async function validateStripePriceForPlan(stripeClient, plan, priceId, commerce 
 }
 
 function expectedPriceForPlan(plan, commerce = getPlanCommerce(plan)) {
+  const type = commerce.priceType || (plan.subscription ? "recurring" : "one_time");
   return {
     currency: commerce.currency,
     unitAmount: commerce.priceCents,
-    type: plan.subscription ? "recurring" : "one_time",
-    interval: plan.subscription ? "month" : null
+    type,
+    interval: type === "recurring" ? commerce.interval || "month" : null
   };
 }
 
@@ -7320,12 +8195,30 @@ function isOwnerManagedLicense(license) {
     isOwnerAccountLifetimeLicense(license);
 }
 
-function ownerAdminAccessForLicense(license, hwid, reason = "valid") {
+function ownerIdentityRequirements(accountAccess) {
+  const status = ownerIdentityStatus(accountAccess, {
+    ownerEmail: FIMA_OWNER_ACCOUNT_EMAIL,
+    ownerDiscordId: PARADISE_OWNER_DISCORD_ID
+  });
+  const missing = [];
+  if (!status.accountPresent || !status.emailMatches) missing.push("owner_fima_account");
+  if (!status.discordUserMatches || !status.discordOAuthMatches) missing.push("owner_discord_link");
+  return { status, missing };
+}
+
+function stripeRuntimeCollectionForCommerce(commerce) {
+  if (commerce?.checkoutType === "gift_code_purchase") return "giftCodePrices";
+  if (commerce?.checkoutType === "direct_gift_purchase") return "directGiftPrices";
+  return "prices";
+}
+
+function ownerAdminAccessForLicense(license, hwid, reason = "valid", accountAccess = null) {
   if (reason !== "valid") return false;
   if (!isOwnerManagedLicense(license)) return false;
   if (!license?.lifetime || license.status !== "active") return false;
   const binding = ownerLicenseBindingState(license, hwid);
-  return binding.ok && binding.reason === "owner_key_bound";
+  if (!binding.ok || binding.reason !== "owner_key_bound") return false;
+  return ownerIdentityRequirements(accountAccess).status.ok;
 }
 
 function ownerLicenseBindingState(license, hwid) {
@@ -7348,6 +8241,147 @@ function ownerLicenseBindingState(license, hwid) {
   }
 
   return { ok: true, reason: "owner_key_bound" };
+}
+
+async function resolveDesktopEntitlementForUser({ user, hwid, appVersion }) {
+  const normalizedHwid = normalizeHwid(hwid);
+  if (!user?.id || !normalizedHwid) {
+    const error = new Error("Desktop entitlement identity is invalid.");
+    error.code = "desktop_entitlement_identity_invalid";
+    throw error;
+  }
+
+  const now = new Date();
+  const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
+  const candidates = await prisma.license.findMany({
+    where: {
+      customerEmail: { equals: user.email, mode: "insensitive" },
+      status: "active",
+      OR: [
+        { lifetime: true },
+        { expiresAt: null },
+        { expiresAt: { gt: now } }
+      ]
+    },
+    orderBy: [
+      { lifetime: "desc" },
+      { expiresAt: "desc" },
+      { createdAt: "desc" }
+    ]
+  });
+
+  for (const initialCandidate of candidates) {
+    let license = initialCandidate;
+    const accountAccess = await buildLicenseAccountAccess(license);
+    if (accountAccess.user?.id !== user.id) continue;
+
+    if (isOwnerManagedLicense(license)) {
+      const binding = ownerLicenseBindingState(license, normalizedHwid);
+      const identity = ownerIdentityRequirements(accountAccess);
+      const ownerAllowed = binding.ok
+        && identity.status.ok
+        && ownerAdminAccessForLicense(license, normalizedHwid, "valid", accountAccess);
+      if (!ownerAllowed) continue;
+    } else {
+      const boundHwid = normalizeHwid(license.hwid);
+      if (!boundHwid) {
+        const bound = await prisma.license.updateMany({
+          where: { id: license.id, hwid: null, status: "active" },
+          data: { hwid: normalizedHwid }
+        });
+        license = await prisma.license.findUnique({ where: { id: license.id } });
+        if (bound.count !== 1 && normalizeHwid(license?.hwid) !== normalizedHwid) continue;
+      }
+      if (normalizeHwid(license?.hwid) !== normalizedHwid) continue;
+    }
+
+    const refreshedAccess = await buildLicenseAccountAccess(license);
+    if (refreshedAccess.user?.id !== user.id) continue;
+    const ownerAdminAccess = ownerAdminAccessForLicense(license, normalizedHwid, "valid", refreshedAccess);
+    const entitlement = issueAppEntitlement({
+      license,
+      user,
+      hwid: normalizedHwid,
+      appVersion,
+      minSupportedAppVersion,
+      licenseStatus: "active",
+      ownerAdminAccess
+    });
+    return {
+      ...licenseValidationPayload(license, {
+        valid: true,
+        reason: "valid",
+        message: "License valid",
+        accountAccess: refreshedAccess,
+        hwid: normalizedHwid,
+        hwidMatches: true,
+        ownerAdminAccess
+      }),
+      valid: true,
+      canUseApp: true,
+      entitlementToken: entitlement.token,
+      entitlement: publicEntitlementPayload(entitlement),
+      entitlementExpiresAt: entitlement.expiresAt,
+      minSupportedAppVersion
+    };
+  }
+
+  const entitlement = issueAppEntitlement({
+    license: null,
+    user,
+    hwid: normalizedHwid,
+    appVersion,
+    minSupportedAppVersion,
+    licenseStatus: "account_only",
+    allowedFeatures: [],
+    ownerAdminAccess: false
+  });
+  return {
+    valid: true,
+    validLicense: false,
+    licenseExists: false,
+    reason: "account_only",
+    message: "FIMA account verified. Purchase FIMA Macro to unlock the runtime.",
+    canUseApp: false,
+    hasActiveLicense: false,
+    accountConnected: true,
+    discordLinked: Boolean(user.discordUserId),
+    robloxLinked: false,
+    ownerAdminAccess: false,
+    isOwner: false,
+    isAdmin: false,
+    adminTools: false,
+    capabilities: [],
+    accountEmail: maskEmail(user.email),
+    discordUsername: user.discordUsername || null,
+    robloxUsername: user.robloxUsername || null,
+    plan: null,
+    expiresAt: null,
+    entitlementToken: entitlement.token,
+    entitlement: publicEntitlementPayload(entitlement),
+    entitlementExpiresAt: entitlement.expiresAt,
+    minSupportedAppVersion
+  };
+}
+
+function normalizeStripeRuntimePriceRow(value, plan, commerce) {
+  const row = value && typeof value === "object" ? value : {};
+  return {
+    plan: plan.id,
+    checkoutType: commerce.checkoutType || "license_purchase",
+    envName: String(row.envName || commerce.priceEnv || ""),
+    priceId: String(row.priceId || ""),
+    productId: String(row.productId || ""),
+    mode: ["live", "test"].includes(row.mode) ? row.mode : "unknown",
+    source: String(row.source || ""),
+    currency: String(row.currency || commerce.currency || "eur").toLowerCase(),
+    amount: Number.isFinite(Number(row.amount)) ? Number(row.amount) : commerce.priceCents,
+    type: String(row.type || commerce.priceType || "one_time"),
+    interval: row.interval ? String(row.interval) : null,
+    productCreated: Boolean(row.productCreated),
+    priceCreated: Boolean(row.priceCreated),
+    lastResolvedAt: row.lastResolvedAt || null
+  };
 }
 
 function validationLogLicenseKey(license, fallback = "") {
@@ -7400,7 +8434,7 @@ function licenseReasonMessage(reason) {
     hwid_mismatch: "This license is already bound to another PC.",
     owner_key_wrong_account_or_hwid: "This owner key is locked to the owner account and device.",
     account_not_connected: "Your license is valid. A Fima account is optional for app access, but linking an account helps recovery and My Products.",
-    discord_not_connected: "Discord is optional except for free trial claims.",
+    discord_not_connected: "Discord is optional for paid app access. Link it only for account recovery, support, and eligible community Activity Rewards.",
     roblox_not_connected: "Roblox is optional. You can add a username later for profile/community features.",
     trial_expired: "Your trial license has expired.",
     gift_not_claimed: "This gift license has not been claimed yet.",
@@ -7430,12 +8464,16 @@ function licenseValidationPayload(license, options = {}) {
   const plan = license?.plan || null;
   const planInfo = plan ? getPlan(plan) : null;
   const user = accountAccess?.user || null;
-  const missingRequirements = accountAccess?.missingRequirements || [];
+  const missingRequirements = [...(accountAccess?.missingRequirements || [])];
+  if (isOwnerManagedLicense(license)) {
+    missingRequirements.push(...ownerIdentityRequirements(accountAccess).missing);
+  }
+  const uniqueMissingRequirements = [...new Set(missingRequirements)];
   const accountConnected = accountAccess ? Boolean(accountAccess.user) : false;
   const licenseExists = Boolean(license);
   const validLicense = options.validLicense ?? Boolean(license && !["license_not_found", "invalid_format"].includes(reason));
   const canUseApp = Boolean(options.valid && hwidMatches);
-  const ownerAdminAccess = Boolean(options.ownerAdminAccess ?? ownerAdminAccessForLicense(license, normalizedHwid, reason));
+  const ownerAdminAccess = Boolean(options.ownerAdminAccess ?? ownerAdminAccessForLicense(license, normalizedHwid, reason, accountAccess));
   const licenseKeyMasked = license ? maskCode(license.licenseKey) : options.licenseKey ? maskCode(options.licenseKey) : null;
   const boundHwidMasked = boundHwid ? maskExternalId(boundHwid) : null;
   const incomingHwidMasked = normalizedHwid ? maskExternalId(normalizedHwid) : null;
@@ -7479,7 +8517,7 @@ function licenseValidationPayload(license, options = {}) {
     discordLinked: accountAccess ? Boolean(accountAccess.discordLinked) : false,
     robloxLinked: accountAccess ? Boolean(accountAccess.robloxLinked) : false,
     canUseApp,
-    missingRequirements,
+    missingRequirements: uniqueMissingRequirements,
     hasActiveLicense: Boolean(license && license.status === "active"),
     buyerEmail: maskEmail(user?.email || license?.customerEmail),
     buyerEmailMasked: maskEmail(user?.email || license?.customerEmail),
@@ -7489,7 +8527,7 @@ function licenseValidationPayload(license, options = {}) {
     accountSetupUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/overview`,
     connectDiscordUrl: `${env("API_BASE_URL") || "https://api.fimamacro.com"}/auth/discord/start?returnTo=/dashboard/overview`,
     connectRobloxUrl: `${env("FRONTEND_URL") || "https://fimamacro.com"}/dashboard/overview#roblox-profile`,
-    optionalProfileMissing: missingRequirements,
+    optionalProfileMissing: uniqueMissingRequirements,
     buyerDiscord: user ? {
       connected: Boolean(accountAccess?.discordLinked),
       id: maskDiscordId(user.discordUserId),
@@ -7582,7 +8620,7 @@ function recommendedLicenseFix(reason) {
     license_not_found: "Check the copied key. If the user paid, search by buyer email and verify the generated license.",
     invalid_format: "Ask the user to copy the full FIMA-XXXX-XXXX-XXXX-XXXX key.",
     expired: "Extend the license or ask the user to renew.",
-    trial_expired: "Trial expired. Ask the user to buy a plan or wait for the next eligible trial.",
+    trial_expired: "Legacy trial expired. Ask the user to buy a plan or qualify for monthly community Activity or verified server-booster Rewards.",
     disabled: "Re-enable the license if it was disabled by mistake.",
     inactive: "Set license status to active if this user should have access.",
     banned: "Unban only if the ban was a mistake.",
@@ -7591,7 +8629,7 @@ function recommendedLicenseFix(reason) {
     hwid_mismatch: "Reset HWID from Admin Panel if this is the owner of the license.",
     owner_key_wrong_account_or_hwid: "Owner key is locked to the owner account and PC. Do not reset unless the owner verified the device.",
     account_not_connected: "Optional only. App access should not be blocked; ask user to link an account only for recovery/My Products.",
-    discord_not_connected: "Discord is optional except when claiming the free trial.",
+    discord_not_connected: "Discord is optional for paid app access and required only for eligible community Activity Rewards and Discord-linked support.",
     roblox_not_connected: "Roblox is optional and should never block app access.",
     gift_not_claimed: "Ask the user to claim the gift from their dashboard.",
     referral_not_claimed: "Ask the user to claim the referral reward from their dashboard.",
@@ -8303,6 +9341,82 @@ async function fetchDiscordGuildMemberships(accessToken) {
   return Array.isArray(guilds) ? guilds.filter(guild => guild?.id) : [];
 }
 
+function publicDiscordGuildMembership(guild) {
+  const id = String(guild?.id || "");
+  const icon = String(guild?.icon || "");
+  return {
+    id,
+    name: String(guild?.name || "Discord server").slice(0, 100),
+    iconUrl: id && icon ? `https://cdn.discordapp.com/icons/${id}/${icon}.png?size=128` : null,
+    owner: guild?.owner === true
+  };
+}
+
+async function buildCommunityProfile(user) {
+  const access = communityAccessForLanguage(user?.preferredLanguage);
+  const communityGuildId = env("FIEELS_COMMUNITY_GUILD_ID", env("DISCORD_GUILD_ID", ""));
+  const link = user?.id
+    ? await prisma.oAuthLink.findFirst({
+        where: { userId: user.id, provider: "discord" },
+        select: {
+          providerSubject: true,
+          providerUsername: true,
+          accessTokenCipher: true,
+          tokenExpiresAt: true,
+          scopes: true
+        }
+      }).catch(() => null)
+    : null;
+  const discordUserId = String(link?.providerSubject || user?.discordUserId || "");
+  const discord = {
+    linked: Boolean(discordUserId),
+    username: link?.providerUsername || user?.discordUsername || null,
+    membershipVerified: false,
+    communityGuildId: communityGuildId || null,
+    connectedGuilds: [],
+    code: discordUserId ? "discord_reauthorization_required" : "discord_link_required"
+  };
+
+  if (!communityGuildId) {
+    discord.code = "community_guild_not_configured";
+  } else {
+    const scopes = new Set(String(link?.scopes || "").split(/\s+/).filter(Boolean));
+    const tokenExpired = Boolean(link?.tokenExpiresAt && link.tokenExpiresAt.getTime() <= Date.now());
+    const accessToken = !tokenExpired && scopes.has("guilds")
+      ? decryptToken(link?.accessTokenCipher)
+      : null;
+    if (accessToken) {
+      try {
+        const memberships = await fetchDiscordGuildMemberships(accessToken);
+        discord.connectedGuilds = memberships.map(publicDiscordGuildMembership);
+        discord.membershipVerified = memberships.some((guild) => String(guild.id) === communityGuildId);
+        discord.code = discord.membershipVerified ? "ok" : "community_membership_required";
+      } catch (error) {
+        discord.code = error?.code || "discord_guilds_unavailable";
+      }
+    }
+  }
+
+  return {
+    preferredLanguage: access.preferredLanguage,
+    countryRegion: user?.countryRegion || null,
+    nationality: user?.nationality || null,
+    nationalityConfigured: Boolean(user?.nationality),
+    nationalityVisible: Boolean(user?.nationality && user?.nationalityVisible),
+    timezone: user?.timezone || null,
+    onboarding: {
+      status: user?.languageOnboardingStatus || "pending",
+      completedAt: user?.languageOnboardingCompletedAt || null,
+      deferredAt: user?.languageOnboardingDeferredAt || null
+    },
+    access: {
+      turkishCategoryAccess: access.turkishCategoryAccess,
+      source: "preferred_language"
+    },
+    discord
+  };
+}
+
 async function requireParadiseOwner(req, res, next) {
   try {
     const access = await paradiseOwnerAccess(req.user);
@@ -8464,6 +9578,15 @@ function publicUser(user) {
     robloxUserIdMasked: maskExternalId(user.robloxUserId),
     robloxAvatarUrl: user.robloxAvatarUrl || null,
     robloxVerified: Boolean(user.robloxUserId),
+    preferredLanguage: user.preferredLanguage || null,
+    countryRegion: user.countryRegion || null,
+    nationality: user.nationalityVisible ? user.nationality || null : null,
+    nationalityConfigured: Boolean(user.nationality),
+    nationalityVisible: Boolean(user.nationality && user.nationalityVisible),
+    timezone: user.timezone || null,
+    languageOnboardingStatus: user.languageOnboardingStatus || "pending",
+    languageOnboardingCompletedAt: user.languageOnboardingCompletedAt || null,
+    languageOnboardingDeferredAt: user.languageOnboardingDeferredAt || null,
     emailVerified: Boolean(user.emailVerifiedAt),
     emailVerifiedAt: user.emailVerifiedAt || null,
     trialUsedAt: user.trialUsedAt || null,
@@ -8778,6 +9901,13 @@ function giftAccessState(row) {
   if (row.status === "redeemed" || row.usedCount >= row.maxUses) return { ok: false, code: "already_redeemed", statusCode: 409 };
   if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return { ok: false, code: "expired", statusCode: 409 };
   return { ok: true };
+}
+
+function rejectLegacyTrialIssuance(res) {
+  return res.status(400).json({
+    error: "trial_program_replaced_by_activity_rewards",
+    programStatus: LEGACY_TRIAL_PROGRAM_STATUS
+  });
 }
 
 async function validateGiftClaimRequirements(user, row) {
@@ -9552,50 +10682,56 @@ function adminReferralPayload(referral) {
 }
 
 async function buildMonthlyTrialSummary(user, now = new Date(), integrations = null) {
-  const promo = getTrialPromoConfig(process.env, now);
   const linked = integrations || await buildIntegrationSummary(user);
   const activeTrial = await findActiveMonthlyTrial(user, now);
-  const promoAlreadyClaimed = promo.active ? await findPromoTrial(user) : null;
   const requirements = [
     { id: "account", label: "Fima account logged in", complete: Boolean(user?.id), action: null },
     { id: "discord", label: "Discord connected", complete: Boolean(linked.discord?.connected), action: "connect_discord" },
     { id: "roblox", label: "Roblox profile verified", complete: Boolean(linked.roblox?.connected), action: "verify_roblox" }
   ];
   const missing = requirements.filter((item) => !item.complete).map((item) => item.id);
-  const nextTrialAvailableAt = promo.active ? null : user?.nextTrialAvailableAt || null;
-  const cooldownActive = Boolean(nextTrialAvailableAt && nextTrialAvailableAt > now);
-  const cooldownSeconds = cooldownActive ? Math.ceil((nextTrialAvailableAt.getTime() - now.getTime()) / 1000) : 0;
   const activeSeconds = activeTrial?.expiresAt ? Math.max(0, Math.ceil((activeTrial.expiresAt.getTime() - now.getTime()) / 1000)) : 0;
   const paidAccessActive = await hasActivePaidLicense(user, now);
 
-  let disabledReason = null;
-  if (activeTrial) disabledReason = "trial_already_active";
-  else if (missing.includes("discord")) disabledReason = "discord_not_connected";
-  else if (missing.includes("roblox")) disabledReason = "roblox_not_verified";
-  else if (promoAlreadyClaimed) disabledReason = "trial_already_claimed";
-  else if (cooldownActive) disabledReason = "trial_cooldown_active";
-
   return {
-    promo: publicTrialPromo(promo),
-    durationDays: promo.currentTrialDays,
-    label: promo.active ? `${promo.promoDays}-Day Free Trial` : `${promo.normalDays}-Day Free Trial`,
+    programStatus: "replaced_by_activity_rewards",
+    label: "FIMA Activity Rewards",
+    activityProgram: {
+      seasonMonths: 1,
+      timezone: "UTC",
+      boards: ["text", "voice"],
+      prizes: [
+        { rank: 1, days: 15 },
+        { rank: 2, days: 10 },
+        { rank: 3, days: 7 }
+      ],
+      rewardsStackAcrossBoards: true,
+      linkedFimaAccountRequired: true
+    },
+    boosterProgram: {
+      periodMonths: 1,
+      timezone: "UTC",
+      daysPerVerifiedActiveBoost: 3,
+      rewardsStackWithActivity: true,
+      linkedFimaAccountRequired: true
+    },
     requirements,
     missing,
-    eligible: requirements.every((item) => item.complete) && !activeTrial && !promoAlreadyClaimed && !cooldownActive,
-    disabledReason,
+    eligible: false,
+    disabledReason: "trial_program_replaced_by_activity_rewards",
     active: Boolean(activeTrial),
     activeLicense: activeTrial ? publicLicense(activeTrial) : null,
     expiresAt: activeTrial?.expiresAt ? activeTrial.expiresAt.toISOString() : user?.trialExpiresAt?.toISOString?.() || null,
     activeSeconds,
-    nextTrialAvailableAt: nextTrialAvailableAt ? nextTrialAvailableAt.toISOString() : null,
-    cooldownActive,
-    cooldownSeconds,
-    status: activeTrial ? "active" : cooldownActive ? "cooldown" : requirements.every((item) => item.complete) ? "available" : "locked",
+    nextTrialAvailableAt: null,
+    cooldownActive: false,
+    cooldownSeconds: 0,
+    status: activeTrial ? "legacy_active" : "replaced",
     claimCount: user?.monthlyTrialClaimCount || 0,
-    promoClaimed: Boolean(promoAlreadyClaimed),
-    promoSource: promoAlreadyClaimed ? promo.source : null,
+    promoClaimed: false,
+    promoSource: null,
     paidAccessActive,
-    priorityRule: paidAccessActive ? "paid_access_has_priority; monthly trial remains optional" : "trial_access"
+    priorityRule: activeTrial ? "legacy_active_trial_remains_read_only_until_expiry" : "activity_rewards_or_paid_access"
   };
 }
 
@@ -9613,31 +10749,6 @@ async function findActiveMonthlyTrial(user, now = new Date()) {
     },
     orderBy: { expiresAt: "desc" }
   });
-}
-
-async function findPromoTrial(user) {
-  if (!user?.email) return null;
-  return prisma.license.findFirst({
-    where: {
-      customerEmail: user.email,
-      notes: { contains: "trial_promo_7d_beta", mode: "insensitive" }
-    },
-    orderBy: { createdAt: "desc" }
-  });
-}
-
-function publicTrialPromo(promo = getTrialPromoConfig(process.env, new Date())) {
-  return {
-    active: promo.active,
-    enabled: promo.enabled,
-    campaign: promo.campaign,
-    source: promo.source,
-    days: promo.currentTrialDays,
-    promoDays: promo.promoDays,
-    normalDays: promo.normalDays,
-    endAt: promo.endAtIso,
-    label: promo.active ? `${promo.promoDays}-Day Free Trial` : `${promo.normalDays}-Day Free Trial`
-  };
 }
 
 async function hasActivePaidLicense(user, now = new Date()) {
@@ -9662,12 +10773,6 @@ async function hasActivePaidLicense(user, now = new Date()) {
     select: { id: true }
   });
   return Boolean(license);
-}
-
-function addCalendarMonth(date) {
-  const next = new Date(date);
-  next.setMonth(next.getMonth() + 1);
-  return next;
 }
 
 async function createStripeCustomerIfPossible(email) {

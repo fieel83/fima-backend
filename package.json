@@ -10,7 +10,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "stripe:setup": "node scripts/setup-stripe-products.js",
-    "test": "node --test",
+    "test": "node --test \"test/*.test.js\"",
     "test:e2e:gifts": "node scripts/e2e-gift-license-flow.js"
   },
   "dependencies": {

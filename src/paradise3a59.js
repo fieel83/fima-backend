@@ -33,7 +33,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v8";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v9";
 // This revision is intentionally limited to the fixed lab guild. It is the
 // owner-authorized compact test layout, never a production-guild rebuild.
 const PARADISE_TEST_LAB_LAYOUT_REVISION = "3a71-compact-tsbtr-lab-v1";
@@ -43,6 +43,7 @@ const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/asse
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
 const APPLICATION_TYPES = Object.freeze([
+  ["helper", "Helper"],
   ["staff", "Staff"], ["moderator", "Moderator"], ["support", "Support"],
   ["training_hoster", "Training Hoster"], ["tryout_hoster", "Tryout Hoster"],
   ["referee", "Referee"], ["event_staff", "Event Staff"],
@@ -52,12 +53,28 @@ const APPLICATION_TYPES = Object.freeze([
   ["fflag_staff", "FFlag Staff"], ["war_hoster", "War Hoster"],
   ["reseller", "Reseller / Affiliate"]
 ]);
+export const FIEELS_COMMUNITY_STAFF_PROGRESSION = Object.freeze([
+  "Helper", "Junior Moderator", "Moderator", "Senior Moderator", "Administrator", "Owner"
+]);
+const COMMUNITY_PUBLIC_STAFF_APPLICATION_TYPES = new Set(["helper"]);
+const BUSINESS_APPLICATION_TYPES = new Set(["partnership", "reseller"]);
 const COMMUNITY_BLOCKED_APPLICATION_TYPES = new Set(["clan_mainer", "tryout_hoster", "referee", "war_hoster"]);
 const CLAN_ONLY_APPLICATION_TYPES = new Set(["clan_mainer", "war_hoster"]);
 const COMMUNITY_ONLY_APPLICATION_TYPES = new Set(["fima_support", "macro_staff", "fflag_staff", "reseller"]);
 const TSBTR_BLOCKED_APPLICATION_TYPES = new Set(["clan_mainer", "fima_support", "macro_staff", "fflag_staff", "war_hoster", "reseller"]);
 const DISCORD_APPLICATION_MODAL_LIMIT = 5;
 const APPLICATION_DRAFT_TTL_MS = 30 * 60_000;
+const APPLICATION_EVIDENCE_MAX_PER_QUESTION = 2;
+const APPLICATION_EVIDENCE_MAX_FILES = 4;
+const APPLICATION_EVIDENCE_MAX_FILE_BYTES = 160 * 1024;
+const APPLICATION_EVIDENCE_MAX_TOTAL_BYTES = 480 * 1024;
+const APPLICATION_EVIDENCE_STORAGE_ROOT = path.resolve(process.cwd(), "artifacts", "paradise-application-evidence");
+const APPLICATION_EVIDENCE_TYPE_RULES = Object.freeze({
+  "image/png": Object.freeze({ extensions: [".png"], extension: ".png" }),
+  "image/jpeg": Object.freeze({ extensions: [".jpg", ".jpeg"], extension: ".jpg" }),
+  "image/webp": Object.freeze({ extensions: [".webp"], extension: ".webp" })
+});
+let paradiseApplicationEvidenceScanner = null;
 const APPLICATION_QUESTION_BANK = Object.freeze({
   staff: [
     ["activity", "Haftalık aktiflik", "Haftada kaç gün ve hangi saatlerde aktif olabilirsin?", TextInputStyle.Short, 3, 180],
@@ -138,6 +155,16 @@ const APPLICATION_QUESTION_BANK = Object.freeze({
   ]
 });
 const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
+  helper: [
+    ["motivation", "Motivasyon", "Fieel's Community Helper ekibine neden katılmak istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["availability", "Aktiflik planı", "Saat dilimin nedir; haftada hangi gün ve saatlerde aktif olabilirsin?", TextInputStyle.Short, 3, 180],
+    ["first_response", "İlk müdahale", "Bir üye yardım istediğinde sorunu nasıl anlayıp ilk yanıtını nasıl verirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["conflict", "Tartışma yönetimi", "İki üye tartışırken ortamı sakinleştirmek için hangi adımları izlersin?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik ve güvenlik", "Bir üyeden hangi özel bilgileri asla istemezsin?", TextInputStyle.Paragraph, 20, 700],
+    ["escalation", "Yetki sınırı", "Çözemediğin veya yetkini aşan bir olayı kime, hangi kanıtlarla aktarırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["teamwork", "Ekip çalışması", "Diğer ekip üyeleriyle fikir ayrılığı yaşarsan nasıl çözersin?", TextInputStyle.Paragraph, 20, 700],
+    ["experience", "Deneyim", "Varsa topluluk desteği veya moderasyon deneyimini anlat.", TextInputStyle.Paragraph, 5, 700]
+  ],
   staff: [
     ["activity", "Haftalık aktiflik", "Haftada kaç gün ve hangi saatlerde aktif olabilirsin?", TextInputStyle.Short, 3, 180],
     ["judgement", "Yetki kullanımı", "Spam, toxiclik veya haksızlık durumunda ilk nasıl hareket edersin?", TextInputStyle.Paragraph, 20, 700],
@@ -388,6 +415,7 @@ const staffTeamRefreshTimers = new Map();
 const levelMessageCooldowns = new Map();
 const paradiseGuildContext = new AsyncLocalStorage();
 const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
+const STATE_FALLBACK_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-paradise-state-fallback.json");
 const STATE_KEY = "paradise_3a59_state_v1";
 const EMPTY_STATE = Object.freeze({
   profiles: {}, verificationChallenges: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
@@ -465,6 +493,10 @@ async function loadState() {
       lastKnownStateSnapshot = normalizeState(row.value);
       return lastKnownStateSnapshot;
     }
+  } catch {}
+  try {
+    lastKnownStateSnapshot = normalizeState(JSON.parse(await fs.readFile(STATE_FALLBACK_STORE, "utf8")));
+    return lastKnownStateSnapshot;
   } catch {}
   try {
     lastKnownStateSnapshot = normalizeState(JSON.parse(await fs.readFile(PROFILE_STORE, "utf8")));
@@ -886,7 +918,7 @@ const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
   community: {
     start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
     member_help_channel: "┆・genel", level_channel: "┆・seviyeler", faq_channel: "⌁・başlangıç", role_guide_channel: "⌁・roller",
-    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
+    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", blacklist_appeal_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
     application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler",
     support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
     support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları"
@@ -897,7 +929,7 @@ const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
     challenge_channel: "⟡・meydan-okuma", challenge_rules_channel: "⟡・meydan-okuma", challenge_results_channel: "◆・sonuçlar", availability_channel: "⟡・müsaitlik-ve-loa", loa_channel: "⟡・müsaitlik-ve-loa",
     training_channel: "◆・aktif-oturumlar", tryout_channel: "◆・aktif-oturumlar", training_results_channel: "◆・sonuçlar", tryout_results_channel: "◆・sonuçlar",
     main_lineup_channel: "◆・lineuplar", war_lineup_channel: "◆・lineuplar", roster_channel: "◆・lineuplar", mainer_proof_channel: "◆・mainer-kanit",
-    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
+    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", blacklist_appeal_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
     application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler", bail_appeal_channel: "〢・incelemeler",
     support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
     support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", activity_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları", roster_logs_channel: "〢・personel-logları", war_logs_channel: "〢・personel-logları"
@@ -907,7 +939,7 @@ const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
     member_help_channel: "┆・genel", level_channel: "┆・seviyeler", faq_channel: "⌁・başlangıç", role_guide_channel: "⌁・roller",
     challenge_channel: "⟡・meydan-okuma", challenge_rules_channel: "⟡・meydan-okuma", challenge_results_channel: "◆・sonuçlar", availability_channel: "⟡・müsaitlik-ve-loa", loa_channel: "⟡・müsaitlik-ve-loa",
     training_channel: "◆・aktif-oturumlar", tryout_channel: "◆・aktif-oturumlar", training_results_channel: "◆・sonuçlar", tryout_results_channel: "◆・sonuçlar",
-    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
+    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", blacklist_appeal_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
     application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler", bail_appeal_channel: "〢・incelemeler",
     support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
     support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", activity_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları"
@@ -1231,7 +1263,15 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("prize").setDescription("Prize").setRequired(true))
         .addIntegerOption(o => o.setName("minutes").setDescription("Duration in minutes").setRequired(true).setMinValue(1).setMaxValue(43200))
         .addIntegerOption(o => o.setName("winners").setDescription("Winner count").setMinValue(1).setMaxValue(20))
-        .addStringOption(o => o.setName("requirements").setDescription("Entry requirements"))),
+        .addStringOption(o => o.setName("requirements").setDescription("Entry requirements")))
+      .addSubcommand(s => s.setName("end").setDescription("End an open giveaway and choose eligible winners")
+        .addStringOption(o => o.setName("id").setDescription("Giveaway ID").setRequired(true)))
+      .addSubcommand(s => s.setName("reroll").setDescription("Reroll completed giveaway winners")
+        .addStringOption(o => o.setName("id").setDescription("Giveaway ID").setRequired(true)))
+      .addSubcommand(s => s.setName("cancel").setDescription("Cancel an open giveaway with an audit reason")
+        .addStringOption(o => o.setName("id").setDescription("Giveaway ID").setRequired(true))
+        .addStringOption(o => o.setName("reason").setDescription("Cancellation reason").setRequired(true).setMaxLength(500)))
+      .addSubcommand(s => s.setName("list").setDescription("List safe recent giveaway lifecycle metadata")),
     new SlashCommandBuilder().setName("gamenight").setNameLocalizations({ tr: "oyun-gecesi" }).setDescription("Paradise game night operations").setDescriptionLocalizations({ tr: "Paradise oyun gecesi işlemleri" })
       .addSubcommand(s => s.setName("start").setDescription("Start a game night")
         .addStringOption(o => o.setName("game").setDescription("Game name").setRequired(true))
@@ -1612,9 +1652,10 @@ export async function initializeParadise(client) {
     state.config.footerBrand = String(state.config.footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim() || DEFAULT_PARADISE_FOOTER_BRAND;
     return state;
   });
-  if (client.user?.username !== "Paradise") {
-    await client.user.setUsername("Paradise").catch(error => {
-      console.warn("Paradise bot username update failed", { message: error.message });
+  const globalUsernameSyncEnabled = String(process.env.FIMA_GLOBAL_USERNAME_SYNC_ENABLED || "").trim().toLowerCase() === "true";
+  if (globalUsernameSyncEnabled && client.user?.username !== "FIMA") {
+    await client.user.setUsername("FIMA").catch(error => {
+      console.warn("FIMA bot username update failed", { message: error.message });
     });
   }
   for (const guild of client.guilds.cache.values()) {
@@ -1623,8 +1664,10 @@ export async function initializeParadise(client) {
       state.guildConfigs[guild.id].footerBrand = String(state.guildConfigs[guild.id].footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim() || DEFAULT_PARADISE_FOOTER_BRAND;
       return state;
     });
+    if (guild.id !== PARADISE_TEST_GUILD_ID) continue;
+    assertParadiseTestGuildMutation({ guildId: guild.id, operation: "initialize_identity_and_maintenance" });
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
-    if (me && me.nickname !== "Paradise") await me.setNickname("Paradise", "Paradise managed server identity").catch(() => {});
+    if (me && me.nickname !== "FIMA") await me.setNickname("FIMA", "FIMA test-guild managed identity").catch(() => {});
     await paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild)).catch(() => {});
     const timer = setInterval(() => paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild)).catch(() => {}), 15 * 60_000);
     timer.unref?.();
@@ -2480,10 +2523,12 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   const moderationChannel = await configuredChannel(guild, "moderation_requests_channel", "moderation-requests");
   const securityChannel = await configuredChannel(guild, "quarantine_review_channel", "quarantine-review")
     || guild.channels.cache.find(item => item.name === "security-alerts" && item.isTextBased?.());
-  const applicationPanel = applicationChannel
-    ? await upsertSmokePanel("application", applicationChannel, paradiseApplicationPanelPayload(await paradiseBrandColor()))
-    : null;
   const supportConfig = configForGuild(await loadState(), guild.id);
+  const applicationPanel = applicationChannel
+    ? await upsertSmokePanel("application", applicationChannel, paradiseApplicationPanelPayload(
+      await paradiseBrandColor(), guildLanguage(supportConfig), supportConfig.applicationSettings
+    ))
+    : null;
   const supportPanel = supportChannel
     ? await upsertSmokePanel("support", supportChannel, paradiseSupportPanelPayload(
       await paradiseBrandColor(), guildLanguage(supportConfig), supportConfig.activeSetupMode || "community"
@@ -2588,6 +2633,143 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   }
 }
 
+function cachedValues(cache) {
+  return cache?.values ? [...cache.values()] : [];
+}
+
+function permissionOverwriteFor(channel, targetId) {
+  return channel?.permissionOverwrites?.cache?.get?.(targetId) || null;
+}
+
+function overwriteViewDecision(overwrite) {
+  if (!overwrite) return null;
+  if (overwrite.allow?.has?.(PermissionsBitField.Flags.ViewChannel)) return "allow";
+  if (overwrite.deny?.has?.(PermissionsBitField.Flags.ViewChannel)) return "deny";
+  return null;
+}
+
+function channelDeniesEveryoneView(guild, channel) {
+  const everyoneId = guild?.roles?.everyone?.id;
+  if (!everyoneId || !channel) return false;
+  const direct = overwriteViewDecision(permissionOverwriteFor(channel, everyoneId));
+  if (direct) return direct === "deny";
+  const parent = channel.parent
+    || guild.channels?.cache?.get?.(channel.parentId)
+    || null;
+  return overwriteViewDecision(permissionOverwriteFor(parent, everyoneId)) === "deny";
+}
+
+async function liveMappedChannel(guild, guildConfig, mappingKey, legacyNames = []) {
+  const configuredId = guildConfig?.channelMappings?.[mappingKey];
+  if (configuredId) {
+    let configured = guild.channels?.cache?.get?.(configuredId) || null;
+    if (!configured && typeof guild.channels?.fetch === "function") {
+      configured = await guild.channels.fetch(configuredId).catch(() => null);
+    }
+    return configured?.isTextBased?.() ? configured : null;
+  }
+  return cachedValues(guild.channels?.cache).find(channel =>
+    legacyNames.includes(channel.name) && channel.isTextBased?.()
+  ) || null;
+}
+
+function messageEmbedTitle(message) {
+  const first = message?.embeds?.[0] || message?.embeds?.first?.() || null;
+  return String(first?.title || "").trim();
+}
+
+export async function inspectParadiseLiveSecurityReadiness(guild, guildConfig = {}) {
+  const unavailable = {
+    liveReadinessAvailable: false,
+    blacklistedRoleReady: false,
+    blacklistPermissionReady: false,
+    blacklistLayout: null,
+    securityPanelReady: false
+  };
+  if (!guild?.id || !guild.channels?.cache || !guild.roles?.cache || !guild.roles?.everyone) return unavailable;
+
+  const roles = cachedValues(guild.roles.cache);
+  const blacklistedRole = roles.find(role => role.name === "BLACKLISTED") || null;
+  const appealChannel = await liveMappedChannel(guild, guildConfig, "blacklist_appeal_channel", [
+    "blacklist-appeal", "ban-appeal"
+  ]);
+  const isLegacyAppeal = Boolean(appealChannel && ["blacklist-appeal", "ban-appeal"].includes(appealChannel.name));
+  const legacyReviewChannels = cachedValues(guild.channels.cache).filter(channel =>
+    ["unblacklist", "bail-review", "blacklist-logs"].includes(channel.name) && channel.isTextBased?.()
+  );
+  const legacyEveryoneDenied = appealChannel
+    ? overwriteViewDecision(permissionOverwriteFor(appealChannel, guild.roles.everyone.id)) === "deny"
+    : false;
+  const legacyBlacklistedAllowed = appealChannel && blacklistedRole
+    ? overwriteViewDecision(permissionOverwriteFor(appealChannel, blacklistedRole.id)) === "allow"
+    : false;
+  const legacyReady = Boolean(
+    blacklistedRole
+    && isLegacyAppeal
+    && legacyEveryoneDenied
+    && legacyBlacklistedAllowed
+    && legacyReviewChannels.length >= 2
+    && legacyReviewChannels.every(channel => channelDeniesEveryoneView(guild, channel))
+  );
+
+  const compactReviewChannels = (await Promise.all([
+    liveMappedChannel(guild, guildConfig, "quarantine_review_channel"),
+    liveMappedChannel(guild, guildConfig, "blacklist_logs_channel")
+  ])).filter(Boolean);
+  const uniqueCompactReviewChannels = [...new Map(compactReviewChannels.map(channel => [channel.id, channel])).values()];
+  const botPermissions = appealChannel?.permissionsFor?.(guild.members?.me) || null;
+  const botCanCreatePrivateThreads = Boolean(
+    botPermissions
+    && botPermissions.has?.(PermissionsBitField.Flags.CreatePrivateThreads)
+    && botPermissions.has?.(PermissionsBitField.Flags.SendMessagesInThreads)
+  );
+  const compactReady = Boolean(
+    blacklistedRole
+    && appealChannel
+    && !isLegacyAppeal
+    && appealChannel.type === ChannelType.GuildText
+    && typeof appealChannel.threads?.create === "function"
+    && botCanCreatePrivateThreads
+    && !channelDeniesEveryoneView(guild, appealChannel)
+    && uniqueCompactReviewChannels.length >= 2
+    && uniqueCompactReviewChannels.every(channel =>
+      channel.id !== appealChannel.id && channelDeniesEveryoneView(guild, channel)
+    )
+  );
+
+  const securityChannel = await liveMappedChannel(guild, guildConfig, "quarantine_review_channel");
+  const securityMessageId = guildConfig?.smokePanelMessageIds?.security || null;
+  let securityMessage = null;
+  if (securityChannel?.isTextBased?.() && securityMessageId && channelDeniesEveryoneView(guild, securityChannel)) {
+    if (typeof securityChannel.messages?.fetch === "function") {
+      securityMessage = await securityChannel.messages.fetch(securityMessageId).catch(() => null);
+    }
+  }
+  const securityPanelReady = Boolean(
+    securityMessage?.id === securityMessageId
+    && (!securityMessage.channelId || securityMessage.channelId === securityChannel.id)
+    && messageEmbedTitle(securityMessage) === "PARADISE SECURITY · LIVE STATUS"
+  );
+
+  return {
+    liveReadinessAvailable: true,
+    blacklistedRoleReady: Boolean(blacklistedRole),
+    blacklistPermissionReady: legacyReady || compactReady,
+    blacklistLayout: legacyReady ? "legacy_dedicated" : compactReady ? "compact_private_thread" : null,
+    securityPanelReady
+  };
+}
+
+export function paradiseAutoSmokeRepairAction({
+  existingTestLab = false,
+  needsCompactLab = false,
+  blacklistPermissionReady = false
+} = {}) {
+  if (needsCompactLab) return "compact_rebuild";
+  if (!existingTestLab || !blacklistPermissionReady) return "repair_permissions";
+  return "skip_existing_lab";
+}
+
 export async function runParadiseAutoSmokeOnce(guild) {
   try {
     assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "auto_smoke" });
@@ -2597,43 +2779,44 @@ export async function runParadiseAutoSmokeOnce(guild) {
   }
   try {
     const state = await loadState();
-    if (state.securityState?.[guild.id]?.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION) {
+    const guildSecurityState = state.securityState?.[guild.id] || {};
+    const needsCompactLab = guildSecurityState.testLabLayoutRevision !== PARADISE_TEST_LAB_LAYOUT_REVISION;
+    const existingTestLab = Boolean(guildSecurityState.lastAutoSmokeResult) && !needsCompactLab;
+    const preSmokeReadiness = existingTestLab
+      ? await inspectParadiseLiveSecurityReadiness(guild, configForGuild(state, guild.id))
+      : null;
+    const completedRevisionIsHealthy = Boolean(
+      existingTestLab
+      && preSmokeReadiness?.blacklistPermissionReady
+      && preSmokeReadiness?.securityPanelReady
+    );
+    if (
+      guildSecurityState.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION
+      && completedRevisionIsHealthy
+    ) {
       return { skipped: true, reason: "already_completed", revision: PARADISE_AUTO_SMOKE_REVISION };
     }
-    const needsCompactLab = state.securityState?.[guild.id]?.testLabLayoutRevision !== PARADISE_TEST_LAB_LAYOUT_REVISION;
+    const repairAction = paradiseAutoSmokeRepairAction({
+      existingTestLab,
+      needsCompactLab,
+      blacklistPermissionReady: preSmokeReadiness?.blacklistPermissionReady === true
+    });
     // The test guild was expressly designated as a disposable template lab.
     // This call is still guarded inside rebuildParadiseTestTemplate by its
     // fixed guild ID and creates a timestamped backup before any deletion.
-    const compactRebuild = needsCompactLab
+    const compactRebuild = repairAction === "compact_rebuild"
       ? await rebuildParadiseTestTemplate(guild, "tsbtr", "REBUILD TEST TSBTR")
       : null;
     // A full missing-only repair is needed for an empty lab, but repeating the
-    // whole template on every source revision delays panel smoke tests for minutes.
-    const existingTestLab = Boolean(state.securityState?.[guild.id]?.lastAutoSmokeResult) && !needsCompactLab;
-    const repair = compactRebuild || (existingTestLab
-      ? { skipped: true, reason: "existing_test_lab" }
-      : await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true }));
+    // whole template on every healthy source revision delays panel smoke tests for minutes.
+    // An existing lab with broken blacklist permissions must still be repaired.
+    const repair = compactRebuild || (repairAction === "repair_permissions"
+      ? await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true })
+      : { skipped: true, reason: "existing_test_lab" });
     const result = await runParadiseTestSmokeSuite(guild, { fast: existingTestLab });
-    const blacklistedRole = guild.roles.cache.find(role => role.name === "BLACKLISTED");
-    const appealChannel = guild.channels.cache.find(channel =>
-      ["ban-appeal", "blacklist-appeal"].includes(channel.name) && channel.isTextBased?.()
-    );
-    const staffReviewChannels = [...guild.channels.cache.values()].filter(channel =>
-      ["unblacklist", "bail-review", "blacklist-logs"].includes(channel.name) && channel.isTextBased?.()
-    );
-    const everyoneAppealOverwrite = appealChannel?.permissionOverwrites?.cache?.get(guild.roles.everyone.id);
-    const blacklistedAppealOverwrite = blacklistedRole
-      ? appealChannel?.permissionOverwrites?.cache?.get(blacklistedRole.id)
-      : null;
-    const blacklistPermissionReady = Boolean(
-      blacklistedRole
-      && appealChannel
-      && everyoneAppealOverwrite?.deny?.has(PermissionsBitField.Flags.ViewChannel)
-      && blacklistedAppealOverwrite?.allow?.has(PermissionsBitField.Flags.ViewChannel)
-      && staffReviewChannels.length >= 2
-      && staffReviewChannels.every(channel =>
-        channel.permissionOverwrites.cache.get(guild.roles.everyone.id)?.deny?.has(PermissionsBitField.Flags.ViewChannel)
-      )
+    const liveReadiness = await inspectParadiseLiveSecurityReadiness(
+      guild,
+      configForGuild(await loadState(), guild.id)
     );
     await saveState(next => {
       next.securityState[guild.id] = {
@@ -2658,12 +2841,13 @@ export async function runParadiseAutoSmokeOnce(guild) {
           applicationPanelReady: Boolean(result.workflowPanels?.application),
           supportPanelReady: Boolean(result.workflowPanels?.support),
           moderationPanelReady: Boolean(result.workflowPanels?.moderation),
-          securityPanelReady: Boolean(result.workflowPanels?.security),
+          securityPanelReady: liveReadiness.securityPanelReady,
           xpPanelReady: Boolean(result.workflowPanels?.xp),
-          repairCreatedChannels: Number(repair?.created?.channels || 0),
-          repairCreatedRoles: Number(repair?.created?.roles || 0),
-          blacklistedRoleReady: Boolean(blacklistedRole),
-          blacklistPermissionReady
+          repairCreatedChannels: Number(repair?.createdChannels ?? repair?.created?.channels ?? 0),
+          repairCreatedRoles: Number(repair?.createdRoles ?? repair?.created?.roles ?? 0),
+          blacklistedRoleReady: liveReadiness.blacklistedRoleReady,
+          blacklistPermissionReady: liveReadiness.blacklistPermissionReady,
+          blacklistLayout: liveReadiness.blacklistLayout
         }
       };
       return next;
@@ -2672,8 +2856,9 @@ export async function runParadiseAutoSmokeOnce(guild) {
       skipped: false,
       revision: PARADISE_AUTO_SMOKE_REVISION,
       repair,
-      blacklistedRoleReady: Boolean(blacklistedRole),
-      blacklistPermissionReady,
+      blacklistedRoleReady: liveReadiness.blacklistedRoleReady,
+      blacklistPermissionReady: liveReadiness.blacklistPermissionReady,
+      blacklistLayout: liveReadiness.blacklistLayout,
       result
     };
   } catch (error) {
@@ -2694,10 +2879,19 @@ export async function runParadiseAutoSmokeOnce(guild) {
   }
 }
 
-export async function paradiseTestLabStatus() {
+export async function paradiseTestLabStatus(guild = null) {
   const state = await loadState();
   const record = state.securityState?.[PARADISE_TEST_GUILD_ID] || {};
   const result = record.lastAutoSmokeResult || {};
+  const liveReadiness = guild?.id === PARADISE_TEST_GUILD_ID
+    ? await inspectParadiseLiveSecurityReadiness(guild, configForGuild(state, guild.id))
+    : {
+        liveReadinessAvailable: false,
+        blacklistedRoleReady: false,
+        blacklistPermissionReady: false,
+        blacklistLayout: null,
+        securityPanelReady: false
+      };
   return {
     completed: record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION,
     revision: record.lastAutoSmokeRevision || null,
@@ -2718,10 +2912,12 @@ export async function paradiseTestLabStatus() {
     applicationPanelReady: result.applicationPanelReady === true,
     supportPanelReady: result.supportPanelReady === true,
     moderationPanelReady: result.moderationPanelReady === true,
-    securityPanelReady: result.securityPanelReady === true,
+    liveReadinessAvailable: liveReadiness.liveReadinessAvailable,
+    securityPanelReady: liveReadiness.securityPanelReady,
     xpPanelReady: result.xpPanelReady === true,
-    blacklistedRoleReady: result.blacklistedRoleReady === true,
-    blacklistPermissionReady: result.blacklistPermissionReady === true,
+    blacklistedRoleReady: liveReadiness.blacklistedRoleReady,
+    blacklistPermissionReady: liveReadiness.blacklistPermissionReady,
+    blacklistLayout: liveReadiness.blacklistLayout,
     repairCreatedChannels: Number(result.repairCreatedChannels || 0),
     repairCreatedRoles: Number(result.repairCreatedRoles || 0)
   };
@@ -4090,6 +4286,20 @@ async function handleTournament(interaction) {
   return interaction.reply({ content: tournament.status === "completed" ? `Tournament complete: ${winner} won.` : `${winner} advanced. Bracket state updated.` });
 }
 
+export function selectParadiseGiveawayWinners(entries = [], count = 1, randomIndex = size => crypto.randomInt(size)) {
+  const pool = [...new Set((entries || []).map(String).filter(Boolean))];
+  const winners = [];
+  while (pool.length && winners.length < Math.max(1, Number(count) || 1)) {
+    const index = Math.max(0, Math.min(pool.length - 1, Number(randomIndex(pool.length)) || 0));
+    winners.push(pool.splice(index, 1)[0]);
+  }
+  return winners;
+}
+
+function findParadiseGiveaway(state, guildId, prefix) {
+  return Object.values(state.giveaways || {}).find(record => record.guildId === guildId && record.id?.startsWith(String(prefix || ""))) || null;
+}
+
 async function handleGiveaway(interaction) {
   if (!hasEventAuthority(interaction, ["Giveaway Manager"])) return interaction.reply({ content: "Giveaway Manager or owner role required.", ephemeral: true });
   const endsAt = Date.now() + interaction.options.getInteger("minutes") * 60_000;
@@ -4386,16 +4596,34 @@ async function handleQotdPayoutReview(interaction) {
   });
 }
 
-function paradiseApplicationPanelPayload(color, language = "tr") {
+function safeApplicationPanelText(value, fallback, max, { multiline = false } = {}) {
+  const source = String(value || fallback || "")
+    .replace(/@(everyone|here)/gi, "@\u200b$1")
+    .trim();
+  const normalized = multiline ? source.replace(/\r\n?/g, "\n") : source.replace(/\s+/g, " ");
+  return normalized.slice(0, max) || String(fallback || "").slice(0, max);
+}
+
+function paradiseApplicationPanelPayload(color, language = "tr", applicationSettings = {}) {
   const tr = language !== "en";
+  const defaultTitle = tr ? "FIEEL'S COMMUNITY BAŞVURULARI" : "FIEEL'S COMMUNITY APPLICATIONS";
+  const defaultDescription = tr
+    ? "# Başvuru merkezi\nFieel's Community personel başlangıcı yalnızca **Helper** başvurusudur. Junior Moderator ve üzeri roller başvuruyla verilmez; ekip içi performans ve yetkili kararıyla ilerlenir.\n\n- Fima hesabı, bağlı Discord ve sunucu üyeliği zorunludur\n- Aynı anda yalnızca bir aktif başvuru açılabilir\n- Kanıtlar güvenlik taramasından geçmeden güvenli sayılmaz"
+    : "# Application center\nThe only public staff entry point for Fieel's Community is **Helper**. Junior Moderator and higher roles are not granted through applications; progression requires internal performance and an authorized decision.\n\n- Fima account, linked Discord and guild membership are required\n- Only one active application may exist at a time\n- Evidence is never treated as safe before security scanning";
+  const defaultButtonLabel = tr ? "Helper başvurusu" : "Apply as Helper";
   return {
-    embeds: [new EmbedBuilder().setColor(color).setTitle(tr ? "PARADISE BAŞVURULAR" : "PARADISE APPLICATIONS")
-      .setDescription(tr
-        ? "# Ekibe katıl\nPozisyonunu seç, formu dürüstçe doldur ve Paradise'ın gösterdiği özel başvuru durumunu takip et.\n\n- Aynı anda yalnızca bir aktif başvuru\n- Blacklistteki kullanıcılar başvuramaz\n- İnceleyenler kendi hiyerarşilerinin üstündeki rolleri veremez\n-# Açıklamalar seçili sunucu dilini kullanır."
-        : "# Join the team\nChoose a position, answer the form honestly, then follow the private status shown by Paradise.\n\n- One active application at a time\n- Blacklisted users cannot apply\n- Reviewers cannot grant roles above their own hierarchy\n-# Explanations follow the selected server language.")
+    embeds: [new EmbedBuilder().setColor(color)
+      .setTitle(safeApplicationPanelText(applicationSettings?.panelTitle, defaultTitle, 80))
+      .setDescription(safeApplicationPanelText(
+        applicationSettings?.panelDescription, defaultDescription, 1200, { multiline: true }
+      ))
       .setFooter(paradiseFooter(tr ? "Özel inceleme kuyruğu" : "Private review queue"))],
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("paradise_application_open").setLabel("Apply / Basvur").setEmoji("📝").setStyle(ButtonStyle.Primary)
+      new ButtonBuilder()
+        .setLabel(safeApplicationPanelText(applicationSettings?.panelButtonLabel, defaultButtonLabel, 40))
+        .setEmoji("📝")
+        .setStyle(ButtonStyle.Link)
+        .setURL(`${PARADISE_PUBLIC_ASSET_BASE}/paradise-apply?workflow=staff&type=helper`)
     )]
   };
 }
@@ -5119,11 +5347,27 @@ function applicationLabel(type) {
   return APPLICATION_TYPES.find(([value]) => value === type)?.[1] || type;
 }
 
-function applicationTypeAllowedForMode(type, mode) {
-  if (mode === "community") return !COMMUNITY_BLOCKED_APPLICATION_TYPES.has(type);
+export function normalizeParadiseApplicationWorkflow(value) {
+  return value === "business" ? "business" : "staff";
+}
+
+function applicationTypeAllowedForMode(type, mode, workflow = "staff") {
+  const normalizedWorkflow = normalizeParadiseApplicationWorkflow(workflow);
+  if (normalizedWorkflow === "business") return BUSINESS_APPLICATION_TYPES.has(type);
+  if (BUSINESS_APPLICATION_TYPES.has(type)) return false;
+  if (mode === "community") return COMMUNITY_PUBLIC_STAFF_APPLICATION_TYPES.has(type);
+  if (type === "helper") return false;
   if (mode === "tsbtr") return !TSBTR_BLOCKED_APPLICATION_TYPES.has(type);
   if (mode === "clan") return !COMMUNITY_ONLY_APPLICATION_TYPES.has(type);
   return true;
+}
+
+export function paradiseWebsiteApplicationTypesForMode(mode, workflow = "staff") {
+  const normalizedWorkflow = normalizeParadiseApplicationWorkflow(workflow);
+  if (normalizedWorkflow !== "staff") return [];
+  return APPLICATION_TYPES
+    .filter(([type]) => COMMUNITY_PUBLIC_STAFF_APPLICATION_TYPES.has(type))
+    .map(([type, label]) => ({ type, label }));
 }
 
 function applicationQuestions(type) {
@@ -5253,12 +5497,286 @@ function applicationCooldownUntil(records, applicationSettings) {
     + Number(applicationSettings.cooldownDays ?? 7) * 86_400_000;
 }
 
-export async function paradiseWebsiteApplicationContext(guild, userId) {
+function applicationEvidenceError(code, details = {}) {
+  return Object.assign(new Error(code), { code, statusCode: 400, ...details });
+}
+
+function detectedApplicationEvidenceMime(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return "image/png";
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF"
+    && buffer.subarray(8, 12).toString("ascii") === "WEBP") {
+    return "image/webp";
+  }
+  return null;
+}
+
+function normalizedApplicationEvidenceName(value) {
+  const basename = path.basename(String(value || "evidence").normalize("NFKC").replaceAll("\\", "/"));
+  const normalized = basename
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (normalized || "evidence").slice(0, 80);
+}
+
+export function validateParadiseApplicationEvidenceFile(entry, validQuestionKeys = []) {
+  if (!entry || typeof entry !== "object") throw applicationEvidenceError("invalid_evidence_file");
+  const questionKey = String(entry.questionKey || "").trim();
+  if (!new Set(validQuestionKeys).has(questionKey)) {
+    throw applicationEvidenceError("invalid_evidence_question", { question: questionKey });
+  }
+  const originalName = normalizedApplicationEvidenceName(entry.name);
+  const suppliedMime = String(entry.mimeType || "").trim().toLowerCase();
+  if (!APPLICATION_EVIDENCE_TYPE_RULES[suppliedMime]) {
+    throw applicationEvidenceError("unsupported_evidence_type", { question: questionKey });
+  }
+  let encoded = String(entry.data || "");
+  if (encoded.startsWith("data:")) {
+    const match = encoded.match(/^data:([^;,]+);base64,([A-Za-z0-9+/]+={0,2})$/i);
+    if (!match || match[1].toLowerCase() !== suppliedMime) {
+      throw applicationEvidenceError("invalid_evidence_encoding", { question: questionKey });
+    }
+    encoded = match[2];
+  }
+  if (!encoded || encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+    || encoded.length > Math.ceil(APPLICATION_EVIDENCE_MAX_FILE_BYTES / 3) * 4 + 4) {
+    throw applicationEvidenceError("invalid_evidence_encoding", { question: questionKey });
+  }
+  const buffer = Buffer.from(encoded, "base64");
+  if (!buffer.length || buffer.length > APPLICATION_EVIDENCE_MAX_FILE_BYTES
+    || buffer.toString("base64").replace(/=+$/, "") !== encoded.replace(/=+$/, "")) {
+    throw applicationEvidenceError("invalid_evidence_size", { question: questionKey });
+  }
+  const detectedMime = detectedApplicationEvidenceMime(buffer);
+  const extension = path.extname(originalName).toLowerCase();
+  const detectedRule = detectedMime ? APPLICATION_EVIDENCE_TYPE_RULES[detectedMime] : null;
+  if (!detectedRule || detectedMime !== suppliedMime || !detectedRule.extensions.includes(extension)) {
+    throw applicationEvidenceError("evidence_signature_mismatch", { question: questionKey });
+  }
+  return {
+    questionKey,
+    originalName,
+    mimeType: detectedMime,
+    extension: detectedRule.extension,
+    size: buffer.length,
+    buffer
+  };
+}
+
+export function setParadiseApplicationEvidenceScanner(scanner = null) {
+  if (scanner !== null && typeof scanner !== "function") {
+    throw new TypeError("Paradise application evidence scanner must be a function or null.");
+  }
+  paradiseApplicationEvidenceScanner = scanner;
+}
+
+export const PARADISE_APPLICATION_EVIDENCE_POLICY = Object.freeze({
+  allowedMimeTypes: Object.freeze(Object.keys(APPLICATION_EVIDENCE_TYPE_RULES)),
+  maxPerQuestion: APPLICATION_EVIDENCE_MAX_PER_QUESTION,
+  maxFiles: APPLICATION_EVIDENCE_MAX_FILES,
+  maxFileBytes: APPLICATION_EVIDENCE_MAX_FILE_BYTES,
+  maxTotalBytes: APPLICATION_EVIDENCE_MAX_TOTAL_BYTES,
+  scannerUnavailableAction: "quarantine"
+});
+
+export function paradiseApplicationEvidenceRequirement(applicationSettings = {}, type, questionKey) {
+  const configured = applicationSettings?.evidenceRequirements?.[type]?.[questionKey];
+  return configured === "required" ? "required" : "optional";
+}
+
+export function validateParadiseApplicationEvidenceSubmission({
+  guildId, applicationId, questions, evidence, requiredQuestionKeys = []
+}) {
+  const evidenceEntries = evidence === undefined || evidence === null ? [] : evidence;
+  if (!Array.isArray(evidenceEntries) || evidenceEntries.length > APPLICATION_EVIDENCE_MAX_FILES) {
+    throw applicationEvidenceError("invalid_evidence_count");
+  }
+  const questionMap = new Map(questions.map(question => [question.key, question.label]));
+  const validated = evidenceEntries.map(entry => validateParadiseApplicationEvidenceFile(entry, [...questionMap.keys()]));
+  const counts = new Map();
+  let totalBytes = 0;
+  for (const file of validated) {
+    counts.set(file.questionKey, (counts.get(file.questionKey) || 0) + 1);
+    if (counts.get(file.questionKey) > APPLICATION_EVIDENCE_MAX_PER_QUESTION) {
+      throw applicationEvidenceError("too_many_evidence_files_for_question", { question: file.questionKey });
+    }
+    totalBytes += file.size;
+  }
+  if (totalBytes > APPLICATION_EVIDENCE_MAX_TOTAL_BYTES) {
+    throw applicationEvidenceError("evidence_total_size_exceeded");
+  }
+  for (const questionKey of new Set(requiredQuestionKeys)) {
+    if (!questionMap.has(questionKey)) {
+      throw applicationEvidenceError("invalid_evidence_question", { question: questionKey });
+    }
+    if (!counts.get(questionKey)) {
+      throw applicationEvidenceError("required_evidence_missing", { question: questionKey });
+    }
+  }
+
+  return { validated, questionMap };
+}
+
+async function processParadiseApplicationEvidence({
+  guildId, applicationId, questions, evidence, requiredQuestionKeys = []
+}) {
+  const { validated, questionMap } = validateParadiseApplicationEvidenceSubmission({
+    guildId, applicationId, questions, evidence, requiredQuestionKeys
+  });
+
+  const guildDirectory = String(guildId || "").replace(/\D/g, "").slice(0, 32) || "unknown";
+  const applicationDirectory = String(applicationId || "").replace(/[^a-z0-9-]/gi, "").slice(0, 64) || crypto.randomUUID();
+  const stored = [];
+  try {
+    for (const file of validated) {
+      let status = "quarantined";
+      let reason = "scanner_unavailable";
+      if (paradiseApplicationEvidenceScanner) {
+        try {
+          const scan = await paradiseApplicationEvidenceScanner({
+            buffer: Buffer.from(file.buffer),
+            name: file.originalName,
+            mimeType: file.mimeType,
+            size: file.size,
+            questionKey: file.questionKey
+          });
+          if (scan?.clean === true) {
+            status = "accepted";
+            reason = null;
+          } else {
+            reason = "scanner_rejected";
+          }
+        } catch {
+          reason = "scanner_error";
+        }
+      }
+      const bucket = status === "accepted" ? "accepted" : "quarantine";
+      const storageFileName = `${crypto.randomUUID()}${file.extension}`;
+      const storageName = path.posix.join(bucket, guildDirectory, applicationDirectory, storageFileName);
+      const destination = path.resolve(APPLICATION_EVIDENCE_STORAGE_ROOT, ...storageName.split("/"));
+      if (!destination.startsWith(`${APPLICATION_EVIDENCE_STORAGE_ROOT}${path.sep}`)) {
+        throw applicationEvidenceError("invalid_evidence_storage_path");
+      }
+      await fs.mkdir(path.dirname(destination), { recursive: true });
+      await fs.writeFile(destination, file.buffer, { flag: "wx", mode: 0o600 });
+      stored.push({
+        id: crypto.randomUUID(),
+        questionKey: file.questionKey,
+        questionLabel: questionMap.get(file.questionKey),
+        originalName: file.originalName,
+        mimeType: file.mimeType,
+        size: file.size,
+        status,
+        quarantineReason: reason,
+        storageName
+      });
+    }
+    return stored;
+  } catch (error) {
+    await removeParadiseApplicationEvidence(stored);
+    throw error;
+  }
+}
+
+async function removeParadiseApplicationEvidence(evidence = []) {
+  await Promise.allSettled(evidence.map(async file => {
+    const storageName = String(file?.storageName || "");
+    if (!storageName) return;
+    const destination = path.resolve(APPLICATION_EVIDENCE_STORAGE_ROOT, ...storageName.split("/"));
+    if (!destination.startsWith(`${APPLICATION_EVIDENCE_STORAGE_ROOT}${path.sep}`)) return;
+    await fs.rm(destination, { force: true });
+  }));
+}
+
+function applicationEvidenceDiscordFiles(evidence = []) {
+  return evidence
+    .filter(file => file.status === "accepted" && String(file.storageName || "").startsWith("accepted/"))
+    .map(file => {
+      const attachment = path.resolve(APPLICATION_EVIDENCE_STORAGE_ROOT, ...String(file.storageName).split("/"));
+      if (!attachment.startsWith(`${APPLICATION_EVIDENCE_STORAGE_ROOT}${path.sep}`)) return null;
+      return { attachment, name: file.originalName, description: `Evidence for ${file.questionLabel || file.questionKey}` };
+    })
+    .filter(Boolean);
+}
+
+function applicationPrivateReviewError(cause = null) {
+  return Object.assign(new Error("application_private_review_unavailable", { cause }), {
+    code: "application_private_review_unavailable",
+    statusCode: 503
+  });
+}
+
+export async function applicationPrivateReviewTarget(reviewChannel, applicationId, type) {
+  if (reviewChannel?.type !== ChannelType.GuildText || !reviewChannel.threads?.create) {
+    throw applicationPrivateReviewError();
+  }
+  let thread = null;
+  try {
+    thread = await reviewChannel.threads.create({
+      name: `application-${type}-${applicationId.slice(0, 8)}`.slice(0, 100),
+      type: ChannelType.PrivateThread,
+      autoArchiveDuration: 1440,
+      invitable: false,
+      reason: "Paradise private application review"
+    });
+  } catch (error) {
+    throw applicationPrivateReviewError(error);
+  }
+  if (!thread?.id || typeof thread.send !== "function") throw applicationPrivateReviewError();
+  return {
+    channel: thread,
+    parentChannelId: reviewChannel.id,
+    privateThread: true
+  };
+}
+
+function applicationRecordWorkflow(record) {
+  return normalizeParadiseApplicationWorkflow(
+    record?.workflow || (BUSINESS_APPLICATION_TYPES.has(record?.type) ? "business" : "staff")
+  );
+}
+
+export function paradiseApplicationAutoGrantRoleKey(record, guildConfig = {}) {
+  const workflow = applicationRecordWorkflow(record);
+  if ((guildConfig.activeSetupMode || "community") === "community") {
+    if (workflow === "staff") return record?.type === "helper" ? "helper_role" : null;
+    if (record?.type === "partnership") return "partner_role";
+    if (record?.type === "reseller") return "reseller_role";
+    return null;
+  }
+  return {
+    helper: "helper_role",
+    staff: "staff_role",
+    moderator: "moderator_role",
+    support: "support_role",
+    training_hoster: "training_hoster_role",
+    tryout_hoster: "tryout_hoster_role",
+    referee: "referee_role",
+    event_staff: "event_staff_role",
+    giveaway_staff: "giveaway_staff_role",
+    content_creator: "content_creator_role",
+    partnership: "partner_role",
+    clan_mainer: "clan_mainer_role",
+    fima_support: "fima_support_role",
+    macro_staff: "macro_staff_role",
+    fflag_staff: "fflag_staff_role",
+    reseller: "reseller_role"
+  }[record?.type] || null;
+}
+
+export async function paradiseWebsiteApplicationContext(guild, userId, { workflow = "staff" } = {}) {
+  const normalizedWorkflow = normalizeParadiseApplicationWorkflow(workflow);
   const member = await guild.members.fetch(userId).catch(() => null);
   const state = await loadState();
   const guildConfig = configForGuild(state, guild.id);
   const applicationSettings = guildConfig.applicationSettings || {};
-  const records = Object.values(state.applications?.[guild.id] || {}).filter(item => item.userId === userId);
+  const records = Object.values(state.applications?.[guild.id] || {})
+    .filter(item => item.userId === userId && applicationRecordWorkflow(item) === normalizedWorkflow);
   const active = records.find(item => ["pending", "more_info"].includes(item.status));
   const cooldownUntil = applicationCooldownUntil(records, applicationSettings);
   return {
@@ -5267,24 +5785,35 @@ export async function paradiseWebsiteApplicationContext(guild, userId) {
     member: Boolean(member),
     applicationsOpen: applicationSettings.enabled !== false,
     activeSetupMode: guildConfig.activeSetupMode || "community",
+    workflow: normalizedWorkflow,
+    evidencePolicy: PARADISE_APPLICATION_EVIDENCE_POLICY,
     blacklisted: state.blacklists?.[guild.id]?.[userId]?.status === "active",
     activeApplication: active ? {
       id: active.id.slice(0, 8), type: active.type, label: applicationLabel(active.type), status: active.status,
       createdAt: active.createdAt
     } : null,
     cooldownUntil: cooldownUntil > Date.now() ? new Date(cooldownUntil).toISOString() : null,
-    types: APPLICATION_TYPES.filter(([type]) => applicationTypeAllowedForMode(type, guildConfig.activeSetupMode)).map(([type, label]) => ({
+    types: paradiseWebsiteApplicationTypesForMode(guildConfig.activeSetupMode, normalizedWorkflow).map(({ type, label }) => ({
       type,
       label,
       questions: applicationQuestions(type).map(([key, questionLabel, placeholder, style, min, max]) => ({
-        key, label: questionLabel, placeholder, multiline: style === TextInputStyle.Paragraph, min, max
+        key,
+        label: questionLabel,
+        placeholder,
+        multiline: style === TextInputStyle.Paragraph,
+        min,
+        max,
+        evidenceRequirement: paradiseApplicationEvidenceRequirement(applicationSettings, type, key)
       }))
     }))
   };
 }
 
-export async function submitParadiseWebsiteApplication(guild, { userId, type, answers, siteUserId = null }) {
-  const context = await paradiseWebsiteApplicationContext(guild, userId);
+export async function submitParadiseWebsiteApplication(guild, {
+  userId, type, answers, evidence = [], siteUserId = null, workflow = "staff"
+}) {
+  const normalizedWorkflow = normalizeParadiseApplicationWorkflow(workflow);
+  const context = await paradiseWebsiteApplicationContext(guild, userId, { workflow: normalizedWorkflow });
   if (!context.member) throw Object.assign(new Error("discord_membership_required"), { code: "discord_membership_required", statusCode: 403 });
   if (!context.applicationsOpen) throw Object.assign(new Error("applications_closed"), { code: "applications_closed", statusCode: 409 });
   if (context.blacklisted) throw Object.assign(new Error("blacklisted_users_cannot_apply"), { code: "blacklisted_users_cannot_apply", statusCode: 403 });
@@ -5305,45 +5834,78 @@ export async function submitParadiseWebsiteApplication(guild, { userId, type, an
     normalizedAnswers[question.label] = value;
   }
   const id = crypto.randomUUID();
+  const storedEvidence = await processParadiseApplicationEvidence({
+    guildId: guild.id,
+    applicationId: id,
+    questions: selected.questions,
+    evidence,
+    requiredQuestionKeys: selected.questions
+      .filter(question => question.evidenceRequirement === "required")
+      .map(question => question.key)
+  });
   const record = {
-    id, guildId: guild.id, userId, type, answers: normalizedAnswers, source: "fima_website",
+    id, guildId: guild.id, userId, type, workflow: normalizedWorkflow,
+    answers: normalizedAnswers, evidence: storedEvidence, source: "fima_website",
     siteUserId, status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
-  await saveState(next => {
-    next.applications = next.applications || {};
-    next.applications[guild.id] = next.applications[guild.id] || {};
-    next.applications[guild.id][id] = record;
-    return next;
-  });
   const review = await configuredChannel(guild, "application_review_channel", "application-reviews");
+  if (!review) {
+    await removeParadiseApplicationEvidence(storedEvidence);
+    throw applicationPrivateReviewError();
+  }
+  let reviewTarget = null;
   let reviewMessage = null;
-  if (review) {
-    reviewMessage = await review.send({
+  try {
+    reviewTarget = await applicationPrivateReviewTarget(review, id, type);
+    const acceptedEvidence = storedEvidence.filter(file => file.status === "accepted").length;
+    const quarantinedEvidence = storedEvidence.length - acceptedEvidence;
+    reviewMessage = await reviewTarget.channel.send({
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(type)}`)
         .setDescription(`Applicant: <@${userId}>\nApplication ID: \`${id.slice(0, 8)}\`\nSource: **Fima website**`)
         .addFields(Object.entries(normalizedAnswers).map(([label, value]) => ({ name: label, value: maskApplicationReviewText(value, 1024), inline: false })))
+        .addFields({
+          name: "Evidence security",
+          value: storedEvidence.length
+            ? `Accepted after scan: **${acceptedEvidence}**\nQuarantined or awaiting scanner: **${quarantinedEvidence}**`
+            : "No evidence files attached.",
+          inline: false
+        })
         .setFooter(paradiseFooter("Pending private review")).setTimestamp()],
-      components: applicationReviewComponents(id)
-    }).catch(() => null);
-    if (reviewMessage) {
-      await saveState(next => {
-        next.applications = next.applications || {};
-        next.applications[guild.id] = next.applications[guild.id] || {};
-        next.applications[guild.id][id] = {
-          ...(next.applications[guild.id][id] || record),
-          reviewChannelId: review.id,
-          reviewMessageId: reviewMessage.id,
-          updatedAt: new Date().toISOString()
-        };
-        return next;
-      });
-    }
+      components: applicationReviewComponents(id),
+      files: applicationEvidenceDiscordFiles(storedEvidence)
+    });
+    if (!reviewMessage?.id) throw applicationPrivateReviewError();
+    record.reviewChannelId = reviewTarget.channel.id;
+    record.reviewParentChannelId = reviewTarget.parentChannelId;
+    record.privateReviewThread = true;
+    record.reviewMessageId = reviewMessage.id;
+    record.updatedAt = new Date().toISOString();
+    await saveState(next => {
+      next.applications = next.applications || {};
+      next.applications[guild.id] = next.applications[guild.id] || {};
+      next.applications[guild.id][id] = record;
+      return next;
+    });
+  } catch (error) {
+    await Promise.allSettled([
+      reviewMessage?.delete?.(),
+      reviewTarget?.privateThread ? reviewTarget.channel?.delete?.("Application delivery failed") : undefined,
+      removeParadiseApplicationEvidence(storedEvidence)
+    ].filter(Boolean));
+    if (error?.code === "application_private_review_unavailable") throw error;
+    throw applicationPrivateReviewError(error);
   }
   await logParadiseAction(guild, "application_logs_channel", "application-logs", "Website application submitted",
     `<@${userId}> submitted **${applicationLabel(type)}** from the Fima website · \`${id.slice(0, 8)}\`.`);
   return {
-    id: id.slice(0, 8), status: "pending", type, label: applicationLabel(type),
-    reviewQueued: Boolean(reviewMessage), createdAt: record.createdAt
+    id: id.slice(0, 8), status: "pending", type, label: applicationLabel(type), workflow: normalizedWorkflow,
+    reviewQueued: true,
+    evidence: {
+      total: storedEvidence.length,
+      accepted: storedEvidence.filter(file => file.status === "accepted").length,
+      quarantined: storedEvidence.filter(file => file.status !== "accepted").length
+    },
+    createdAt: record.createdAt
   };
 }
 
@@ -5352,8 +5914,11 @@ async function handleApplicationCommand(interaction) {
   if (sub === "panel") {
     if (!canManageClan(interaction.member)) return interaction.reply({ content: "Application management authority required.", ephemeral: true });
     const channel = await configuredChannel(interaction.guild, "application_ticket_channel", "application-ticket") || interaction.channel;
-    const language = guildLanguage(configForGuild(await loadState(), interaction.guildId));
-    await channel.send(paradiseApplicationPanelPayload(await paradiseBrandColor(), language));
+    const guildConfig = configForGuild(await loadState(), interaction.guildId);
+    const language = guildLanguage(guildConfig);
+    await channel.send(paradiseApplicationPanelPayload(
+      await paradiseBrandColor(), language, guildConfig.applicationSettings
+    ));
     return interaction.reply({ content: `Application panel posted in ${channel}.`, ephemeral: true });
   }
   const state = await loadState();
@@ -5612,16 +6177,14 @@ async function finalizeApplicationReview(interaction, action, id, rawReason = ""
   let grantedRole = null;
   if (status === "approved" && configForGuild(state, interaction.guildId).applicationSettings?.autoGrantRole === true) {
     const guildConfig = configForGuild(state, interaction.guildId);
-    const applicationRoleKeys = {
-      staff: "staff_role",
-      moderator: "moderator_role", support: "support_role", training_hoster: "training_hoster_role",
-      tryout_hoster: "tryout_hoster_role", referee: "referee_role", event_staff: "event_staff_role",
-      giveaway_staff: "giveaway_staff_role", content_creator: "content_creator_role",
-      partnership: "partner_role", clan_mainer: "clan_mainer_role", fima_support: "fima_support_role",
-      macro_staff: "macro_staff_role", fflag_staff: "fflag_staff_role", reseller: "reseller_role"
-    };
-    const roleName = guildConfig.applicationSettings?.roleMappings?.[record.type]
-      || guildConfig.roleMappings?.[applicationRoleKeys[record.type]];
+    const roleKey = paradiseApplicationAutoGrantRoleKey(record, guildConfig);
+    const roleName = roleKey
+      ? (
+        guildConfig.applicationSettings?.roleMappings?.[record.type]
+        || guildConfig.roleMappings?.[roleKey]
+        || (roleKey === "helper_role" ? "Helper" : null)
+      )
+      : null;
     const role = roleName ? interaction.guild.roles.cache.find(item => item.name === roleName || item.id === roleName) : null;
     const applicant = await interaction.guild.members.fetch(record.userId).catch(() => null);
     const botMember = interaction.guild.members.me;
@@ -8672,6 +9235,89 @@ async function updateBlacklistAppealPanel(guild) {
   return message;
 }
 
+function blacklistAppealPrivateReviewError(cause = null) {
+  return Object.assign(new Error("blacklist_appeal_private_review_unavailable", { cause }), {
+    code: "blacklist_appeal_private_review_unavailable",
+    statusCode: 503
+  });
+}
+
+function blacklistAppealReviewerIds(guild, applicantId, explicitReviewerIds = []) {
+  const cachedReviewers = cachedValues(guild?.members?.cache)
+    .filter(member => {
+      try { return canManageBlacklist(member); } catch { return false; }
+    })
+    .map(member => member.id);
+  return [...new Set([guild?.ownerId, ...explicitReviewerIds, ...cachedReviewers]
+    .map(value => String(value || "").trim())
+    .filter(value => value && value !== String(applicantId)))].slice(0, 8);
+}
+
+export async function createBlacklistAppealPrivateReview({
+  guild,
+  parentChannel,
+  applicantId,
+  applicantName = "member",
+  reviewerIds = [],
+  messagePayload
+} = {}) {
+  if (
+    !guild?.id
+    || parentChannel?.type !== ChannelType.GuildText
+    || typeof parentChannel.threads?.create !== "function"
+    || !applicantId
+  ) throw blacklistAppealPrivateReviewError();
+
+  const reviewers = blacklistAppealReviewerIds(guild, applicantId, reviewerIds);
+  if (!reviewers.length) throw blacklistAppealPrivateReviewError();
+
+  let thread = null;
+  let firstMessage = null;
+  try {
+    const safeName = String(applicantName || "member")
+      .normalize("NFKC")
+      .replace(/[^\p{L}\p{N}-]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 72) || "member";
+    thread = await parentChannel.threads.create({
+      name: `appeal-${safeName}`.slice(0, 90),
+      type: ChannelType.PrivateThread,
+      autoArchiveDuration: 1440,
+      invitable: false,
+      reason: "Paradise private blacklist appeal"
+    });
+    if (
+      !thread?.id
+      || thread.type !== ChannelType.PrivateThread
+      || typeof thread.members?.add !== "function"
+      || typeof thread.send !== "function"
+    ) throw blacklistAppealPrivateReviewError();
+
+    const applicantMembership = await thread.members.add(String(applicantId));
+    if (!applicantMembership) throw blacklistAppealPrivateReviewError();
+    const reviewerMemberships = await Promise.allSettled(reviewers.map(id => thread.members.add(id)));
+    if (!reviewerMemberships.some(result => result.status === "fulfilled" && result.value)) {
+      throw blacklistAppealPrivateReviewError();
+    }
+    firstMessage = await thread.send(messagePayload);
+    if (!firstMessage?.id) throw blacklistAppealPrivateReviewError();
+    return {
+      channel: thread,
+      parentChannelId: parentChannel.id,
+      privateThread: true,
+      message: firstMessage,
+      reviewerIds: reviewers
+    };
+  } catch (error) {
+    await Promise.allSettled([
+      firstMessage?.delete?.(),
+      thread?.delete?.("Blacklist appeal delivery failed")
+    ].filter(Boolean));
+    if (error?.code === "blacklist_appeal_private_review_unavailable") throw error;
+    throw blacklistAppealPrivateReviewError(error);
+  }
+}
+
 async function handleBlacklist(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "status") {
@@ -8739,42 +9385,49 @@ async function handleAppeal(interaction) {
       return interaction.reply({ content: `You already have a pending appeal${existing.threadId ? `: <#${existing.threadId}>` : "."}`, ephemeral: true });
     }
     await interaction.deferReply({ ephemeral: true });
-    const parent = await configuredChannel(interaction.guild, "blacklist_appeal_channel", "blacklist-appeal");
-    let thread = null;
-    if (parent?.threads?.create) {
-      thread = await parent.threads.create({
-        name: `appeal-${interaction.user.username}`.slice(0, 90),
-        type: ChannelType.PrivateThread,
-        invitable: false,
-        reason: "Paradise private blacklist appeal"
-      }).catch(() => null);
-      if (thread) {
-        await thread.members.add(interaction.user.id).catch(() => {});
-        await thread.send({
+    const parent = await configuredChannel(interaction.guild, "blacklist_appeal_channel", [
+      "blacklist-appeal", "ban-appeal", "◇・destek"
+    ]);
+    const reason = interaction.options.getString("reason");
+    const evidence = interaction.options.getString("evidence") || null;
+    let privateReview = null;
+    try {
+      privateReview = await createBlacklistAppealPrivateReview({
+        guild: interaction.guild,
+        parentChannel: parent,
+        applicantId: interaction.user.id,
+        applicantName: interaction.user.username,
+        messagePayload: {
           content: `<@${interaction.user.id}>`,
+          allowedMentions: { users: [interaction.user.id], roles: [], parse: [] },
           embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◇ PRIVATE BLACKLIST APPEAL")
-            .setDescription(`**Applicant:** <@${interaction.user.id}>\n**Reason:** ${interaction.options.getString("reason")}\n**Evidence:** ${interaction.options.getString("evidence") || "Not supplied"}\n\n> Staff review is evidence-based. Bail is never guaranteed and cannot automatically remove a blacklist.`)
+            .setDescription(`**Applicant:** <@${interaction.user.id}>\n**Reason:** ${reason}\n**Evidence:** ${evidence || "Not supplied"}\n\n> Staff review is evidence-based. Bail is never guaranteed and cannot automatically remove a blacklist.`)
             .setFooter(paradiseFooter("Private staff review")).setTimestamp()]
-        }).catch(() => {});
-      }
+        }
+      });
+      await saveState(next => {
+        next.appeals[interaction.guildId] = next.appeals[interaction.guildId] || {};
+        next.appeals[interaction.guildId][interaction.user.id] = {
+          userId: interaction.user.id,
+          status: "pending",
+          reason,
+          evidence,
+          threadId: privateReview.channel.id,
+          reviewMessageId: privateReview.message.id,
+          createdAt: new Date().toISOString()
+        };
+        return next;
+      });
+    } catch {
+      await Promise.allSettled([
+        privateReview?.message?.delete?.(),
+        privateReview?.channel?.delete?.("Blacklist appeal state save failed")
+      ].filter(Boolean));
+      return interaction.editReply("Your appeal could not be opened privately, so nothing was recorded. Please ask staff to repair the appeal channel permissions and try again.");
     }
-    await saveState(next => {
-      next.appeals[interaction.guildId] = next.appeals[interaction.guildId] || {};
-      next.appeals[interaction.guildId][interaction.user.id] = {
-        userId: interaction.user.id,
-        status: "pending",
-        reason: interaction.options.getString("reason"),
-        evidence: interaction.options.getString("evidence") || null,
-        threadId: thread?.id || null,
-        createdAt: new Date().toISOString()
-      };
-      return next;
-    });
     await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", "Blacklist appeal opened",
-      `<@${interaction.user.id}> opened a private appeal${thread ? ` in ${thread}` : ""}.`);
-    return interaction.editReply(thread
-      ? `Your private appeal was created: ${thread}`
-      : "Your appeal was recorded. Staff will review it privately; the mapped channel could not create a private thread.");
+      `<@${interaction.user.id}> opened a private appeal in ${privateReview.channel}.`);
+    return interaction.editReply(`Your private appeal was created: ${privateReview.channel}`);
   }
   if (!canManageBlacklist(interaction.member)) return interaction.reply({ content: "Blacklist manager or security authority required.", ephemeral: true });
   const user = interaction.options.getUser("user");

@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import { generateCandidateLicenseKey, normalizeHwid, normalizeLicenseKey } from "../src/license.js";
 import {
   checkoutModeForPlan,
+  getDirectGiftCommerce,
+  getGiftCodeCommerce,
   getPlan,
   getPlanCommerce,
   getPlanExpiry,
   isPublicCheckoutPlan,
   productionInlinePriceDataBlocked,
   publicCheckoutPlanIds,
+  requiredDirectGiftPriceEnvs,
+  requiredGiftCodePriceEnvs,
   requiredPublicPriceEnvs
 } from "../src/plans.js";
 
@@ -61,6 +65,56 @@ test("free trial does not require a Stripe price env", () => {
 test("public checkout and required price envs are the current paid products only", () => {
   assert.deepEqual(publicCheckoutPlanIds(), ["3days", "monthly", "lifetime"]);
   assert.deepEqual(requiredPublicPriceEnvs(), ["STRIPE_PRICE_3DAYS", "STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_LIFETIME"]);
+});
+
+test("gift code checkout uses dedicated products and price envs", () => {
+  assert.deepEqual(requiredGiftCodePriceEnvs(), [
+    "STRIPE_GIFT_PRICE_3DAYS",
+    "STRIPE_GIFT_PRICE_MONTHLY",
+    "STRIPE_GIFT_PRICE_LIFETIME"
+  ]);
+  assert.deepEqual(requiredGiftCodePriceEnvs({ test: true }), [
+    "STRIPE_TEST_GIFT_PRICE_3DAYS",
+    "STRIPE_TEST_GIFT_PRICE_MONTHLY",
+    "STRIPE_TEST_GIFT_PRICE_LIFETIME"
+  ]);
+
+  const threeDays = getGiftCodeCommerce(getPlan("3days"));
+  const monthly = getGiftCodeCommerce(getPlan("monthly"));
+  const lifetime = getGiftCodeCommerce(getPlan("lifetime"));
+  assert.equal(threeDays.productName, "FIMA Gift Code — 3 Days");
+  assert.equal(monthly.productName, "FIMA Gift Code — Monthly");
+  assert.equal(lifetime.productName, "FIMA Gift Code — Lifetime");
+  assert.equal(monthly.checkoutType, "gift_code_purchase");
+  assert.equal(monthly.priceType, "one_time");
+  assert.equal(monthly.interval, null);
+  assert.equal(monthly.priceEnv, "STRIPE_GIFT_PRICE_MONTHLY");
+  assert.equal(getGiftCodeCommerce(getPlan("monthly"), { test: true }).priceEnv, "STRIPE_TEST_GIFT_PRICE_MONTHLY");
+});
+
+test("direct-recipient gifts use dedicated one-time products and price envs", () => {
+  assert.deepEqual(requiredDirectGiftPriceEnvs(), [
+    "STRIPE_DIRECT_GIFT_PRICE_3DAYS",
+    "STRIPE_DIRECT_GIFT_PRICE_MONTHLY",
+    "STRIPE_DIRECT_GIFT_PRICE_LIFETIME"
+  ]);
+  assert.deepEqual(requiredDirectGiftPriceEnvs({ test: true }), [
+    "STRIPE_TEST_DIRECT_GIFT_PRICE_3DAYS",
+    "STRIPE_TEST_DIRECT_GIFT_PRICE_MONTHLY",
+    "STRIPE_TEST_DIRECT_GIFT_PRICE_LIFETIME"
+  ]);
+
+  const threeDays = getDirectGiftCommerce(getPlan("3days"));
+  const monthly = getDirectGiftCommerce(getPlan("monthly"));
+  const lifetime = getDirectGiftCommerce(getPlan("lifetime"));
+  assert.equal(threeDays.productName, "FIMA Direct Gift — 3 Days");
+  assert.equal(monthly.productName, "FIMA Direct Gift — Monthly");
+  assert.equal(lifetime.productName, "FIMA Direct Gift — Lifetime");
+  assert.equal(monthly.checkoutType, "direct_gift_purchase");
+  assert.equal(monthly.priceType, "one_time");
+  assert.equal(monthly.interval, null);
+  assert.equal(monthly.priceEnv, "STRIPE_DIRECT_GIFT_PRICE_MONTHLY");
+  assert.equal(getDirectGiftCommerce(getPlan("monthly"), { test: true }).priceEnv, "STRIPE_TEST_DIRECT_GIFT_PRICE_MONTHLY");
 });
 
 test("legacy packages are readable but cannot be public checkout plans", () => {

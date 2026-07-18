@@ -110,6 +110,9 @@ function safeOptions(value, allowed, code) {
     } else if (definition.type === "enum") {
       if (!definition.values.includes(candidate)) throw workspaceError(code);
       result[key] = candidate;
+    } else if (definition.type === "string") {
+      if (typeof candidate !== "string") throw workspaceError(code);
+      result[key] = candidate.trim().slice(0, definition.max || 200);
     }
   }
   if (Object.keys(result).length !== Object.keys(value).length) throw workspaceError(code);
@@ -162,7 +165,14 @@ export function normalizeParadiseCustomerWorkspacePatch({ route, value } = {}) {
     welcome: ["welcome", { enabled: { type: "boolean" }, mentionMember: { type: "boolean" }, showMemberCount: { type: "boolean" } }],
     tickets: ["ticketSettings", { enabled: { type: "boolean" }, claimEnabled: { type: "boolean" }, autoTranscript: { type: "boolean" }, deleteDelayMinutes: { type: "integer", min: 0, max: 10080, fallback: 5 } }],
     sessions: ["sessionSettings", { trainingEnabled: { type: "boolean" }, tryoutEnabled: { type: "boolean" }, resultApprovalRequired: { type: "boolean" } }],
-    applications: ["applicationSettings", { enabled: { type: "boolean" }, membershipRequired: { type: "boolean" }, cooldownDays: { type: "integer", min: 0, max: 365, fallback: 0 } }],
+    applications: ["applicationSettings", {
+      enabled: { type: "boolean" },
+      membershipRequired: { type: "boolean" },
+      cooldownDays: { type: "integer", min: 0, max: 365, fallback: 0 },
+      panelTitle: { type: "string", max: 80 },
+      panelDescription: { type: "string", max: 1200 },
+      panelButtonLabel: { type: "string", max: 40 }
+    }],
     levels: ["xpSettings", { enabled: { type: "boolean" }, chatXp: { type: "integer", min: 1, max: 100, fallback: 10 }, chatCooldownSeconds: { type: "integer", min: 15, max: 3600, fallback: 60 } }],
     voice: ["voiceSettings", { enabled: { type: "boolean" }, defaultLimit: { type: "integer", min: 0, max: 99, fallback: 0 }, autoDelete: { type: "boolean" }, safeNames: { type: "boolean" } }],
     security: ["automod", { enabled: { type: "boolean" }, blockInvites: { type: "boolean" }, blockScamKeywords: { type: "boolean" }, mentionSpamLimit: { type: "integer", min: 3, max: 50, fallback: 8 } }],

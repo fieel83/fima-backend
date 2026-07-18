@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="theme-color" content="#100b1b">
+    <title>Paradise Content Studio | FIMA</title>
+    <style>
+      :root{color-scheme:dark;--bg:#09070e;--panel:#151020;--panel-2:#0e0a15;--line:#ffffff17;--text:#f8f4ff;--muted:#a99eb8;--violet:#9b6cff;--blue:#4c94ff;--good:#48d9a0;--warn:#ffd166;--bad:#ff7890;--radius:18px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+      *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0,#7041bd3b,transparent 32%),radial-gradient(circle at 90% 24%,#176ed02a,transparent 31%),var(--bg);color:var(--text)}button,input,textarea,select{font:inherit}.hidden{display:none!important}
+      .shell{width:min(1540px,calc(100% - 28px));margin:auto;padding:26px 0 60px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.brand{display:flex;align-items:center;gap:13px}.brand-mark{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;background:linear-gradient(135deg,var(--violet),var(--blue));font-weight:1000}.brand h1{font-size:clamp(1.35rem,3vw,2rem);margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:.9rem}.top-actions{display:flex;gap:9px;flex-wrap:wrap}
+      .button{border:1px solid var(--line);border-radius:11px;background:#ffffff0b;color:var(--text);padding:10px 13px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px}.button:hover{border-color:#ffffff36;transform:translateY(-1px)}.button.primary{background:linear-gradient(135deg,#8058e9,#3c82ef);border-color:transparent}.button.danger{background:#5b1e2f;border-color:#ff78904a}.button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+      .notice{margin-bottom:15px;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:#11101b;color:var(--muted)}.notice.good{border-color:#48d9a066;color:#aff0d5}.notice.warn{border-color:#ffd16666;color:#ffe2a0}.notice.bad{border-color:#ff789066;color:#ffb3c0}
+      .gate{max-width:700px;margin:11vh auto;padding:30px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,#211532,#100c18);box-shadow:0 35px 90px #0009}.gate h2{font-size:2rem;margin-top:0}.gate p{color:var(--muted);line-height:1.65}
+      .workspace{display:grid;grid-template-columns:290px minmax(480px,1fr) minmax(340px,.78fr);gap:14px;align-items:start}.panel{border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(145deg,#171120f2,#0e0a15f5);box-shadow:0 24px 70px #0005;overflow:hidden}.panel-head{padding:16px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel-head h2,.panel-head h3{font-size:1rem;margin:0}.panel-body{padding:16px}.stack{display:grid;gap:12px}.field{display:grid;gap:6px}.field label,.subheading{font-size:.84rem;font-weight:850;color:#ded6e8}.field small,.help{font-size:.78rem;color:var(--muted);line-height:1.45}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:10px;background:#08060c;color:var(--text);padding:10px 11px}.field textarea{resize:vertical;min-height:88px}.field input:focus,.field textarea:focus,.field select:focus{outline:2px solid #9b6cff55;border-color:var(--violet)}
+      .document-list,.version-list{display:grid;gap:8px;max-height:300px;overflow:auto}.document-row,.version-row{border:1px solid var(--line);border-radius:11px;background:#0b0811;padding:10px;display:grid;gap:6px}.document-row.active{border-color:#9b6cffaa;background:#53358b28}.document-row button{border:0;background:none;color:inherit;text-align:left;padding:0;cursor:pointer;font-weight:850}.meta{font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.inline>*{flex:1}.inline>.fit{flex:0 0 auto}.divider{height:1px;background:var(--line);margin:4px 0}
+      .embed-card{border:1px solid #ffffff20;border-radius:15px;background:#0b0811;padding:13px;display:grid;gap:11px}.embed-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.embed-head strong{font-size:.9rem}.embed-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.embed-grid .wide{grid-column:1/-1}.field-row{border-left:3px solid #9b6cff66;padding-left:10px;display:grid;grid-template-columns:1fr 1.4fr auto auto;gap:8px;align-items:end}.checkbox{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:.82rem}.checkbox input{width:auto}.counter{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}.toolbar{display:flex;gap:7px;flex-wrap:wrap}
+      .preview-tabs{display:flex;gap:7px}.preview-shell{margin:auto;border:1px solid var(--line);border-radius:15px;background:#313338;padding:16px;transition:.2s;width:100%;max-width:720px;min-height:170px}.preview-shell.mobile{max-width:360px}.discord-message{display:grid;grid-template-columns:42px 1fr;gap:10px}.avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--violet),var(--blue));font-weight:1000}.message-head{font-size:.84rem}.message-head strong{color:#fff}.message-time{color:#949ba4;font-size:.72rem}.message-content{white-space:pre-wrap;overflow-wrap:anywhere;color:#dbdee1;line-height:1.35;margin:4px 0}.preview-embeds{display:grid;gap:6px;margin-top:5px}.preview-embed{position:relative;max-width:520px;border-radius:4px;background:#2b2d31;padding:11px 13px 11px 16px;overflow:hidden}.preview-embed::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--embed-color,#9b5cff)}.preview-author,.preview-footer{font-size:.75rem;color:#b5bac1}.preview-title{font-weight:850;margin-top:6px}.preview-description{font-size:.88rem;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px;color:#dbdee1}.preview-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}.preview-field{min-width:0}.preview-field.wide{grid-column:1/-1}.preview-field strong{font-size:.78rem;display:block}.preview-field span{font-size:.8rem;color:#dbdee1;white-space:pre-wrap;overflow-wrap:anywhere}.preview-image{display:block;max-width:100%;max-height:280px;border-radius:4px;margin-top:10px;object-fit:cover}.preview-thumb{float:right;width:70px;height:70px;border-radius:4px;object-fit:cover;margin:0 0 8px 10px}.preview-footer{margin-top:10px}.empty{padding:20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+      .publish-box{border:1px solid #ffd1664f;background:#33270e55;border-radius:13px;padding:13px}.publish-box code{color:#ffe2a0}.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--good)}
+      @media(max-width:1180px){.workspace{grid-template-columns:280px 1fr}.preview-panel{grid-column:1/-1}}@media(max-width:760px){.shell{width:min(100% - 18px,1540px);padding-top:14px}.topbar{align-items:flex-start}.workspace{grid-template-columns:1fr}.preview-panel{grid-column:auto}.embed-grid{grid-template-columns:1fr}.embed-grid .wide{grid-column:auto}.field-row{grid-template-columns:1fr}.preview-fields{grid-template-columns:1fr}.preview-field{grid-column:1!important}}
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand"><div class="brand-mark">P</div><div><h1>Paradise Content Studio</h1><p>Owner-only, versioned Discord message editor</p></div></div>
+        <div class="top-actions"><a class="button" href="/paradise">Dashboard</a><a class="button" href="/">FIMA</a></div>
+      </header>
+      <div id="notice" class="notice">Checking owner session…</div>
+
+      <section id="accessGate" class="gate hidden">
+        <h2>Owner access required</h2>
+        <p id="gateReason">Sign in with the FIMA owner account and connect the authorized Discord identity.</p>
+        <div class="toolbar"><a id="loginLink" class="button primary" href="/login?returnTo=%2Fparadise%2Fcontent-studio">Sign in</a><a id="discordLink" class="button" href="/auth/discord/start?returnTo=%2Fparadise%2Fcontent-studio">Connect Discord</a></div>
+      </section>
+
+      <section id="studio" class="workspace hidden">
+        <aside class="panel">
+          <div class="panel-head"><h2>Library</h2><button id="newDocument" class="button fit" type="button">New</button></div>
+          <div class="panel-body stack">
+            <div class="field"><label for="guildSelect">Managed server</label><select id="guildSelect"></select><small id="guildPolicy">Publishing is isolated to the configured test guild.</small></div>
+            <div class="field"><label>Saved messages</label><div id="documentList" class="document-list"></div></div>
+            <div class="divider"></div>
+            <div class="field"><label>Verified source imports</label><div class="toolbar"><button class="button" data-preset="outfits" type="button">Outfits</button><button class="button" data-preset="capes" type="button">Capes</button></div><small>Captured read-only from the real owner messages. Editing creates an Improved Draft while preserving the immutable Original snapshot.</small></div>
+            <div class="divider"></div>
+            <div class="field"><label for="importChannelId">Import existing Discord message</label><input id="importChannelId" inputmode="numeric" placeholder="Channel ID"><input id="importMessageId" inputmode="numeric" placeholder="Message ID"><button id="importMessage" class="button" type="button">Import read-only copy</button><small>Import never edits Discord. Save the imported draft before publishing.</small></div>
+            <div class="divider"></div>
+            <div class="field"><label>Version history</label><div id="versionList" class="version-list"></div></div>
+          </div>
+        </aside>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Message editor</h2><span id="dirtyState" class="meta">Unsaved draft</span></div>
+          <div class="panel-body stack">
+            <div class="embed-grid">
+              <div class="field"><label for="documentName">Document name</label><input id="documentName" maxlength="100" value="Untitled message"></div>
+              <div class="field"><label for="deliveryMode">Delivery</label><select id="deliveryMode"><option value="bot">Paradise bot</option><option value="managed_webhook">Bot-managed webhook</option></select><small>No webhook URL or token is accepted.</small></div>
+              <div class="field"><label for="contentStage">Content stage</label><select id="contentStage"><option value="starter_draft">Starter Draft</option><option value="imported">Imported</option><option value="improved_draft" selected>Improved Draft</option><option value="production_version">Production Version</option></select><small>Editing an Imported copy advances it to Improved Draft. The Original snapshot remains immutable.</small></div>
+              <div class="field"><label>Source lineage</label><div id="lineageStatus" class="meta">Original: not applicable · Current: Improved Draft</div></div>
+              <div class="field"><label for="targetChannelId">Target channel ID</label><input id="targetChannelId" inputmode="numeric" placeholder="Required to publish"></div>
+              <div class="field"><label for="targetMessageId">Target message ID</label><input id="targetMessageId" inputmode="numeric" placeholder="Blank creates a new message"><small>Set only to edit an existing bot-owned message.</small></div>
+              <div class="field wide"><label for="messageContent">Message content</label><textarea id="messageContent" maxlength="2000" placeholder="Optional when an embed exists"></textarea><div id="contentCounter" class="counter">0/2000</div></div>
+            </div>
+            <div class="inline"><span class="subheading">Embeds <span id="embedCount">0/10</span></span><button id="addEmbed" class="button fit" type="button">Add embed</button></div>
+            <div id="embedsList" class="stack"></div>
+            <div class="divider"></div>
+            <div class="inline"><label class="checkbox"><input id="overwriteConfirmation" type="checkbox"> Confirm overwrite of the selected saved document</label><button id="saveDocument" class="button primary fit" type="button">Save version</button></div>
+            <small class="help">Every successful save creates a rollback version. Concurrent updates are rejected and reloaded.</small>
+          </div>
+        </section>
+
+        <aside class="panel preview-panel">
+          <div class="panel-head"><h2>Discord preview</h2><div class="preview-tabs"><button class="button fit" data-preview-mode="desktop" type="button">Desktop</button><button class="button fit" data-preview-mode="mobile" type="button">Mobile</button></div></div>
+          <div class="panel-body stack">
+            <div id="previewShell" class="preview-shell" aria-live="polite"></div>
+            <button id="validatePreview" class="button" type="button">Validate with server</button>
+            <div class="publish-box stack">
+              <strong>Test-guild publishing</strong>
+              <span class="help">Only the saved version can be sent. Type <code>PUBLISH TEST CONTENT</code> exactly.</span>
+              <div class="field"><input id="publishConfirmation" autocomplete="off" placeholder="PUBLISH TEST CONTENT"></div>
+              <button id="publishMessage" class="button danger" type="button" disabled>Publish saved version</button>
+              <span id="publishPolicy" class="help">Select the isolated test guild to enable publishing.</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <script src="/assets/js/paradise-content-studio.js?v=20260717-2"></script>
+  </body>
+</html>

@@ -19,62 +19,6 @@
   color-scheme: dark;
 }
 
-.trial-promo-card {
-  box-sizing: border-box;
-  width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: center;
-  margin: 0 0 18px;
-  padding: 18px;
-  border: 1px solid rgba(176, 132, 255, 0.36);
-  border-radius: 8px;
-  background: rgba(28, 20, 52, 0.78);
-  box-shadow: 0 18px 48px rgba(4, 2, 14, 0.24);
-}
-
-.pricing-grid > .trial-promo-card {
-  grid-column: 1 / -1;
-}
-
-.home-trial-promo-card {
-  margin-top: 22px;
-}
-
-.trial-promo-card span {
-  color: #bfa8ff;
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.trial-promo-card strong {
-  display: block;
-  margin-top: 4px;
-  color: #fff;
-  font-size: clamp(1rem, 2vw, 1.25rem);
-}
-
-.trial-promo-card p {
-  margin: 6px 0 0;
-  color: rgba(245, 241, 255, 0.72);
-}
-
-.trial-promo-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.trial-promo-actions b,
-.trial-promo-card > b {
-  color: #f8d477;
-  font-variant-numeric: tabular-nums;
-}
-
 .download-fallback-page {
   min-height: 100vh;
   background: #090812;
@@ -111,16 +55,10 @@
 }
 
 @media (max-width: 680px) {
-  .trial-promo-card {
-    grid-template-columns: 1fr;
-  }
-
-  .trial-promo-actions,
   .download-fallback-actions {
     justify-content: stretch;
   }
 
-  .trial-promo-actions .button,
   .download-fallback-actions .button {
     width: 100%;
   }
@@ -2233,6 +2171,517 @@ body.modal-open {
   font-weight: 800;
 }
 
+.robux-plan-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.robux-plan-picker[hidden] {
+  display: none;
+}
+
+.robux-plan-option {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 16px 14px;
+  color: var(--text);
+  text-align: left;
+  border: 1px solid color-mix(in srgb, var(--primary-strong) 28%, var(--line));
+  border-radius: calc(var(--radius) + 2px);
+  background:
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--primary) 30%, transparent), transparent 45%),
+    rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.robux-plan-option::after {
+  content: "";
+  position: absolute;
+  inset: auto -24px -42px 24%;
+  height: 72px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  filter: blur(26px);
+  pointer-events: none;
+}
+
+.robux-plan-option:hover,
+.robux-plan-option:focus-visible {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--primary-strong) 75%, white 10%);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--primary) 16%, transparent), inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.robux-plan-option strong {
+  position: relative;
+  z-index: 1;
+  font-size: 0.96rem;
+}
+
+.robux-plan-option span {
+  position: relative;
+  z-index: 1;
+  color: var(--primary-strong);
+  font-weight: 900;
+}
+
+.robux-dialog {
+  width: min(820px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  isolation: isolate;
+  scrollbar-color: color-mix(in srgb, var(--primary-strong) 55%, transparent) transparent;
+}
+
+.robux-dialog::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    radial-gradient(circle at 12% 14%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 34%),
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 28%);
+  pointer-events: none;
+}
+
+.robux-orbit {
+  position: absolute;
+  z-index: -1;
+  width: 330px;
+  height: 330px;
+  border: 1px solid color-mix(in srgb, var(--primary-strong) 18%, transparent);
+  border-radius: 50%;
+  opacity: 0.56;
+  pointer-events: none;
+  animation: robux-orbit-drift 12s linear infinite;
+}
+
+.robux-orbit::before,
+.robux-orbit::after {
+  position: absolute;
+  border-radius: 50%;
+  content: "";
+}
+
+.robux-orbit::before {
+  top: 21px;
+  left: 66px;
+  width: 8px;
+  height: 8px;
+  background: var(--primary-strong);
+  box-shadow: 0 0 20px 5px color-mix(in srgb, var(--primary) 52%, transparent);
+}
+
+.robux-orbit::after {
+  inset: 48px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.robux-orbit-one {
+  top: -190px;
+  right: -90px;
+}
+
+.robux-orbit-two {
+  bottom: -230px;
+  left: -130px;
+  width: 390px;
+  height: 390px;
+  animation-direction: reverse;
+  animation-duration: 16s;
+}
+
+.robux-account-loading {
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  min-height: 210px;
+  margin-top: 20px;
+  padding: 30px;
+  color: var(--text);
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--primary-strong) 30%, var(--line));
+  border-radius: calc(var(--radius) + 8px);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.robux-account-loading[hidden],
+.robux-order-workspace[hidden] {
+  display: none;
+}
+
+.robux-loading-core {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border: 2px solid color-mix(in srgb, var(--primary-strong) 22%, transparent);
+  border-top-color: var(--primary-strong);
+  border-radius: 50%;
+  box-shadow: 0 0 30px color-mix(in srgb, var(--primary) 24%, transparent);
+  animation: robux-spin 900ms linear infinite;
+}
+
+.robux-loading-core::after {
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent), color-mix(in srgb, var(--primary) 42%, transparent) 55%, transparent 65%);
+  content: "";
+  animation: robux-pulse 1.4s ease-in-out infinite;
+}
+
+.robux-order-workspace {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.robux-account-strip,
+.robux-quote-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--primary-strong) 24%, var(--line));
+  border-radius: calc(var(--radius) + 5px);
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--primary) 10%, transparent), rgba(255, 255, 255, 0.035)),
+    rgba(8, 7, 17, 0.78);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055);
+}
+
+.robux-account-strip > div,
+.robux-quote-card > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.robux-account-strip span:not(.robux-account-mark):not(.robux-verified-chip),
+.robux-quote-card span,
+.robux-quote-card small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.robux-account-strip strong {
+  max-width: 360px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.robux-account-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #080713;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--primary-strong), var(--accent));
+  box-shadow: 0 9px 28px color-mix(in srgb, var(--primary) 30%, transparent);
+  font-weight: 1000;
+}
+
+.robux-verified-chip {
+  margin-left: auto;
+  padding: 7px 10px;
+  color: #b8ffd3;
+  border: 1px solid rgba(99, 233, 151, 0.26);
+  border-radius: 999px;
+  background: rgba(46, 165, 102, 0.12);
+  font-size: 0.7rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.robux-quote-card {
+  justify-content: space-between;
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line));
+  background:
+    radial-gradient(circle at 94% 18%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 37%),
+    linear-gradient(120deg, color-mix(in srgb, var(--primary) 12%, transparent), rgba(255, 255, 255, 0.04));
+}
+
+.robux-quote-card strong {
+  color: var(--text);
+  font-size: clamp(1.2rem, 4vw, 1.75rem);
+  letter-spacing: -0.035em;
+}
+
+.robux-order-form {
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 7px);
+  background: rgba(4, 4, 12, 0.46);
+}
+
+.robux-order-form > label,
+.robux-proof-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.robux-order-form input,
+.robux-order-form textarea {
+  width: 100%;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.045);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.robux-order-form textarea {
+  min-height: 104px;
+  padding: 12px 13px;
+  resize: vertical;
+  font: inherit;
+}
+
+.robux-order-form input:focus,
+.robux-order-form textarea:focus {
+  border-color: color-mix(in srgb, var(--primary-strong) 78%, white 8%);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent), 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.robux-premium-fieldset {
+  min-width: 0;
+  margin: 3px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.robux-premium-fieldset legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.robux-premium-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.robux-premium-options label {
+  position: relative;
+  cursor: pointer;
+}
+
+.robux-premium-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.robux-premium-options span {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  padding: 9px 12px;
+  color: var(--muted);
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.035);
+  transition: color 170ms ease, border-color 170ms ease, transform 170ms ease, box-shadow 170ms ease, background 170ms ease;
+}
+
+.robux-premium-options input:checked + span {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--primary-strong) 68%, white 8%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 21%, transparent), color-mix(in srgb, var(--accent) 11%, transparent));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 15%, transparent), inset 0 1px rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.robux-premium-options input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.robux-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.robux-secure-note {
+  margin: 3px 0 0;
+  padding: 11px 12px 11px 37px;
+  border: 1px solid rgba(95, 216, 153, 0.19);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 20px 50%, #75e7a8 0 3px, transparent 4px),
+    rgba(49, 160, 103, 0.075);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.robux-order-notice {
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.robux-order-notice.is-good { color: #80edaa; }
+.robux-order-notice.is-warn { color: #ffd88a; }
+.robux-order-notice.is-bad { color: #ff95ac; }
+
+.robux-submit-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.robux-submit-button::after {
+  position: absolute;
+  inset: -80% -35%;
+  content: "";
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.4) 49%, transparent 60%);
+  transform: translateX(-60%) rotate(8deg);
+  transition: transform 480ms ease;
+  pointer-events: none;
+}
+
+.robux-submit-button:hover::after {
+  transform: translateX(60%) rotate(8deg);
+}
+
+.robux-orders-panel {
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 7px);
+  background: rgba(5, 4, 13, 0.52);
+}
+
+.robux-orders-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.robux-orders-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.robux-orders-panel .button {
+  min-height: 38px;
+  padding: 7px 11px;
+  font-size: 0.76rem;
+}
+
+.robux-orders-list {
+  display: grid;
+  gap: 8px;
+}
+
+.robux-orders-empty {
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+.robux-order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #d0aa61;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.robux-order-row.is-approved { border-left-color: #65dc9b; }
+.robux-order-row.is-rejected { border-left-color: #ff7894; }
+
+.robux-order-row > div:first-child,
+.robux-order-state {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.robux-order-row span,
+.robux-order-row small,
+.robux-order-row time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.robux-order-row strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+}
+
+.robux-order-state {
+  justify-items: end;
+  text-align: right;
+}
+
+.robux-status-pill {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 8px;
+  color: #ffe0a6 !important;
+  border: 1px solid rgba(234, 181, 91, 0.24);
+  border-radius: 999px;
+  background: rgba(189, 126, 40, 0.11);
+}
+
+.robux-order-row.is-approved .robux-status-pill {
+  color: #a9f3c5 !important;
+  border-color: rgba(89, 223, 145, 0.24);
+  background: rgba(48, 171, 104, 0.11);
+}
+
+.robux-order-row.is-rejected .robux-status-pill {
+  color: #ffb4c2 !important;
+  border-color: rgba(255, 101, 132, 0.24);
+  background: rgba(188, 51, 80, 0.11);
+}
+
+@keyframes robux-orbit-drift {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes robux-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes robux-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
 .checkout-dialog form {
   display: grid;
   gap: 10px;
@@ -2724,6 +3173,85 @@ body.modal-open {
     display: grid;
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+}
+
+@media (max-width: 680px) {
+  .robux-dialog {
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 24px 16px 18px;
+  }
+
+  .robux-plan-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .robux-plan-option {
+    min-height: 88px;
+  }
+
+  .robux-account-strip,
+  .robux-quote-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .robux-account-strip > div {
+    flex: 1 1 calc(100% - 60px);
+  }
+
+  .robux-account-strip strong {
+    max-width: 100%;
+  }
+
+  .robux-verified-chip {
+    margin-left: 55px;
+  }
+
+  .robux-quote-card > div,
+  .robux-quote-card > strong {
+    width: 100%;
+  }
+
+  .robux-premium-options,
+  .robux-proof-grid,
+  .robux-order-row {
+    grid-template-columns: 1fr;
+  }
+
+  .robux-order-state {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .robux-orders-panel > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .robux-orders-panel .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .robux-orbit,
+  .robux-loading-core,
+  .robux-loading-core::after {
+    animation: none;
+  }
+
+  .robux-submit-button::after {
+    display: none;
+  }
+
+  .robux-plan-option,
+  .robux-premium-options span,
+  .robux-order-form input,
+  .robux-order-form textarea {
+    scroll-behavior: auto;
+    transition: none;
   }
 }
 

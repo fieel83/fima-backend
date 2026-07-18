@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ChannelType } from "discord.js";
+import { ChannelType, Collection, PermissionsBitField } from "discord.js";
 import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
   isQuestionAnswerMatch,
@@ -9,8 +9,246 @@ import {
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, transitionParadiseWar, tryoutAnnouncementMarkdown,
-  timedAvailabilityLines, paradiseXpPolicy
+  timedAvailabilityLines, paradiseXpPolicy, paradiseApplicationEvidenceRequirement, applicationPrivateReviewTarget,
+  createBlacklistAppealPrivateReview, inspectParadiseLiveSecurityReadiness, paradiseAutoSmokeRepairAction
 } from "../src/paradise3a59.js";
+
+const viewOverwrite = decision => ({
+  allow: new PermissionsBitField(decision === "allow" ? [PermissionsBitField.Flags.ViewChannel] : []),
+  deny: new PermissionsBitField(decision === "deny" ? [PermissionsBitField.Flags.ViewChannel] : [])
+});
+
+function securityReadinessFixture({ layout = "compact", badStaffOverwrite = false, botThreadPermissions = true, panelTitle = "PARADISE SECURITY · LIVE STATUS" } = {}) {
+  const everyone = { id: "guild" };
+  const blacklisted = { id: "blacklisted", name: "BLACKLISTED" };
+  const channel = ({ id, name, everyoneView = null, blacklistedView = null, panel = false, privateThreads = false }) => {
+    const overwrites = new Collection();
+    if (everyoneView) overwrites.set(everyone.id, viewOverwrite(everyoneView));
+    if (blacklistedView) overwrites.set(blacklisted.id, viewOverwrite(blacklistedView));
+    return {
+      id,
+      name,
+      type: ChannelType.GuildText,
+      parent: null,
+      parentId: null,
+      isTextBased: () => true,
+      permissionOverwrites: { cache: overwrites },
+      permissionsFor: () => botThreadPermissions
+        ? new PermissionsBitField([
+            PermissionsBitField.Flags.CreatePrivateThreads,
+            PermissionsBitField.Flags.SendMessagesInThreads
+          ])
+        : null,
+      threads: privateThreads ? { create: async () => null } : undefined,
+      messages: panel ? {
+        fetch: async messageId => messageId === "security-message"
+          ? { id: messageId, channelId: id, embeds: [{ title: panelTitle }] }
+          : null
+      } : undefined
+    };
+  };
+
+  const channels = layout === "legacy"
+    ? [
+        channel({ id: "appeal", name: "blacklist-appeal", everyoneView: "deny", blacklistedView: "allow" }),
+        channel({ id: "unblacklist", name: "unblacklist", everyoneView: "deny", panel: true }),
+        channel({ id: "bail", name: "bail-review", everyoneView: "deny" }),
+        channel({ id: "logs", name: "blacklist-logs", everyoneView: "deny" })
+      ]
+    : [
+        channel({ id: "support", name: "◇・destek", privateThreads: true }),
+        channel({ id: "review", name: "〢・incelemeler", everyoneView: badStaffOverwrite ? "allow" : "deny", panel: true }),
+        channel({ id: "logs", name: "〢・personel-logları", everyoneView: "deny" })
+      ];
+  const cache = new Collection(channels.map(item => [item.id, item]));
+  const guild = {
+    id: "guild",
+    roles: { everyone, cache: new Collection([[everyone.id, everyone], [blacklisted.id, blacklisted]]) },
+    channels: { cache, fetch: async id => cache.get(id) || null },
+    members: { me: { id: "bot" } }
+  };
+  const mappings = layout === "legacy"
+    ? { quarantine_review_channel: "unblacklist", blacklist_logs_channel: "logs" }
+    : { blacklist_appeal_channel: "support", quarantine_review_channel: "review", blacklist_logs_channel: "logs" };
+  return {
+    guild,
+    config: { channelMappings: mappings, smokePanelMessageIds: { security: "security-message" } }
+  };
+}
+
+test("live security readiness recognizes the protected legacy blacklist layout and real panel message", async () => {
+  const { guild, config } = securityReadinessFixture({ layout: "legacy" });
+  assert.deepEqual(await inspectParadiseLiveSecurityReadiness(guild, config), {
+    liveReadinessAvailable: true,
+    blacklistedRoleReady: true,
+    blacklistPermissionReady: true,
+    blacklistLayout: "legacy_dedicated",
+    securityPanelReady: true
+  });
+});
+
+test("live security readiness recognizes compact private-thread appeals and rejects unsafe staff visibility", async () => {
+  const safe = securityReadinessFixture();
+  assert.deepEqual(await inspectParadiseLiveSecurityReadiness(safe.guild, safe.config), {
+    liveReadinessAvailable: true,
+    blacklistedRoleReady: true,
+    blacklistPermissionReady: true,
+    blacklistLayout: "compact_private_thread",
+    securityPanelReady: true
+  });
+
+  const unsafe = securityReadinessFixture({ badStaffOverwrite: true });
+  const unsafeResult = await inspectParadiseLiveSecurityReadiness(unsafe.guild, unsafe.config);
+  assert.equal(unsafeResult.blacklistPermissionReady, false);
+  assert.equal(unsafeResult.blacklistLayout, null);
+  assert.equal(unsafeResult.securityPanelReady, false);
+});
+
+test("live security readiness fails closed for a missing compact appeal mapping or unverified panel title", async () => {
+  const missing = securityReadinessFixture();
+  delete missing.config.channelMappings.blacklist_appeal_channel;
+  const missingResult = await inspectParadiseLiveSecurityReadiness(missing.guild, missing.config);
+  assert.equal(missingResult.blacklistPermissionReady, false);
+
+  const wrongPanel = securityReadinessFixture({ panelTitle: "PARADISE SECURITY · STALE" });
+  const wrongPanelResult = await inspectParadiseLiveSecurityReadiness(wrongPanel.guild, wrongPanel.config);
+  assert.equal(wrongPanelResult.blacklistPermissionReady, true);
+  assert.equal(wrongPanelResult.securityPanelReady, false);
+
+  const unknownBotPermissions = securityReadinessFixture({ botThreadPermissions: false });
+  const unknownBotPermissionsResult = await inspectParadiseLiveSecurityReadiness(
+    unknownBotPermissions.guild,
+    unknownBotPermissions.config
+  );
+  assert.equal(unknownBotPermissionsResult.blacklistPermissionReady, false);
+  assert.equal(unknownBotPermissionsResult.blacklistLayout, null);
+});
+
+test("blacklist appeals add applicant and reviewer before sending the first private-thread message", async () => {
+  const added = [];
+  let sent = false;
+  const thread = {
+    id: "private-appeal",
+    type: ChannelType.PrivateThread,
+    members: { add: async id => { added.push(id); return { id }; } },
+    send: async payload => {
+      sent = true;
+      assert.deepEqual(payload, { content: "appeal" });
+      return { id: "first-message" };
+    },
+    delete: async () => true
+  };
+  const result = await createBlacklistAppealPrivateReview({
+    guild: { id: "guild", ownerId: "owner", members: { cache: new Collection() } },
+    parentChannel: {
+      id: "support",
+      type: ChannelType.GuildText,
+      threads: { create: async options => {
+        assert.equal(options.type, ChannelType.PrivateThread);
+        assert.equal(options.invitable, false);
+        return thread;
+      } }
+    },
+    applicantId: "applicant",
+    applicantName: "Applicant Name",
+    reviewerIds: ["reviewer"],
+    messagePayload: { content: "appeal" }
+  });
+  assert.equal(sent, true);
+  assert.deepEqual(added, ["applicant", "owner", "reviewer"]);
+  assert.equal(result.channel, thread);
+  assert.equal(result.message.id, "first-message");
+  assert.equal(result.privateThread, true);
+});
+
+test("blacklist appeal creation fails closed when thread creation or membership fails", async () => {
+  const guild = { id: "guild", ownerId: "owner", members: { cache: new Collection() } };
+  await assert.rejects(createBlacklistAppealPrivateReview({
+    guild,
+    parentChannel: { id: "support", type: ChannelType.GuildText, threads: { create: async () => { throw new Error("denied"); } } },
+    applicantId: "applicant",
+    messagePayload: { content: "appeal" }
+  }), { code: "blacklist_appeal_private_review_unavailable", statusCode: 503 });
+
+  let deleted = 0;
+  const thread = {
+    id: "private-appeal",
+    type: ChannelType.PrivateThread,
+    members: { add: async () => null },
+    send: async () => ({ id: "must-not-send" }),
+    delete: async () => { deleted += 1; }
+  };
+  await assert.rejects(createBlacklistAppealPrivateReview({
+    guild,
+    parentChannel: { id: "support", type: ChannelType.GuildText, threads: { create: async () => thread } },
+    applicantId: "applicant",
+    messagePayload: { content: "appeal" }
+  }), { code: "blacklist_appeal_private_review_unavailable", statusCode: 503 });
+  assert.equal(deleted, 1, "the orphan private thread is removed");
+});
+
+test("blacklist appeal delivery removes orphan message and thread when the first message is invalid", async () => {
+  let messageDeleted = 0;
+  let threadDeleted = 0;
+  const orphanMessage = { delete: async () => { messageDeleted += 1; } };
+  const thread = {
+    id: "private-appeal",
+    type: ChannelType.PrivateThread,
+    members: { add: async id => ({ id }) },
+    send: async () => orphanMessage,
+    delete: async () => { threadDeleted += 1; }
+  };
+  await assert.rejects(createBlacklistAppealPrivateReview({
+    guild: { id: "guild", ownerId: "owner", members: { cache: new Collection() } },
+    parentChannel: { id: "support", type: ChannelType.GuildText, threads: { create: async () => thread } },
+    applicantId: "applicant",
+    messagePayload: { content: "appeal" }
+  }), { code: "blacklist_appeal_private_review_unavailable", statusCode: 503 });
+  assert.equal(messageDeleted, 1);
+  assert.equal(threadDeleted, 1);
+});
+
+test("application evidence requirements default safely and allow explicit required questions", () => {
+  const settings = {
+    evidenceRequirements: {
+      helper: { experience: "required", availability: "optional", motivation: "unexpected" }
+    }
+  };
+  assert.equal(paradiseApplicationEvidenceRequirement(settings, "helper", "experience"), "required");
+  assert.equal(paradiseApplicationEvidenceRequirement(settings, "helper", "availability"), "optional");
+  assert.equal(paradiseApplicationEvidenceRequirement(settings, "helper", "motivation"), "optional");
+  assert.equal(paradiseApplicationEvidenceRequirement({}, "helper", "experience"), "optional");
+});
+
+test("website applications fail closed unless a real private review thread is created", async () => {
+  await assert.rejects(
+    applicationPrivateReviewTarget({ id: "review", type: ChannelType.GuildText }, "application-id", "helper"),
+    { code: "application_private_review_unavailable", statusCode: 503 }
+  );
+  await assert.rejects(
+    applicationPrivateReviewTarget({
+      id: "review",
+      type: ChannelType.GuildText,
+      threads: { create: async () => null }
+    }, "application-id", "helper"),
+    { code: "application_private_review_unavailable", statusCode: 503 }
+  );
+  const thread = { id: "private-thread", send: async () => ({ id: "message" }) };
+  const target = await applicationPrivateReviewTarget({
+    id: "review",
+    type: ChannelType.GuildText,
+    threads: { create: async options => {
+      assert.equal(options.type, ChannelType.PrivateThread);
+      assert.equal(options.invitable, false);
+      return thread;
+    } }
+  }, "application-id", "helper");
+  assert.deepEqual(target, {
+    channel: thread,
+    parentChannelId: "review",
+    privateThread: true
+  });
+});
 
 test("score approval excludes Trial Referee and Referee by default", () => {
   assert.equal(canRoleNamesApproveScore(["Trial Referee"]), false);
@@ -321,9 +559,35 @@ test("training and tryout announcements follow the selected language and have no
 test("repeat smoke refreshes boards without replaying a full template repair", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /reason: "existing_test_lab"/);
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: true,
+    needsCompactLab: false,
+    blacklistPermissionReady: true
+  }), "skip_existing_lab");
   assert.match(source, /const staffTeam = await updateStaffTeamEmbed\(guild\)/);
   assert.match(source, /leaderboardBoardCount/);
   assert.match(source, /staffTeamReady/);
+});
+
+test("repeat smoke repairs an existing lab when blacklist permissions are unhealthy", () => {
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: true,
+    needsCompactLab: false,
+    blacklistPermissionReady: false
+  }), "repair_permissions");
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: false,
+    needsCompactLab: false,
+    blacklistPermissionReady: false
+  }), "repair_permissions");
+});
+
+test("compact lab revision still takes precedence over permission-only repair", () => {
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: true,
+    needsCompactLab: true,
+    blacklistPermissionReady: false
+  }), "compact_rebuild");
 });
 
 test("availability panel uses a restart-safe guild-scoped component ID while keeping old panels repairable", async () => {
@@ -356,9 +620,21 @@ test("compact lab rebuild remains hard-guarded to the disposable test guild", as
 
 test("application panel follows the selected server language and defaults to Turkish", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
-  assert.match(source, /function paradiseApplicationPanelPayload\(color, language = "tr"\)/);
-  assert.match(source, /PARADISE BAŞVURULAR/);
-  assert.match(source, /paradiseApplicationPanelPayload\(await paradiseBrandColor\(\), language\)/);
+  assert.match(source, /function paradiseApplicationPanelPayload\(color, language = "tr", applicationSettings = \{\}\)/);
+  assert.match(source, /FIEEL'S COMMUNITY BAŞVURULARI/);
+  assert.match(source, /paradiseApplicationPanelPayload\(\s*await paradiseBrandColor\(\), language, guildConfig\.applicationSettings\s*\)/);
+});
+
+test("Discord application panels are website-first and link only the public Helper staff entry", async () => {
+  const paradiseSource = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  const legacyBotSource = await (await import("node:fs/promises")).readFile(new URL("../src/discordBot.js", import.meta.url), "utf8");
+
+  assert.match(paradiseSource, /setStyle\(ButtonStyle\.Link\)[\s\S]*paradise-apply\?workflow=staff&type=helper/);
+  assert.doesNotMatch(paradiseSource, /setCustomId\("paradise_application_open"\)[\s\S]{0,300}setLabel\(safeApplicationPanelText/);
+  assert.doesNotMatch(paradiseSource, /paradise-apply\?workflow=business/);
+  assert.match(legacyBotSource, /function applicationPanelPayload\(\)[\s\S]*setLabel\("Apply as Helper"\)[\s\S]*setStyle\(ButtonStyle\.Link\)[\s\S]*workflow=staff&type=helper/);
+  assert.doesNotMatch(legacyBotSource, /paradise-apply\?workflow=business/);
+  assert.doesNotMatch(legacyBotSource, /function applicationPanelPayload\(\)[\s\S]{0,1800}(?:Moderator|support staff|event staff|giveaway staff).*application/i);
 });
 
 test("application forms stay within Discord's five-input modal limit and retain the required role-specific scenario", () => {

@@ -5,10 +5,14 @@ import { paradiseDashboardHtml } from "../src/paradiseDashboardHtml.js";
 
 const serverSource = fs.readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
 const htmlSource = fs.readFileSync(new URL("../src/paradiseDashboardHtml.js", import.meta.url), "utf8");
+const applicationSource = fs.readFileSync(new URL("../public/assets/js/paradise-apply.js", import.meta.url), "utf8");
+const applicationHtml = fs.readFileSync(new URL("../public/paradise-apply.html", import.meta.url), "utf8");
+const contentStudioHtml = fs.readFileSync(new URL("../public/paradise-content-studio.html", import.meta.url), "utf8");
+const publicConfigSource = fs.readFileSync(new URL("../public/assets/js/config.js", import.meta.url), "utf8");
 
 test("Paradise dashboard client script parses", () => {
   const html = paradiseDashboardHtml({ clientId: "123", apiBaseUrl: "https://api.example.test", frontendUrl: "https://example.test" });
-  const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1] || "";
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] || "";
   assert.ok(script.length > 1000);
   assert.doesNotThrow(() => new Function(script));
 });
@@ -42,6 +46,9 @@ test("Paradise config writes require owner action header and trusted official or
 
 test("browser dashboard route is UI-first while API authorization remains JSON", () => {
   assert.match(serverSource, /app\.get\(\["\/paradise", "\/dashboard\/paradise"\]/);
+  assert.match(serverSource, /app\.get\("\/paradise\/dashboard"[\s\S]{0,100}res\.redirect\(302, "\/paradise"\)/);
+  assert.match(contentStudioHtml, /href="\/paradise">Dashboard<\/a>/);
+  assert.doesNotMatch(contentStudioHtml, /href="\/paradise\/dashboard"/);
   assert.match(serverSource, /isParadiseApiHost\(req\.hostname\)/);
   assert.match(serverSource, /res\.redirect\(302, `\$\{frontendUrl\(\)\}\/paradise`\)/);
   assert.match(serverSource, /app\.get\("\/api\/paradise\/session-status"/);
@@ -64,6 +71,23 @@ test("dashboard mutations use CSRF protection and retry one expired token safely
   assert.match(htmlSource, /'x-fima-csrf':token/);
   assert.match(htmlSource, /result\.error==='csrf_required'&&retry/);
   assert.match(serverSource, /csrfReady/);
+});
+
+test("application mutations use only the canonical CSRF header in executable code", () => {
+  assert.match(applicationSource, /"x-fima-csrf": token/);
+  assert.doesNotMatch(applicationSource, /"x-csrf-token": token/);
+  assert.doesNotMatch(applicationHtml, /application\/x-fima-legacy/);
+  assert.equal((applicationHtml.match(/paradise-apply\.js/g) || []).length, 1);
+});
+
+test("local browser verification stays on the loopback API without changing the production default", () => {
+  assert.match(publicConfigSource, /fimaLoopbackHost/);
+  assert.match(publicConfigSource, /window\.location\.origin/);
+  assert.match(publicConfigSource, /https:\/\/api\.fimamacro\.com/);
+  assert.match(applicationSource, /loopbackHost/);
+  assert.match(applicationSource, /defaultApiBase = loopbackHost \? window\.location\.origin/);
+  assert.match(applicationSource, /error\.status === 401/);
+  assert.match(applicationSource, /Fima hesabına giriş gerekli/);
 });
 
 test("multi-server owner console scopes reads and writes to a managed guild", () => {

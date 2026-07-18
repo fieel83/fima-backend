@@ -4,7 +4,31 @@ import path from "node:path";
 import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
+import {
+  COMMUNITY_LANGUAGE_ONBOARDING_CHOICES,
+  normalizeLanguageOnboardingChoice
+} from "./accountProfilePreferences.js";
 import { createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
+import {
+  communityActivityLeaderboard,
+  communityActivityRank,
+  communityActivityRewards,
+  handleCommunityTextActivity,
+  handleCommunityVoiceActivity,
+  startCommunityActivityWorker
+} from "./communityActivity.js";
+import {
+  observeCommunityBoostMessage,
+  reconcileCommunityBoosterMember,
+  startCommunityBoosterWorker
+} from "./communityBooster.js";
+import { answerFimaSupportQuestion, fimaAiHealth } from "./fimaAiAdapter.js";
+import {
+  assertSafeParadiseContentDelivery,
+  importParadiseDiscordMessage,
+  normalizeParadiseContentPayload
+} from "./paradiseContentStudio.js";
+import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
 import {
   applyParadiseTemplateMissingOnly,
   handleParadiseGuildMemberAdd,
@@ -14,6 +38,7 @@ import {
   handleParadiseMessage,
   handleParadiseVoiceStateUpdate,
   initializeParadise,
+  PARADISE_TEST_GUILD_ID,
   PARADISE_SETUP_SCHEMAS,
   paradiseSetupChannelType,
   paradiseCommandAllowedForMode,
@@ -107,11 +132,13 @@ const ROLE_TYPES = {
   languageTurkish: {
     envName: "DISCORD_LANGUAGE_TR_ROLE_ID",
     fallbackName: "Language: Turkish",
+    aliases: ["Türkçe", "Turkish"],
     color: 0xe74c3c
   },
   languageEnglish: {
     envName: "DISCORD_LANGUAGE_EN_ROLE_ID",
     fallbackName: "Language: English",
+    aliases: ["English"],
     color: 0x3498db
   },
   languageGerman: {
@@ -131,13 +158,22 @@ const ROLE_TYPES = {
   }
 };
 
-const LANGUAGE_CHOICES = [
-  { id: "tr", label: "Turkish", roleType: "languageTurkish" },
-  { id: "en", label: "English", roleType: "languageEnglish" },
-  { id: "de", label: "German", roleType: "languageGerman" },
-  { id: "fr", label: "French", roleType: "languageFrench" },
-  { id: "bs", label: "Bosnian", roleType: "languageBosnian" }
-];
+const LANGUAGE_ROLE_TYPES = new Set([
+  "languageTurkish",
+  "languageEnglish",
+  "languageGerman",
+  "languageFrench",
+  "languageBosnian"
+]);
+
+const LANGUAGE_CHOICES = COMMUNITY_LANGUAGE_ONBOARDING_CHOICES.map((choice) => ({
+  ...choice,
+  roleType: choice.id === "tr"
+    ? "languageTurkish"
+    : choice.id === "en"
+      ? "languageEnglish"
+      : null
+}));
 
 const PING_ROLE_CHOICES = [
   { id: "app_updates", label: "App Updates", roleType: "appUpdatesPing" },
@@ -159,18 +195,6 @@ const COMMUNITY_CHANNEL_BLUEPRINT = [
   { name: "training-signup", topic: "Community training queue and practice signup." },
   { name: "training-results", topic: "Training and event result submissions." },
   { name: "event-results", topic: "Event result summaries and highlights." }
-];
-
-const FIMA_KNOWLEDGE_BASE = [
-  { id: "download.official", title: "Official download", summary: "Use fimamacro.com/download and verify hashes on the security page." },
-  { id: "security.no-secrets", title: "No cookie/token/password stealing", summary: "Fima never asks for Roblox cookies, Discord tokens or browser passwords." },
-  { id: "license.hwid", title: "License and HWID", summary: "Keys bind to an account/device after activation. HWID help belongs in a private ticket with masked details." },
-  { id: "pricing.trial", title: "Pricing, trial and gifts", summary: "Pricing, trials, referrals and gifts live on fimamacro.com. Support can help with Robux orders only inside a ticket." },
-  { id: "setup.basics", title: "App setup basics", summary: "Choose language, set sensitivity/MS, configure screen, assign a bind, then test safely." },
-  { id: "fpsms.honesty", title: "FPS/MS source", summary: "Fima labels values exact, estimated or unavailable and does not read Roblox panels as source." },
-  { id: "community.training", title: "Training and events", summary: "Fima training queues are community practice/support systems, not clan membership requirements." },
-  { id: "oldtgmacro.proof", title: "Old TGMacro proof", summary: "Old TGMacro buyer proof belongs in a private ticket. Staff can review masked proof manually." },
-  { id: "support.escalate", title: "Escalation", summary: "If the bot is unsure, it should open or escalate a ticket for staff." }
 ];
 
 const TICKET_CATEGORIES = [
@@ -356,6 +380,10 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Discord command registration failed", { message: error.message });
     });
+    const activityWorker = startCommunityActivityWorker(client);
+    console.info("FIMA community activity worker state", activityWorker);
+    const boosterWorker = startCommunityBoosterWorker(client);
+    console.info("FIMA community booster worker state", boosterWorker);
     // Guild maintenance can take time across several servers. Do not make the
     // strictly test-guild-only smoke wait behind it after a deploy.
     void initializeParadise(client).catch((error) => {
@@ -397,6 +425,16 @@ export function startDiscordBot() {
   });
 
   client.on("messageCreate", (message) => {
+    if (message.guildId === PARADISE_TEST_GUILD_ID) {
+      observeCommunityBoostMessage(message).catch((error) => {
+        lastError = error.message;
+        console.warn("FIMA booster observation failed", { message: error.message, code: error.code || null, messageId: message?.id || null });
+      });
+      handleCommunityTextActivity(message).catch((error) => {
+        lastError = error.message;
+        console.warn("FIMA text activity handler failed", { message: error.message, code: error.code || null, channelId: message?.channelId || null });
+      });
+    }
     handleParadiseMessage(message).catch((error) => {
       lastError = error.message;
       console.warn("Paradise sticky message handler failed", { message: error.message, channelId: message?.channelId || null });
@@ -408,6 +446,12 @@ export function startDiscordBot() {
   });
 
   client.on("guildMemberUpdate", (oldMember, newMember) => {
+    if (newMember?.guild?.id === PARADISE_TEST_GUILD_ID) {
+      reconcileCommunityBoosterMember(oldMember, newMember).catch((error) => {
+        lastError = error.message;
+        console.warn("FIMA booster member reconciliation failed", { message: error.message, code: error.code || null, guildId: newMember?.guild?.id || null });
+      });
+    }
     handleParadiseGuildMemberUpdate(oldMember, newMember).catch((error) => {
       lastError = error.message;
       console.warn("Paradise staff-team refresh failed", { message: error.message, guildId: newMember?.guild?.id || null });
@@ -419,9 +463,19 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Paradise welcome automation failed", { message: error.message, guildId: member?.guild?.id || null });
     });
+    handleCommunityLanguageOnboarding(member).catch((error) => {
+      lastError = error.message;
+      console.warn("Community language onboarding failed", { message: error.message, guildId: member?.guild?.id || null });
+    });
   });
 
   client.on("guildMemberRemove", (member) => {
+    if (member?.guild?.id === PARADISE_TEST_GUILD_ID) {
+      reconcileCommunityBoosterMember(member, null).catch((error) => {
+        lastError = error.message;
+        console.warn("FIMA booster leave reconciliation failed", { message: error.message, code: error.code || null, guildId: member?.guild?.id || null });
+      });
+    }
     handleParadiseGuildMemberRemove(member).catch((error) => {
       lastError = error.message;
       console.warn("Paradise leave automation failed", { message: error.message, guildId: member?.guild?.id || null });
@@ -429,6 +483,12 @@ export function startDiscordBot() {
   });
 
   client.on("voiceStateUpdate", (oldState, newState) => {
+    if ((newState?.guild?.id || oldState?.guild?.id) === PARADISE_TEST_GUILD_ID) {
+      handleCommunityVoiceActivity(oldState, newState).catch((error) => {
+        lastError = error.message;
+        console.warn("FIMA voice activity handler failed", { message: error.message, code: error.code || null });
+      });
+    }
     handleParadiseVoiceStateUpdate(oldState, newState).catch((error) => {
       lastError = error.message;
       console.warn("Paradise temporary voice automation failed", { message: error.message, guildId: newState?.guild?.id || oldState?.guild?.id || null });
@@ -461,6 +521,22 @@ async function registerDiscordCommands() {
   if (!client?.application) return;
   const allCommands = [
     ...paradiseCommands(),
+    new SlashCommandBuilder()
+      .setName("fima")
+      .setDescription("FIMA activity ranks and Macro rewards.")
+      .addSubcommand((subcommand) => subcommand
+        .setName("leaderboard")
+        .setDescription("Show this season's text or voice leaderboard.")
+        .addStringOption((option) => option
+          .setName("board")
+          .setDescription("Leaderboard type")
+          .setRequired(true)
+          .addChoices(
+            { name: "Text", value: "text" },
+            { name: "Voice", value: "voice" }
+          )))
+      .addSubcommand((subcommand) => subcommand.setName("rank").setDescription("Show your text and voice ranks."))
+      .addSubcommand((subcommand) => subcommand.setName("rewards").setDescription("Show your earned Macro reward history.")),
     new SlashCommandBuilder().setName("fima_account").setDescription("Show your linked Fima account."),
     new SlashCommandBuilder().setName("fima_recovery").setDescription("Send a password reset code to your Discord DM."),
     new SlashCommandBuilder().setName("fima_help").setDescription("Show Fima account, trial and support help."),
@@ -482,11 +558,11 @@ async function registerDiscordCommands() {
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
     new SlashCommandBuilder()
       .setName("fima_roles_setup")
-      .setDescription("Check or create the Fima Buyer and Trial roles.")
+      .setDescription("Check or create the FIMA community roles.")
       .addChannelOption((option) => option.setName("channel").setDescription("Target channel").addChannelTypes(ChannelType.GuildText).setRequired(false)),
     new SlashCommandBuilder()
       .setName("fima_roles_sync")
-      .setDescription("Check or create the Fima Buyer and Trial roles."),
+      .setDescription("Check or create the FIMA community roles."),
     new SlashCommandBuilder()
       .setName("fima_ticket")
       .setDescription("Open the Fima support ticket menu."),
@@ -587,11 +663,9 @@ async function registerDiscordCommands() {
         .setDescription("Language")
         .setRequired(false)
         .addChoices(
-          { name: "Turkish", value: "tr" },
+          { name: "Türkçe", value: "tr" },
           { name: "English", value: "en" },
-          { name: "German", value: "de" },
-          { name: "French", value: "fr" },
-          { name: "Bosnian", value: "bs" }
+          { name: "Decide Later", value: "later" }
         )),
     new SlashCommandBuilder()
       .setName("language_broadcast")
@@ -697,13 +771,105 @@ async function registerDiscordCommands() {
   }
 }
 
+function activitySeasonLabel(season) {
+  const startsAt = new Date(season?.startsAt || Date.now());
+  const endsAt = new Date(season?.endsAt || Date.now());
+  const start = Math.floor(startsAt.getTime() / 1000);
+  const end = Math.floor(endsAt.getTime() / 1000);
+  return `<t:${start}:D> - <t:${end}:D>`;
+}
+
+function activityVoiceDuration(seconds) {
+  const totalMinutes = Math.max(0, Math.floor(Number(seconds || 0) / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours ? `${hours}s ${minutes}dk` : `${minutes}dk`;
+}
+
+function activityPrizeLabel(rank) {
+  return ({ 1: "15 gun", 2: "10 gun", 3: "7 gun" })[rank] || null;
+}
+
+async function handleCommunityActivityCommand(interaction) {
+  if (interaction.guildId !== PARADISE_TEST_GUILD_ID) {
+    return interaction.reply({
+      content: "FIMA activity sistemi production sunucusunda henuz etkin degil. Sonuclari dogrulanana kadar yalniz test sunucusunda calisir.",
+      ephemeral: true
+    });
+  }
+
+  const subcommand = interaction.options.getSubcommand();
+  await interaction.deferReply({ ephemeral: subcommand !== "leaderboard" });
+  try {
+    if (subcommand === "leaderboard") {
+      const board = interaction.options.getString("board", true);
+      const result = await communityActivityLeaderboard({ guildId: interaction.guildId, board, limit: 10 });
+      const boardName = board === "voice" ? "Ses" : "Text";
+      const lines = result.entries.map((entry) => {
+        const activity = board === "voice"
+          ? `${activityVoiceDuration(entry.voiceSeconds)} • ${entry.xp} XP`
+          : `${entry.textMessages} mesaj • ${entry.xp} XP`;
+        const prize = activityPrizeLabel(entry.rank);
+        return `**#${entry.rank}** <@${entry.discordUserId}> • ${activity}${prize ? ` • **${prize} FIMA Macro**` : ""}`;
+      });
+      const embed = new EmbedBuilder()
+        .setColor(board === "voice" ? 0x40d6ff : 0x9b5cff)
+        .setTitle(`FIMA ${boardName} Leaderboard`)
+        .setDescription(lines.length ? lines.join("\n") : "Bu sezonda henuz uygun aktivite kaydi yok.")
+        .addFields(
+          { name: "Sezon", value: activitySeasonLabel(result.season), inline: false },
+          { name: "Oduller", value: "1. 15 gun • 2. 10 gun • 3. 7 gun FIMA Macro. Text ve ses odulleri ayri kazanilir ve ust uste eklenir.", inline: false },
+          { name: "Booster Odulleri", value: "Her ay dogrulanan aktif boost basina +3 gun FIMA Macro verilir. Booster, text ve ses odulleri ust uste eklenir.", inline: false }
+        )
+        .setFooter({ text: "Leaderboard siralamalari her ay UTC saatine gore sifirlanir." });
+      return interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
+    }
+
+    if (subcommand === "rank") {
+      const result = await communityActivityRank({ guildId: interaction.guildId, discordUserId: interaction.user.id });
+      const textRank = result.text
+        ? `#${result.text.rank || "-"} • ${result.text.xp} XP • ${result.text.textMessages} mesaj`
+        : "Henuz uygun text aktivitesi yok.";
+      const voiceRank = result.voice
+        ? `#${result.voice.rank || "-"} • ${result.voice.xp} XP • ${activityVoiceDuration(result.voice.voiceSeconds)}`
+        : "Henuz uygun ses aktivitesi yok.";
+      const embed = new EmbedBuilder()
+        .setColor(0x9b5cff)
+        .setTitle("FIMA Activity Rank")
+        .addFields(
+          { name: "Text", value: textRank, inline: false },
+          { name: "Ses", value: voiceRank, inline: false },
+          { name: "Sezon", value: activitySeasonLabel(result.season), inline: false }
+        )
+        .setFooter({ text: "Odul alabilmek icin Discord hesabin FIMA hesabina bagli olmalidir." });
+      return interaction.editReply({ embeds: [embed] });
+    }
+
+    const rewards = await communityActivityRewards({ guildId: interaction.guildId, discordUserId: interaction.user.id });
+    const lines = rewards.slice(0, 10).map((reward) => {
+      const boardName = reward.board === "voice" ? "Ses" : "Text";
+      const grantState = reward.entitlementGrant ? "lisansa eklendi" : reward.status === "blocked" ? "hesap baglantisi bekliyor" : reward.status;
+      return `**${boardName} #${reward.rank}** • ${reward.days} gun • ${grantState} • ${activitySeasonLabel(reward.season)}`;
+    });
+    const embed = new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle("FIMA Macro Activity Odulleri")
+      .setDescription(lines.length ? lines.join("\n") : "Henuz kazanilmis activity odulu yok.")
+      .addFields({ name: "Odul tablosu", value: "1. 15 gun • 2. 10 gun • 3. 7 gun. Text ve ses Top 3 odulleri ayri ayri verilir.", inline: false });
+    return interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.warn("FIMA activity command failed", { message: error.message, code: error.code || null, subcommand });
+    return interaction.editReply({ content: "Activity verisi su anda alinamiyor. Herhangi bir odul veya lisans islemi uydurulmadi." });
+  }
+}
+
 async function handleDiscordInteraction(interaction) {
   if (await handleParadiseInteraction(interaction)) return;
   if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_ticket_category") {
     return handleTicketCategorySelect(interaction);
   }
 
-  if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_language_select") {
+  if (interaction?.isStringSelectMenu?.() && String(interaction.customId || "").startsWith("fima_language_select")) {
     return handleLanguageSelect(interaction);
   }
 
@@ -725,16 +891,24 @@ async function handleDiscordInteraction(interaction) {
 
   if (!interaction?.isChatInputCommand?.()) return;
 
+  if (interaction.commandName === "fima") {
+    return handleCommunityActivityCommand(interaction);
+  }
+
   if (interaction.commandName === "fima_help") {
     return interaction.reply({ embeds: [fimaHelpEmbed()], ephemeral: true });
   }
 
   if (interaction.commandName === "fima_support_ai") {
     const question = interaction.options.getString("question") || "";
-    const answer = fimaKnowledgeAnswer(question);
+    const answer = await fimaKnowledgeAnswer(question);
     await auditDiscordBotAction("discord_ai_support_answered", "discord_user", interaction.user.id, {
       matched: answer.matchedIds,
       risky: answer.risky,
+      source: answer.source,
+      confidence: answer.confidence,
+      escalation: answer.escalation,
+      fallbackReason: answer.reason,
       questionLength: question.length
     });
     return interaction.reply({ embeds: [answer.embed], ephemeral: true });
@@ -775,7 +949,6 @@ async function handleDiscordInteraction(interaction) {
     const result = await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
     const lines = [
       `Buyer role: ${result.roles.buyer?.name || "missing"} (${result.roles.buyer?.created ? "created" : "ready"})`,
-      `Trial role: ${result.roles.trial?.name || "missing"} (${result.roles.trial?.created ? "created" : "ready"})`,
       result.position?.attempted
         ? `Position: ${result.position.success ? "updated" : "checked"}`
         : "Position: not changed"
@@ -851,10 +1024,9 @@ async function handleDiscordInteraction(interaction) {
     if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({ content: "Only admins can set up language selection.", ephemeral: true });
     }
-    await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
     const channel = interaction.options.getChannel("channel") || interaction.channel;
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
-    await channel.send(fimaLanguagePanelPayload());
+    await channel.send(fimaLanguagePanelPayload(interaction.guildId));
     await auditDiscordBotAction("discord_language_panel_sent", "discord_channel", channel.id, {
       actorId: interaction.user.id,
       languages: LANGUAGE_CHOICES.map((item) => item.id)
@@ -901,7 +1073,7 @@ async function handleDiscordInteraction(interaction) {
     await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
     const channel = interaction.options.getChannel("channel") || interaction.channel;
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
-    await channel.send(fimaLanguagePanelPayload());
+    await channel.send(fimaLanguagePanelPayload(interaction.guildId));
     await channel.send(fimaPingRolePanelPayload());
     await auditDiscordBotAction("discord_rolepicker_panel_sent", "discord_channel", channel.id, {
       actorId: interaction.user.id
@@ -911,7 +1083,7 @@ async function handleDiscordInteraction(interaction) {
 
   if (interaction.commandName === "language") {
     const choice = interaction.options.getString("choice");
-    if (!choice) return interaction.reply({ ...fimaLanguagePanelPayload(), ephemeral: true });
+    if (!choice) return interaction.reply({ ...fimaLanguagePanelPayload(interaction.guildId), ephemeral: true });
     return applyLanguageChoice(interaction, choice);
   }
 
@@ -921,7 +1093,7 @@ async function handleDiscordInteraction(interaction) {
     }
     const channel = interaction.options.getChannel("channel") || interaction.channel;
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
-    await channel.send(fimaLanguagePanelPayload());
+    await channel.send(fimaLanguagePanelPayload(interaction.guildId));
     await auditDiscordBotAction("discord_language_broadcast", "discord_channel", channel.id, {
       actorId: interaction.user.id
     });
@@ -1078,83 +1250,238 @@ function fimaHelpEmbed() {
     .setDescription("Need a hand? Use `/fima_account` to check your link or `/fima_recovery` for a reset code. For setup, payments, or old TGMacro proof, open a ticket.");
 }
 
-function fimaKnowledgeAnswer(question) {
-  const text = String(question || "").toLowerCase();
-  const risky = /\b(crack|bypass|injector|inject|cookie|token|stolen|steal|fake file|decompile|patch)\b/i.test(text);
-  const matches = FIMA_KNOWLEDGE_BASE.filter((item) => {
-    const haystack = `${item.id} ${item.title} ${item.summary}`.toLowerCase();
-    return text.split(/\s+/).filter(Boolean).some((word) => word.length > 3 && haystack.includes(word));
-  }).slice(0, 4);
-  const selected = risky
-    ? [FIMA_KNOWLEDGE_BASE.find((item) => item.id === "security.no-secrets"), FIMA_KNOWLEDGE_BASE.find((item) => item.id === "download.official")].filter(Boolean)
-    : matches.length ? matches : [FIMA_KNOWLEDGE_BASE.find((item) => item.id === "support.escalate")].filter(Boolean);
+async function fimaKnowledgeAnswer(question) {
+  const answer = await answerFimaSupportQuestion(question);
   const embed = new EmbedBuilder()
-    .setColor(risky ? 0xff4d6d : 0x9b5cff)
-    .setTitle(risky ? "Fima safety answer" : "Fima support answer")
-    .setDescription(risky
-      ? "I can help with safe Fima support only. Do not use cracked files, bypasses, injectors, cookies or token-based instructions."
-      : "I answered using the approved Fima knowledge base. If this does not solve it, open a ticket.")
-    .addFields(selected.map((item) => ({
-      name: `${item.id} - ${item.title}`,
-      value: item.summary,
-      inline: false
-    })));
-  if (!matches.length && !risky) {
-    embed.addFields({ name: "Next step", value: "Open a ticket with masked details. Staff can ask guided questions without exposing keys or HWIDs.", inline: false });
+    .setColor(answer.risky ? 0xff4d6d : 0x9b5cff)
+    .setTitle(answer.title)
+    .setDescription(answer.description)
+    .addFields(answer.fields);
+  if (answer.escalation) {
+    embed.addFields({ name: "Next step", value: "Open a private ticket with masked details so staff can verify the request. Never post keys, tokens, cookies, passwords, payment details or full HWIDs.", inline: false });
   }
   return {
+    ...answer,
     embed,
-    matchedIds: selected.map((item) => item.id),
-    risky
   };
 }
 
-function fimaLanguagePanelPayload() {
+export async function fimaAiSupportHealth() {
+  return fimaAiHealth();
+}
+
+function communityGuildId(requestedGuildId = null) {
+  return requestedGuildId || env("FIEELS_COMMUNITY_GUILD_ID") || env("DISCORD_GUILD_ID");
+}
+
+function communityLanguageOnboardingEnabled() {
+  return ["1", "true", "yes", "on"].includes(String(env("FIEELS_COMMUNITY_LANGUAGE_ONBOARDING", "false")).trim().toLowerCase());
+}
+
+async function handleCommunityLanguageOnboarding(member) {
+  if (!communityLanguageOnboardingEnabled() || member?.user?.bot) return { skipped: true, reason: "disabled_or_bot" };
+  const guildId = communityGuildId();
+  if (!guildId || member?.guild?.id !== guildId) return { skipped: true, reason: "different_guild" };
+
+  const recordKey = String(member.id || "");
+  if (!recordKey) return { skipped: true, reason: "missing_member_id" };
+  const where = {
+    guildId_kind_recordKey: {
+      guildId,
+      kind: "community_language_onboarding",
+      recordKey
+    }
+  };
+  const existing = await prisma.paradiseGuildRecord.findUnique({ where }).catch(() => null);
+  if (existing) return { skipped: true, reason: "already_recorded" };
+
+  try {
+    await prisma.paradiseGuildRecord.create({
+      data: {
+        guildId,
+        kind: "community_language_onboarding",
+        recordKey,
+        payload: {
+          status: "pending",
+          discordUserId: recordKey,
+          createdAt: new Date().toISOString()
+        }
+      }
+    });
+  } catch (error) {
+    const racedRecord = await prisma.paradiseGuildRecord.findUnique({ where }).catch(() => null);
+    if (racedRecord) return { skipped: true, reason: "already_recorded" };
+    throw error;
+  }
+
+  let status = "sent";
+  let errorCode = null;
+  try {
+    await member.send(fimaLanguagePanelPayload(guildId));
+  } catch (error) {
+    status = "dm_unavailable";
+    errorCode = error?.code ? String(error.code) : "discord_dm_failed";
+  }
+  await prisma.paradiseGuildRecord.update({
+    where,
+    data: {
+      payload: {
+        status,
+        discordUserId: recordKey,
+        deliveredAt: status === "sent" ? new Date().toISOString() : null,
+        errorCode
+      }
+    }
+  }).catch(() => {});
+  await auditDiscordBotAction("discord_language_onboarding_recorded", "discord_user", recordKey, {
+    guildId,
+    status,
+    errorCode
+  });
+  return { skipped: false, status };
+}
+
+async function recordCommunityLanguageChoice(discordUserId, languageId, requestedGuildId = null) {
+  const normalizedChoice = normalizeLanguageOnboardingChoice(languageId);
+  if (!normalizedChoice) return;
+  const now = new Date();
+  const data = normalizedChoice === "later"
+    ? {
+        languageOnboardingStatus: "deferred",
+        languageOnboardingDeferredAt: now
+      }
+    : {
+        preferredLanguage: normalizedChoice,
+        languageOnboardingStatus: "completed",
+        languageOnboardingCompletedAt: now,
+        languageOnboardingDeferredAt: null
+      };
+  await prisma.user.updateMany({
+    where: { discordUserId: String(discordUserId || "") },
+    data
+  }).catch((error) => {
+    console.warn("Community profile language save failed", { message: error.message });
+  });
+
+  const guildId = communityGuildId(requestedGuildId);
+  if (!guildId) return;
+  await prisma.paradiseGuildRecord.updateMany({
+    where: {
+      guildId,
+      kind: "community_language_onboarding",
+      recordKey: String(discordUserId || "")
+    },
+    data: {
+      payload: {
+        status: normalizedChoice === "later" ? "deferred" : "completed",
+        choice: normalizedChoice,
+        discordUserId: String(discordUserId || ""),
+        completedAt: now.toISOString()
+      }
+    }
+  }).catch(() => {});
+}
+
+export async function syncDiscordLanguageRole(discordUserId, languageId, { guildId = null } = {}) {
+  const normalizedChoice = normalizeLanguageOnboardingChoice(languageId);
+  if (!normalizedChoice) {
+    const error = new Error("invalid_community_language");
+    error.code = "invalid_community_language";
+    throw error;
+  }
+  if (normalizedChoice === "later") {
+    return { success: true, deferred: true, language: normalizedChoice, roleId: null };
+  }
+
+  const selected = LANGUAGE_CHOICES.find((item) => item.id === normalizedChoice);
+  const guild = await getGuild(communityGuildId(guildId));
+  const member = await guild.members.fetch(String(discordUserId || "")).catch(() => null);
+  if (!member) {
+    const error = new Error("discord_guild_membership_required");
+    error.code = "discord_guild_membership_required";
+    throw error;
+  }
+
+  const role = await findRole(guild, ROLE_TYPES[selected.roleType]);
+  if (!role) {
+    const error = new Error("discord_language_role_missing");
+    error.code = "discord_language_role_missing";
+    throw error;
+  }
+
+  for (const other of LANGUAGE_CHOICES.filter((item) => item.roleType && item.id !== normalizedChoice)) {
+    const otherRole = await findRole(guild, ROLE_TYPES[other.roleType]).catch(() => null);
+    if (otherRole && member.roles.cache.has(otherRole.id)) await member.roles.remove(otherRole.id);
+  }
+  if (!member.roles.cache.has(role.id)) await member.roles.add(role.id);
+  await auditDiscordBotAction("discord_language_selected", "discord_user", String(discordUserId || ""), {
+    guildId: guild.id,
+    language: normalizedChoice,
+    roleId: role.id,
+    existingRoleOnly: true
+  });
+  return {
+    success: true,
+    deferred: false,
+    language: normalizedChoice,
+    guildId: guild.id,
+    roleId: role.id,
+    roleName: role.name
+  };
+}
+
+function fimaLanguagePanelPayload(guildId = null) {
+  const customId = guildId ? `fima_language_select:${guildId}` : "fima_language_select";
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
-    .setTitle("Choose your Fima language")
-    .setDescription("Pick the language you want for support messages. The bot will not DM you repeatedly after you choose.");
+    .setTitle("Choose your community language")
+    .setDescription("Choose Türkçe, English, or Decide Later. This onboarding message is sent only once.");
   const row = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId("fima_language_select")
+      .setCustomId(customId)
       .setPlaceholder("Select language")
       .addOptions(LANGUAGE_CHOICES.map((language) => ({
         label: language.label,
         value: language.id,
-        description: `Use ${language.label} for Fima support where available.`
+        description: language.id === "later"
+          ? "Keep your current roles and choose later."
+          : `Use ${language.label} for community access and support.`
       })))
   );
   return { embeds: [embed], components: [row] };
 }
 
 async function handleLanguageSelect(interaction) {
-  return applyLanguageChoice(interaction, interaction.values?.[0]);
+  const guildId = String(interaction.customId || "").split(":")[1] || interaction.guildId || null;
+  return applyLanguageChoice(interaction, interaction.values?.[0], guildId);
 }
 
-async function applyLanguageChoice(interaction, languageId) {
-  const selected = LANGUAGE_CHOICES.find((item) => item.id === languageId);
+async function applyLanguageChoice(interaction, languageId, requestedGuildId = null) {
+  const normalizedChoice = normalizeLanguageOnboardingChoice(languageId);
+  const selected = LANGUAGE_CHOICES.find((item) => item.id === normalizedChoice);
   if (!selected) return interaction.reply({ content: "That language is not available yet.", ephemeral: true });
 
-  const guild = interaction.guild || await getGuild();
-  const role = await getOrCreateRole(guild, selected.roleType);
-  const member = await guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!member) return interaction.reply({ content: "Could not find your server member profile.", ephemeral: true });
-
-  const languageRoleIds = [];
-  for (const language of LANGUAGE_CHOICES) {
-    const languageRole = await findRole(guild, ROLE_TYPES[language.roleType]).catch(() => null);
-    if (languageRole) languageRoleIds.push(languageRole.id);
-  }
-  for (const roleId of languageRoleIds) {
-    if (roleId !== role.id && member.roles.cache.has(roleId)) {
-      await member.roles.remove(roleId).catch(() => {});
+  const guildId = requestedGuildId || interaction.guildId || communityGuildId();
+  let syncResult = { success: true, deferred: selected.id === "later", roleId: null };
+  let syncWarning = null;
+  if (selected.id !== "later") {
+    try {
+      syncResult = await syncDiscordLanguageRole(interaction.user.id, selected.id, { guildId });
+    } catch (error) {
+      syncWarning = error?.code || error?.message || "discord_language_sync_failed";
     }
   }
-  await member.roles.add(role.id);
-  await auditDiscordBotAction("discord_language_selected", "discord_user", interaction.user.id, {
-    language: selected.id,
-    roleId: role.id
-  });
+
+  await recordCommunityLanguageChoice(interaction.user.id, selected.id, guildId);
+  if (syncWarning) {
+    return interaction.reply({
+      content: `Your **${selected.label}** choice was saved, but the existing server role could not be mapped (${syncWarning}). Staff must map the current role; no replacement role was created.`,
+      ephemeral: true
+    });
+  }
+  if (syncResult.deferred) {
+    return interaction.reply({ content: "Choice deferred. Your existing roles were not changed.", ephemeral: true });
+  }
   return interaction.reply({ content: `Language set to **${selected.label}**.`, ephemeral: true });
 }
 
@@ -1551,17 +1878,22 @@ function staffSummaryEmbed(commandName, period) {
 }
 
 function applicationPanelPayload() {
+  const siteUrl = (env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "");
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
-    .setTitle("Paradise Applications")
-    .setDescription("Choose the right application path. Long forms continue in safe steps, and staff reviews every submission manually.")
+    .setTitle("Fieel's Community Applications")
+    .setDescription("Applications start on the Fima website. A linked Discord account and membership in the selected server are required before a private staff review ticket is created.")
     .addFields(
-      { name: "Community staff", value: "Fima Support, Macro Staff, FFlag Staff, Event/Giveaway Hoster and Moderator applications.", inline: false },
-      { name: "Clan / ranking staff", value: "Training Hoster, Tryout Hoster, Referee, Leaderboard, Roster and War Hoster applications.", inline: false },
-      { name: "Reseller / Partner", value: "Owner-reviewed only. Resellers receive referral tracking, never raw license keys or secret customer data.", inline: false }
+      { name: "Community staff", value: "Helper is the only public staff entry. Junior Moderator and higher roles are internal promotions and cannot be requested or auto-granted.", inline: false }
     )
     .setFooter({ text: "Made By Fieel" });
-  return { embeds: [embed] };
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel("Apply as Helper")
+      .setStyle(ButtonStyle.Link)
+      .setURL(`${siteUrl}/paradise-apply?workflow=staff&type=helper`)
+  );
+  return { embeds: [embed], components: [buttons] };
 }
 
 function sanitizeDiscordText(value, max = 120) {
@@ -1674,13 +2006,13 @@ function fimaAnnouncementPayload(commandName = "fima_embed") {
     .setDescription("Need Fima? Start here.")
     .addFields(
       { name: "Setup", value: "Download the app, log in, paste your key, and you are ready.", inline: false },
-      { name: "Price", value: "Use the website for the current EUR prices and active trial offer.", inline: true },
+      { name: "Price", value: "Use the website for the current EUR prices and available access plans.", inline: true },
       { name: "Buy Options", value: "Card checkout, gift codes and support-assisted Robux orders.", inline: true },
-      { name: "Recommended", value: "Start with the trial if it is active, then pick the plan that fits you.", inline: false },
+      { name: "Recommended", value: "Start with 3 Days if you need short access, or choose Monthly or Lifetime for longer use.", inline: false },
       { name: "Tutorial", value: "Open the Macros page for setup notes and video slots.", inline: true },
       { name: "Support", value: "Stuck? Open a ticket and we will help.", inline: true },
       { name: "Download", value: "Use the website download page so the link always follows the latest public release.", inline: false },
-      { name: "Old TGMacro buyer?", value: "Open a ticket and send proof. Staff can check if a 3-day Fima trial applies.", inline: false }
+      { name: "Old TGMacro buyer?", value: "Open a private ticket and send masked proof. Staff can review whether legacy 3-day access applies.", inline: false }
     )
     .setImage(`${siteUrl.replace(/\/+$/, "")}/assets/social-preview.png?v=20260531-1`);
   const mainRow = new ActionRowBuilder().addComponents(
@@ -1757,7 +2089,7 @@ function fimaTrustPanelPayload() {
       { name: "Official download", value: `Use ${siteUrl}/download. Do not trust random reuploads.`, inline: false },
       { name: "Is Fima safe?", value: "Fima does not ask for Roblox passwords, Roblox cookies, Discord tokens or browser passwords.", inline: false },
       { name: "Fake/cracked files", value: "Modified builds are not supported and can be unsafe. Use the public release only.", inline: false },
-      { name: "Pricing and trial", value: `Check ${siteUrl}/pricing for current plans and trial info.`, inline: false },
+      { name: "Pricing and rewards", value: `Check ${siteUrl}/pricing for current paid plans. Monthly Activity Rewards and verified Booster Rewards are tracked separately and can stack.`, inline: false },
       { name: "Old TGMacro buyer", value: "Open a ticket, send proof, and staff can review 3-day access.", inline: false }
     );
   const row = new ActionRowBuilder().addComponents(
@@ -1774,9 +2106,10 @@ function fimaFaqPanelPayload() {
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
     .setTitle("Fima FAQ")
-    .setDescription("Quick answers for buying, trials, licenses, HWID and safe downloads.")
+    .setDescription("Quick answers for buying, Activity Rewards, Booster Rewards, licenses, HWID and safe downloads.")
     .addFields(
-      { name: "How trial works", value: "Trial access is claimed from your Fima account. Free trial requirements can include Discord and Roblox profile verification.", inline: false },
+      { name: "How Activity Rewards work", value: "Every UTC month, the Top 3 text and Top 3 voice members earn 15, 10 and 7 days of FIMA Macro access. Text and voice rewards are separate and can stack.", inline: false },
+      { name: "How Booster Rewards work", value: "Each verified active server boost adds 3 days of FIMA Macro access for that UTC month. Booster, text and voice rewards can stack; Discord must be linked for delivery.", inline: false },
       { name: "License and HWID", value: "Keys are device-bound after activation. If your PC changed, open a License / HWID ticket with masked details only.", inline: false },
       { name: "Old TGMacro buyer proof", value: "Open an Old TGMacro buyer proof ticket, send proof privately, and staff will review eligibility.", inline: false },
       { name: "Support rules", value: "Never post full keys, emails, HWIDs, tokens, passwords or cookies. Staff only needs masked details.", inline: false }
@@ -2531,6 +2864,122 @@ export async function paradiseDiscordGuildsSnapshot() {
   return guilds.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function contentStudioDiscordError(code, message = code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+async function contentStudioTextChannel(guildId, channelId) {
+  const guild = await getGuild(guildId);
+  const normalizedChannelId = String(channelId || "").trim();
+  if (!/^\d{16,22}$/.test(normalizedChannelId)) throw contentStudioDiscordError("invalid_channel_id");
+  const channel = await guild.channels.fetch(normalizedChannelId).catch(() => null);
+  if (
+    !channel
+    || channel.guildId !== guild.id
+    || channel.isThread?.()
+    || !channel.isTextBased?.()
+    || !channel.messages?.fetch
+  ) {
+    throw contentStudioDiscordError("content_channel_not_found");
+  }
+  return { guild, channel };
+}
+
+export async function paradiseDiscordContentMessage(guildId, channelId, messageId, options = {}) {
+  const normalizedMessageId = String(messageId || "").trim();
+  if (!/^\d{16,22}$/.test(normalizedMessageId)) throw contentStudioDiscordError("invalid_message_id");
+  const { channel } = await contentStudioTextChannel(guildId, channelId);
+  const message = await channel.messages.fetch(normalizedMessageId).catch(() => null);
+  if (!message) throw contentStudioDiscordError("content_message_not_found");
+  return importParadiseDiscordMessage(message, { ...options, sourceGuildId: guildId });
+}
+
+async function managedContentStudioWebhook(channel) {
+  if (typeof channel.fetchWebhooks !== "function" || typeof channel.createWebhook !== "function") {
+    throw contentStudioDiscordError("managed_webhook_channel_unsupported");
+  }
+  const webhooks = await channel.fetchWebhooks();
+  const existing = [...webhooks.values()].find(webhook =>
+    webhook.name === "Paradise Content Studio"
+    && webhook.owner?.id === client?.user?.id
+    && webhook.token
+  );
+  if (existing) return existing;
+  return channel.createWebhook({
+    name: "Paradise Content Studio",
+    reason: "Owner-approved Content Studio delivery in the isolated Paradise test guild"
+  });
+}
+
+export async function publishParadiseContentMessage({
+  guildId,
+  channelId,
+  messageId = null,
+  payload,
+  deliveryMode = "bot",
+  webhookUrl = null
+} = {}) {
+  const policy = assertParadiseTestGuildMutation({ guildId, operation: "content_studio_publish" });
+  const delivery = assertSafeParadiseContentDelivery({ deliveryMode, webhookUrl });
+  const normalized = normalizeParadiseContentPayload(payload);
+  const { guild, channel } = await contentStudioTextChannel(guildId, channelId);
+  const normalizedMessageId = messageId ? String(messageId).trim() : null;
+  if (normalizedMessageId && !/^\d{16,22}$/.test(normalizedMessageId)) {
+    throw contentStudioDiscordError("invalid_message_id");
+  }
+
+  let result;
+  let operation;
+  if (delivery.deliveryMode === "bot") {
+    if (typeof channel.send !== "function") throw contentStudioDiscordError("content_channel_not_sendable");
+    if (normalizedMessageId) {
+      const message = await channel.messages.fetch(normalizedMessageId).catch(() => null);
+      if (!message) throw contentStudioDiscordError("content_message_not_found");
+      if (message.webhookId || message.author?.id !== client?.user?.id) {
+        throw contentStudioDiscordError("content_message_not_owned_by_bot");
+      }
+      result = await message.edit(normalized);
+      operation = "edit";
+    } else {
+      result = await channel.send(normalized);
+      operation = "send";
+    }
+  } else {
+    const webhook = await managedContentStudioWebhook(channel);
+    if (normalizedMessageId) {
+      const message = await channel.messages.fetch(normalizedMessageId).catch(() => null);
+      if (!message) throw contentStudioDiscordError("content_message_not_found");
+      if (message.webhookId !== webhook.id) throw contentStudioDiscordError("content_message_not_owned_by_managed_webhook");
+      result = await webhook.editMessage(normalizedMessageId, normalized);
+      operation = "edit";
+    } else {
+      result = await webhook.send({ ...normalized, wait: true });
+      operation = "send";
+    }
+  }
+
+  await auditDiscordBotAction("discord_content_studio_published", "discord_message", result.id, {
+    guildId: guild.id,
+    channelId: channel.id,
+    operation,
+    deliveryMode: delivery.deliveryMode,
+    testGuildPolicy: policy.code,
+    embedCount: normalized.embeds.length,
+    hasContent: Boolean(normalized.content)
+  });
+  return {
+    success: true,
+    guildId: guild.id,
+    channelId: channel.id,
+    messageId: result.id,
+    operation,
+    deliveryMode: delivery.deliveryMode,
+    testGuildPolicy: policy.code
+  };
+}
+
 const IMPORTANT_AUDIT_CHANNEL = /(welcome|rule|guide|verify|faq|trust|challenge|availability|loa|training|tryout|referee|hoster|activity|report|support|application|blacklist|appeal|bail|lineup|line-up|roster|mainer|relation|ally|enemy|announcement|update|mod-|message-|channel-|member-|ticket|log)/i;
 
 function auditMessageType(channelName, message) {
@@ -2866,7 +3315,16 @@ export async function runParadiseTestSmokeSuiteFromDashboard(guildId) {
 }
 
 export async function paradiseTestLabPublicStatus() {
-  return paradiseTestLabStatus();
+  let guild = null;
+  if (client?.isReady?.()) {
+    guild = client.guilds?.cache?.get?.(PARADISE_TEST_GUILD_ID)
+      || await client.guilds?.fetch?.(PARADISE_TEST_GUILD_ID).catch(() => null)
+      || null;
+    if (guild && !guild.members?.me && typeof guild.members?.fetchMe === "function") {
+      await guild.members.fetchMe().catch(() => null);
+    }
+  }
+  return paradiseTestLabStatus(guild);
 }
 
 export async function giveDiscordRole(discordUserId, type) {
@@ -2992,6 +3450,8 @@ async function ensureFimaRoles({ organize = false, actorId = null } = {}) {
   const guild = await getGuild();
   const roles = {};
   for (const type of Object.keys(ROLE_TYPES)) {
+    if (LANGUAGE_ROLE_TYPES.has(type)) continue;
+    if (type === "trial") continue;
     const before = await findRole(guild, ROLE_TYPES[type]);
     const role = await getOrCreateRole(guild, type);
     roles[type] = {
@@ -3020,7 +3480,7 @@ async function organizeRolePositions(guild, roleSummary) {
   }
   const highest = me.roles.highest?.position || 0;
   let moved = 0;
-  for (const [index, type] of Object.keys(ROLE_TYPES).entries()) {
+  for (const [index, type] of Object.keys(roleSummary).entries()) {
     const role = await guild.roles.fetch(roleSummary[type]?.id).catch(() => null);
     if (!role) {
       warnings.push(`${ROLE_TYPES[type].fallbackName} was not found.`);
@@ -3052,8 +3512,11 @@ async function getOrCreateRole(guild, type) {
   const role = await findRole(guild, config);
   if (role) return role;
 
-  const existing = guild.roles.cache.find((role) => role.name === config.fallbackName);
-  if (existing) return existing;
+  if (LANGUAGE_ROLE_TYPES.has(type)) {
+    const error = new Error("discord_language_role_missing");
+    error.code = "discord_language_role_missing";
+    throw error;
+  }
 
   const me = guild.members.me || await guild.members.fetchMe();
   if (!me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
@@ -3077,7 +3540,8 @@ async function findRole(guild, config) {
   }
 
   await guild.roles.fetch().catch(() => null);
-  return guild.roles.cache.find((role) => role.name === config.fallbackName) || null;
+  const candidateNames = new Set([config.fallbackName, ...(config.aliases || [])]);
+  return guild.roles.cache.find((role) => candidateNames.has(role.name)) || null;
 }
 
 async function auditDiscordBotAction(action, targetType = null, targetId = null, metadata = {}) {
@@ -3119,9 +3583,9 @@ async function getGuild(requestedGuildId = null) {
   return guild;
 }
 
-export async function paradiseWebsiteApplicationFormContext(guildId, discordUserId) {
+export async function paradiseWebsiteApplicationFormContext(guildId, discordUserId, options = {}) {
   const guild = await getGuild(guildId);
-  return paradiseWebsiteApplicationContext(guild, discordUserId);
+  return paradiseWebsiteApplicationContext(guild, discordUserId, options);
 }
 
 export async function submitParadiseWebsiteApplicationForm(guildId, payload) {

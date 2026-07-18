@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="FIMA masaüstü istemcisinde güvenli hesap oturumu açın.">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Masaüstü Girişi | FIMA</title>
+    <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="/assets/css/desktop-login.css?v=20260718-1">
+  </head>
+  <body>
+    <div class="ambient ambient-a" aria-hidden="true"></div>
+    <div class="ambient ambient-b" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="FIMA ana sayfa">
+        <img src="/assets/images/fima-logo.png?v=20260526-2" alt="">
+        <span>FIMA</span>
+      </a>
+      <span class="secure-pill"><i aria-hidden="true"></i> Güvenli cihaz onayı</span>
+    </header>
+
+    <main class="login-shell">
+      <section class="intro" aria-labelledby="desktop-login-title">
+        <p class="eyebrow">FIMA DESKTOP</p>
+        <h1 id="desktop-login-title">Hesabını bu cihaza bağla.</h1>
+        <p class="lead">FIMA uygulamasında gösterilen tek kullanımlık kodu gir. Şifren, lisans anahtarın ve ödeme bilgin masaüstü uygulamasıyla paylaşılmaz.</p>
+        <div class="trust-grid">
+          <article><span>01</span><div><strong>Kısa kod</strong><small>10 dakika içinde sona erer</small></div></article>
+          <article><span>02</span><div><strong>Cihaz kontrolü</strong><small>Onaydan önce ayrıntıları görürsün</small></div></article>
+          <article><span>03</span><div><strong>Tek kullanımlık</strong><small>Onay yalnız bekleyen istemciye gider</small></div></article>
+        </div>
+      </section>
+
+      <section class="approval-card" aria-labelledby="approval-title">
+        <div class="card-glow" aria-hidden="true"></div>
+        <div class="card-head">
+          <span class="status-orb" aria-hidden="true"></span>
+          <div><p>ACCOUNT LINK</p><h2 id="approval-title">Masaüstü kodunu gir</h2></div>
+        </div>
+
+        <form id="code-form" novalidate>
+          <label for="user-code">TEK KULLANIMLIK KOD</label>
+          <input id="user-code" name="userCode" type="text" inputmode="text" autocomplete="one-time-code" maxlength="9" placeholder="ABCD-EFGH" spellcheck="false" required>
+          <button id="inspect-button" class="primary-action" type="submit"><span>Cihazı kontrol et</span><b aria-hidden="true">→</b></button>
+        </form>
+
+        <div id="device-panel" class="device-panel" hidden>
+          <div class="device-icon" aria-hidden="true"><span></span></div>
+          <div class="device-copy">
+            <span>ONAY BEKLEYEN CİHAZ</span>
+            <strong id="device-name">Windows PC</strong>
+            <small id="device-meta">Windows · FIMA</small>
+          </div>
+          <time id="request-expiry"></time>
+        </div>
+
+        <div id="approval-actions" class="approval-actions" hidden>
+          <button id="approve-button" class="primary-action approve" type="button"><span>Bu cihazda giriş yap</span><b aria-hidden="true">✓</b></button>
+          <button id="different-code" class="secondary-action" type="button">Farklı kod kullan</button>
+        </div>
+
+        <div id="page-status" class="page-status" role="status" aria-live="polite">
+          <span aria-hidden="true"></span>
+          <div><strong>FIMA hesabınla devam et</strong><p>Kodu yalnız kendi açtığın FIMA uygulamasından aldıysan onayla.</p></div>
+        </div>
+        <p class="legal-note">Tanımadığın bir cihazı onaylama. FIMA destek ekibi hiçbir zaman bu kodu senden istemez.</p>
+      </section>
+    </main>
+
+    <script src="/assets/js/config.js?v=20260526-9"></script>
+    <script src="/assets/js/desktop-login.js?v=20260718-1" defer></script>
+  </body>
+</html>

@@ -16,59 +16,76 @@
       .bot-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.bot-card{padding:22px;border:1px solid #ffffff17;border-radius:20px;background:linear-gradient(145deg,#21152fdd,#110d19ee);box-shadow:0 22px 55px #0006;transition:.2s}.bot-card:hover{transform:translateY(-5px);border-color:#9b6cff80}.bot-card .status{display:inline-flex;padding:5px 9px;border-radius:999px;background:#9b6cff20;color:#d9c6ff;font-size:.76rem;font-weight:800}.bot-card ul{padding-left:18px;color:#c8bfd5;line-height:1.7}
       .command-tools{display:grid;grid-template-columns:260px 1fr;gap:18px}.command-list{display:grid;gap:10px}.command{padding:14px 16px;border:1px solid #ffffff12;border-radius:14px;background:#0d0a14}.command code{color:#d9c6ff;font-weight:800}.command small{display:block;color:#aaa0b9;margin-top:5px}.search-box{position:sticky;top:140px;align-self:start;padding:18px;border:1px solid #ffffff17;border-radius:18px;background:#15101f}.search-box input{width:100%}
       .tier-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.tier{padding:22px;border-radius:20px;border:1px solid #ffffff16;background:#15101f}.tier.featured{border-color:#9b6cff;box-shadow:0 0 0 1px #9b6cff55,0 22px 60px #7c3aed26}.tier strong{display:block;font-size:1.45rem}.tier em{display:block;color:#aaa0b9;margin:8px 0 18px}.roadmap{border-left:4px solid #f5b942;padding:15px 18px;background:#2a210d88;border-radius:12px;color:#f7dda4}
-      @media(max-width:900px){.bot-grid,.tier-grid{grid-template-columns:1fr 1fr}.command-tools{grid-template-columns:1fr}.search-box{position:static}}@media(max-width:620px){.bot-grid,.tier-grid{grid-template-columns:1fr}.bot-hero{padding-top:105px}.bot-tabs{top:64px}}
+      .bot-card .status.planned{background:#f5b9421c;color:#f7d77f}.bot-card .status.core{background:#22c55e1c;color:#87e6aa}.bot-pref{display:flex;gap:8px}.bot-pref select{min-width:84px;border:1px solid #ffffff1c;border-radius:12px;background:#171020;color:#f5f1fb;padding:9px 34px 9px 11px}.roadmap-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.roadmap-grid .bot-card{min-height:180px}
+      .template-banner{display:block;width:calc(100% + 44px);height:126px;margin:-22px -22px 18px;object-fit:cover;border-radius:20px 20px 10px 10px;border-bottom:1px solid #ffffff1a}.bot-card:has(.template-banner){overflow:hidden}
+      @media(max-width:900px){.bot-grid,.tier-grid,.roadmap-grid{grid-template-columns:1fr 1fr}.command-tools{grid-template-columns:1fr}.search-box{position:static}}@media(max-width:620px){.bot-grid,.tier-grid,.roadmap-grid{grid-template-columns:1fr}.bot-hero{padding-top:105px}.bot-tabs{top:64px}.bot-pref{display:none}}
     </style>
   </head>
   <body class="paradise-page" data-page="paradise-bot">
     <canvas id="ambientCanvas" aria-hidden="true"></canvas>
     <header class="site-header" data-header><div class="nav-shell">
       <a class="brand" href="/"><img class="brand-logo" src="/assets/images/fima-logo.png?v=20260526-2" alt="" width="44" height="44"><span>Fima × Paradise</span></a>
-      <nav class="site-menu" aria-label="Paradise navigation"><a href="/">Fima</a><a href="#features">Features</a><a href="#commands">Commands</a><a href="#premium">Premium</a><a href="#feedback">Feedback</a></nav>
-      <div class="nav-controls"><a class="nav-cta" href="/paradise/invite">Invite Paradise</a></div>
+      <nav class="site-menu" aria-label="Paradise navigation"><a href="/">Fima</a><a href="#features" data-bot-key="navFeatures">Features</a><a href="#commands" data-bot-key="navCommands">Commands</a><a href="#premium">Premium</a><a href="#feedback" data-bot-key="navFeedback">Feedback</a></nav>
+      <div class="nav-controls"><div class="bot-pref"><select id="themeSelect" aria-label="Theme"><option value="violet-dragon">Violet</option><option value="royal-nebula">Nebula</option><option value="crimson-void">Crimson</option><option value="ice-phantom">Ice</option><option value="emerald-matrix">Emerald</option></select><select id="languageSelect" aria-label="Language"><option value="en">EN</option><option value="tr">TR</option></select></div><a class="nav-cta" href="/paradise/invite" data-bot-key="invite">Invite Paradise</a></div>
     </div></header>
 
     <main id="main">
       <section class="section bot-hero"><div class="hero-copy">
-        <p class="eyebrow"><span class="pulse-dot"></span> Fima-powered Discord operations</p>
-        <h1>One bot. Three focused <span>server systems.</span></h1>
-        <p class="hero-lead">Paradise combines community support, clan operations and competitive TSBTR workflows without mixing the wrong commands into the wrong server.</p>
-        <div class="hero-actions"><a class="button primary" href="/paradise/invite">Add to Discord</a><a class="button secondary" href="/paradise">Open Dashboard</a><a class="button secondary" href="#commands">Browse Commands</a></div>
+        <p class="eyebrow"><span class="pulse-dot"></span> <span data-bot-key="heroEyebrow">Fima-powered Discord operations</span></p>
+        <h1 data-bot-key="heroTitle">One bot. Three focused <span>server systems.</span></h1>
+        <p class="hero-lead" data-bot-key="heroLead">Paradise combines community support, clan operations and competitive TSBTR workflows without mixing the wrong commands into the wrong server.</p>
+        <div class="hero-actions"><a class="button primary" href="/paradise/invite" data-bot-key="addDiscord">Add to Discord</a><a class="button secondary" href="/paradise" data-bot-key="openDashboard">Open Dashboard</a><a class="button secondary" href="#commands" data-bot-key="browseCommands">Browse Commands</a></div>
       </div></section>
 
-      <nav class="bot-tabs"><a href="#features">Features</a><a href="#templates">Templates</a><a href="#commands">Commands</a><a href="#premium">Premium plan</a><a href="#feedback">Feedback</a></nav>
+      <nav class="bot-tabs"><a href="#features">Features</a><a href="#templates">Templates</a><a href="#commands">Commands</a><a href="#join-team">Apply</a><a href="#premium">Premium plan</a><a href="#feedback">Feedback</a></nav>
 
       <section class="section" id="features"><div class="section-heading"><p class="eyebrow">Platform</p><h2>Built for actual server operations.</h2><p>Backup-aware setup, audited state, permission boundaries and Discord-native panels—not a pile of unrelated commands.</p></div>
         <div class="bot-grid">
-          <article class="bot-card"><span class="status">LIVE</span><h3>Profiles & ranked boards</h3><ul><li>Short Roblox-safe verification</li><li>Full Stage + Level + Strength</li><li>Top 10 / 20 / 30 cards</li><li>Cooldown, immunity and tickets</li></ul></article>
-          <article class="bot-card"><span class="status">LIVE</span><h3>Training & tryout</h3><ul><li>Plain Markdown announcements</li><li>Lock, unlock and end controls</li><li>Structured tryout results</li><li>Staff authority limits</li></ul></article>
-          <article class="bot-card"><span class="status">LIVE</span><h3>Tickets & applications</h3><ul><li>Support and application panels</li><li>Challenge sticky headers</li><li>Approval and audit queues</li><li>Private transcripts</li></ul></article>
-          <article class="bot-card"><span class="status">LIVE</span><h3>Security</h3><ul><li>Quarantine and raid mode</li><li>Link, invite and mention controls</li><li>Low-staff approval requests</li><li>Role hierarchy checks</li></ul></article>
-          <article class="bot-card"><span class="status">LIVE</span><h3>Voice & XP</h3><ul><li>Join-to-Create rooms</li><li>Owner voice controls</li><li>Chat and voice XP</li><li>Weekly/monthly boards</li></ul></article>
+          <article class="bot-card"><span class="status core">CORE READY</span><h3>Profiles & ranked boards</h3><ul><li>Short Roblox-safe verification</li><li>Full Stage + Level + Strength</li><li>Top 10 / 20 / 30 cards</li><li>Cooldown, immunity and tickets</li></ul></article>
+          <article class="bot-card"><span class="status core">CORE READY</span><h3>Training & tryout</h3><ul><li>Plain Markdown announcements</li><li>Lock, unlock and end controls</li><li>Structured tryout results</li><li>Staff authority limits</li></ul></article>
+          <article class="bot-card"><span class="status core">CORE READY</span><h3>Tickets & applications</h3><ul><li>Support and application panels</li><li>Challenge sticky headers</li><li>Approval and audit queues</li><li>Private transcripts</li></ul></article>
+          <article class="bot-card"><span class="status core">CORE READY</span><h3>Security</h3><ul><li>Quarantine and raid mode</li><li>Link, invite and mention controls</li><li>Low-staff approval requests</li><li>Role hierarchy checks</li></ul></article>
+          <article class="bot-card"><span class="status core">CORE READY</span><h3>Voice & XP</h3><ul><li>Join-to-Create rooms</li><li>Owner voice controls</li><li>Chat and voice XP</li><li>Weekly/monthly boards</li></ul></article>
           <article class="bot-card"><span class="status">OWNER SAFE</span><h3>Operations Console</h3><ul><li>Per-server templates</li><li>Searchable mappings</li><li>Preview and create-missing</li><li>Typed destructive confirmation</li></ul></article>
         </div>
       </section>
 
       <section class="section section-band" id="templates"><div class="section-heading"><p class="eyebrow">Templates</p><h2>Clear boundaries by server type.</h2></div>
         <div class="bot-grid">
-          <article class="bot-card"><h3>Fieel’s Community</h3><p>Fima support, announcements, applications, events, giveaways, moderation, voice and XP. Ranking/challenge/roster stays off by default.</p></article>
-          <article class="bot-card"><h3>Paradise Clan</h3><p>Roster, main and war lineups, mainers, relations, wars, challenge, training, tryout and the daily question.</p></article>
-          <article class="bot-card"><h3>TSBTR-style</h3><p>Profiles, top boards, challenge/availability, referee/hoster workflows, activity, blacklist, appeal and competitive guides.</p></article>
+          <article class="bot-card"><img class="template-banner" src="/assets/images/paradise/banners/fieels-community-banner-v1.png" alt="Original Fieel's Community purple network banner"><h3>Fieel’s Community</h3><p>Fima support, announcements, applications, events, giveaways, moderation, voice and XP. Ranking/challenge/roster stays off by default.</p></article>
+          <article class="bot-card"><img class="template-banner" src="/assets/images/paradise/banners/paradise-clan-banner-v1.png" alt="Original Paradise Clan violet portal banner"><h3>Paradise Clan</h3><p>Roster, main and war lineups, mainers, relations, wars, challenge, training, tryout and the daily question.</p></article>
+          <article class="bot-card"><img class="template-banner" src="/assets/images/paradise/banners/tsbtr-banner-v1.png" alt="Original TSBTR-style red and black competitive banner"><h3>TSBTR-style</h3><p>Profiles, top boards, challenge/availability, referee/hoster workflows, activity, blacklist, appeal and competitive guides.</p></article>
         </div>
       </section>
 
-      <section class="section" id="commands"><div class="section-heading"><p class="eyebrow">Command directory</p><h2>Search the live command families.</h2><p>Discord’s private <code>/help</code> manual contains 25 categories with TR/EN pages and permission guidance.</p></div>
+      <section class="section" id="commands"><div class="section-heading"><p class="eyebrow">Command directory</p><h2>Search the implemented command families.</h2><p>Discord’s private <code>/help</code> manual contains 30 categories with TR/EN pages and permission guidance.</p></div>
         <div class="command-tools"><aside class="search-box"><label for="commandSearch">Search commands</label><input id="commandSearch" type="search" placeholder="profile, challenge, training…"><p>Only implemented command families are listed as live. Roadmap modules are labeled clearly.</p></aside>
           <div class="command-list" id="commandList">
             <article class="command" data-command="help manual search"><code>/help query:&lt;text&gt;</code><small>Search the interactive TR/EN manual.</small></article>
             <article class="command" data-command="profile verify roblox"><code>/profile create · /profile view</code><small>Create or search by profile ID, user, Discord ID or Roblox name.</small></article>
             <article class="command" data-command="leaderboard top rank"><code>/leaderboard panel · add · move · swap · repost</code><small>Permission-protected ranked boards that update in place.</small></article>
-            <article class="command" data-command="challenge autowin referee"><code>/challenge create · post · /autowin</code><small>Eligibility rechecks, sticky ticket context and approvals.</small></article>
+            <article class="command" data-command="challenge autowin referee"><code>/challenge create · post · autowin</code><small>Eligibility rechecks, sticky ticket context and approvals.</small></article>
             <article class="command" data-command="training tryout hoster"><code>/training start · result · /tryout start · result</code><small>Plain announcements, controls and structured results.</small></article>
             <article class="command" data-command="lineup roster mainer clan"><code>/lineup · /roster · /mainer</code><small>Stored live boards, approvals and logs.</small></article>
-            <article class="command" data-command="application ticket support"><code>/application panel · apply · /ticket setup</code><small>Guided private flows with review queues.</small></article>
+            <article class="command" data-command="application ticket support"><code>/application panel · apply · status</code><small>Guided private flows with review queues.</small></article>
             <article class="command" data-command="mod security quarantine"><code>/mod · /security</code><small>Warnings, timeouts, approval requests, quarantine and raid controls.</small></article>
-            <article class="command" data-command="voice xp rank"><code>/rank · /leaderboard show · /voice setup</code><small>Activity XP and Join-to-Create controls.</small></article>
+            <article class="command" data-command="voice xp rank"><code>/rank · /leaderboard show</code><small>Activity XP plus automatic Join-to-Create controls in configured voice channels.</small></article>
           </div>
+        </div>
+      </section>
+
+      <section class="section section-band" id="roadmap"><div class="section-heading"><p class="eyebrow">Roadmap modules</p><h2>Useful next systems, clearly separated from available core features.</h2><p>These modules remain disabled until their safety, provider and live-test requirements are finished.</p></div>
+        <div class="roadmap-grid">
+          <article class="bot-card"><span class="status planned">PLANNED</span><h3>Auto responder</h3><p>Channel/role filters, cooldowns, safe variables and test previews.</p></article>
+          <article class="bot-card"><span class="status planned">PLANNED</span><h3>AI support</h3><p>Approved knowledge only, opt-in channels, rate limits and staff escalation.</p></article>
+          <article class="bot-card"><span class="status planned">PLANNED</span><h3>Social feeds</h3><p>Official APIs, RSS or webhooks only—no private scraping.</p></article>
+          <article class="bot-card"><span class="status planned">LEGAL PROVIDER NEEDED</span><h3>Music / audio</h3><p>No YouTube or Spotify ripping. Playback stays disabled until a licensed source is configured.</p></article>
+        </div>
+      </section>
+
+      <section class="section" id="join-team"><div class="section-heading"><p class="eyebrow">Join the team</p><h2>Apply from Fima, review in Discord.</h2><p>Applications verify your linked Discord account and server membership before sending answers to the private Paradise review queue.</p></div>
+        <div class="bot-grid">
+          <article class="bot-card"><span class="status core">COMMUNITY</span><h3>Helper application</h3><p>Helper is the only public staff entry. Junior Moderator, Moderator, Senior Moderator, Administrator and Owner are internal promotions and cannot be requested or auto-granted.</p><a class="button primary" href="/paradise-apply?workflow=staff&amp;type=helper">Apply as Helper</a></article>
         </div>
       </section>
 
@@ -81,9 +98,17 @@
       <section class="section" id="invite-unavailable"><div class="roadmap">If the invite button is temporarily unavailable, open the owner dashboard and use its verified “Invite Paradise” action.</div></section>
     </main>
     <script>
+      const botCopy={
+        en:{navFeatures:'Features',navCommands:'Commands',navFeedback:'Feedback',invite:'Invite Paradise',heroEyebrow:'Fima-powered Discord operations',heroTitle:'One bot. Three focused <span>server systems.</span>',heroLead:'Paradise combines community support, clan operations and competitive TSBTR workflows without mixing the wrong commands into the wrong server.',addDiscord:'Add to Discord',openDashboard:'Open Dashboard',browseCommands:'Browse Commands'},
+        tr:{navFeatures:'Özellikler',navCommands:'Komutlar',navFeedback:'Geri Bildirim',invite:'Paradise’ı Davet Et',heroEyebrow:'Fima destekli Discord operasyonları',heroTitle:'Tek bot. Birbirine karışmayan <span>üç sunucu sistemi.</span>',heroLead:'Paradise; community desteğini, klan operasyonlarını ve TSBTR rekabet sistemlerini yanlış komutları yanlış sunucuya taşımadan bir araya getirir.',addDiscord:'Discord’a Ekle',openDashboard:'Dashboard’u Aç',browseCommands:'Komutlara Bak'}
+      };
+      const applyBotLanguage=language=>{const lang=language==='tr'?'tr':'en';document.documentElement.lang=lang;document.querySelectorAll('[data-bot-key]').forEach(node=>{const value=botCopy[lang][node.dataset.botKey];if(value)node.innerHTML=value})};
+      const botLanguage=document.getElementById('languageSelect');
+      botLanguage?.addEventListener('change',event=>applyBotLanguage(event.target.value));
+      applyBotLanguage(localStorage.getItem('fima.language')||'en');
       const search=document.getElementById('commandSearch');
       search?.addEventListener('input',()=>{const q=search.value.trim().toLowerCase();document.querySelectorAll('[data-command]').forEach(card=>{card.hidden=Boolean(q&&!((card.dataset.command+' '+card.textContent).toLowerCase().includes(q)))})});
     </script>
-    <script src="/assets/js/app.js?v=20260621-3a50" defer></script>
+    <script src="/assets/js/app.js?v=20260718-avatar-1" defer></script>
   </body>
 </html>

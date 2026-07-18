@@ -4,3 +4,13 @@ node_modules/
 !.env.example
 prisma/dev.db
 *.log
+
+# Local Codex/browser proof output; never deploy these generated artifacts.
+artifacts/paradise-application-evidence/
+artifacts/post-security-backlog/3a59-paradise-state-fallback.json
+artifacts/post-security-backlog/3a79-content-studio-browser-local-proof.json
+artifacts/post-security-backlog/3a80-discord-readonly-audit-live-source-blockers-20260717.json
+
+# This repository is npm/package-lock based. Ignore accidental pnpm workspace files.
+pnpm-lock.yaml
+pnpm-workspace.yaml

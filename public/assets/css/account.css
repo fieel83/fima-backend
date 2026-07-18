@@ -30,7 +30,7 @@ body {
 }
 
 a { color: inherit; text-decoration: none; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 .account-header {
   position: sticky;
@@ -624,7 +624,8 @@ p { color: var(--muted); }
 
 form { display: grid; gap: 13px; }
 label { display: grid; gap: 7px; color: var(--muted); font-weight: 800; }
-input {
+input,
+select {
   min-height: 48px;
   width: 100%;
   padding: 0 13px;
@@ -634,7 +635,12 @@ input {
   outline: none;
   background: rgba(5, 4, 13, 0.88);
 }
-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+select {
+  color: var(--text);
+  color-scheme: dark;
+}
+input:focus,
+select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
 
 .password-field {
   position: relative;
@@ -1609,6 +1615,146 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
   min-width: min(100%, 360px);
 }
 
+.community-profile-card {
+  display: grid;
+  gap: 18px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 38%),
+    rgba(7, 5, 16, .58);
+}
+
+.community-profile-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.community-profile-heading h3 {
+  margin: 10px 0 6px;
+  font-size: 1.16rem;
+}
+
+.community-profile-heading p,
+.community-guilds small,
+.community-guild-more {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.community-profile-statuses {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.community-profile-statuses .status-pill.is-good {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 42%, transparent);
+  background: color-mix(in srgb, var(--good) 10%, transparent);
+}
+
+.community-profile-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.community-profile-form label {
+  min-width: 0;
+}
+
+.community-checkbox {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(5, 4, 13, .56);
+}
+
+.community-checkbox input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.community-checkbox span {
+  color: var(--text);
+}
+
+.community-profile-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.community-guilds {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.community-guilds > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.community-guild-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.community-guild-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,.035);
+}
+
+.community-guild-card img,
+.community-guild-card > span {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--primary) 36%, transparent);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  font-weight: 950;
+}
+
+.community-guild-card div {
+  min-width: 0;
+}
+
+.community-guild-card strong,
+.community-guild-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .email-code-actions {
   grid-template-columns: minmax(180px, 260px) auto auto;
 }
@@ -1816,7 +1962,7 @@ input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in s
 code { color: var(--primary-strong); }
 
 @media (max-width: 920px) {
-  .hero-grid, .grid, .cards, .access-grid, .auth-shell, .account-summary-card, .integration-grid, .integration-card, .trial-card, .requirement-list, .verification-card, .verification-actions, .verification-actions form, .roblox-profile-form .verification-actions, .gift-claim-grid, .gift-redeem-card form, .gift-package-card, .gift-code-box, .gift-history-row, .gift-modal-key, .referral-dashboard, .referral-apply-card form, .referral-code-box, .billing-summary-grid { grid-template-columns: 1fr; }
+  .hero-grid, .grid, .cards, .access-grid, .auth-shell, .account-summary-card, .integration-grid, .integration-card, .trial-card, .requirement-list, .verification-card, .verification-actions, .verification-actions form, .roblox-profile-form .verification-actions, .gift-claim-grid, .gift-redeem-card form, .gift-package-card, .gift-code-box, .gift-history-row, .gift-modal-key, .referral-dashboard, .referral-apply-card form, .referral-code-box, .billing-summary-grid, .community-profile-form, .community-guild-grid { grid-template-columns: 1fr; }
   .account-dashboard-layout { grid-template-columns: 1fr; }
   .account-dashboard-sidebar { position: static; }
   .account-dashboard-nav {
@@ -1839,6 +1985,8 @@ code { color: var(--primary-strong); }
   .section-heading { flex-direction: column; }
   .integration-actions,
   .trial-hint { align-items: stretch; flex-direction: column; }
+  .community-profile-heading { flex-direction: column; }
+  .community-profile-statuses { justify-content: flex-start; }
   .overview-trial-hint { grid-template-columns: 1fr; max-width: none; }
   .overview-trial-hint .button { min-width: 0; }
   .email-code-actions { grid-template-columns: 1fr; }

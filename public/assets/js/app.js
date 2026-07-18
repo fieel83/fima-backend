@@ -150,7 +150,6 @@
   ];
 
   const basePlans = [
-    { id: "1day", basePrice: 0, sale: false, trial: true, robuxPremium: 0, robuxNoPremium: 0 },
     { id: "3days", basePrice: 0.99, sale: false, featured: true, robuxPremium: 150, robuxNoPremium: 215 },
     { id: "monthly", basePrice: 4.99, sale: false, subscription: true, featured: true, robuxPremium: 750, robuxNoPremium: 1080 },
     { id: "lifetime", basePrice: 29.99, compareAt: 39.99, sale: false, featured: true, robuxPremium: 4500, robuxNoPremium: 6430 }
@@ -158,7 +157,6 @@
 
   const saleStartsAt = new Date("2026-05-31T00:00:00+02:00");
   const saleEndsAt = new Date("2026-06-03T23:59:59+02:00");
-  const robuxTicketUrl = "https://discord.com/channels/1419335632324657306/1421241033693462599";
 
   const isLaunchSaleActive = () => false;
 
@@ -376,20 +374,44 @@
         robuxPremium: "Robux with Premium/Plus",
         robuxNoPremium: "Robux without Premium/Plus",
         robuxNote: "Without Premium/Plus includes Roblox's 30% fee, so we receive the correct amount.",
-        robuxTicket: "Robux payments are manually verified by staff. Open a Discord ticket and include your plan, Roblox username and whether you pay with Premium/Plus.",
+        robuxTicket: "Robux orders are bound to your FIMA account and manually verified before delivery.",
         robuxModalTitle: "Manual Robux payment",
-        robuxModalDescription: "Robux payments are not automatic checkout. Open a Discord ticket, include the selected plan and Roblox username, and wait for staff to verify the payment and order.",
-        robuxModalStaff: "Staff will verify the payment before any license is delivered.",
-        robuxModalStripe: "No automatic Stripe checkout is started.",
-        robuxOpenTicket: "Open Discord Ticket",
+        robuxModalDescription: "Create a protected order from your signed-in FIMA account. Staff verifies the Robux payment before the license is delivered.",
+        robuxModalStaff: "The amount is calculated by FIMA; browser-supplied prices are never trusted.",
+        robuxModalStripe: "Creating this order never starts Stripe or transfers Robux automatically.",
+        robuxOpenTicket: "Support",
+        robuxChoosePlanTitle: "Choose a Robux plan",
+        robuxChoosePlanDescription: "Select the FIMA Macro access period, then create an account-bound order with the exact server price.",
+        robuxChoosePlanCancel: "Not now",
+        robuxAccountEyebrow: "Protected manual order",
+        robuxAccount: "Signed-in FIMA account",
+        robuxAccountLoading: "Verifying your FIMA account...",
+        robuxQuoteUnavailable: "Price unavailable",
+        robuxUsername: "Roblox username",
+        robuxPremiumChoice: "Roblox Premium / Plus status",
+        robuxPremiumYes: "I have Premium / Plus",
+        robuxPremiumNo: "I do not have Premium / Plus",
+        robuxProofUrl: "Proof URL (optional)",
+        robuxProofText: "Payment note (optional)",
+        robuxProofPlaceholder: "Add a public proof link or short note for staff. Never enter a password or cookie.",
+        robuxCreateOrder: "Create protected order",
+        robuxCreatingOrder: "Securing order...",
+        robuxRefresh: "Refresh status",
+        robuxOrders: "Your recent Robux orders",
+        robuxNoOrders: "No Robux orders on this account yet.",
+        robuxPending: "Pending staff review",
+        robuxApproved: "Approved - license delivered",
+        robuxRejected: "Rejected - review the staff note",
+        robuxOrderCreated: "Order created. Keep the order ID and complete the staff payment instructions.",
+        robuxSecureNote: "Price, FIMA identity and delivery are locked on the server. Do not include passwords, cookies or private account codes.",
+        robuxOrderId: "Order",
+        robuxLoginRequired: "Sign in or create a FIMA account before starting a Robux order.",
+        robuxInvalidUsername: "Enter a valid Roblox username (3-20 letters, numbers or underscores).",
+        robuxInvalidProof: "Use a valid http:// or https:// proof link.",
+        robuxPendingExists: "This account already has a pending order. Its latest status is shown below.",
+        robuxRequestFailed: "The order service could not be reached. Your retry key was preserved; try again safely.",
         accountPrompt: "Already bought? Log in to see your licenses in My Products. New here? Register first.",
         plans: {
-          "1day": {
-            name: "Free Trial",
-            duration: "1 day trial access",
-            badge: "Discord required",
-            features: ["Free 1 day trial", "Discord link required only for trial", "Full Fima Macro access", "Updates included"]
-          },
           "3days": {
             name: "3 Days Access",
             duration: "3 days license access",
@@ -429,7 +451,7 @@
       download: {
         eyebrow: "Download",
         title: "Download the current setup.",
-        description: "Install Fima Macro, then activate your copied key or trial key inside the app. Need help? Open the key guide.",
+        description: "Install Fima Macro, then activate your copied license or reward key inside the app. Need help? Open the key guide.",
         primaryCta: "Download Fima Macro",
         secondaryCta: "Setup Help",
         latest: "Latest version",
@@ -458,8 +480,8 @@
         description: "Short, clear answers about access, updates, licenses, refunds and the move away from SellAuth.",
         items: [
           ["What is Fima Macro?", "Fima Macro is a premium macro app built around clean timing, keybind profiles, ping-aware setups and scaling for resolution and sensitivity."],
-          ["How do I get my key?", "After checkout or trial claim, Fima shows your key on the success page and in My Products. Use the Copy button, then paste it into the app key screen."],
-          ["Is this a one-time purchase or subscription?", "Both are available: 3 Days and Lifetime are one-time, Monthly is a cancellable subscription, and the free trial is 1 day."],
+          ["How do I get my key?", "After checkout, gift redemption or an Activity Reward, Fima shows your key in My Products. Use the Copy button, then paste it into the app key screen."],
+          ["Is this a one-time purchase or subscription?", "Both are available: 3 Days and Lifetime are one-time purchases, while Monthly is a cancellable subscription."],
           ["Do I get updates?", "Yes. Active licenses include updates during the access period, and lifetime includes future updates."],
           ["Can I change my PC?", "The license system is planned around HWID locking with reset requests handled through support or the dashboard."],
           ["What happens when my license expires?", "The app will no longer unlock until the license is renewed or extended."],
@@ -622,15 +644,44 @@
         robuxPremium: "Premium/Plus ile Robux",
         robuxNoPremium: "Premium/Plus olmadan Robux",
         robuxNote: "Premium/Plus olmadan Roblox %30 kesinti al\u0131r; bu fiyat kesintiyi kapsar.",
-        robuxTicket: "Robux \u00f6demeleri staff taraf\u0131ndan manuel do\u011frulan\u0131r. Ticket a\u00e7\u0131p plan\u0131n\u0131, Roblox kullan\u0131c\u0131 ad\u0131n\u0131 ve Premium/Plus durumunu yaz.",
+        robuxTicket: "Robux sipari\u015fleri FIMA hesab\u0131na ba\u011flan\u0131r ve teslimden \u00f6nce staff taraf\u0131ndan do\u011frulan\u0131r.",
         robuxModalTitle: "Manuel Robux \u00f6demesi",
-        robuxModalDescription: "Robux \u00f6demeleri otomatik checkout de\u011fildir. Discord ticket a\u00e7, se\u00e7ilen plan\u0131 ve Roblox kullan\u0131c\u0131 ad\u0131n\u0131 yaz, staff \u00f6demeyi ve sipari\u015fi do\u011frulas\u0131n.",
-        robuxModalStaff: "Lisans teslim edilmeden \u00f6nce staff \u00f6demeyi do\u011frular.",
-        robuxModalStripe: "Bu i\u015flem Stripe Checkout ba\u015flatmaz.",
-        robuxOpenTicket: "Discord Ticket A\u00e7",
+        robuxModalDescription: "Giri\u015f yap\u0131lm\u0131\u015f FIMA hesab\u0131ndan korumal\u0131 sipari\u015f olu\u015ftur. Lisans tesliminden \u00f6nce Robux \u00f6demesi staff taraf\u0131ndan do\u011frulan\u0131r.",
+        robuxModalStaff: "Tutar FIMA taraf\u0131ndan hesaplan\u0131r; taray\u0131c\u0131dan g\u00f6nderilen fiyatlara asla g\u00fcvenilmez.",
+        robuxModalStripe: "Sipari\u015f olu\u015fturmak Stripe ba\u015flatmaz veya otomatik Robux aktarmaz.",
+        robuxOpenTicket: "Destek",
+        robuxChoosePlanTitle: "Robux plan\u0131n\u0131 se\u00e7",
+        robuxChoosePlanDescription: "FIMA Macro eri\u015fim s\u00fcresini se\u00e7, sonra sunucunun belirledi\u011fi kesin fiyatla hesaba ba\u011fl\u0131 sipari\u015f olu\u015ftur.",
+        robuxChoosePlanCancel: "\u015eimdi de\u011fil",
+        robuxAccountEyebrow: "Korumal\u0131 manuel sipari\u015f",
+        robuxAccount: "Giri\u015f yap\u0131lan FIMA hesab\u0131",
+        robuxAccountLoading: "FIMA hesab\u0131n do\u011frulan\u0131yor...",
+        robuxQuoteUnavailable: "Fiyat kullan\u0131lam\u0131yor",
+        robuxUsername: "Roblox kullan\u0131c\u0131 ad\u0131",
+        robuxPremiumChoice: "Roblox Premium / Plus durumu",
+        robuxPremiumYes: "Premium / Plus var",
+        robuxPremiumNo: "Premium / Plus yok",
+        robuxProofUrl: "Kan\u0131t ba\u011flant\u0131s\u0131 (opsiyonel)",
+        robuxProofText: "\u00d6deme notu (opsiyonel)",
+        robuxProofPlaceholder: "Staff i\u00e7in herkese a\u00e7\u0131k bir kan\u0131t ba\u011flant\u0131s\u0131 veya k\u0131sa not ekle. Asla \u015fifre ya da cookie yazma.",
+        robuxCreateOrder: "Korumal\u0131 sipari\u015f olu\u015ftur",
+        robuxCreatingOrder: "Sipari\u015f korunuyor...",
+        robuxRefresh: "Durumu yenile",
+        robuxOrders: "Son Robux sipari\u015flerin",
+        robuxNoOrders: "Bu hesapta hen\u00fcz Robux sipari\u015fi yok.",
+        robuxPending: "Staff incelemesi bekleniyor",
+        robuxApproved: "Onayland\u0131 - lisans teslim edildi",
+        robuxRejected: "Reddedildi - staff notunu incele",
+        robuxOrderCreated: "Sipari\u015f olu\u015fturuldu. Sipari\u015f numaran\u0131 sakla ve staff \u00f6deme ad\u0131mlar\u0131n\u0131 tamamla.",
+        robuxSecureNote: "Fiyat, FIMA kimli\u011fi ve teslimat sunucuda kilitlenir. \u015eifre, cookie veya gizli hesap kodu yazma.",
+        robuxOrderId: "Sipari\u015f",
+        robuxLoginRequired: "Robux sipari\u015fi ba\u015flatmadan \u00f6nce FIMA hesab\u0131na giri\u015f yap veya kaydol.",
+        robuxInvalidUsername: "Ge\u00e7erli bir Roblox kullan\u0131c\u0131 ad\u0131 yaz (3-20 harf, rakam veya alt \u00e7izgi).",
+        robuxInvalidProof: "Ge\u00e7erli bir http:// veya https:// kan\u0131t ba\u011flant\u0131s\u0131 kullan.",
+        robuxPendingExists: "Bu hesab\u0131n zaten bekleyen bir sipari\u015fi var. Son durum a\u015fa\u011f\u0131da g\u00f6steriliyor.",
+        robuxRequestFailed: "Sipari\u015f servisine ula\u015f\u0131lamad\u0131. G\u00fcvenli yeniden deneme anahtar\u0131 korundu; tekrar deneyebilirsin.",
         accountPrompt: "Zaten ald\u0131ysan Login veya Register ile My Products i\u00e7inde lisanslar\u0131n\u0131 g\u00f6rebilirsin.",
         plans: {
-          "1day": { name: "Free Trial", duration: "1 g\u00fcn deneme eri\u015fimi", badge: "Discord gerekli", features: ["1 g\u00fcn \u00fccretsiz deneme", "Discord sadece trial i\u00e7in gerekli", "Tam Fima Macro eri\u015fimi", "G\u00fcncellemeler dahil"] },
           "3days": { name: "3 G\u00fcn Eri\u015fim", duration: "3 g\u00fcn lisans eri\u015fimi", badge: "Ba\u015flang\u0131\u00e7", features: ["Uygun beta fiyat\u0131", "Discord veya Roblox gerekmez", "Tam Fima Macro eri\u015fimi", "G\u00fcncellemeler dahil"] },
           "monthly": { name: "Ayl\u0131k Abonelik", duration: "Her ay otomatik yenilenir", badge: "En Pop\u00fcler", features: ["EUR 4.99/ay beta fiyat\u0131", "Yenilemeyi istedi\u011fin zaman iptal et", "Eri\u015fim d\u00f6nem sonuna kadar aktif kal\u0131r", "Tam Fima Macro eri\u015fimi"] },
           lifetime: { name: "Lifetime", duration: "S\u00fcresiz lisans", badge: "Uzun vade", features: ["Tek seferlik beta fiyat\u0131", "Tam Fima Macro eri\u015fimi", "Gelecek g\u00fcncellemeler dahil", "S\u00fcresiz lisans"] }
@@ -655,7 +706,7 @@
       download: {
         eyebrow: "\u0130ndir",
         title: "Guncel setup'i indir.",
-        description: "Fima Macro'yu kur, sonra kopyaladigin key'i veya trial key'ini uygulamada aktive et. Yardim gerekiyorsa key rehberini ac.",
+        description: "Fima Macro'yu kur, sonra kopyaladigin lisans veya odul key'ini uygulamada aktive et. Yardim gerekiyorsa key rehberini ac.",
         primaryCta: "Fima Macro indir",
         secondaryCta: "Kurulum Yard\u0131m\u0131",
         latest: "Son s\u00fcr\u00fcm",
@@ -684,8 +735,8 @@
         description: "Eri\u015fim, g\u00fcncellemeler, lisans, iade ve SellAuth'tan ayr\u0131lma hakk\u0131nda k\u0131sa cevaplar.",
         items: [
           ["Fima Macro nedir?", "Fima Macro; temiz zamanlama, keybind profilleri, ping'e duyarl\u0131 kurulum ve \u00e7\u00f6z\u00fcn\u00fcrl\u00fck/sensitivity \u00f6l\u00e7ekleme etraf\u0131nda geli\u015ftirilen premium macro uygulamas\u0131d\u0131r."],
-          ["Key'imi nasil alirim?", "Checkout veya trial claim sonrasi Fima key'ini success sayfasinda ve My Products icinde gosterir. Copy butonuyla kopyalayip app key ekranina yapistir."],
-          ["Tek seferlik sat\u0131n alma m\u0131 abonelik mi?", "Ikisi de var: 3 Gun ve Lifetime tek seferlik, Monthly iptal edilebilir abonelik, free trial ise 1 gundur."],
+          ["Key'imi nasil alirim?", "Checkout, hediye kullanimi veya Activity Reward sonrasi Fima key'ini My Products icinde gosterir. Copy butonuyla kopyalayip app key ekranina yapistir."],
+          ["Tek seferlik sat\u0131n alma m\u0131 abonelik mi?", "Ikisi de var: 3 Gun ve Lifetime tek seferlik, Monthly ise iptal edilebilir aboneliktir."],
           ["G\u00fcncelleme alacak m\u0131y\u0131m?", "Evet. Aktif lisanslar eri\u015fim s\u00fcresi boyunca g\u00fcncelleme al\u0131r; lifetime gelecekteki g\u00fcncellemeleri kapsar."],
           ["Bilgisayar\u0131m\u0131 de\u011fi\u015ftirebilir miyim?", "Lisans sistemi HWID kilidi ve destek/dashboard \u00fczerinden reset talepleri mant\u0131\u011f\u0131yla planlan\u0131yor."],
           ["Lisans\u0131m bitince ne olur?", "Lisans yenilenene veya uzat\u0131lana kadar uygulama a\u00e7\u0131lmaz."],
@@ -769,21 +820,20 @@
         saleBannerText: "Preise k\u00f6nnen nach mehr Stabilit\u00e4t steigen. Aktive Nutzer behalten ihren bezahlten Zeitraum.",
         saleCountdown: "Endet in",
         plans: {
-          "1day": { name: "Free Trial", duration: "1 Tag Testzugang", badge: "Discord erforderlich", features: ["1 Tag kostenlos testen", "Discord nur f\u00fcr Trial erforderlich", "Voller Fima Macro Zugriff", "Updates inklusive"] },
           "3days": { name: "3 Tage Zugang", duration: "3 Tage Lizenzzugriff", badge: "Starter", features: ["G\u00fcnstiger Beta-Einstieg", "Kein Discord oder Roblox n\u00f6tig", "Voller Fima Macro Zugriff", "Updates inklusive"] },
           "monthly": { name: "Monatsabo", duration: "Verl\u00e4ngert sich monatlich", badge: "Am beliebtesten", features: ["EUR 4.99/Monat Beta-Preis", "Verl\u00e4ngerung jederzeit k\u00fcndbar", "Zugang bleibt bis Periodenende aktiv", "Voller Fima Macro Zugriff"] },
           lifetime: { name: "Lifetime", duration: "Lifetime Lizenz", badge: "Langfristig", features: ["Einmaliger Beta-Preis", "Voller Fima Macro Zugriff", "K\u00fcnftige Updates inklusive", "Lifetime Lizenz"] }
         }
       },
       checkout: { eyebrow: "Sicherer Checkout", title: "Erst einloggen", description: "Deine Lizenz braucht einen Account. Logge dich ein oder registriere dich vor dem Kauf.", loginFirstTitle: "Erst einloggen", loginFirstBody: "Deine Lizenz braucht einen Account. Logge dich ein oder registriere dich vor dem Kauf.", loginButton: "Einloggen", registerButton: "Registrieren", emailLabel: "E-Mail-Adresse", cancel: "Abbrechen", continue: "Weiter zu Stripe", loading: "Checkout wird erstellt...", invalidEmail: "Gib eine gültige E-Mail-Adresse ein.", failed: "Checkout konnte nicht gestartet werden. Bitte versuche es gleich erneut.", backendMissing: "Der Zahlungsserver ist gerade nicht erreichbar. Bitte versuche es gleich erneut." },
-      download: { eyebrow: "Download", title: "Aktuelles Setup herunterladen.", description: "Installiere Fima Macro und nutze danach deinen Lizenzschluessel oder Free Trial in der App.", primaryCta: "Fima Macro herunterladen", secondaryCta: "Setup-Hilfe", latest: "Neueste Version", versionFallback: "Manifest wird gepr\u00fcft", versionUnavailable: "latest.json nicht gefunden", platform: "Plattform", updater: "Auto Updater", updaterValue: "Unterst\u00fctzt", support: "Support" },
+      download: { eyebrow: "Download", title: "Aktuelles Setup herunterladen.", description: "Installiere Fima Macro und aktiviere danach deinen Lizenz- oder Belohnungsschluessel in der App.", primaryCta: "Fima Macro herunterladen", secondaryCta: "Setup-Hilfe", latest: "Neueste Version", versionFallback: "Manifest wird gepr\u00fcft", versionUnavailable: "latest.json nicht gefunden", platform: "Plattform", updater: "Auto Updater", updaterValue: "Unterst\u00fctzt", support: "Support" },
       dashboard: { eyebrow: "Dashboard Vorschau", title: "Lizenzverwaltung erscheint hier nach Backend-Integration.", description: "Dieser Platzhalter zeigt die Richtung: Lizenzlogin, Plan, Ablaufdatum, HWID-Reset, Downloads und Supportlinks.", inputLabel: "Lizenzschl\u00fcssel", button: "Lizenzsystem kommt bald", plan: "Plan", planValue: "Backend erforderlich", hwid: "HWID", hwidValue: "Reset-Anfragen geplant", access: "Downloadzugriff", accessValue: "Nach Login verbunden" },
       faq: {
         title: "H\u00e4ufige Fragen vor dem Kauf.",
         description: "Kurze Antworten zu Zugriff, Updates, Lizenzen, R\u00fcckerstattung und dem Wechsel weg von SellAuth.",
         items: [
           ["Was ist Fima Macro?", "Eine Premium-Macro-App f\u00fcr sauberes Timing, Keybind-Profile, ping-bewusste Setups und Skalierung f\u00fcr Aufl\u00f6sung und Sensitivity."],
-          ["Einmaliger Kauf oder Abo?", "Beides ist verfuegbar: 3 Tage und Lifetime sind Einmalkaeufe, Monthly ist ein kuendbares Abo und Free Trial ist 1 Tag kostenlos."],
+          ["Einmaliger Kauf oder Abo?", "Beides ist verfuegbar: 3 Tage und Lifetime sind Einmalkaeufe, Monthly ist ein kuendbares Abo."],
           ["Bekomme ich Updates?", "Ja. Aktive Lizenzen erhalten Updates im Zugriffszeitraum, Lifetime umfasst k\u00fcnftige Updates."],
           ["Kann ich den PC wechseln?", "Geplant ist HWID-Lock mit Reset-Anfragen \u00fcber Support oder Dashboard."],
           ["Was passiert nach Ablauf?", "Die App wird erst nach Verl\u00e4ngerung oder Erneuerung wieder freigeschaltet."],
@@ -845,24 +895,23 @@
         accessPass: "Pass d'acc\u00e8s",
         saleEnds: "Acces beta",
         saleBannerTitle: "Tarifs beta simples",
-        saleBannerText: "Les produits actuels sont Free Trial, 3 Jours, Mensuel et Lifetime.",
+        saleBannerText: "Les produits actuels sont 3 Jours, Mensuel et Lifetime.",
         saleCountdown: "Mise a jour",
         plans: {
-          "1day": { name: "Free Trial", duration: "Essai gratuit 1 jour", badge: "Discord requis", features: ["Essai gratuit 1 jour", "Discord requis uniquement pour l'essai", "Acces complet Fima Macro", "Updates incluses"] },
           "3days": { name: "3 Jours", duration: "3 jours d'acces", badge: "Starter", features: ["Prix beta bas", "Discord et Roblox non requis", "Acces complet Fima Macro", "Updates incluses"] },
           "monthly": { name: "Mensuel", duration: "Renouvellement mensuel", badge: "Populaire", features: ["EUR 4.99/mois", "Annulation possible", "Acces actif jusqu'a la fin de periode", "Acces complet Fima Macro"] },
           lifetime: { name: "Lifetime", duration: "Licence \u00e0 vie", badge: "Prix fixe", features: ["Payer une fois, utiliser toujours", "Acc\u00e8s complet Fima Macro", "Futures updates incluses", "Support prioritaire", "Licence \u00e0 vie", "Meilleure valeur long terme"] }
         }
       },
       checkout: { eyebrow: "Checkout s\u00e9curis\u00e9", title: "Connecte-toi d'abord", description: "Ta licence a besoin d'un compte. Connecte-toi ou inscris-toi avant d'acheter.", loginFirstTitle: "Connecte-toi d'abord", loginFirstBody: "Ta licence a besoin d'un compte. Connecte-toi ou inscris-toi avant d'acheter.", loginButton: "Connexion", registerButton: "S'inscrire", emailLabel: "Adresse e-mail", cancel: "Annuler", continue: "Continuer vers Stripe", loading: "Cr\u00e9ation du checkout...", invalidEmail: "Entre une adresse e-mail valide.", failed: "Impossible de d\u00e9marrer le checkout. R\u00e9essaie dans un instant.", backendMissing: "Le paiement n'est pas joignable pour l'instant. R\u00e9essaie dans un instant." },
-      download: { eyebrow: "Download", title: "Telecharge le setup actuel.", description: "Installe Fima Macro, puis utilise ta cle de licence ou ton free trial dans l'app.", primaryCta: "Telecharger Fima Macro", secondaryCta: "Aide setup", latest: "Derni\u00e8re version", versionFallback: "V\u00e9rification du manifest", versionUnavailable: "latest.json introuvable", platform: "Plateforme", updater: "Auto updater", updaterValue: "Support\u00e9", support: "Support" },
+      download: { eyebrow: "Download", title: "Telecharge le setup actuel.", description: "Installe Fima Macro, puis active ta cle de licence ou de recompense dans l'app.", primaryCta: "Telecharger Fima Macro", secondaryCta: "Aide setup", latest: "Derni\u00e8re version", versionFallback: "V\u00e9rification du manifest", versionUnavailable: "latest.json introuvable", platform: "Plateforme", updater: "Auto updater", updaterValue: "Support\u00e9", support: "Support" },
       dashboard: { eyebrow: "Aper\u00e7u dashboard", title: "La gestion des licences arrivera ici apr\u00e8s backend.", description: "Placeholder pour login licence, plan, expiration, reset HWID, downloads et support.", inputLabel: "Cl\u00e9 de licence", button: "Syst\u00e8me de licence bient\u00f4t", plan: "Plan", planValue: "Backend requis", hwid: "HWID", hwidValue: "Resets pr\u00e9vus", access: "Acc\u00e8s download", accessValue: "Connect\u00e9 apr\u00e8s login" },
       faq: {
         title: "Questions fr\u00e9quentes avant achat.",
         description: "R\u00e9ponses courtes sur acc\u00e8s, updates, licences, remboursements et sortie de SellAuth.",
         items: [
           ["Qu'est-ce que Fima Macro ?", "Une app macro premium pour timing propre, profils keybind, setup ping-aware et scaling r\u00e9solution/sensibilit\u00e9."],
-          ["Achat unique ou abonnement ?", "3 jours et Lifetime sont uniques; Monthly est un abonnement annulable; l'essai gratuit dure 1 jour."],
+          ["Achat unique ou abonnement ?", "3 jours et Lifetime sont des achats uniques; Monthly est un abonnement annulable."],
           ["Les updates sont incluses ?", "Oui, pendant la p\u00e9riode active; lifetime inclut les futures updates."],
           ["Puis-je changer de PC ?", "Le syst\u00e8me pr\u00e9vu utilise HWID lock avec demandes de reset via support/dashboard."],
           ["Que se passe-t-il \u00e0 expiration ?", "L'app ne se d\u00e9verrouille plus jusqu'au renouvellement ou extension."],
@@ -924,24 +973,23 @@
         accessPass: "Access pass",
         saleEnds: "Beta pristup",
         saleBannerTitle: "Jednostavne beta cijene",
-        saleBannerText: "Trenutni proizvodi su Free Trial, 3 Dana, Monthly i Lifetime.",
+        saleBannerText: "Trenutni proizvodi su 3 Dana, Monthly i Lifetime.",
         saleCountdown: "Azurirano",
         plans: {
-          "1day": { name: "Free Trial", duration: "1 dan besplatne probe", badge: "Discord potreban", features: ["1 dan besplatne probe", "Discord je potreban samo za trial", "Pun Fima Macro pristup", "Updates uklju\u010deni"] },
           "3days": { name: "3 Dana", duration: "3 dana pristupa", badge: "Starter", features: ["Niska beta cijena", "Discord i Roblox nisu obavezni", "Pun Fima Macro pristup", "Updates ukljuceni"] },
           "monthly": { name: "Monthly", duration: "Mjesecna pretplata", badge: "Popularno", features: ["EUR 4.99/mjesec", "Otkazi obnovu bilo kada", "Pristup ostaje do kraja perioda", "Pun Fima Macro pristup"] },
           lifetime: { name: "Lifetime", duration: "Do\u017eivotna licenca", badge: "Fiksna cijena", features: ["Plati jednom, koristi zauvijek", "Pun Fima Macro pristup", "Budu\u0107i updates uklju\u010deni", "Prioritetna podr\u0161ka", "Do\u017eivotna licenca", "Najbolja dugoro\u010dna vrijednost"] }
         }
       },
       checkout: { eyebrow: "Siguran checkout", title: "Prvo se prijavi", description: "Licenca mora biti vezana za account. Prijavi se ili registruj prije kupovine.", loginFirstTitle: "Prvo se prijavi", loginFirstBody: "Licenca mora biti vezana za account. Prijavi se ili registruj prije kupovine.", loginButton: "Login", registerButton: "Register", emailLabel: "E-mail adresa", cancel: "Otkaži", continue: "Nastavi na Stripe", loading: "Kreiranje checkouta...", invalidEmail: "Unesi validnu e-mail adresu.", failed: "Checkout nije mogao biti pokrenut. Pokušaj ponovo za trenutak.", backendMissing: "Payment trenutno nije dostupan. Pokušaj ponovo za trenutak." },
-      download: { eyebrow: "Download", title: "Preuzmi trenutni setup.", description: "Instaliraj Fima Macro, zatim koristi license key ili free trial u appu.", primaryCta: "Preuzmi Fima Macro", secondaryCta: "Setup pomo\u0107", latest: "Zadnja verzija", versionFallback: "Provjera manifesta", versionUnavailable: "latest.json nije prona\u0111en", platform: "Platforma", updater: "Auto updater", updaterValue: "Podr\u017eano", support: "Podr\u0161ka" },
+      download: { eyebrow: "Download", title: "Preuzmi trenutni setup.", description: "Instaliraj Fima Macro, zatim aktiviraj license ili reward key u appu.", primaryCta: "Preuzmi Fima Macro", secondaryCta: "Setup pomo\u0107", latest: "Zadnja verzija", versionFallback: "Provjera manifesta", versionUnavailable: "latest.json nije prona\u0111en", platform: "Platforma", updater: "Auto updater", updaterValue: "Podr\u017eano", support: "Podr\u0161ka" },
       dashboard: { eyebrow: "Dashboard preview", title: "Upravljanje licencom dolazi ovdje nakon backend integracije.", description: "Placeholder pokazuje smjer: login licencom, plan, istek, HWID reset, download i support linkovi.", inputLabel: "License key", button: "License sistem uskoro", plan: "Plan", planValue: "Backend potreban", hwid: "HWID", hwidValue: "Reset zahtjevi planirani", access: "Download pristup", accessValue: "Povezano nakon logina" },
       faq: {
         title: "\u010cesta pitanja prije kupovine.",
         description: "Kratki odgovori o pristupu, updateima, licencama, refundu i napu\u0161tanju SellAuth-a.",
         items: [
           ["\u0160ta je Fima Macro?", "Premium macro app za \u010disto timing pona\u0161anje, keybind profile, ping-aware setup i scaling rezolucije/sensitivityja."],
-          ["Jednokratna kupovina ili pretplata?", "3 dana i Lifetime su jednokratni; Monthly je pretplata koju mozes otkazati; free trial traje 1 dan."],
+          ["Jednokratna kupovina ili pretplata?", "3 dana i Lifetime su jednokratni; Monthly je pretplata koju mozes otkazati."],
           ["Da li dobijam updates?", "Da. Aktivne licence uklju\u010duju updates tokom pristupa, lifetime uklju\u010duje budu\u0107e updates."],
           ["Mogu li promijeniti PC?", "Planiran je HWID lock sa reset zahtjevima kroz support ili dashboard."],
           ["\u0160ta kad licenca istekne?", "App se ne\u0107e otklju\u010dati dok se licenca ne obnovi ili produ\u017ei."],
@@ -960,8 +1008,7 @@
 
   const state = {
     language: "en",
-    currency: "USD",
-    trialPromo: null
+    currency: "USD"
   };
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -1101,7 +1148,6 @@
     renderUiTour();
     renderFeatures();
     renderPricing();
-    renderHomeTrialPromoBanner();
     renderFaq();
     hydrateLatestVersion();
     renderSiteAccountNav(currentSiteAccount);
@@ -1136,15 +1182,6 @@
     if (days > 0) return `${days}d ${hours}h ${minutes}m`;
     if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
     return `${minutes}m ${seconds}s`;
-  };
-
-  const trialPromoActive = () => Boolean(state.trialPromo?.active && state.trialPromo?.endAt);
-  const trialPromoDays = () => Number(state.trialPromo?.promoDays || state.trialPromo?.days || 7);
-  const trialPromoLabel = () => trialPromoActive() ? `${trialPromoDays()}-Day Free Trial` : "Free Trial";
-  const trialPromoDuration = () => trialPromoActive() ? `${trialPromoDays()} days free trial access` : "Free trial access";
-  const trialPromoCountdown = () => {
-    const endAt = state.trialPromo?.endAt ? new Date(state.trialPromo.endAt) : null;
-    return endAt && Number.isFinite(endAt.getTime()) ? formatCountdown(endAt) : "";
   };
 
   const renderStats = () => {
@@ -1333,38 +1370,6 @@
       .join("");
   };
 
-  const renderHomeTrialPromoBanner = () => {
-    const host = document.querySelector(".hero-copy");
-    if (!host) return;
-    let banner = $("#homeTrialPromoBanner");
-    if (!trialPromoActive()) {
-      banner?.remove();
-      return;
-    }
-    if (!banner) {
-      banner = document.createElement("article");
-      banner.id = "homeTrialPromoBanner";
-      banner.className = "trial-promo-card home-trial-promo-card";
-      const anchor = host.querySelector(".hero-actions");
-      if (anchor) {
-        anchor.insertAdjacentElement("afterend", banner);
-      } else {
-        host.appendChild(banner);
-      }
-    }
-    banner.innerHTML = `
-      <div>
-        <span>Limited beta offer</span>
-        <strong>Free trials are now ${trialPromoDays()} days for the next week.</strong>
-        <p>One promotional trial per account during this event.</p>
-      </div>
-      <div class="trial-promo-actions">
-        <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
-        <a class="button primary" href="/dashboard/redeem#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
-      </div>
-    `;
-  };
-
   const renderPricing = () => {
     const target = $("#pricingGrid");
     if (!target) return;
@@ -1383,19 +1388,6 @@
         <div class="sale-campaign-clock">
           <span>${pricingCopy.saleCountdown || fallbackPricing.saleCountdown}</span>
           <b data-pricing-countdown>${formatCountdown(saleEndsAt)}</b>
-        </div>
-      </article>
-    ` : "";
-    const promoBanner = trialPromoActive() ? `
-      <article class="trial-promo-card">
-        <div>
-          <span>Limited beta offer</span>
-          <strong>Free trials are now ${trialPromoDays()} days for the next week.</strong>
-          <p>One promotional trial per account during this event.</p>
-        </div>
-        <div class="trial-promo-actions">
-          <b data-trial-promo-countdown>${trialPromoCountdown()}</b>
-          <a class="button primary" href="/dashboard/redeem#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>
         </div>
       </article>
     ` : "";
@@ -1419,16 +1411,9 @@
         </div>
       </article>
     `;
-    target.innerHTML = promoBanner + saleBanner + accountPrompt + basePlans
+    target.innerHTML = saleBanner + accountPrompt + basePlans
       .map((plan, index) => {
         const data = { ...(pricingCopy.plans[plan.id] || fallbackPricing.plans[plan.id]) };
-        if (plan.trial) {
-          data.name = trialPromoLabel();
-          data.duration = trialPromoDuration();
-          data.features = trialPromoActive()
-            ? [`${trialPromoDays()} days free trial`, "Discord link required only for trial", "Full Fima Macro access", "Updates included"]
-            : ["Free trial", "Discord link required only for trial", "Full Fima Macro access", "Updates included"];
-        }
         const badge = data.badge ? `<span class="price-badge">${data.badge}</span>` : "";
         const features = data.features.map((feature) => `<li>${feature}</li>`).join("");
         const litCount = Math.min(4, index + 1);
@@ -1444,18 +1429,15 @@
           : (plan.subscription ? `<span class="price-fixed">Subscription - cancel anytime</span>` : "");
         const saleLine = saleIsActive ? `<span class="price-sale">${pricingCopy.saleEnds || fallbackPricing.saleEnds} - <b data-pricing-countdown>${formatCountdown(saleEndsAt)}</b></span>` : "";
         const planCode = {
-          "1day": "FIMA-TRIAL",
           "3days": "FIMA-3D",
           "monthly": "FIMA-MONTHLY",
           lifetime: "FIMA-LIFE"
         }[plan.id];
-        const cardButton = plan.trial
-          ? `<a class="button ${plan.featured ? "primary" : "secondary"}" href="/dashboard/redeem#monthly-trial" data-trial-claim-link>Claim ${trialPromoLabel()}</a>`
-          : `<a class="button ${plan.featured ? "primary" : "secondary"}" href="#checkout" data-checkout-plan="${plan.id}">${pricingCopy.payCard || fallbackPricing.payCard}</a>`;
-        const robuxButton = plan.trial ? "" : `<button class="button secondary robux-ticket-button" type="button" data-robux-plan="${plan.id}">${pricingCopy.payRobux || fallbackPricing.payRobux}</button>`;
+        const cardButton = `<a class="button ${plan.featured ? "primary" : "secondary"}" href="#checkout" data-checkout-plan="${plan.id}">${pricingCopy.payCard || fallbackPricing.payCard}</a>`;
+        const robuxButton = `<button class="button secondary robux-ticket-button" type="button" data-robux-plan="${plan.id}">${pricingCopy.payRobux || fallbackPricing.payRobux}</button>`;
         const giftIcon = `<svg class="gift-button-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M20 7h-2.2c.2-.5.3-1 .2-1.5A3 3 0 0 0 15 3c-1.4 0-2.4.8-3 1.8A3.5 3.5 0 0 0 9 3a3 3 0 0 0-3 2.5C5.9 6 6 6.5 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1Zm-5-2c.6 0 1 .4 1 1s-.4 1-1 1h-2c.2-.9.8-2 2-2ZM8 6c0-.6.4-1 1-1 1.2 0 1.8 1.1 2 2H9c-.6 0-1-.4-1-1Zm-4 7v7a1 1 0 0 0 1 1h6v-8H4Zm9 0v8h6a1 1 0 0 0 1-1v-7h-7Z"/></svg>`;
-        const giftButton = plan.trial ? "" : `<a class="button secondary gift-code-button" href="#checkout" data-gift-code-checkout-plan="${plan.id}">${giftIcon}<span>${pricingCopy.buyGiftCode || fallbackPricing.buyGiftCode || "Buy Gift Code"}</span></a>`;
-        const robuxBox = plan.trial ? "" : `
+        const giftButton = `<a class="button secondary gift-code-button" href="#checkout" data-gift-code-checkout-plan="${plan.id}">${giftIcon}<span>${pricingCopy.buyGiftCode || fallbackPricing.buyGiftCode || "Buy Gift Code"}</span></a>`;
+        const robuxBox = `
             <div class="robux-box" aria-label="Robux">
               <div>
                 <span>${pricingCopy.robuxPremium || fallbackPricing.robuxPremium}</span>
@@ -1712,6 +1694,31 @@
     return { label: "Fima", sub: "Account", avatar: "", fallback: "F" };
   };
 
+  const safeProfileInitial = (value, backup = "F") => {
+    const normalized = String(value || "").normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "");
+    const backupNormalized = String(backup || "F").normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "");
+    return (Array.from(normalized)[0] || Array.from(backupNormalized)[0] || "F").toUpperCase();
+  };
+
+  const wireSiteProfileAvatarFallbacks = (root, fallback) => {
+    if (!root) return;
+    root.querySelectorAll("img[data-profile-avatar]").forEach((avatar) => {
+      if (avatar.dataset.avatarFallbackWired === "1") return;
+      avatar.dataset.avatarFallbackWired = "1";
+      const initial = safeProfileInitial(avatar.dataset.avatarFallback, fallback);
+      const replaceBrokenAvatar = () => {
+        if (!avatar.isConnected) return;
+        avatar.removeEventListener("error", replaceBrokenAvatar);
+        const replacement = document.createElement("span");
+        replacement.dataset.profileAvatarFallback = "true";
+        replacement.textContent = initial;
+        avatar.replaceWith(replacement);
+      };
+      avatar.addEventListener("error", replaceBrokenAvatar, { once: true });
+      if (avatar.complete && avatar.naturalWidth === 0) replaceBrokenAvatar();
+    });
+  };
+
   const siteProfileMenuItems = (user) => ([
     ["Account", "/dashboard/overview", true],
     ["My Products", "/dashboard/products", true],
@@ -1798,12 +1805,12 @@
     ).join("");
     menu.innerHTML = `
       <button class="site-profile-chip" type="button" data-site-profile-toggle aria-expanded="false" aria-label="${escapeHtml(profile.label)} menu">
-        ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+        ${profile.avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(profile.label)}" src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
         <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
       </button>
       <div class="site-profile-dropdown" data-site-profile-panel hidden>
         <div class="site-profile-summary">
-          ${profile.avatar ? `<img src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
+          ${profile.avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(profile.label)}" src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
           <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(profile.sub)}</small></div>
         </div>
         ${links}
@@ -1814,6 +1821,7 @@
       cta.href = "/pricing";
     }
     controls.insertBefore(menu, cta || null);
+    wireSiteProfileAvatarFallbacks(menu, profile.fallback);
     wireSiteProfileDropdown(menu);
   };
 
@@ -1954,10 +1962,6 @@
       register.href = registerHref;
       register.textContent = activeCopy.registerButton || copy.en.checkout.registerButton || "Register";
     }
-    if (options.trialClaim) {
-      $("[data-login-checkout-title]", modal).textContent = "Log in first";
-      $("[data-login-checkout-body]", modal).textContent = "Claim your free trial from your account after connecting Discord and verifying your Roblox profile.";
-    }
     modal.classList.add("is-visible");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
@@ -2015,7 +2019,7 @@
       return data?.message || pricingCopy.giftCodeBlocked || copy.en.pricing.giftCodeBlocked;
     }
     if (code === "discord_not_connected") return data?.message || (state.language === "tr" ? "Bu islem icin Discord gerekirse hesap ayarlarindan bagla." : "Connect Discord from account settings if this action requires it.");
-    if (code === "roblox_not_connected" || code === "roblox_not_verified") return data?.message || (state.language === "tr" ? "Free trial icin Roblox profilini dogrula." : "Verify your Roblox profile for the free trial.");
+    if (code === "roblox_not_connected" || code === "roblox_not_verified") return data?.message || (state.language === "tr" ? "Bu islem icin Roblox profilini dogrula." : "Verify your Roblox profile for this action.");
     return data?.message || activeCopy.failed;
   };
 
@@ -2062,6 +2066,135 @@
     return planCopy.name || planId || "Fima Macro";
   };
 
+  let selectedRobuxPlan = null;
+  let selectedRobuxPremiumPlus = true;
+  let activeRobuxQuote = null;
+  let robuxIdempotencyKey = null;
+  let robuxRequestInFlight = false;
+  let robuxQuoteRequestVersion = 0;
+  let robuxOpenRequestVersion = 0;
+
+  const createRobuxIdempotencyKey = () => {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    const bytes = new Uint8Array(24);
+    window.crypto.getRandomValues(bytes);
+    return `fima-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  };
+
+  const robuxStatusLabel = (status) => {
+    const pricingCopy = getCopy().pricing || copy.en.pricing;
+    if (status === "approved") return pricingCopy.robuxApproved || copy.en.pricing.robuxApproved;
+    if (status === "rejected") return pricingCopy.robuxRejected || copy.en.pricing.robuxRejected;
+    return pricingCopy.robuxPending || copy.en.pricing.robuxPending;
+  };
+
+  const setRobuxNotice = (modal, message = "", tone = "") => {
+    const notice = modal?.querySelector("[data-robux-notice]");
+    if (!notice) return;
+    notice.textContent = message;
+    notice.className = `robux-order-notice${tone ? ` is-${tone}` : ""}`;
+  };
+
+  const setRobuxBusy = (modal, busy) => {
+    robuxRequestInFlight = busy;
+    const pricingCopy = getCopy().pricing || copy.en.pricing;
+    const submit = modal?.querySelector("[data-robux-submit]");
+    if (!submit) return;
+    const loading = modal.dataset.robuxLoading === "1";
+    const ordersReady = modal.dataset.robuxOrdersReady === "1";
+    modal.setAttribute("aria-busy", busy || loading ? "true" : "false");
+    modal.querySelectorAll("#robuxOrderForm input, #robuxOrderForm textarea, [data-robux-refresh]").forEach((control) => {
+      control.disabled = busy;
+    });
+    submit.disabled = busy || !activeRobuxQuote || !ordersReady || modal.dataset.robuxPending === "1" || loading;
+    submit.textContent = busy
+      ? (pricingCopy.robuxCreatingOrder || copy.en.pricing.robuxCreatingOrder)
+      : (pricingCopy.robuxCreateOrder || copy.en.pricing.robuxCreateOrder);
+  };
+
+  const renderRobuxOrders = (modal, submissions = []) => {
+    const pricingCopy = getCopy().pricing || copy.en.pricing;
+    const list = modal.querySelector("[data-robux-orders-list]");
+    if (!list) return;
+    const rows = Array.isArray(submissions) ? submissions : [];
+    modal.dataset.robuxPending = rows.some((item) => item?.status === "pending") ? "1" : "0";
+    modal.dataset.robuxOrdersReady = "1";
+    if (!rows.length) {
+      list.innerHTML = `<p class="robux-orders-empty">${escapeHtml(pricingCopy.robuxNoOrders || copy.en.pricing.robuxNoOrders)}</p>`;
+      setRobuxBusy(modal, robuxRequestInFlight);
+      return;
+    }
+    list.innerHTML = rows.map((item) => {
+      const status = ["pending", "approved", "rejected"].includes(item?.status) ? item.status : "pending";
+      const created = item?.createdAt ? new Date(item.createdAt) : null;
+      const createdLabel = created && !Number.isNaN(created.getTime()) ? created.toLocaleString() : "";
+      const amount = Number(item?.robuxAmount);
+      const amountLabel = Number.isFinite(amount) ? `${amount.toLocaleString("en-US")} Robux` : "Robux";
+      const licenseLabel = item?.license
+        ? `${escapeHtml(item.license.plan || item.plan || "FIMA")} · ${escapeHtml(item.license.status || "active")}`
+        : "";
+      return `
+        <article class="robux-order-row is-${status}">
+          <div>
+            <span>${escapeHtml(pricingCopy.robuxOrderId || copy.en.pricing.robuxOrderId)} ${escapeHtml(item?.id || "")}</span>
+            <strong>${escapeHtml(robuxPlanLabel(item?.plan))} · ${escapeHtml(amountLabel)}</strong>
+          </div>
+          <div class="robux-order-state">
+            <span class="robux-status-pill">${escapeHtml(robuxStatusLabel(status))}</span>
+            ${licenseLabel ? `<small>${licenseLabel}</small>` : ""}
+            ${createdLabel ? `<time>${escapeHtml(createdLabel)}</time>` : ""}
+          </div>
+        </article>
+      `;
+    }).join("");
+    setRobuxBusy(modal, robuxRequestInFlight);
+  };
+
+  const loadRobuxOrders = async (modal) => {
+    modal.dataset.robuxOrdersReady = "0";
+    setRobuxBusy(modal, robuxRequestInFlight);
+    const response = await fetchWithTimeout(`${apiBase}/payments/robux/manual`, {
+      credentials: "include"
+    }, 10000);
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401 || data.error === "account_required") throw Object.assign(new Error("account_required"), { code: "account_required" });
+    if (!response.ok) throw Object.assign(new Error(data.error || "manual_payment_list_failed"), { code: data.error });
+    renderRobuxOrders(modal, data.submissions);
+    return data.submissions || [];
+  };
+
+  const loadRobuxQuote = async (modal) => {
+    const requestVersion = ++robuxQuoteRequestVersion;
+    const requestedPlan = selectedRobuxPlan;
+    const requestedPremiumPlus = selectedRobuxPremiumPlus;
+    activeRobuxQuote = null;
+    setRobuxBusy(modal, robuxRequestInFlight);
+    const quoteNode = modal.querySelector("[data-robux-quote]");
+    const versionNode = modal.querySelector("[data-robux-pricing-version]");
+    quoteNode.textContent = "...";
+    versionNode.textContent = "";
+    const query = new URLSearchParams({
+      plan: requestedPlan,
+      premiumPlus: String(requestedPremiumPlus)
+    });
+    const response = await fetchWithTimeout(`${apiBase}/payments/robux/manual/quote?${query}`, {
+      credentials: "include"
+    }, 10000);
+    const data = await response.json().catch(() => ({}));
+    if (requestVersion !== robuxQuoteRequestVersion || requestedPlan !== selectedRobuxPlan || requestedPremiumPlus !== selectedRobuxPremiumPlus) return null;
+    if (response.status === 401 || data.error === "account_required") throw Object.assign(new Error("account_required"), { code: "account_required" });
+    if (!response.ok || !data.quote) {
+      quoteNode.textContent = (getCopy().pricing || copy.en.pricing).robuxQuoteUnavailable || copy.en.pricing.robuxQuoteUnavailable;
+      setRobuxBusy(modal, robuxRequestInFlight);
+      throw Object.assign(new Error(data.error || "manual_payment_quote_failed"), { code: data.error });
+    }
+    activeRobuxQuote = data.quote;
+    quoteNode.textContent = `${Number(data.quote.robuxAmount).toLocaleString("en-US")} Robux`;
+    versionNode.textContent = `Price policy ${data.quote.pricingVersion}`;
+    setRobuxBusy(modal, robuxRequestInFlight);
+    return data.quote;
+  };
+
   const ensureRobuxModal = () => {
     let modal = $("#robuxModal");
     if (modal) return modal;
@@ -2071,17 +2204,82 @@
     modal.setAttribute("aria-hidden", "true");
     modal.innerHTML = `
       <div class="checkout-dialog robux-dialog" role="dialog" aria-modal="true" aria-labelledby="robuxTitle">
-        <button class="modal-close" type="button" data-robux-close aria-label="Close">X</button>
-        <p class="eyebrow">Manual payment</p>
+        <div class="robux-orbit robux-orbit-one" aria-hidden="true"></div>
+        <div class="robux-orbit robux-orbit-two" aria-hidden="true"></div>
+        <button class="modal-close" type="button" data-robux-close aria-label="Close">x</button>
+        <p class="eyebrow" data-robux-eyebrow>Manual payment</p>
         <h2 id="robuxTitle"></h2>
         <p data-robux-description></p>
-        <div class="robux-modal-points">
-          <span data-robux-staff></span>
-          <span data-robux-stripe></span>
+        <div class="robux-account-loading" data-robux-loading hidden>
+          <span class="robux-loading-core" aria-hidden="true"></span>
+          <strong data-robux-loading-label></strong>
         </div>
-        <div class="modal-actions">
-          <button class="button secondary" type="button" data-robux-close>Cancel</button>
-          <a class="button primary" href="${robuxTicketUrl}" target="_blank" rel="noopener" data-robux-ticket>Open Discord Ticket</a>
+        <div class="robux-plan-picker" data-robux-plan-picker hidden></div>
+        <section class="robux-order-workspace" data-robux-order hidden>
+          <div class="robux-account-strip">
+            <span class="robux-account-mark" aria-hidden="true">F</span>
+            <div>
+              <span data-robux-account-label></span>
+              <strong data-robux-account-value></strong>
+            </div>
+            <span class="robux-verified-chip">Verified session</span>
+          </div>
+          <div class="robux-quote-card">
+            <div>
+              <span data-robux-plan-name></span>
+              <small data-robux-pricing-version></small>
+            </div>
+            <strong data-robux-quote>...</strong>
+          </div>
+          <div class="robux-modal-points">
+            <span data-robux-staff></span>
+            <span data-robux-stripe></span>
+          </div>
+          <form id="robuxOrderForm" class="robux-order-form" novalidate>
+            <label>
+              <span data-robux-username-label></span>
+              <input type="text" name="robloxUsername" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="off" required>
+            </label>
+            <fieldset class="robux-premium-fieldset">
+              <legend data-robux-premium-label></legend>
+              <div class="robux-premium-options">
+                <label>
+                  <input type="radio" name="premiumPlus" value="true" checked>
+                  <span data-robux-premium-yes></span>
+                </label>
+                <label>
+                  <input type="radio" name="premiumPlus" value="false">
+                  <span data-robux-premium-no></span>
+                </label>
+              </div>
+            </fieldset>
+            <div class="robux-proof-grid">
+              <label>
+                <span data-robux-proof-url-label></span>
+                <input type="url" name="proofUrl" maxlength="2048" inputmode="url" placeholder="https://">
+              </label>
+              <label>
+                <span data-robux-proof-text-label></span>
+                <textarea name="proofText" maxlength="3000" rows="3"></textarea>
+              </label>
+            </div>
+            <p class="robux-secure-note" data-robux-secure-note></p>
+            <p class="robux-order-notice" data-robux-notice role="status" aria-live="polite"></p>
+            <div class="modal-actions">
+              <a class="button secondary" href="/support" data-robux-support></a>
+              <button class="button primary robux-submit-button" type="submit" data-robux-submit></button>
+            </div>
+          </form>
+          <section class="robux-orders-panel">
+            <header>
+              <h3 data-robux-orders-title></h3>
+              <button class="button secondary" type="button" data-robux-refresh></button>
+            </header>
+            <div class="robux-orders-list" data-robux-orders-list></div>
+          </section>
+        </section>
+        <div class="modal-actions" data-robux-picker-actions>
+          <button class="button secondary" type="button" data-robux-close data-robux-cancel>Cancel</button>
         </div>
       </div>
     `;
@@ -2089,21 +2287,116 @@
     return modal;
   };
 
-  const openRobuxModal = (planId) => {
+  const openRobuxModal = async (planId) => {
+    const openRequestVersion = ++robuxOpenRequestVersion;
     const pricingCopy = getCopy().pricing || copy.en.pricing;
     const modal = ensureRobuxModal();
-    const planName = robuxPlanLabel(planId);
-    modal.querySelector("#robuxTitle").textContent = `${pricingCopy.robuxModalTitle || copy.en.pricing.robuxModalTitle}: ${planName}`;
-    modal.querySelector("[data-robux-description]").textContent = pricingCopy.robuxModalDescription || copy.en.pricing.robuxModalDescription;
-    modal.querySelector("[data-robux-staff]").textContent = pricingCopy.robuxModalStaff || copy.en.pricing.robuxModalStaff;
-    modal.querySelector("[data-robux-stripe]").textContent = pricingCopy.robuxModalStripe || copy.en.pricing.robuxModalStripe;
-    modal.querySelector("[data-robux-ticket]").textContent = pricingCopy.robuxOpenTicket || copy.en.pricing.robuxOpenTicket;
+    const selectedPlan = basePlans.some((plan) => plan.id === planId) ? planId : null;
+    const picker = modal.querySelector("[data-robux-plan-picker]");
+    const order = modal.querySelector("[data-robux-order]");
+    const pickerActions = modal.querySelector("[data-robux-picker-actions]");
+    const cancel = modal.querySelector("[data-robux-cancel]");
+    const loading = modal.querySelector("[data-robux-loading]");
+    modal.querySelector("[data-robux-eyebrow]").textContent = pricingCopy.robuxAccountEyebrow || copy.en.pricing.robuxAccountEyebrow;
     modal.classList.add("is-visible");
     modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("modal-open");
+    if (!selectedPlan) {
+      modal.querySelector("#robuxTitle").textContent = pricingCopy.robuxChoosePlanTitle || copy.en.pricing.robuxChoosePlanTitle;
+      modal.querySelector("[data-robux-description]").textContent = pricingCopy.robuxChoosePlanDescription || copy.en.pricing.robuxChoosePlanDescription;
+      picker.innerHTML = basePlans.map((plan) => `
+        <button class="robux-plan-option" type="button" data-robux-select-plan="${plan.id}">
+          <strong>${escapeHtml(robuxPlanLabel(plan.id))}</strong>
+          <span>${plan.robuxPremium.toLocaleString("en-US")} / ${plan.robuxNoPremium.toLocaleString("en-US")} Robux</span>
+        </button>
+      `).join("");
+      picker.hidden = false;
+      loading.hidden = true;
+      order.hidden = true;
+      pickerActions.hidden = false;
+      cancel.textContent = pricingCopy.robuxChoosePlanCancel || copy.en.pricing.robuxChoosePlanCancel;
+      return;
+    }
+
+    const planName = robuxPlanLabel(selectedPlan);
+    modal.querySelector("#robuxTitle").textContent = `${pricingCopy.robuxModalTitle || copy.en.pricing.robuxModalTitle}: ${planName}`;
+    modal.querySelector("[data-robux-description]").textContent = pricingCopy.robuxModalDescription || copy.en.pricing.robuxModalDescription;
+    modal.querySelector("[data-robux-loading-label]").textContent = pricingCopy.robuxAccountLoading || copy.en.pricing.robuxAccountLoading;
+    picker.hidden = true;
+    order.hidden = true;
+    pickerActions.hidden = true;
+    loading.hidden = false;
+    modal.dataset.robuxLoading = "1";
+    setRobuxBusy(modal, false);
+
+    const user = await getCurrentAccount();
+    if (openRequestVersion !== robuxOpenRequestVersion || modal.getAttribute("aria-hidden") === "true") return;
+    if (!user) {
+      closeRobuxModal();
+      openLoginBeforeCheckoutModal(selectedPlan, { next: `/pricing?payment=robux&plan=${encodeURIComponent(selectedPlan)}` });
+      const loginModal = ensureLoginBeforeCheckoutModal();
+      const body = loginModal.querySelector("[data-login-checkout-body]");
+      if (body) body.textContent = pricingCopy.robuxLoginRequired || copy.en.pricing.robuxLoginRequired;
+      return;
+    }
+
+    if (selectedRobuxPlan !== selectedPlan) robuxIdempotencyKey = null;
+    if (selectedRobuxPremiumPlus !== true) robuxIdempotencyKey = null;
+    selectedRobuxPlan = selectedPlan;
+    selectedRobuxPremiumPlus = true;
+    activeRobuxQuote = null;
+    modal.dataset.robuxPending = "0";
+    modal.dataset.robuxOrdersReady = "0";
+    loading.hidden = true;
+    picker.hidden = true;
+    order.hidden = false;
+    pickerActions.hidden = true;
+    modal.querySelector("[data-robux-plan-name]").textContent = planName;
+    modal.querySelector("[data-robux-staff]").textContent = pricingCopy.robuxModalStaff || copy.en.pricing.robuxModalStaff;
+    modal.querySelector("[data-robux-stripe]").textContent = pricingCopy.robuxModalStripe || copy.en.pricing.robuxModalStripe;
+    modal.querySelector("[data-robux-account-label]").textContent = pricingCopy.robuxAccount || copy.en.pricing.robuxAccount;
+    modal.querySelector("[data-robux-account-value]").textContent = user.email || user.username || "FIMA account";
+    modal.querySelector("[data-robux-username-label]").textContent = pricingCopy.robuxUsername || copy.en.pricing.robuxUsername;
+    modal.querySelector("[data-robux-premium-label]").textContent = pricingCopy.robuxPremiumChoice || copy.en.pricing.robuxPremiumChoice;
+    modal.querySelector("[data-robux-premium-yes]").textContent = pricingCopy.robuxPremiumYes || copy.en.pricing.robuxPremiumYes;
+    modal.querySelector("[data-robux-premium-no]").textContent = pricingCopy.robuxPremiumNo || copy.en.pricing.robuxPremiumNo;
+    modal.querySelector("[data-robux-proof-url-label]").textContent = pricingCopy.robuxProofUrl || copy.en.pricing.robuxProofUrl;
+    modal.querySelector("[data-robux-proof-text-label]").textContent = pricingCopy.robuxProofText || copy.en.pricing.robuxProofText;
+    modal.querySelector("textarea[name=proofText]").placeholder = pricingCopy.robuxProofPlaceholder || copy.en.pricing.robuxProofPlaceholder;
+    modal.querySelector("[data-robux-secure-note]").textContent = pricingCopy.robuxSecureNote || copy.en.pricing.robuxSecureNote;
+    modal.querySelector("[data-robux-support]").textContent = pricingCopy.robuxOpenTicket || copy.en.pricing.robuxOpenTicket;
+    modal.querySelector("[data-robux-orders-title]").textContent = pricingCopy.robuxOrders || copy.en.pricing.robuxOrders;
+    modal.querySelector("[data-robux-refresh]").textContent = pricingCopy.robuxRefresh || copy.en.pricing.robuxRefresh;
+    modal.querySelector("input[name=robloxUsername]").value = user.robloxUsername || "";
+    modal.querySelector("input[name=premiumPlus][value=true]").checked = true;
+    setRobuxNotice(modal, "");
+    setRobuxBusy(modal, false);
+
+    try {
+      const results = await Promise.allSettled([loadRobuxQuote(modal), loadRobuxOrders(modal)]);
+      if (openRequestVersion !== robuxOpenRequestVersion || modal.getAttribute("aria-hidden") === "true") return;
+      modal.dataset.robuxLoading = "0";
+      const rejected = results.find((result) => result.status === "rejected");
+      setRobuxBusy(modal, false);
+      if (!rejected) return;
+      const error = rejected.reason;
+      if (error?.code === "account_required") {
+        closeRobuxModal();
+        openLoginBeforeCheckoutModal(selectedPlan, { next: `/pricing?payment=robux&plan=${encodeURIComponent(selectedPlan)}` });
+        return;
+      }
+      setRobuxNotice(modal, pricingCopy.robuxRequestFailed || copy.en.pricing.robuxRequestFailed, "bad");
+    } catch (error) {
+      if (openRequestVersion !== robuxOpenRequestVersion || modal.getAttribute("aria-hidden") === "true") return;
+      modal.dataset.robuxLoading = "0";
+      setRobuxNotice(modal, pricingCopy.robuxRequestFailed || copy.en.pricing.robuxRequestFailed, "bad");
+      setRobuxBusy(modal, false);
+    }
   };
 
   const closeRobuxModal = () => {
+    robuxOpenRequestVersion += 1;
+    robuxQuoteRequestVersion += 1;
     const modal = $("#robuxModal");
     if (!modal) return;
     modal.classList.remove("is-visible");
@@ -2111,9 +2404,112 @@
     document.body.classList.remove("modal-open");
   };
 
+  const submitRobuxOrder = async (event) => {
+    event.preventDefault();
+    const modal = ensureRobuxModal();
+    const pricingCopy = getCopy().pricing || copy.en.pricing;
+    if (
+      robuxRequestInFlight ||
+      !selectedRobuxPlan ||
+      !activeRobuxQuote ||
+      activeRobuxQuote.plan !== selectedRobuxPlan ||
+      activeRobuxQuote.premiumPlus !== selectedRobuxPremiumPlus ||
+      modal.dataset.robuxOrdersReady !== "1" ||
+      modal.dataset.robuxPending === "1" ||
+      modal.dataset.robuxLoading === "1"
+    ) return;
+    const form = event.currentTarget;
+    const robloxUsername = String(form.elements.robloxUsername?.value || "").trim();
+    const proofUrl = String(form.elements.proofUrl?.value || "").trim();
+    const proofText = String(form.elements.proofText?.value || "").trim();
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(robloxUsername)) {
+      setRobuxNotice(modal, pricingCopy.robuxInvalidUsername || copy.en.pricing.robuxInvalidUsername, "bad");
+      form.elements.robloxUsername?.focus();
+      return;
+    }
+    if (proofUrl) {
+      try {
+        const parsed = new URL(proofUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("invalid_protocol");
+      } catch {
+        setRobuxNotice(modal, pricingCopy.robuxInvalidProof || copy.en.pricing.robuxInvalidProof, "bad");
+        form.elements.proofUrl?.focus();
+        return;
+      }
+    }
+
+    robuxIdempotencyKey ||= createRobuxIdempotencyKey();
+    setRobuxNotice(modal, "");
+    setRobuxBusy(modal, true);
+    try {
+      const response = await fetchWithTimeout(`${apiBase}/payments/robux/manual/submit`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
+          "Idempotency-Key": robuxIdempotencyKey,
+          ...(await csrfHeaders())
+        },
+        body: JSON.stringify({
+          plan: selectedRobuxPlan,
+          premiumPlus: selectedRobuxPremiumPlus,
+          robloxUsername,
+          proofUrl: proofUrl || null,
+          proofText: proofText || null
+        })
+      }, 15000);
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401 || data.error === "account_required") {
+        closeRobuxModal();
+        openLoginBeforeCheckoutModal(selectedRobuxPlan, { next: `/pricing?payment=robux&plan=${encodeURIComponent(selectedRobuxPlan)}` });
+        return;
+      }
+      if (data.error === "pending_submission_exists") {
+        setRobuxNotice(modal, pricingCopy.robuxPendingExists || copy.en.pricing.robuxPendingExists, "warn");
+        await loadRobuxOrders(modal);
+        return;
+      }
+      if (!response.ok || !data.submission) throw Object.assign(new Error(data.error || "manual_payment_submit_failed"), { code: data.error });
+      await loadRobuxOrders(modal);
+      setRobuxNotice(modal, `${pricingCopy.robuxOrderCreated || copy.en.pricing.robuxOrderCreated} ${data.submission.id}`, "good");
+      robuxIdempotencyKey = null;
+    } catch (error) {
+      setRobuxNotice(modal, pricingCopy.robuxRequestFailed || copy.en.pricing.robuxRequestFailed, "bad");
+    } finally {
+      setRobuxBusy(modal, false);
+    }
+  };
+
   const initCheckoutFlow = () => {
     const form = $("#checkoutForm");
     form?.addEventListener("submit", submitCheckout);
+
+    document.addEventListener("submit", (event) => {
+      if (event.target.matches("#robuxOrderForm")) submitRobuxOrder(event);
+    });
+
+    document.addEventListener("change", (event) => {
+      if (!event.target.matches("#robuxOrderForm input[name=premiumPlus]")) return;
+      const modal = ensureRobuxModal();
+      selectedRobuxPremiumPlus = event.target.value === "true";
+      robuxIdempotencyKey = null;
+      setRobuxNotice(modal, "");
+      loadRobuxQuote(modal).catch((error) => {
+        if (error?.code === "account_required") {
+          closeRobuxModal();
+          openLoginBeforeCheckoutModal(selectedRobuxPlan, { next: `/pricing?payment=robux&plan=${encodeURIComponent(selectedRobuxPlan)}` });
+          return;
+        }
+        setRobuxNotice(modal, (getCopy().pricing || copy.en.pricing).robuxRequestFailed || copy.en.pricing.robuxRequestFailed, "bad");
+        setRobuxBusy(modal, false);
+      });
+    });
+
+    document.addEventListener("input", (event) => {
+      if (event.target.matches("#robuxOrderForm input[name=robloxUsername], #robuxOrderForm input[name=proofUrl], #robuxOrderForm textarea[name=proofText]")) {
+        robuxIdempotencyKey = null;
+      }
+    });
 
     document.addEventListener("click", (event) => {
       const giftCodeTrigger = event.target.closest("[data-gift-code-checkout-plan]");
@@ -2130,18 +2526,37 @@
         return;
       }
 
-      if (event.target.closest("[data-robux-close]") || event.target.classList.contains("robux-modal")) {
+      const robuxPlanTrigger = event.target.closest("[data-robux-select-plan]");
+      if (robuxPlanTrigger) {
         event.preventDefault();
-        closeRobuxModal();
+        openRobuxModal(robuxPlanTrigger.dataset.robuxSelectPlan);
         return;
       }
 
-      const trialClaimTrigger = event.target.closest("[data-trial-claim-link]");
-      if (trialClaimTrigger) {
+      const robuxRefreshTrigger = event.target.closest("[data-robux-refresh]");
+      if (robuxRefreshTrigger) {
         event.preventDefault();
-        const next = "/dashboard/redeem#monthly-trial";
-        if (!currentSiteAccount) openLoginBeforeCheckoutModal("1day", { next, trialClaim: true });
-        else window.location.href = next;
+        const modal = ensureRobuxModal();
+        if (robuxRequestInFlight) return;
+        setRobuxNotice(modal, "");
+        setRobuxBusy(modal, true);
+        loadRobuxOrders(modal)
+          .catch((error) => {
+            if (error?.code === "account_required") {
+              closeRobuxModal();
+              openLoginBeforeCheckoutModal(selectedRobuxPlan, { next: `/pricing?payment=robux&plan=${encodeURIComponent(selectedRobuxPlan)}` });
+              return;
+            }
+            setRobuxNotice(modal, (getCopy().pricing || copy.en.pricing).robuxRequestFailed || copy.en.pricing.robuxRequestFailed, "bad");
+          })
+          .finally(() => setRobuxBusy(modal, false));
+        return;
+      }
+
+      if (event.target.closest("[data-robux-close]") || event.target.classList.contains("robux-modal")) {
+        event.preventDefault();
+        if (robuxRequestInFlight) return;
+        closeRobuxModal();
         return;
       }
 
@@ -2167,12 +2582,18 @@
       if (event.key === "Escape") {
         closeCheckoutModal();
         closeLoginBeforeCheckoutModal();
+        if (!robuxRequestInFlight) closeRobuxModal();
       }
     });
 
-    const checkoutParam = new URLSearchParams(location.search).get("checkout");
-    const isGiftCodeCheckout = new URLSearchParams(location.search).get("giftCode") === "1";
-    if (checkoutParam && basePlans.some((plan) => plan.id === checkoutParam)) {
+    const commerceParams = new URLSearchParams(location.search);
+    const checkoutParam = commerceParams.get("checkout");
+    const isGiftCodeCheckout = commerceParams.get("giftCode") === "1";
+    const robuxRequested = commerceParams.get("payment") === "robux";
+    const robuxPlan = commerceParams.get("plan");
+    if (robuxRequested) {
+      window.setTimeout(() => openRobuxModal(robuxPlan), 350);
+    } else if (checkoutParam && basePlans.some((plan) => plan.id === checkoutParam)) {
       window.setTimeout(() => startAccountCheckout(checkoutParam, isGiftCodeCheckout ? { checkoutType: "gift_code_purchase" } : {}), 350);
     }
   };
@@ -2181,23 +2602,6 @@
     $$("[data-pricing-countdown]").forEach((node) => {
       node.textContent = formatCountdown(saleEndsAt);
     });
-    $$("[data-trial-promo-countdown]").forEach((node) => {
-      node.textContent = trialPromoCountdown();
-    });
-  };
-
-  const hydrateTrialPromo = async () => {
-    try {
-      const response = await fetchWithTimeout(`${apiBase}/api/trial-promo`, {}, 2600);
-      if (!response.ok) return;
-      const data = await response.json();
-      state.trialPromo = data.promo || null;
-      renderHomeTrialPromoBanner();
-      renderPricing();
-    } catch (error) {
-      state.trialPromo = null;
-      renderHomeTrialPromoBanner();
-    }
   };
 
   const loadPublicSiteSettings = async () => {
@@ -2525,7 +2929,6 @@
     await loadPublicSiteSettings();
     hydrateDiscordLinks();
     initPreferences();
-    hydrateTrialPromo();
     hydrateSiteAccountNav();
     window.setInterval(updatePricingCountdowns, 1000);
     initMacroVideoGallery();

@@ -83,6 +83,30 @@ export const FREE_TRIAL_PLAN_ID = "1day";
 export const PUBLIC_CHECKOUT_PLAN_IDS = Object.freeze(["3days", "monthly", "lifetime"]);
 export const PUBLIC_REQUIRED_PRICE_ENVS = Object.freeze(["STRIPE_PRICE_3DAYS", "STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_LIFETIME"]);
 export const TEST_PRICE_ENVS = Object.freeze(["STRIPE_TEST_PRICE_3DAYS", "STRIPE_TEST_PRICE_MONTHLY", "STRIPE_TEST_PRICE_LIFETIME"]);
+export const GIFT_CODE_PRICE_ENV_BY_PLAN = Object.freeze({
+  "3days": "STRIPE_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_GIFT_PRICE_LIFETIME"
+});
+export const TEST_GIFT_CODE_PRICE_ENV_BY_PLAN = Object.freeze({
+  "3days": "STRIPE_TEST_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_TEST_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_TEST_GIFT_PRICE_LIFETIME"
+});
+export const DIRECT_GIFT_PRICE_ENV_BY_PLAN = Object.freeze({
+  "3days": "STRIPE_DIRECT_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_DIRECT_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_DIRECT_GIFT_PRICE_LIFETIME"
+});
+export const TEST_DIRECT_GIFT_PRICE_ENV_BY_PLAN = Object.freeze({
+  "3days": "STRIPE_TEST_DIRECT_GIFT_PRICE_3DAYS",
+  monthly: "STRIPE_TEST_DIRECT_GIFT_PRICE_MONTHLY",
+  lifetime: "STRIPE_TEST_DIRECT_GIFT_PRICE_LIFETIME"
+});
+export const GIFT_CODE_REQUIRED_PRICE_ENVS = Object.freeze(Object.values(GIFT_CODE_PRICE_ENV_BY_PLAN));
+export const TEST_GIFT_CODE_PRICE_ENVS = Object.freeze(Object.values(TEST_GIFT_CODE_PRICE_ENV_BY_PLAN));
+export const DIRECT_GIFT_REQUIRED_PRICE_ENVS = Object.freeze(Object.values(DIRECT_GIFT_PRICE_ENV_BY_PLAN));
+export const TEST_DIRECT_GIFT_PRICE_ENVS = Object.freeze(Object.values(TEST_DIRECT_GIFT_PRICE_ENV_BY_PLAN));
 
 export function getPlan(planId) {
   return PLANS[String(planId || "").toLowerCase()] || null;
@@ -98,6 +122,14 @@ export function publicCheckoutPlanIds() {
 
 export function requiredPublicPriceEnvs() {
   return [...PUBLIC_REQUIRED_PRICE_ENVS];
+}
+
+export function requiredGiftCodePriceEnvs({ test = false } = {}) {
+  return [...(test ? TEST_GIFT_CODE_PRICE_ENVS : GIFT_CODE_REQUIRED_PRICE_ENVS)];
+}
+
+export function requiredDirectGiftPriceEnvs({ test = false } = {}) {
+  return [...(test ? TEST_DIRECT_GIFT_PRICE_ENVS : DIRECT_GIFT_REQUIRED_PRICE_ENVS)];
 }
 
 export function isPublicCheckoutPlan(planId) {
@@ -127,7 +159,59 @@ export function getPlanCommerce(plan, now = new Date()) {
     priceCents: plan.priceCents,
     compareAtCents: plan.compareAtCents || null,
     priceEnv: plan.priceEnv || null,
+    priceType: plan.subscription ? "recurring" : "one_time",
+    interval: plan.subscription ? "month" : null,
+    checkoutType: "license_purchase",
+    productName: plan.name,
     saleActive: false
+  };
+}
+
+export function giftCodeProductName(plan) {
+  const suffix = plan?.id === "3days"
+    ? "3 Days"
+    : plan?.id === "monthly"
+      ? "Monthly"
+      : plan?.id === "lifetime"
+        ? "Lifetime"
+        : String(plan?.name || "Access");
+  return `FIMA Gift Code — ${suffix}`;
+}
+
+export function getGiftCodeCommerce(plan, { test = false } = {}) {
+  const base = getPlanCommerce(plan);
+  const envMap = test ? TEST_GIFT_CODE_PRICE_ENV_BY_PLAN : GIFT_CODE_PRICE_ENV_BY_PLAN;
+  return {
+    ...base,
+    priceEnv: envMap[plan?.id] || null,
+    priceType: "one_time",
+    interval: null,
+    checkoutType: "gift_code_purchase",
+    productName: giftCodeProductName(plan)
+  };
+}
+
+export function directGiftProductName(plan) {
+  const suffix = plan?.id === "3days"
+    ? "3 Days"
+    : plan?.id === "monthly"
+      ? "Monthly"
+      : plan?.id === "lifetime"
+        ? "Lifetime"
+        : String(plan?.name || "Access");
+  return `FIMA Direct Gift — ${suffix}`;
+}
+
+export function getDirectGiftCommerce(plan, { test = false } = {}) {
+  const base = getPlanCommerce(plan);
+  const envMap = test ? TEST_DIRECT_GIFT_PRICE_ENV_BY_PLAN : DIRECT_GIFT_PRICE_ENV_BY_PLAN;
+  return {
+    ...base,
+    priceEnv: envMap[plan?.id] || null,
+    priceType: "one_time",
+    interval: null,
+    checkoutType: "direct_gift_purchase",
+    productName: directGiftProductName(plan)
   };
 }
 

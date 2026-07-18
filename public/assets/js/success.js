@@ -20,7 +20,7 @@
   let siteSettings = {};
 
   const formatPlan = (plan) => ({
-    "1day": "Free Trial",
+    "1day": "Legacy Trial",
     "3days": "3 Days Access",
     monthly: "Monthly Subscription",
     "2weeks": "Legacy Product - 15 Days",
