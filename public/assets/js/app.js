@@ -1104,8 +1104,21 @@
 
   const applyPageMode = () => {
     const page = document.body.dataset.page || pageFromPath();
-    const visibleSections = new Set(pageSections[page] || pageSections.home);
-    document.body.dataset.page = pageSections[page] ? page : "home";
+    const visibleSectionIds = pageSections[page];
+
+    // Standalone pages such as /paradise-bot own their complete main layout.
+    // Only the multi-page marketing shell may hide sections by route.
+    if (!visibleSectionIds) {
+      document.body.classList.remove("page-mode");
+      $$("main > section").forEach((section) => {
+        section.classList.remove("page-section-hidden");
+        section.removeAttribute("aria-hidden");
+      });
+      return;
+    }
+
+    const visibleSections = new Set(visibleSectionIds);
+    document.body.dataset.page = page;
     document.body.classList.add("page-mode");
 
     $$("main > section").forEach((section) => {
