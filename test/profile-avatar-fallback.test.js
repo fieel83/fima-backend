@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const readSource = (relativePath) => readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
-const currentAvatarCacheKey = "20260722-bandwidth-1";
+const currentAvatarCacheKey = "20260723-locale-1";
 
 const publicHtmlSources = async () => {
   const root = new URL("../public/", import.meta.url);

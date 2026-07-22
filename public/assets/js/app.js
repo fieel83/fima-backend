@@ -33,10 +33,7 @@
   const supportedCurrencySet = new Set(currencyOptions);
 
   const languageOptions = [
-    ["en", "EN"], ["tr", "TR"], ["de", "DE"], ["fr", "FR"], ["bs", "BS"],
-    ["es", "ES"], ["pt", "PT"], ["it", "IT"], ["nl", "NL"], ["pl", "PL"],
-    ["ru", "RU"], ["uk", "UK"], ["ar", "AR"], ["hi", "HI"], ["id", "ID"],
-    ["ja", "JA"], ["ko", "KO"], ["zh", "ZH"], ["ro", "RO"], ["sr", "SR"]
+    ["en", "EN"], ["tr", "TR"], ["de", "DE"], ["fr", "FR"], ["bs", "BS"]
   ];
 
   const symbols = {
@@ -248,10 +245,14 @@
         macros: "Macros",
         features: "Features",
         pricing: "Pricing",
+        keyGuide: "How to get a key",
         download: "Download",
         faq: "FAQ",
         support: "Support",
         dashboard: "Account",
+        login: "Login",
+        register: "Register",
+        products: "My Products",
         cta: "Buy Now"
       },
       hero: {
@@ -525,10 +526,14 @@
         macros: "Macrolar",
         features: "\u00d6zellikler",
         pricing: "Fiyatlar",
+        keyGuide: "Anahtar nas\u0131l al\u0131n\u0131r?",
         download: "\u0130ndir",
         faq: "SSS",
         support: "Destek",
         dashboard: "Hesap",
+        login: "Giri\u015f Yap",
+        register: "Kay\u0131t Ol",
+        products: "\u00dcr\u00fcnlerim",
         cta: "Sat\u0131n Al"
       },
       hero: {
@@ -775,7 +780,7 @@
     de: {
       accessibility: { skip: "Zum Inhalt springen", menu: "Men\u00fc \u00f6ffnen" },
       controls: { theme: "Theme", language: "Sprache", currency: "W\u00e4hrung" },
-      nav: { home: "Start", macros: "Macros", features: "Features", pricing: "Preise", download: "Download", faq: "FAQ", support: "Support", dashboard: "Konto", cta: "Kaufen" },
+      nav: { home: "Start", macros: "Macros", features: "Features", pricing: "Preise", keyGuide: "Schl\u00fcssel erhalten", download: "Download", faq: "FAQ", support: "Support", dashboard: "Konto", login: "Anmelden", register: "Registrieren", products: "Meine Produkte", cta: "Kaufen" },
       hero: {
         eyebrow: "Fima Macro f\u00fcr TSBG",
         title: "Pr\u00e4zise Macros f\u00fcr dein Setup.",
@@ -853,7 +858,7 @@
     fr: {
       accessibility: { skip: "Aller au contenu", menu: "Ouvrir le menu" },
       controls: { theme: "Th\u00e8me", language: "Langue", currency: "Devise" },
-      nav: { home: "Accueil", macros: "Macros", features: "Fonctions", pricing: "Prix", download: "Download", faq: "FAQ", support: "Aide", dashboard: "Compte", cta: "Acheter" },
+      nav: { home: "Accueil", macros: "Macros", features: "Fonctions", pricing: "Prix", keyGuide: "Obtenir une cl\u00e9", download: "T\u00e9l\u00e9charger", faq: "FAQ", support: "Aide", dashboard: "Compte", login: "Connexion", register: "S'inscrire", products: "Mes produits", cta: "Acheter" },
       hero: {
         eyebrow: "Fima Macro pour TSBG",
         title: "Des macros pr\u00e9cises adapt\u00e9es \u00e0 ton setup.",
@@ -931,7 +936,7 @@
     bs: {
       accessibility: { skip: "Idi na sadr\u017eaj", menu: "Otvori meni" },
       controls: { theme: "Tema", language: "Jezik", currency: "Valuta" },
-      nav: { home: "Po\u010detna", macros: "Macroi", features: "Funkcije", pricing: "Cijene", download: "Preuzmi", faq: "FAQ", support: "Podr\u0161ka", dashboard: "Nalog", cta: "Kupi" },
+      nav: { home: "Po\u010detna", macros: "Macroi", features: "Funkcije", pricing: "Cijene", keyGuide: "Kako dobiti klju\u010d", download: "Preuzmi", faq: "FAQ", support: "Podr\u0161ka", dashboard: "Nalog", login: "Prijava", register: "Registracija", products: "Moji proizvodi", cta: "Kupi" },
       hero: {
         eyebrow: "Fima Macro za TSBG",
         title: "Precizni macroi prilago\u0111eni tvom setupu.",
@@ -1443,15 +1448,15 @@
         </strong>
         <div>
           <a href="/dashboard/overview">${siteAccountLabel()}</a>
-          <a href="/dashboard/products">My Products</a>
+          <a href="/dashboard/products">${getCopy().nav.products}</a>
         </div>
       </article>
     ` : `
       <article class="pricing-account-prompt">
         <strong>${pricingCopy.accountPrompt || fallbackPricing.accountPrompt}</strong>
         <div>
-          <a href="/login">${copy[state.language]?.nav?.dashboard === "Panel" ? "Login" : "Login"}</a>
-          <a href="/register">${state.language === "tr" ? "Register" : "Register"}</a>
+          <a href="/login">${getCopy().nav.login}</a>
+          <a href="/register">${getCopy().nav.register}</a>
         </div>
       </article>
     `;
@@ -1717,13 +1722,7 @@
     en: "Account"
   }[state.language] || "Account");
 
-  const loginRegisterLabel = () => ({
-    tr: "Login",
-    de: "Login",
-    fr: "Login",
-    bs: "Login",
-    en: "Login"
-  }[state.language] || "Login");
+  const loginRegisterLabel = () => getCopy().nav.login;
 
   const siteProfileFor = (user) => {
     if (user?.robloxUsername) {
@@ -1827,12 +1826,12 @@
         login.className = "nav-auth-link";
         login.href = "/login";
         login.dataset.siteAuthLink = "login";
-        login.textContent = "Login";
+        login.textContent = getCopy().nav.login;
         const register = document.createElement("a");
         register.className = "nav-auth-link nav-auth-register";
         register.href = "/register";
         register.dataset.siteAuthLink = "register";
-        register.textContent = "Register";
+        register.textContent = getCopy().nav.register;
         controls.insertBefore(login, cta);
         controls.insertBefore(register, cta);
       }

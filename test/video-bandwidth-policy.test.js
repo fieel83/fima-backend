@@ -27,7 +27,7 @@ test("marketing pages do not download a macro video during initial HTML load", (
     assert.match(videoTag, /preload="none"/u, `${file} must disable eager media preload`);
     assert.doesNotMatch(videoTag, /\bautoplay\b/u, `${file} must not autoplay before lazy activation`);
     assert.doesNotMatch(videoSource, /\bsrc=/u, `${file} must not ship an initial MP4 URL`);
-    assert.match(source, /assets\/js\/app\.js\?v=20260722-bandwidth-1/u, `${file} must use the bandwidth-safe script revision`);
+    assert.match(source, /assets\/js\/app\.js\?v=20260723-locale-1/u, `${file} must use the bandwidth-safe localized script revision`);
   }
 });
 
