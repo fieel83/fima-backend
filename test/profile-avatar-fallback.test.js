@@ -5,7 +5,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const readSource = (relativePath) => readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
-const currentAvatarCacheKey = "20260723-locale-1";
+const currentAppCacheKey = "20260723-locale-2";
+const currentAccountCacheKey = "20260723-locale-1";
 
 const publicHtmlSources = async () => {
   const root = new URL("../public/", import.meta.url);
@@ -35,7 +36,7 @@ test("public and account profile avatars fail safely to a one-time text initial"
   }
 });
 
-test("all public HTML pages use one current avatar script cache key", async () => {
+test("all public HTML pages use one current cache key per avatar script", async () => {
   const htmlSources = await publicHtmlSources();
   const keysByScript = { "app.js": new Set(), "account.js": new Set() };
 
@@ -45,8 +46,8 @@ test("all public HTML pages use one current avatar script cache key", async () =
     }
   }
 
-  assert.deepEqual([...keysByScript["app.js"]], [currentAvatarCacheKey]);
-  assert.deepEqual([...keysByScript["account.js"]], [currentAvatarCacheKey]);
+  assert.deepEqual([...keysByScript["app.js"]], [currentAppCacheKey]);
+  assert.deepEqual([...keysByScript["account.js"]], [currentAccountCacheKey]);
 });
 
 test("HTML responses revalidate before serving profile-avatar script references", async () => {

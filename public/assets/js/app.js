@@ -571,40 +571,40 @@
         ]
       },
       showcase: {
-        eyebrow: "Canli macro onizleme",
-        title: "Macro sec ve calisma akisini izle.",
-        description: "Her onizleme public video manifestinden yuklenir; yeni klip eklediginde sayfa tasarimini tekrar kurmadan liste genisler.",
-        videoLabel: "Macro execution demo",
-        currentLabel: "Simdi oynuyor",
-        sideTitle: "Profiller ve bindler",
-        sideText: "Yeni MP4 ve manifest kaydi eklediginde secici otomatik olarak yeni macro videosunu gosterir."
+        eyebrow: "Canlı makro önizlemesi",
+        title: "Bir makro seç ve çalışmasını izle.",
+        description: "Her önizleme herkese açık video listesinden yüklenir; yeni bir klip eklendiğinde sayfa tasarımı yeniden kurulmadan liste genişler.",
+        videoLabel: "Makro çalışma gösterimi",
+        currentLabel: "Şimdi oynatılıyor",
+        sideTitle: "Profiller ve tuş atamaları",
+        sideText: "Yeni bir MP4 ve liste kaydı eklendiğinde seçici, yeni makro videosunu otomatik olarak gösterir."
       },
       tour: {
-        eyebrow: "App walkthrough",
-        title: "Gercek Fima Macro Studio kanallarinda gez.",
-        description: "Home, macros, shop, updates, benefits, tutorials, feedback ve settings ekranlari direkt canli desktop app'ten yakalandi.",
+        eyebrow: "Uygulama turu",
+        title: "Gerçek Fima Macro Studio bölümlerini keşfet.",
+        description: "Ana ekran, makrolar, mağaza, değişiklikler, avantajlar, rehberler, geri bildirim ve ayarlar doğrudan masaüstü uygulamasından gösterilir.",
         views: {
-          home: { label: "Home", title: "Macro control studio", description: "Dashboard, macro power, activity ve live status tek odakli app penceresinde." },
-          macros: { label: "Macros", title: "Profiller ve bindler", description: "Profilleri gez, bind ata ve timing ayarlarini macro ekranindan cikmadan duzenle." },
-          shop: { label: "Shop", title: "Stores and community", description: "Community ve store yuzeyleri ayni premium desktop shell icinde durur." },
-          updates: { label: "Updates", title: "Version changelog", description: "Release notlari, updater kontrolu ve version gecmisi app icinde gorunur." },
-          benefits: { label: "Benefits", title: "Macro benefits", description: "App, macro kapsamini ve hazir olan kisimlari odakli bir benefits ekraninda anlatir." },
-          tutorials: { label: "Tutorials", title: "Tutorial library", description: "Tutorial videolari ve macro rehberleri profillerin yaninda hazir durur." },
-          feedback: { label: "Feedback", title: "Feedback channel", description: "Kullanicilar onerileri veya sorunlari app icindeki feedback ekranindan gonderebilir." },
-          settings: { label: "Settings", title: "Setup scaling ve runtime", description: "Sensitivity, ping, ekran boyutu, tema ve klavye duzeni tek settings yuzeyinde." }
+          home: { label: "Ana ekran", title: "Makro kontrol merkezi", description: "Kontrol paneli, makro gücü, etkinlik ve canlı durum tek bir odaklı uygulama penceresinde." },
+          macros: { label: "Makrolar", title: "Profiller ve tuş atamaları", description: "Profilleri incele, tuş ata ve makro ekranından ayrılmadan zamanlamayı düzenle." },
+          shop: { label: "Mağaza", title: "Mağazalar ve topluluk", description: "Topluluk bağlantıları ve mağaza alanları aynı gelişmiş masaüstü arayüzünde yer alır." },
+          updates: { label: "Değişiklikler", title: "Sürüm geçmişi", description: "Sürüm notları, güncelleme kontrolleri ve sürüm geçmişi uygulama içinde görünür." },
+          benefits: { label: "Avantajlar", title: "Makro avantajları", description: "Uygulama, makro kapsamını ve kullanılabilir özellikleri odaklı bir avantajlar ekranında açıklar." },
+          tutorials: { label: "Rehberler", title: "Rehber kütüphanesi", description: "Eğitim videoları ve makro rehberleri, kullanıcıların çalıştırdığı profillerin yanında bulunur." },
+          feedback: { label: "Geri bildirim", title: "Geri bildirim merkezi", description: "Kullanıcılar önerilerini veya sorunlarını uygulamadaki özel geri bildirim alanından gönderebilir." },
+          settings: { label: "Ayarlar", title: "Kurulum ölçekleme ve çalışma ayarları", description: "Hassasiyet, ping, ekran boyutu, tema ve klavye düzeni tek bir ayarlar alanında bulunur." }
         }
       },
       upcoming: {
-        eyebrow: "Yakinda",
-        title: "Sonraki macro profilleri sistemde yerini aliyor.",
-        description: "Bu profiller app tarafinda locked veya upcoming variant olarak planlanan yeni techler.",
-        status: "Planlandi",
+        eyebrow: "Yakında",
+        title: "Sonraki makro profilleri için sistemde yer hazır.",
+        description: "Bu profiller uygulamada kilitli veya yakında sunulacak seçenekler olarak planlanıyor.",
+        status: "Planlandı",
         items: [
-          ["Tab Supa", "Tab tabanli rotalar icin ek Supa varianti."],
-          ["No-Shiftlock Lethal", "No-shiftlock setup icin ayarlanacak Lethal Dash varianti."],
-          ["Normal Twisted", "True Twisted yaninda gelecek Twisted rotasi."],
-          ["Shove 3M1 Reset", "3M1 ailesi icin follow-up reset varianti."],
-          ["Boomy Tech", "Sonraki update icin ayrilan yeni tech profili."]
+          ["Tab Supa", "Sekme tabanlı rotalar için ek Supa seçeneği."],
+          ["No-Shiftlock Lethal", "Shiftlock kullanılmayan kurulumlar için ayarlanmış Lethal Dash seçeneği."],
+          ["Normal Twisted", "True Twisted yanında sunulacak yeni Twisted rotası."],
+          ["Shove 3M1 Reset", "3M1 ailesi için takip eden sıfırlama seçeneği."],
+          ["Boomy Tech", "Gelecek bir sürüm için ayrılan yeni teknik profili."]
         ]
       },
       features: {
@@ -793,6 +793,43 @@
       },
       mockup: { realPreview: "Echte App-Home-Vorschau", profiles: "Profile", activeMacro: "Aktives Macro", ready: "Bereit", ping: "Ping", resolution: "Aufl\u00f6sung", sensitivity: "Sensitivity", scaleTitle: "Setup-Skalierung", scaleText: "Timing- und Bewegungswerte passen sich vom Basisprofil an Bildschirm und Sensitivity an." },
       macros: { eyebrow: "Macro-Bibliothek", title: "Schneller Zugriff auf Techs, die Spieler wirklich nutzen.", description: "Jede Karte ist als klares Profilziel f\u00fcr Keybind-Aktivierung und sp\u00e4tere lizenzierte Auslieferung vorbereitet.", descriptions: ["Optimiertes Bewegungstiming f\u00fcr sauberere Aktivierung.", "Mit Sensitivity- und Screen-Scaling im Blick gebaut.", "F\u00fcr schnelle Keybind-Aktivierung w\u00e4hrend der Bewegung gedacht.", "F\u00fcr konsistentes Timing \u00fcber verschiedene Ping-Bereiche strukturiert.", "F\u00fcr Profil-Tuning ohne kompliziertes Setup vorbereitet.", "Ein fokussiertes Tech-Profil f\u00fcr gleichm\u00e4\u00dfigere Wiederholung."] },
+      showcase: {
+        eyebrow: "Live-Macro-Vorschau",
+        title: "Wähle ein Macro und sieh dir die Ausführung an.",
+        description: "Jede Vorschau wird aus dem öffentlichen Videoverzeichnis geladen, damit neue Clips ohne Umbau des Seitenlayouts ergänzt werden können.",
+        videoLabel: "Macro-Ausführungsdemo",
+        currentLabel: "Wird gerade abgespielt",
+        sideTitle: "Profile und Tastenbelegungen",
+        sideText: "Nach dem Hinzufügen einer MP4-Datei und eines Verzeichniseintrags zeigt die Auswahl das neue Macro-Video automatisch an."
+      },
+      tour: {
+        eyebrow: "App-Rundgang",
+        title: "Entdecke die echten Bereiche von Fima Macro Studio.",
+        description: "Start, Macros, Shop, Änderungen, Vorteile, Anleitungen, Feedback und Einstellungen werden direkt aus der Desktop-App gezeigt.",
+        views: {
+          home: { label: "Start", title: "Macro-Kontrollzentrum", description: "Dashboard, Macro-Steuerung, Aktivität und Live-Status in einem fokussierten App-Fenster." },
+          macros: { label: "Macros", title: "Profile und Tastenbelegungen", description: "Profile durchsuchen, Tasten zuweisen und das Timing anpassen, ohne den Macro-Bildschirm zu verlassen." },
+          shop: { label: "Shop", title: "Shops und Community", description: "Community-Links und Shop-Bereiche befinden sich in derselben hochwertigen Desktop-Oberfläche." },
+          updates: { label: "Änderungen", title: "Versionsverlauf", description: "Versionshinweise, Update-Prüfungen und der Versionsverlauf bleiben in der App sichtbar." },
+          benefits: { label: "Vorteile", title: "Macro-Vorteile", description: "Die App erklärt den Macro-Umfang und die verfügbaren Funktionen in einer eigenen Vorteilsansicht." },
+          tutorials: { label: "Anleitungen", title: "Anleitungsbibliothek", description: "Anleitungsvideos und Macro-Hilfen stehen direkt neben den Profilen bereit, die Nutzer ausführen." },
+          feedback: { label: "Feedback", title: "Feedback-Bereich", description: "Nutzer können Vorschläge oder Probleme über einen eigenen Bereich in der App senden." },
+          settings: { label: "Einstellungen", title: "Setup-Skalierung und Laufzeit", description: "Sensitivity, Ping, Bildschirmgröße, Theme und Tastaturlayout befinden sich in einer Einstellungsansicht." }
+        }
+      },
+      upcoming: {
+        eyebrow: "Demnächst",
+        title: "Das System bietet bereits Platz für die nächsten Macro-Profile.",
+        description: "Diese Profile sind als gesperrte oder demnächst verfügbare Varianten in der App vorgesehen.",
+        status: "Geplant",
+        items: [
+          ["Tab Supa", "Zusätzliche Supa-Variante für tab-basierte Routen."],
+          ["No-Shiftlock Lethal", "Lethal-Dash-Variante für Setups ohne Shiftlock."],
+          ["Normal Twisted", "Künftige Twisted-Route neben True Twisted."],
+          ["Shove 3M1 Reset", "Nachfolgende Reset-Variante für die 3M1-Familie."],
+          ["Boomy Tech", "Neues Tech-Profil, das für eine spätere Version vorgesehen ist."]
+        ]
+      },
       features: {
         eyebrow: "Kernsystem",
         title: "Gebaut, um Timing und Bewegung an dein Setup anzupassen.",
@@ -871,6 +908,43 @@
       },
       mockup: { realPreview: "Aper\u00e7u r\u00e9el de l'app", profiles: "Profils", activeMacro: "Macro active", ready: "Pr\u00eat", ping: "Ping", resolution: "R\u00e9solution", sensitivity: "Sensibilit\u00e9", scaleTitle: "Scaling du setup", scaleText: "Le timing et les mouvements s'adaptent du profil de base \u00e0 ton \u00e9cran et ta sensibilit\u00e9." },
       macros: { eyebrow: "Biblioth\u00e8que de macros", title: "Acc\u00e8s rapide aux techs vraiment utilis\u00e9es.", description: "Chaque carte est pens\u00e9e comme un profil clair pour activation par keybind et distribution future sous licence.", descriptions: ["Timing de mouvement optimis\u00e9 pour une activation plus propre.", "Con\u00e7u avec le scaling de sensibilit\u00e9 et d'\u00e9cran en t\u00eate.", "Pens\u00e9 pour une activation rapide par keybind en mouvement.", "Structur\u00e9 pour un timing coh\u00e9rent sur diff\u00e9rentes plages de ping.", "Pr\u00e9par\u00e9 pour r\u00e9gler les profils sans setup compliqu\u00e9.", "Un profil tech cibl\u00e9 pour une ex\u00e9cution r\u00e9p\u00e9t\u00e9e plus fluide."] },
+      showcase: {
+        eyebrow: "Aperçu macro en direct",
+        title: "Choisis une macro et regarde son exécution.",
+        description: "Chaque aperçu est chargé depuis le catalogue vidéo public, afin d'ajouter de nouveaux clips sans reconstruire la mise en page.",
+        videoLabel: "Démonstration d'exécution de macro",
+        currentLabel: "Lecture en cours",
+        sideTitle: "Profils et raccourcis",
+        sideText: "Lorsqu'un MP4 et son entrée de catalogue sont ajoutés, le sélecteur affiche automatiquement la nouvelle vidéo de macro."
+      },
+      tour: {
+        eyebrow: "Visite de l'application",
+        title: "Explore les vrais espaces de Fima Macro Studio.",
+        description: "Accueil, macros, boutique, changements, avantages, tutoriels, retours et paramètres sont présentés directement depuis l'application de bureau.",
+        views: {
+          home: { label: "Accueil", title: "Centre de contrôle des macros", description: "Tableau de bord, contrôle des macros, activité et état en direct dans une fenêtre dédiée." },
+          macros: { label: "Macros", title: "Profils et raccourcis", description: "Parcours les profils, attribue des touches et ajuste le timing sans quitter l'écran des macros." },
+          shop: { label: "Boutique", title: "Boutiques et communauté", description: "Les liens communautaires et les espaces boutique restent dans la même interface de bureau haut de gamme." },
+          updates: { label: "Changements", title: "Historique des versions", description: "Les notes de version, les contrôles de mise à jour et l'historique restent visibles dans l'application." },
+          benefits: { label: "Avantages", title: "Avantages des macros", description: "L'application explique la couverture des macros et les fonctions disponibles dans un espace dédié." },
+          tutorials: { label: "Tutoriels", title: "Bibliothèque de tutoriels", description: "Les vidéos et guides de macros restent à côté des profils utilisés par les joueurs." },
+          feedback: { label: "Retours", title: "Espace de retours", description: "Les utilisateurs peuvent envoyer leurs suggestions ou signaler un problème depuis un espace dédié dans l'application." },
+          settings: { label: "Paramètres", title: "Mise à l'échelle et fonctionnement", description: "Sensibilité, ping, taille d'écran, thème et disposition du clavier sont regroupés dans les paramètres." }
+        }
+      },
+      upcoming: {
+        eyebrow: "Bientôt",
+        title: "Le système prévoit déjà les prochains profils de macros.",
+        description: "Ces profils sont prévus comme variantes verrouillées ou bientôt disponibles dans l'application.",
+        status: "Prévu",
+        items: [
+          ["Tab Supa", "Variante Supa supplémentaire pour les routes basées sur les onglets."],
+          ["No-Shiftlock Lethal", "Variante Lethal Dash réglée pour les configurations sans shiftlock."],
+          ["Normal Twisted", "Future route Twisted aux côtés de True Twisted."],
+          ["Shove 3M1 Reset", "Variante de réinitialisation complémentaire pour la famille 3M1."],
+          ["Boomy Tech", "Nouveau profil technique réservé à une version ultérieure."]
+        ]
+      },
       features: {
         eyebrow: "Syst\u00e8me central",
         title: "Con\u00e7u pour adapter timing et mouvements \u00e0 ton setup.",
@@ -949,6 +1023,43 @@
       },
       mockup: { realPreview: "Pravi preview app po\u010detne", profiles: "Profili", activeMacro: "Aktivni macro", ready: "Spremno", ping: "Ping", resolution: "Rezolucija", sensitivity: "Sensitivity", scaleTitle: "Setup scaling", scaleText: "Timing i vrijednosti pokreta prilago\u0111avaju se od baznog profila prema ekranu i sensitivityju." },
       macros: { eyebrow: "Macro biblioteka", title: "Brz pristup techovima koje igra\u010di stvarno koriste.", description: "Svaka kartica je \u010dist profil za keybind aktivaciju i budu\u0107u licenciranu isporuku.", descriptions: ["Optimizovan timing pokreta za \u010di\u0161\u0107u aktivaciju.", "Gra\u0111eno s podr\u0161kom za sensitivity i screen scaling.", "Dizajnirano za brzu keybind aktivaciju tokom pokreta.", "Strukturirano za stabilniji timing kroz razli\u010dit ping.", "Spremno za pode\u0161avanje profila bez komplikovanog setupa.", "Fokusiran tech profil za gla\u0111e ponavljanje."] },
+      showcase: {
+        eyebrow: "Pregled macroa u\u017eivo",
+        title: "Odaberi macro i pogledaj kako se izvr\u0161ava.",
+        description: "Svaki pregled se u\u010ditava iz javnog direktorija videa, pa se novi snimci mogu dodati bez preure\u0111ivanja stranice.",
+        videoLabel: "Demonstracija izvr\u0161avanja macroa",
+        currentLabel: "Trenutno se prikazuje",
+        sideTitle: "Profili i dodjele tipki",
+        sideText: "Kada se dodaju MP4 datoteka i zapis u direktoriju, izbornik automatski prikazuje novi macro video."
+      },
+      tour: {
+        eyebrow: "Obilazak aplikacije",
+        title: "Istra\u017ei stvarne dijelove Fima Macro Studija.",
+        description: "Po\u010detna, macroi, trgovina, promjene, pogodnosti, uputstva, povratne informacije i postavke prikazuju se direktno iz desktop aplikacije.",
+        views: {
+          home: { label: "Po\u010detna", title: "Kontrolni centar macroa", description: "Kontrolna plo\u010da, upravljanje macroima, aktivnost i status u\u017eivo u jednom fokusiranom prozoru aplikacije." },
+          macros: { label: "Macroi", title: "Profili i dodjele tipki", description: "Pregledaj profile, dodijeli tipke i prilagodi timing bez napu\u0161tanja macro ekrana." },
+          shop: { label: "Trgovina", title: "Trgovine i zajednica", description: "Linkovi zajednice i prodajni dijelovi nalaze se u istom naprednom desktop interfejsu." },
+          updates: { label: "Promjene", title: "Historija verzija", description: "Napomene izdanja, provjere nadogradnji i historija verzija ostaju vidljivi u aplikaciji." },
+          benefits: { label: "Pogodnosti", title: "Pogodnosti macroa", description: "Aplikacija obja\u0161njava obim macroa i dostupne funkcije u posebnom prikazu pogodnosti." },
+          tutorials: { label: "Uputstva", title: "Biblioteka uputstava", description: "Video uputstva i pomo\u0107 za macroe nalaze se uz profile koje korisnici pokre\u0107u." },
+          feedback: { label: "Povratne informacije", title: "Centar za povratne informacije", description: "Korisnici mogu poslati prijedloge ili probleme kroz poseban dio aplikacije." },
+          settings: { label: "Postavke", title: "Skaliranje setupa i radne postavke", description: "Sensitivity, ping, veli\u010dina ekrana, tema i raspored tastature nalaze se u jednom prikazu postavki." }
+        }
+      },
+      upcoming: {
+        eyebrow: "Uskoro",
+        title: "Sistem ve\u0107 ima mjesto za sljede\u0107e macro profile.",
+        description: "Ovi profili su planirani kao zaklju\u010dane ili uskoro dostupne opcije u aplikaciji.",
+        status: "Planirano",
+        items: [
+          ["Tab Supa", "Dodatna Supa varijanta za rute zasnovane na tabu."],
+          ["No-Shiftlock Lethal", "Lethal Dash varijanta za setup bez shiftlocka."],
+          ["Normal Twisted", "Budu\u0107a Twisted ruta uz True Twisted."],
+          ["Shove 3M1 Reset", "Naredna reset varijanta za 3M1 porodicu."],
+          ["Boomy Tech", "Novi tech profil planiran za neko od budu\u0107ih izdanja."]
+        ]
+      },
       features: {
         eyebrow: "Glavni sistem",
         title: "Napravljeno da prilagodi timing i pokrete tvom setupu.",
