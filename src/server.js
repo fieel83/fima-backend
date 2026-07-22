@@ -178,6 +178,13 @@ const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standa
 const adminRuntimeLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
 const paradiseApplicationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
+const videoAssetLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Video request limit exceeded. Please retry shortly."
+});
 const adminFailedLoginState = new Map();
 const USER_SESSION_COOKIE = "fima_user_session";
 const PARADISE_OWNER_DISCORD_ID = "762858334440521739";
@@ -272,6 +279,7 @@ app.use(helmet({
       "script-src": ["'self'", "'unsafe-inline'"],
       "style-src": ["'self'", "'unsafe-inline'"],
       "img-src": ["'self'", "data:", "https:"],
+      "media-src": ["'self'", "https:"],
       "font-src": ["'self'", "data:"],
       "connect-src": [
         "'self'",
@@ -6459,18 +6467,110 @@ for (const [legacyPath, cleanPath] of cleanHtmlRedirects) {
   });
 }
 
+const videoAssetAllowedOrigins = new Set(
+  [
+    ...listEnv("VIDEO_ASSET_ALLOWED_ORIGINS", ""),
+    frontendUrl(),
+    apiBaseUrl(),
+    "https://fimamacro.com",
+    "https://www.fimamacro.com",
+    "https://api.fimamacro.com"
+  ]
+    .map(originFromUrl)
+    .filter(Boolean)
+);
+const videoTraffic = {
+  startedAt: new Date().toISOString(),
+  requests: 0,
+  rangeRequests: 0,
+  bytes: 0,
+  statuses: new Map()
+};
+
+function originFromUrl(value) {
+  try {
+    return new URL(String(value || "").trim()).origin.toLowerCase();
+  } catch (_error) {
+    return "";
+  }
+}
+
+function videoAssetHotlinkAllowed(req) {
+  if (!["GET", "HEAD"].includes(req.method)) return true;
+
+  const fetchSite = String(req.get("sec-fetch-site") || "").toLowerCase();
+  const fetchMode = String(req.get("sec-fetch-mode") || "").toLowerCase();
+  const fetchDest = String(req.get("sec-fetch-dest") || "").toLowerCase();
+  const referer = String(req.get("referer") || "").trim();
+
+  // Address-bar navigation and command-line/direct requests remain usable.
+  if (fetchMode === "navigate" && fetchDest === "document") return true;
+  if (!referer && fetchSite !== "cross-site") return true;
+
+  const refererOrigin = originFromUrl(referer);
+  const requestOrigin = originFromUrl(`${req.protocol}://${req.get("host") || ""}`);
+  const trustedReferer = Boolean(refererOrigin) && (
+    refererOrigin === requestOrigin || videoAssetAllowedOrigins.has(refererOrigin)
+  );
+
+  if (fetchSite === "cross-site") return trustedReferer;
+  if (referer) return trustedReferer;
+  return true;
+}
+
+function recordVideoAssetTraffic(req, res, next) {
+  res.once("finish", () => {
+    videoTraffic.requests += 1;
+    if (req.get("range")) videoTraffic.rangeRequests += 1;
+    const bytes = Number(res.getHeader("content-length"));
+    if (Number.isFinite(bytes) && bytes > 0) videoTraffic.bytes += bytes;
+    videoTraffic.statuses.set(res.statusCode, (videoTraffic.statuses.get(res.statusCode) || 0) + 1);
+  });
+  next();
+}
+
+function flushVideoAssetTraffic() {
+  if (!videoTraffic.requests) return;
+  console.info("Video asset traffic (15m aggregate)", {
+    startedAt: videoTraffic.startedAt,
+    endedAt: new Date().toISOString(),
+    requests: videoTraffic.requests,
+    rangeRequests: videoTraffic.rangeRequests,
+    bytes: videoTraffic.bytes,
+    statuses: Object.fromEntries(videoTraffic.statuses)
+  });
+  videoTraffic.startedAt = new Date().toISOString();
+  videoTraffic.requests = 0;
+  videoTraffic.rangeRequests = 0;
+  videoTraffic.bytes = 0;
+  videoTraffic.statuses.clear();
+}
+
+setInterval(flushVideoAssetTraffic, 15 * 60 * 1000).unref?.();
+
+app.use("/assets/videos", recordVideoAssetTraffic, videoAssetLimiter, (req, res, next) => {
+  if (videoAssetHotlinkAllowed(req)) return next();
+  return res.status(403).type("text/plain").send("Cross-site video embedding is not allowed.");
+});
+
 app.use(express.static(publicDir, {
   extensions: ["html"],
   setHeaders(res, filePath) {
     res.setHeader("X-Content-Type-Options", "nosniff");
     const normalized = filePath.replace(/\\/g, "/");
     const extension = path.extname(filePath).toLowerCase();
+    const requestUrl = String(res.req?.originalUrl || res.req?.url || "");
+    const versionedAsset = /(?:^|[?&])v=[A-Za-z0-9._-]+(?:&|$)/u.test(requestUrl);
     if (normalized.endsWith("/latest.json")) {
       res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
       return;
     }
     if (extension === ".html") {
       res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
+      return;
+    }
+    if (versionedAsset && [".mp4", ".webm", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".css", ".js", ".mjs"].includes(extension)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       return;
     }
     if ([".mp4", ".webm", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".woff", ".woff2", ".ttf"].includes(extension)) {

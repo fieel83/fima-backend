@@ -233,6 +233,8 @@
   let activeTourView = "home";
   let selectedMacroVideo = "normal-supa";
   let macroVideos = macroVideoFallback;
+  let macroVideoBaseUrl = "";
+  let macroVideoVisibilityReady = false;
   let macroVideoSwitchToken = 0;
   let tourImageSwitchToken = 0;
   let tourTimer;
@@ -1218,42 +1220,56 @@
       .join("");
   };
 
-  const switchMacroVideo = (video, source, sourceUrl) => {
+  const normalizeMacroVideoBaseUrl = (value) => {
+    if (!value) return "";
+    try {
+      const parsed = new URL(String(value));
+      if (parsed.protocol !== "https:") return "";
+      parsed.search = "";
+      parsed.hash = "";
+      return parsed.href.endsWith("/") ? parsed.href : `${parsed.href}/`;
+    } catch (error) {
+      return "";
+    }
+  };
+
+  const macroVideoUrl = (file) => {
+    const encodedFile = encodeURIComponent(file);
+    const baseUrl = macroVideoBaseUrl
+      ? new URL(encodedFile, macroVideoBaseUrl).toString()
+      : `assets/videos/${encodedFile}`;
+    return `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}v=20260722-1`;
+  };
+
+  const switchMacroVideo = (video, source, sourceUrl, shouldPlay = true) => {
+    if (video.dataset.loadedSource === sourceUrl) {
+      video.classList.remove("is-switching");
+      if (shouldPlay) video.play().catch(() => {});
+      return;
+    }
+
     const token = ++macroVideoSwitchToken;
     video.removeAttribute("poster");
     video.classList.add("is-switching");
 
-    const preloader = document.createElement("video");
-    preloader.muted = true;
-    preloader.playsInline = true;
-    preloader.preload = "auto";
+    source.src = sourceUrl;
+    video.dataset.loadedSource = sourceUrl;
+    video.load();
 
-    let committed = false;
-    const commit = () => {
-      if (committed || token !== macroVideoSwitchToken) return;
-      committed = true;
-      source.src = sourceUrl;
-      video.load();
-
-      let revealed = false;
-      const reveal = () => {
-        if (revealed || token !== macroVideoSwitchToken) return;
-        revealed = true;
-        video.play().catch(() => {});
-        window.setTimeout(() => video.classList.remove("is-switching"), 140);
-      };
-
-      video.addEventListener("canplay", reveal, { once: true });
-      window.setTimeout(reveal, 900);
+    let revealed = false;
+    const reveal = () => {
+      if (revealed || token !== macroVideoSwitchToken) return;
+      revealed = true;
+      if (shouldPlay) video.play().catch(() => {});
+      window.setTimeout(() => video.classList.remove("is-switching"), 140);
     };
 
-    preloader.addEventListener("canplay", commit, { once: true });
-    preloader.addEventListener("error", commit, { once: true });
-    preloader.src = sourceUrl;
-    preloader.load();
+    video.addEventListener("canplay", reveal, { once: true });
+    video.addEventListener("error", reveal, { once: true });
+    window.setTimeout(reveal, 1200);
   };
 
-  const renderShowcase = () => {
+  const renderShowcase = ({ loadVideo = macroVideoVisibilityReady, shouldPlay = loadVideo } = {}) => {
     const list = $("#macroVideoList");
     const video = $("#macroVideo");
     const source = $("#macroVideoSource");
@@ -1265,9 +1281,9 @@
     const active = macroVideos.find((item) => item.id === selectedMacroVideo) || macroVideos[0] || macroVideoFallback[0];
     selectedMacroVideo = active.id;
 
-    const sourceUrl = `assets/videos/${active.file}?v=20260605-1`;
-    if (!source.src.includes(active.file)) {
-      switchMacroVideo(video, source, sourceUrl);
+    const sourceUrl = macroVideoUrl(active.file);
+    if (loadVideo) {
+      switchMacroVideo(video, source, sourceUrl, shouldPlay);
     }
 
     title.textContent = active.name;
@@ -1284,13 +1300,14 @@
 
   const hydrateMacroVideos = async () => {
     try {
-      const response = await fetch("assets/videos/macro-videos.json?v=20260605-1", { cache: "no-store" });
+      const response = await fetch("assets/videos/macro-videos.json?v=20260722-1", { cache: "default" });
       if (!response.ok) return;
       const manifest = await response.json();
       const videos = Array.isArray(manifest.videos)
-        ? manifest.videos.filter((item) => item?.id && item?.name && item?.file)
+        ? manifest.videos.filter((item) => item?.id && item?.name && /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:mp4|webm)$/u.test(item?.file || ""))
         : [];
       if (!videos.length) return;
+      macroVideoBaseUrl = normalizeMacroVideoBaseUrl(manifest.baseUrl);
       macroVideos = videos.map((item) => ({
         id: item.id,
         name: item.name,
@@ -1314,8 +1331,22 @@
       const button = event.target.closest("[data-video-id]");
       if (!button) return;
       selectedMacroVideo = button.dataset.videoId;
-      renderShowcase();
+      macroVideoVisibilityReady = true;
+      renderShowcase({ loadVideo: true, shouldPlay: true });
     });
+  };
+
+  const initMacroVideoLazyLoading = () => {
+    const video = $("#macroVideo");
+    if (!video || navigator.connection?.saveData || !("IntersectionObserver" in window)) return;
+    const gallery = video.closest(".macro-showcase") || video;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      macroVideoVisibilityReady = true;
+      renderShowcase({ loadVideo: true, shouldPlay: true });
+      observer.disconnect();
+    }, { rootMargin: "120px 0px", threshold: 0.15 });
+    observer.observe(gallery);
   };
 
   const renderUpcoming = () => {
@@ -2945,7 +2976,7 @@
     hydrateSiteAccountNav();
     window.setInterval(updatePricingCountdowns, 1000);
     initMacroVideoGallery();
-    hydrateMacroVideos();
+    hydrateMacroVideos().finally(initMacroVideoLazyLoading);
     initUiTour();
     initCanvas();
   });

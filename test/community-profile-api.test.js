@@ -20,7 +20,7 @@ test("community profile API exposes separate language, region, nationality and t
 
 test("Turkish community access is derived only from preferred language", () => {
   const profileBuilder = serverSource.match(
-    /async function buildCommunityProfile\([\s\S]*?\n}\n/
+    /async function buildCommunityProfile\([\s\S]*?(?=\nasync function requireParadiseOwner\()/
   )?.[0] || "";
   assert.match(profileBuilder, /communityAccessForLanguage\(user\?\.preferredLanguage\)/);
   assert.doesNotMatch(profileBuilder, /communityAccessForLanguage\([^)]*(?:country|nationality)/i);
