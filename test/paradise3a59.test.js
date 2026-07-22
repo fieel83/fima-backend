@@ -10,7 +10,7 @@ import {
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, transitionParadiseWar, tryoutAnnouncementMarkdown,
   timedAvailabilityLines, paradiseXpPolicy, paradiseApplicationEvidenceRequirement, applicationPrivateReviewTarget,
-  createBlacklistAppealPrivateReview, inspectParadiseLiveSecurityReadiness, paradiseAutoSmokeRepairAction
+  createBlacklistAppealPrivateReview, inspectParadiseLiveSecurityReadiness, inspectParadiseLiveTestLabReadiness, paradiseAutoSmokeRepairAction
 } from "../src/paradise3a59.js";
 
 const viewOverwrite = decision => ({
@@ -122,6 +122,55 @@ test("live security readiness fails closed for a missing compact appeal mapping 
   );
   assert.equal(unknownBotPermissionsResult.blacklistPermissionReady, false);
   assert.equal(unknownBotPermissionsResult.blacklistLayout, null);
+});
+
+test("live test-lab readiness verifies decorated leaderboard and staff message IDs", async () => {
+  const fixture = securityReadinessFixture();
+  const addMessageChannel = (id, name, messages) => {
+    fixture.guild.channels.cache.set(id, {
+      id,
+      name,
+      type: ChannelType.GuildText,
+      parent: null,
+      parentId: null,
+      isTextBased: () => true,
+      permissionOverwrites: { cache: new Collection() },
+      messages: {
+        fetch: async messageId => messages[messageId]
+          ? { id: messageId, channelId: id, embeds: [{ title: messages[messageId] }] }
+          : null
+      }
+    });
+  };
+  addMessageChannel("top-10-channel", "⟡・top-10", { "top-10-message": "✦ #1 — Owner" });
+  addMessageChannel("top-20-channel", "⟡・top-20", { "top-20-message": "✦ #11 — Vacant" });
+  addMessageChannel("top-30-channel", "⟡・top-30", { "top-30-message": "✦ #21 — Vacant" });
+  addMessageChannel("staff-channel", "〢・personel-merkezi", { "staff-message": "✦ PARADISE STAFF TEAM" });
+  fixture.config.rankedLeaderboardMessageIds = {
+    "top-10:1-10": "top-10-message",
+    "top-20:11-20": "top-20-message",
+    "top-30:21-30": "top-30-message"
+  };
+  fixture.config.staffTeamMessageId = "staff-message";
+
+  assert.deepEqual(await inspectParadiseLiveTestLabReadiness(fixture.guild, fixture.config), {
+    liveReadinessAvailable: true,
+    blacklistedRoleReady: true,
+    blacklistPermissionReady: true,
+    blacklistLayout: "compact_private_thread",
+    securityPanelReady: true,
+    leaderboardBoardCount: 3,
+    leaderboardBoardExpectedCount: 3,
+    leaderboardBoardsReady: true,
+    staffTeamReady: true
+  });
+
+  delete fixture.config.rankedLeaderboardMessageIds["top-20:11-20"];
+  fixture.config.staffTeamMessageId = "missing-staff-message";
+  const incomplete = await inspectParadiseLiveTestLabReadiness(fixture.guild, fixture.config);
+  assert.equal(incomplete.leaderboardBoardCount, 2);
+  assert.equal(incomplete.leaderboardBoardsReady, false);
+  assert.equal(incomplete.staffTeamReady, false);
 });
 
 test("blacklist appeals add applicant and reviewer before sending the first private-thread message", async () => {
@@ -567,6 +616,10 @@ test("repeat smoke refreshes boards without replaying a full template repair", a
   assert.match(source, /const staffTeam = await updateStaffTeamEmbed\(guild\)/);
   assert.match(source, /leaderboardBoardCount/);
   assert.match(source, /staffTeamReady/);
+  assert.match(source, /preSmokeReadiness\?\.leaderboardBoardsReady/);
+  assert.match(source, /preSmokeReadiness\?\.staffTeamReady/);
+  assert.match(source, /paradiseTextChannelByName\(guild, group\.channel\)/);
+  assert.match(source, /paradiseTextChannelByName\(guild, "staff-team", "personel-merkezi"\)/);
 });
 
 test("repeat smoke repairs an existing lab when blacklist permissions are unhealthy", () => {

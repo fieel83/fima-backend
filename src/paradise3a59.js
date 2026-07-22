@@ -33,7 +33,7 @@ export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
 // Changing this revision reruns the guarded smoke suite only in the fixed
 // Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v9";
+const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v10";
 // This revision is intentionally limited to the fixed lab guild. It is the
 // owner-authorized compact test layout, never a production-guild rebuild.
 const PARADISE_TEST_LAB_LAYOUT_REVISION = "3a71-compact-tsbtr-lab-v1";
@@ -2678,6 +2678,71 @@ function messageEmbedTitle(message) {
   return String(first?.title || "").trim();
 }
 
+function paradiseChannelNameMatches(actualName, expectedName) {
+  const normalize = value => String(value || "").normalize("NFKC").trim().toLocaleLowerCase("tr");
+  const actual = normalize(actualName);
+  const expected = normalize(expectedName);
+  if (!actual || !expected) return false;
+  return actual === expected || actual.split("・").at(-1) === expected;
+}
+
+function paradiseTextChannelByName(guild, ...names) {
+  return cachedValues(guild?.channels?.cache).find(channel =>
+    channel?.isTextBased?.() && names.some(name => paradiseChannelNameMatches(channel.name, name))
+  ) || null;
+}
+
+function rankedLeaderboardGroups(guildConfig = {}) {
+  const topSize = Math.min(100, Math.max(2, Number(guildConfig.challenge?.topSize) || 30));
+  const groups = [];
+  for (let min = 1; min <= topSize; min += 10) {
+    const max = Math.min(min + 9, topSize);
+    const channel = min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30";
+    groups.push({ channel, min, max, label: `TOP ${min}-${max}`, messageKey: `${channel}:${min}-${max}` });
+  }
+  return groups;
+}
+
+export async function inspectParadiseLiveTestLabReadiness(guild, guildConfig = {}) {
+  const security = await inspectParadiseLiveSecurityReadiness(guild, guildConfig);
+  const leaderboardMessageIds = guildConfig.rankedLeaderboardMessageIds || {};
+  const groups = rankedLeaderboardGroups(guildConfig);
+  let leaderboardBoardCount = 0;
+  for (const group of groups) {
+    const channel = paradiseTextChannelByName(guild, group.channel);
+    const messageId = leaderboardMessageIds[group.messageKey]
+      || (group.min <= 21 ? leaderboardMessageIds[group.channel] : null);
+    const message = channel?.messages?.fetch && messageId
+      ? await channel.messages.fetch(messageId).catch(() => null)
+      : null;
+    if (
+      messageId
+      && message?.id === messageId
+      && (!message.channelId || message.channelId === channel.id)
+      && messageEmbedTitle(message).startsWith("✦ #")
+    ) leaderboardBoardCount += 1;
+  }
+
+  const staffChannel = paradiseTextChannelByName(guild, "staff-team", "personel-merkezi");
+  const staffMessageId = guildConfig.staffTeamMessageId || null;
+  const staffMessage = staffChannel?.messages?.fetch && staffMessageId
+    ? await staffChannel.messages.fetch(staffMessageId).catch(() => null)
+    : null;
+  const staffTeamReady = Boolean(
+    staffMessage?.id === staffMessageId
+    && (!staffMessage.channelId || staffMessage.channelId === staffChannel.id)
+    && messageEmbedTitle(staffMessage) === "✦ PARADISE STAFF TEAM"
+  );
+
+  return {
+    ...security,
+    leaderboardBoardCount,
+    leaderboardBoardExpectedCount: groups.length,
+    leaderboardBoardsReady: groups.length > 0 && leaderboardBoardCount === groups.length,
+    staffTeamReady
+  };
+}
+
 export async function inspectParadiseLiveSecurityReadiness(guild, guildConfig = {}) {
   const unavailable = {
     liveReadinessAvailable: false,
@@ -2783,12 +2848,14 @@ export async function runParadiseAutoSmokeOnce(guild) {
     const needsCompactLab = guildSecurityState.testLabLayoutRevision !== PARADISE_TEST_LAB_LAYOUT_REVISION;
     const existingTestLab = Boolean(guildSecurityState.lastAutoSmokeResult) && !needsCompactLab;
     const preSmokeReadiness = existingTestLab
-      ? await inspectParadiseLiveSecurityReadiness(guild, configForGuild(state, guild.id))
+      ? await inspectParadiseLiveTestLabReadiness(guild, configForGuild(state, guild.id))
       : null;
     const completedRevisionIsHealthy = Boolean(
       existingTestLab
       && preSmokeReadiness?.blacklistPermissionReady
       && preSmokeReadiness?.securityPanelReady
+      && preSmokeReadiness?.leaderboardBoardsReady
+      && preSmokeReadiness?.staffTeamReady
     );
     if (
       guildSecurityState.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION
@@ -2814,7 +2881,7 @@ export async function runParadiseAutoSmokeOnce(guild) {
       ? await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true })
       : { skipped: true, reason: "existing_test_lab" });
     const result = await runParadiseTestSmokeSuite(guild, { fast: existingTestLab });
-    const liveReadiness = await inspectParadiseLiveSecurityReadiness(
+    const liveReadiness = await inspectParadiseLiveTestLabReadiness(
       guild,
       configForGuild(await loadState(), guild.id)
     );
@@ -2833,8 +2900,8 @@ export async function runParadiseAutoSmokeOnce(guild) {
           tryoutPlainMarkdown: result.tryout?.plainMarkdown === true,
           trainingLifecycleReplies: Number(result.training?.lifecycleReplies || 0),
           tryoutLifecycleReplies: Number(result.tryout?.lifecycleReplies || 0),
-          leaderboardBoardCount: Number(result.leaderboardBoards?.length || 0),
-          staffTeamReady: Boolean(result.staffTeam?.messageId),
+          leaderboardBoardCount: Number(liveReadiness.leaderboardBoardCount || 0),
+          staffTeamReady: liveReadiness.staffTeamReady === true,
           supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
           supportTicketTranscriptReady: Boolean(result.workflowPanels?.supportTicket?.transcriptSaved),
           supportTicketReopenReady: Boolean(result.workflowPanels?.supportTicket?.closedThenReopened),
@@ -2884,16 +2951,26 @@ export async function paradiseTestLabStatus(guild = null) {
   const record = state.securityState?.[PARADISE_TEST_GUILD_ID] || {};
   const result = record.lastAutoSmokeResult || {};
   const liveReadiness = guild?.id === PARADISE_TEST_GUILD_ID
-    ? await inspectParadiseLiveSecurityReadiness(guild, configForGuild(state, guild.id))
+    ? await inspectParadiseLiveTestLabReadiness(guild, configForGuild(state, guild.id))
     : {
         liveReadinessAvailable: false,
         blacklistedRoleReady: false,
         blacklistPermissionReady: false,
         blacklistLayout: null,
-        securityPanelReady: false
+        securityPanelReady: false,
+        leaderboardBoardCount: 0,
+        leaderboardBoardExpectedCount: 0,
+        leaderboardBoardsReady: false,
+        staffTeamReady: false
       };
   return {
-    completed: record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION,
+    completed: Boolean(
+      record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION
+      && liveReadiness.blacklistPermissionReady
+      && liveReadiness.securityPanelReady
+      && liveReadiness.leaderboardBoardsReady
+      && liveReadiness.staffTeamReady
+    ),
     revision: record.lastAutoSmokeRevision || null,
     completedAt: record.lastAutoSmokeAt || null,
     lastError: record.lastAutoSmokeError || null,
@@ -2904,8 +2981,10 @@ export async function paradiseTestLabStatus(guild = null) {
     tryoutPlainMarkdown: result.tryoutPlainMarkdown === true,
     trainingLifecycleReplies: Number(result.trainingLifecycleReplies || 0),
     tryoutLifecycleReplies: Number(result.tryoutLifecycleReplies || 0),
-    leaderboardBoardCount: Number(result.leaderboardBoardCount || 0),
-    staffTeamReady: result.staffTeamReady === true,
+    leaderboardBoardCount: Number(liveReadiness.leaderboardBoardCount || 0),
+    leaderboardBoardExpectedCount: Number(liveReadiness.leaderboardBoardExpectedCount || 0),
+    leaderboardBoardsReady: liveReadiness.leaderboardBoardsReady === true,
+    staffTeamReady: liveReadiness.staffTeamReady === true,
     supportTicketReady: Boolean(result.supportTicketChannelId),
     supportTicketTranscriptReady: result.supportTicketTranscriptReady === true,
     supportTicketReopenReady: result.supportTicketReopenReady === true,
@@ -6888,22 +6967,11 @@ async function updateRankedLeaderboardBoards(guild) {
   const entries = Object.entries(leaderboard)
     .filter(([, row]) => Number.isInteger(Number(row.spot)) && Number(row.spot) >= 1 && Number(row.spot) <= topSize)
     .sort((a, b) => Number(a[1].spot) - Number(b[1].spot));
-  const groups = [];
-  for (let min = 1; min <= topSize; min += 10) {
-    const max = Math.min(min + 9, topSize);
-    const channelName = min <= 10 ? "top-10" : min <= 20 ? "top-20" : "top-30";
-    groups.push({
-      channel: channelName,
-      min,
-      max,
-      label: `TOP ${min}-${max}`,
-      messageKey: `${channelName}:${min}-${max}`
-    });
-  }
+  const groups = rankedLeaderboardGroups(guildConfig);
   const messageIds = guildConfig.rankedLeaderboardMessageIds || {};
   const posted = [];
   for (const group of groups) {
-    const channel = guild.channels.cache.find(item => item.name === group.channel && item.isTextBased?.());
+    const channel = paradiseTextChannelByName(guild, group.channel);
     if (!channel) continue;
     const cards = [];
     for (let rank = group.min; rank <= group.max; rank += 1) {
@@ -9761,7 +9829,7 @@ export async function handleParadiseMessage(message) {
 }
 
 async function updateStaffTeamEmbed(guild) {
-  const channel = guild.channels.cache.find(item => item.name === "staff-team");
+  const channel = paradiseTextChannelByName(guild, "staff-team", "personel-merkezi");
   if (!channel) return null;
   await guild.members.fetch().catch(() => {});
   const state = await loadState();
