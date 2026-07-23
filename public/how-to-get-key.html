@@ -12,7 +12,7 @@
     <meta property="og:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="theme-color" content="#090812">
-    <title>How to get a key | Fima Macro</title>
+    <title data-i18n="keyGuide.metaTitle">How to get a key | Fima Macro</title>
     <link rel="icon" href="assets/images/fima-logo.png?v=20260526-2" type="image/png">
     <link rel="stylesheet" href="assets/css/styles.css?v=20260621-3a50">
     <style>
@@ -426,7 +426,7 @@
   </head>
   <body class="key-guide-page" data-page="how-to-get-key">
     <canvas id="ambientCanvas" aria-hidden="true"></canvas>
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main" data-i18n="accessibility.skip">Skip to content</a>
 
     <header class="site-header" data-header>
       <div class="nav-shell">
@@ -439,73 +439,128 @@
           <span></span>
           <span></span>
           <span></span>
-          <span class="sr-only">Open menu</span>
+          <span class="sr-only" data-i18n="accessibility.menu">Open menu</span>
         </button>
 
         <nav class="site-menu" id="siteMenu" aria-label="Primary navigation" data-menu>
-          <a href="/" data-page-link="home">Home</a>
-          <a href="/macros" data-page-link="macros">Macros</a>
-          <a href="/features" data-page-link="features">Features</a>
-          <a href="/pricing" data-page-link="pricing">Pricing</a>
-          <a href="/download" data-page-link="download">Download</a>
-          <a href="/faq" data-page-link="faq">FAQ</a>
-          <a href="/support" data-page-link="support">Support</a>
-          <a href="/security" data-page-link="security">Security</a>
-          <a href="/dashboard/overview" data-page-link="dashboard">Dashboard</a>
+          <a href="/" data-page-link="home" data-i18n="nav.home">Home</a>
+          <a href="/macros" data-page-link="macros" data-i18n="nav.macros">Macros</a>
+          <a href="/features" data-page-link="features" data-i18n="nav.features">Features</a>
+          <a href="/pricing" data-page-link="pricing" data-i18n="nav.pricing">Pricing</a>
+          <a href="/how-to-get-key" data-page-link="how-to-get-key" data-i18n="nav.keyGuide">How to get a key</a>
+          <a href="/download" data-page-link="download" data-i18n="nav.download">Download</a>
+          <a href="/faq" data-page-link="faq" data-i18n="nav.faq">FAQ</a>
+          <a href="/support" data-page-link="support" data-i18n="nav.support">Support</a>
+          <a href="/dashboard/overview" data-page-link="dashboard" data-i18n="nav.dashboard">Dashboard</a>
         </nav>
 
         <div class="nav-controls" aria-label="Site preferences">
-          <a class="btn btn-ghost" href="/pricing">Buy Now</a>
-          <a class="btn btn-primary" href="/download">Download</a>
+          <div class="select-wrap custom-select" data-custom-select="themeSelect">
+            <span class="sr-only" data-i18n="controls.theme">Theme</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>Violet Dragon</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="violet-dragon">Violet Dragon</button>
+              <button type="button" role="option" data-value="royal-nebula">Royal Nebula</button>
+              <button type="button" role="option" data-value="amethyst-smoke">Amethyst Smoke</button>
+              <button type="button" role="option" data-value="spider-venom">Spider Venom</button>
+              <button type="button" role="option" data-value="crimson-void">Crimson Void</button>
+              <button type="button" role="option" data-value="ice-phantom">Ice Phantom</button>
+              <button type="button" role="option" data-value="emerald-matrix">Emerald Matrix</button>
+            </div>
+            <select id="themeSelect" class="native-select" aria-label="Theme selector" tabindex="-1">
+              <option value="violet-dragon">Violet Dragon</option>
+              <option value="royal-nebula">Royal Nebula</option>
+              <option value="amethyst-smoke">Amethyst Smoke</option>
+              <option value="spider-venom">Spider Venom</option>
+              <option value="crimson-void">Crimson Void</option>
+              <option value="ice-phantom">Ice Phantom</option>
+              <option value="emerald-matrix">Emerald Matrix</option>
+            </select>
+          </div>
+          <div class="select-wrap custom-select compact" data-custom-select="languageSelect">
+            <span class="sr-only" data-i18n="controls.language">Language</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>EN</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="en">EN</button>
+              <button type="button" role="option" data-value="tr">TR</button>
+              <button type="button" role="option" data-value="de">DE</button>
+              <button type="button" role="option" data-value="fr">FR</button>
+              <button type="button" role="option" data-value="bs">BS</button>
+            </div>
+            <select id="languageSelect" class="native-select" aria-label="Language selector" tabindex="-1">
+              <option value="en">EN</option>
+              <option value="tr">TR</option>
+              <option value="de">DE</option>
+              <option value="fr">FR</option>
+              <option value="bs">BS</option>
+            </select>
+          </div>
+          <div class="select-wrap custom-select compact currency-control" data-custom-select="currencySelect">
+            <span class="sr-only" data-i18n="controls.currency">Currency</span>
+            <button class="select-button" type="button" aria-haspopup="listbox" aria-expanded="false" data-select-button>USD</button>
+            <div class="select-menu" role="listbox" data-select-menu>
+              <button type="button" role="option" data-value="USD">USD</button>
+              <button type="button" role="option" data-value="EUR">EUR</button>
+              <button type="button" role="option" data-value="TRY">TRY</button>
+              <button type="button" role="option" data-value="GBP">GBP</button>
+            </div>
+            <select id="currencySelect" class="native-select" aria-label="Currency selector" tabindex="-1">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="TRY">TRY</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <a class="nav-cta" href="/pricing" data-i18n="nav.cta">Buy Now</a>
         </div>
       </div>
     </header>
 
     <main id="main" class="key-guide">
       <div class="key-guide-modal-shell">
-        <button class="key-guide-close" type="button" data-key-guide-close aria-label="Close key guide">X</button>
+        <button class="key-guide-close" type="button" data-key-guide-close aria-label="Close key guide" data-i18n-aria-label="keyGuide.close">X</button>
       <section class="section-shell key-hero" aria-labelledby="keyGuideTitle">
         <article class="key-hero-card">
           <div>
-            <span class="key-eyebrow">License guide</span>
-            <h1 id="keyGuideTitle">How to get your FIMA key</h1>
-            <p>
+            <span class="key-eyebrow" data-i18n="keyGuide.eyebrow">License guide</span>
+            <h1 id="keyGuideTitle" data-i18n="keyGuide.title">How to get your FIMA key</h1>
+            <p data-i18n="keyGuide.description">
               Use this page when the app asks where to get a key. It shows the safe path:
               choose a plan, finish checkout, copy your masked license from Fima, then paste it
               into the app once. Never buy from fake links or share your full key.
             </p>
           </div>
           <div class="key-cta-row">
-            <a class="key-button" href="/pricing">Choose a plan</a>
-            <a class="key-button secondary" href="/dashboard/products">Open My Products</a>
-            <a class="key-button secondary" href="/download">Download app</a>
+            <a class="key-button" href="/pricing" data-i18n="keyGuide.choosePlan">Choose a plan</a>
+            <a class="key-button secondary" href="/dashboard/products" data-i18n="keyGuide.openProducts">Open My Products</a>
+            <a class="key-button secondary" href="/download" data-i18n="keyGuide.downloadApp">Download app</a>
           </div>
         </article>
 
-        <aside class="key-checklist" aria-label="Quick key checklist">
-          <h2>Quick checklist</h2>
+        <aside class="key-checklist" aria-label="Quick checklist" data-i18n-aria-label="keyGuide.quickChecklist">
+          <h2 data-i18n="keyGuide.quickChecklist">Quick checklist</h2>
           <div class="key-check">
             <span>1</span>
-            <p><strong>Buy, earn, or redeem.</strong> Paid keys come from checkout. Activity Reward and gift keys show in your account after they are granted or redeemed.</p>
+            <p><strong data-i18n="keyGuide.check1Title">Buy, earn, or redeem.</strong> <span data-i18n="keyGuide.check1Body">Paid keys come from checkout. Activity Reward and gift keys show in your account after they are granted or redeemed.</span></p>
           </div>
           <div class="key-check">
             <span>2</span>
-            <p><strong>Copy from Fima only.</strong> Use the success page or <a href="/dashboard/products">My Products</a>. Keys are masked on-screen for privacy.</p>
+            <p><strong data-i18n="keyGuide.check2Title">Copy from Fima only.</strong> <span data-i18n="keyGuide.check2Body">Use the success page or My Products. Keys are masked on-screen for privacy.</span></p>
           </div>
           <div class="key-check">
             <span>3</span>
-            <p><strong>Paste into the app.</strong> The app binds access to your account/device and stores a safe entitlement instead of showing the full key again.</p>
+            <p><strong data-i18n="keyGuide.check3Title">Paste into the app.</strong> <span data-i18n="keyGuide.check3Body">The app binds access to your account/device and stores a safe entitlement instead of showing the full key again.</span></p>
           </div>
           <div class="key-check">
             <span>4</span>
-            <p><strong>Need help?</strong> If payment worked but the key is missing, open support with your masked order/key details only.</p>
+            <p><strong data-i18n="keyGuide.check4Title">Need help?</strong> <span data-i18n="keyGuide.check4Body">If payment worked but the key is missing, open support with your masked order/key details only.</span></p>
           </div>
         </aside>
       </section>
 
       <section class="section-shell key-section" aria-labelledby="stepsTitle">
-        <h2 id="stepsTitle">Step-by-step</h2>
-        <p class="key-section-intro">
+        <h2 id="stepsTitle" data-i18n="keyGuide.stepsTitle">Step-by-step</h2>
+        <p class="key-section-intro" data-i18n="keyGuide.stepsIntro">
           These steps work for 3-day access, monthly access, lifetime access, gift/redeem keys and Activity Rewards.
           The flow may look slightly different depending on whether you are buying, receiving a leaderboard reward
           or redeeming a gift.
@@ -513,54 +568,53 @@
         <div class="key-steps-grid">
           <article class="key-step">
             <div class="step-number">01</div>
-            <h3>Go to Pricing</h3>
-            <p>Open <a href="/pricing">fimamacro.com/pricing</a>, choose the plan you want, and start checkout. Do not use old SellAuth or unofficial links.</p>
+            <h3 data-i18n="keyGuide.step1Title">Go to Pricing</h3>
+            <p data-i18n="keyGuide.step1Body">Open fimamacro.com/pricing, choose the plan you want, and start checkout. Do not use old SellAuth or unofficial links.</p>
           </article>
           <article class="key-step">
             <div class="step-number">02</div>
-            <h3>Finish checkout or redeem</h3>
-            <p>Stripe opens for paid plans. Gift, redeem and Activity Reward flows stay inside your Fima account so the key is linked safely.</p>
+            <h3 data-i18n="keyGuide.step2Title">Finish checkout or redeem</h3>
+            <p data-i18n="keyGuide.step2Body">Stripe opens for paid plans. Gift, redeem and Activity Reward flows stay inside your Fima account so the key is linked safely.</p>
           </article>
           <article class="key-step">
             <div class="step-number">03</div>
-            <h3>Copy your key</h3>
-            <p>After checkout, use the success page or <a href="/dashboard/products">My Products</a>. The page shows a masked key and a Copy button.</p>
+            <h3 data-i18n="keyGuide.step3Title">Copy your key</h3>
+            <p data-i18n="keyGuide.step3Body">After checkout, use the success page or My Products. The page shows a masked key and a Copy button.</p>
           </article>
           <article class="key-step">
             <div class="step-number">04</div>
-            <h3>Activate in the app</h3>
-            <p>Open FIMA MACRO, paste the key, and press Activate License. If your device changed, support can help with HWID reset.</p>
+            <h3 data-i18n="keyGuide.step4Title">Activate in the app</h3>
+            <p data-i18n="keyGuide.step4Body">Open FIMA MACRO, paste the key, and press Activate License. If your device changed, support can help with HWID reset.</p>
           </article>
         </div>
 
         <div class="key-safe-strip">
           <div>
-            <strong>Security note:</strong>
-            Fima never needs your Roblox password, cookies, Discord token, or browser session token.
-            Only enter your license key inside the official Fima app or website.
+            <strong data-i18n="keyGuide.securityLabel">Security note:</strong>
+            <span data-i18n="keyGuide.securityText">Fima never needs your Roblox password, cookies, Discord token, or browser session token. Only enter your license key inside the official Fima app or website.</span>
           </div>
-          <a class="key-button secondary" href="/security">Read security page</a>
+          <a class="key-button secondary" href="/security" data-i18n="keyGuide.readSecurity">Read security page</a>
         </div>
       </section>
 
       <section class="section-shell key-section" aria-labelledby="troubleTitle">
-        <h2 id="troubleTitle">If something goes wrong</h2>
-        <p class="key-section-intro">
+        <h2 id="troubleTitle" data-i18n="keyGuide.troubleTitle">If something goes wrong</h2>
+        <p class="key-section-intro" data-i18n="keyGuide.troubleIntro">
           Most activation problems are account, payment, or device-binding issues. Use masked details
           when asking for help.
         </p>
         <div class="key-trouble-grid">
           <article class="key-trouble-card">
-            <h3>I paid but cannot find my key</h3>
-            <p>Open <a href="/dashboard/products">My Products</a>. If it is still missing, contact support with the payment time and masked account info.</p>
+            <h3 data-i18n="keyGuide.trouble1Title">I paid but cannot find my key</h3>
+            <p data-i18n="keyGuide.trouble1Body">Open My Products. If it is still missing, contact support with the payment time and masked account info.</p>
           </article>
           <article class="key-trouble-card">
-            <h3>The app says the key is for another device</h3>
-            <p>Your HWID may have changed. Open support and request a reset. Do not post full HWID or full key in public channels.</p>
+            <h3 data-i18n="keyGuide.trouble2Title">The app says the key is for another device</h3>
+            <p data-i18n="keyGuide.trouble2Body">Your HWID may have changed. Open support and request a reset. Do not post full HWID or full key in public channels.</p>
           </article>
           <article class="key-trouble-card">
-            <h3>The app asks me to validate again</h3>
-            <p>Make sure you are using the latest approved build. If it repeats, open a ticket and mention "license refresh loop".</p>
+            <h3 data-i18n="keyGuide.trouble3Title">The app asks me to validate again</h3>
+            <p data-i18n="keyGuide.trouble3Body">Make sure you are using the latest approved build. If it repeats, open a ticket and mention "license refresh loop".</p>
           </article>
         </div>
       </section>
@@ -574,37 +628,26 @@
             <img class="brand-logo" src="assets/images/fima-logo.png?v=20260526-2" alt="" width="40" height="40">
             <span>Fima Macro</span>
           </a>
-          <p>Official Fima license help. Keep your key private and use clean official links.</p>
+          <p data-i18n="keyGuide.footerText">Official Fima license help. Keep your key private and use clean official links.</p>
         </div>
         <div>
-          <h3>Key help</h3>
-          <a href="/pricing">Pricing</a>
-          <a href="/dashboard/products">My Products</a>
-          <a href="/success">Success page</a>
-          <a href="/support">Support</a>
+          <h3 data-i18n="keyGuide.keyHelp">Key help</h3>
+          <a href="/pricing" data-i18n="nav.pricing">Pricing</a>
+          <a href="/dashboard/products" data-i18n="nav.products">My Products</a>
+          <a href="/success" data-i18n="keyGuide.successPage">Success page</a>
+          <a href="/support" data-i18n="nav.support">Support</a>
         </div>
         <div>
-          <h3>Trust</h3>
-          <a href="/security">Security</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/download">Official download</a>
+          <h3 data-i18n="keyGuide.trust">Trust</h3>
+          <a href="/security" data-i18n="keyGuide.security">Security</a>
+          <a href="/terms" data-i18n="footer.terms">Terms</a>
+          <a href="/privacy" data-i18n="footer.privacy">Privacy</a>
+          <a href="/download" data-i18n="keyGuide.officialDownload">Official download</a>
         </div>
       </div>
     </footer>
 
     <script>
-      (() => {
-        const toggle = document.querySelector("[data-menu-toggle]");
-        const menu = document.querySelector("[data-menu]");
-        if (!toggle || !menu) return;
-        toggle.addEventListener("click", () => {
-          const open = toggle.getAttribute("aria-expanded") === "true";
-          toggle.setAttribute("aria-expanded", String(!open));
-          menu.classList.toggle("is-open", !open);
-        });
-      })();
-
       (() => {
         const close = document.querySelector("[data-key-guide-close]");
         close?.addEventListener("click", () => {
@@ -616,5 +659,7 @@
         });
       })();
     </script>
+    <script src="assets/js/config.js?v=20260526-9" charset="utf-8"></script>
+    <script src="assets/js/app.js?v=20260723-locale-3" charset="utf-8" defer></script>
   </body>
 </html>
