@@ -527,6 +527,16 @@ const ROLE_KEYS=[
 let currentPayload=null,selectedGuildId='',csrfPromise=null,currentTheme='paradise',selectorLookups={channels:{},roles:{}};
 const byId=id=>document.getElementById(id);
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+window.__PARADISE_OWNER_CONSOLE__={
+  apiBase:API_BASE,
+  state:'booting',
+  lastError:null,
+  getSelectedGuildId:()=>selectedGuildId,
+  mutate,
+  show,
+  reload:load,
+  markDirty
+};
 const UI_TR={
   'Paradise Operations Console':'Paradise Operasyon Paneli','Operations':'Operasyonlar','Overview':'Genel Bakış','Setup & templates':'Kurulum ve şablonlar',
   'Server Selector':'Sunucu Seçici','Template Setup':'Şablon Kurulumu','Channels':'Kanallar','Challenges':'Meydan Okumalar',
@@ -730,10 +740,34 @@ function renderAccess(status){
   applyUiLanguage(byId('uiLanguage')?.value||'tr');
   return false;
 }
+async function fetchJsonWithTimeout(url,options={},timeoutMs=10000){
+  const controller=typeof AbortController==='function'?new AbortController():null;
+  const timeoutId=controller?setTimeout(()=>controller.abort(),timeoutMs):null;
+  try{
+    const response=await fetch(url,{...options,...(controller?{signal:controller.signal}:{})});
+    let body;
+    try{body=await response.json()}catch{
+      const error=new Error('invalid_response');
+      error.code='invalid_response';
+      error.status=response.status;
+      throw error;
+    }
+    return{response,body};
+  }catch(error){
+    if(error&&error.name==='AbortError'){
+      const timeoutError=new Error('session_check_timeout');
+      timeoutError.code='session_check_timeout';
+      throw timeoutError;
+    }
+    throw error;
+  }finally{
+    if(timeoutId!==null)clearTimeout(timeoutId);
+  }
+}
 async function sessionStatus(){
-  const response=await fetch(API_BASE+'/api/paradise/session-status',{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
+  const {response,body}=await fetchJsonWithTimeout(API_BASE+'/api/paradise/session-status',{credentials:'include',headers:{accept:'application/json'},cache:'no-store'},10000);
   if(!response.ok&&response.status>=500)throw new Error('session_check_failed');
-  return response.json();
+  return body;
 }
 async function load(){
   setLoading(true);
@@ -929,8 +963,34 @@ byId('runTestSmoke').onclick=runSelectedTestSmoke;
 byId('autoDetectChannels').onclick=autoDetectChannels;byId('previewChallengeRange').onclick=previewChallengeRange;
 document.querySelectorAll('input,select,textarea').forEach(field=>{if(field.id!=='serverSelect')field.addEventListener('change',markDirty)});
 byId('exportConfig').onclick=()=>{if(!currentPayload)return;const guild=currentPayload.runtime.guild;const safeGuild=guild?{name:guild.name,id:'…'+String(guild.id||'').slice(-6),memberCount:guild.memberCount}:null;const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),config:currentPayload.config,runtimeSummary:{guild:safeGuild,commandSync:currentPayload.runtime.commandSync}},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='paradise-safe-config.json';a.click();URL.revokeObjectURL(a.href)};
-async function start(){try{const uiLanguage=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||'tr'}catch{return'tr'}})();byId('uiLanguage').value=uiLanguage;applyUiLanguage(uiLanguage);updateHeroToggleLabel();initializePages();const status=await sessionStatus();if(renderAccess(status)){await csrfToken();await load();applyUiLanguage(byId('uiLanguage').value);updateHeroToggleLabel()}else setLoading(false)}catch{setLoading(false);renderAccess({reasonCode:'session_check_failed',ownerAuthorized:false})}}
-window.__PARADISE_OWNER_CONSOLE__={apiBase:API_BASE,getSelectedGuildId:()=>selectedGuildId,mutate,show,reload:load,markDirty};
+async function start(){
+  const diagnostics=window.__PARADISE_OWNER_CONSOLE__;
+  diagnostics.state='checking_session';
+  diagnostics.lastError=null;
+  setLoading(true);
+  try{
+    const uiLanguage=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||'tr'}catch{return'tr'}})();
+    byId('uiLanguage').value=uiLanguage;
+    applyUiLanguage(uiLanguage);
+    updateHeroToggleLabel();
+    initializePages();
+    const status=await sessionStatus();
+    diagnostics.state=status.ownerAuthorized?'loading_console':'access_required';
+    if(renderAccess(status)){
+      await csrfToken();
+      await load();
+      applyUiLanguage(byId('uiLanguage').value);
+      updateHeroToggleLabel();
+      diagnostics.state='ready';
+    }
+  }catch(error){
+    diagnostics.state='session_check_failed';
+    diagnostics.lastError=error&&error.code?error.code:'session_check_failed';
+    renderAccess({reasonCode:diagnostics.lastError,ownerAuthorized:false});
+  }finally{
+    setLoading(false);
+  }
+}
 start();
 </script>
 <script src="/assets/js/paradise-community-structure.js"></script>

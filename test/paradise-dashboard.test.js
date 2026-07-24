@@ -66,6 +66,55 @@ test("cross-subdomain dashboard requests use secure credentialed API fetches", (
   assert.match(serverSource, /credentials:\s*true/);
 });
 
+test("dashboard session check times out safely and always clears its timer", async () => {
+  const html = paradiseDashboardHtml({ clientId: "123", apiBaseUrl: "https://api.example.test", frontendUrl: "https://example.test" });
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] || "";
+  const extractFunction = (name) => {
+    const start = script.indexOf(`async function ${name}(`);
+    assert.notEqual(start, -1, `${name} should exist`);
+    const signatureEnd = script.indexOf("){", start);
+    assert.notEqual(signatureEnd, -1, `${name} should have a function body`);
+    const firstBrace = signatureEnd + 1;
+    let depth = 0;
+    for (let index = firstBrace; index < script.length; index += 1) {
+      if (script[index] === "{") depth += 1;
+      if (script[index] === "}") depth -= 1;
+      if (depth === 0) return script.slice(start, index + 1);
+    }
+    assert.fail(`${name} should have a closing brace`);
+  };
+  const factory = new Function(
+    "API_BASE", "fetch", "AbortController", "setTimeout", "clearTimeout",
+    `${extractFunction("fetchJsonWithTimeout")}\n${extractFunction("sessionStatus")}\nreturn {sessionStatus};`
+  );
+  let timerCleared = false;
+  const fetchNeverCompletes = (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => {
+      const error = new Error("aborted");
+      error.name = "AbortError";
+      reject(error);
+    });
+  });
+  const { sessionStatus } = factory(
+    "https://api.example.test",
+    fetchNeverCompletes,
+    AbortController,
+    (callback) => {
+      queueMicrotask(callback);
+      return 7;
+    },
+    (timerId) => {
+      assert.equal(timerId, 7);
+      timerCleared = true;
+    }
+  );
+
+  await assert.rejects(sessionStatus(), (error) => error.code === "session_check_timeout");
+  assert.equal(timerCleared, true);
+  assert.match(script, /finally\{\s*setLoading\(false\)/);
+  assert.match(script, /state:'booting'/);
+});
+
 test("dashboard mutations use CSRF protection and retry one expired token safely", () => {
   assert.match(htmlSource, /API_BASE\+'\/api\/csrf-token'/);
   assert.match(htmlSource, /'x-fima-csrf':token/);
