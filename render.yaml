@@ -5,3 +5,6 @@ services:
     buildCommand: npm install && npm run prisma:generate && npm run prisma:deploy
     startCommand: npm start
     healthCheckPath: /healthz
+    envVars:
+      - key: FIMA_SITE_ACCESS_MODE
+        value: owner_only

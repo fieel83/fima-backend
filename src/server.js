@@ -120,6 +120,12 @@ import {
   verifyAppEntitlement
 } from "./entitlements.js";
 import { ownerIdentityStatus } from "./ownerAccess.js";
+import {
+  isUpdatingModeApiRequest,
+  isUpdatingModeEnabled,
+  isUpdatingModeOpenPath,
+  updatingModeHeaders
+} from "./siteUpdatingMode.js";
 import { paradiseApplicationHttpError, requireParadisePrivateReviewQueued } from "./paradiseApplicationHttp.js";
 import { isStrictAccountOnlyEntitlementPayload } from "./desktopLogin.js";
 import { createDesktopLoginHandlers } from "./desktopLoginRoutes.js";
@@ -127,6 +133,7 @@ import { createDesktopLoginHandlers } from "./desktopLoginRoutes.js";
 const app = express();
 const port = Number(env("PORT", "8080"));
 const publicDir = path.resolve("public");
+const SITE_UPDATING_MODE_ENABLED = isUpdatingModeEnabled(env("FIMA_SITE_ACCESS_MODE", "owner_only"));
 const DEFAULT_MIN_SUPPORTED_APP_VERSION = "1.0.128";
 const PUBLIC_SETUP_DOWNLOAD_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.Setup.exe";
 const PUBLIC_APP_PACKAGE_URL = "https://github.com/fieel83/fima-macro-releases/releases/download/v1.0.130/FIMA.MACRO.App.zip";
@@ -414,6 +421,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false }));
 app.use(emergencyAdminSecurityGate);
+app.use(siteUpdatingModeGate);
 
 app.get(["/api/admin/system/env-status", "/admin/api/system/env-status"], adminRuntimeLimiter, requireRuntimeAdminKey, async (req, res) => {
   await auditRuntimeAdmin(req, "runtime_env_status");
@@ -687,6 +695,12 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     }
 
     const hydrated = await ensureUserStripeCustomer(user);
+    const ownerLoginMatches = Boolean(FIMA_OWNER_ACCOUNT_EMAIL)
+      && normalizeEmail(hydrated.emailNormalized || hydrated.email) === normalizeEmail(FIMA_OWNER_ACCOUNT_EMAIL);
+    if (SITE_UPDATING_MODE_ENABLED && !ownerLoginMatches) {
+      await createAuditLog("user_login_denied_updating_mode", "user", hydrated.id, {});
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
     await issueUserSession(res, hydrated.id);
     await createAuditLog("user_login_success", "user", hydrated.id, {});
     return res.json({ success: true, user: publicUser(hydrated) });
@@ -6560,6 +6574,16 @@ app.use(express.static(publicDir, {
     const normalized = filePath.replace(/\\/g, "/");
     const extension = path.extname(filePath).toLowerCase();
     const requestUrl = String(res.req?.originalUrl || res.req?.url || "");
+    // The maintenance landing page and the owner-only sign-in flow are
+    // intentionally reachable while the site is closed.  They must not be
+    // cached by a browser or intermediary, otherwise a visitor could see an
+    // obsolete public state after maintenance is enabled.
+    if (SITE_UPDATING_MODE_ENABLED && isUpdatingModeOpenPath(requestUrl)) {
+      for (const [name, value] of Object.entries(updatingModeHeaders())) {
+        res.setHeader(name, value);
+      }
+      return;
+    }
     const versionedAsset = /(?:^|[?&])v=[A-Za-z0-9._-]+(?:&|$)/u.test(requestUrl);
     if (normalized.endsWith("/latest.json")) {
       res.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
@@ -9610,6 +9634,68 @@ function isTrustedParadiseOrigin(origin) {
   } catch {
     return false;
   }
+}
+
+async function siteUpdatingModeGate(req, res, next) {
+  if (!SITE_UPDATING_MODE_ENABLED) return next();
+
+  const requestTarget = req.originalUrl || req.url || req.path || "/";
+  let requestPath = "/";
+  try {
+    requestPath = new URL(requestTarget, "http://fima.local").pathname;
+  } catch {
+    // A malformed path cannot bypass the maintenance boundary.
+    requestPath = "/";
+  }
+
+  if (requestPath === "/auth/discord/start") {
+    try {
+      const user = await getOptionalUser(req, res);
+      const ownerAccount = ownerIdentityStatus({ user }, {
+        ownerEmail: FIMA_OWNER_ACCOUNT_EMAIL,
+        ownerDiscordId: PARADISE_OWNER_DISCORD_ID
+      });
+      if (ownerAccount.accountPresent && ownerAccount.emailMatches) return next();
+    } catch {
+      // Fail closed.
+    }
+  } else if (isUpdatingModeOpenPath(requestTarget)) {
+    return next();
+  }
+
+  try {
+    const user = await getOptionalUser(req, res);
+    if (user?.id) {
+      const oauthLinks = await prisma.oAuthLink.findMany({
+        where: { userId: user.id },
+        select: { provider: true, providerSubject: true }
+      });
+      const owner = ownerIdentityStatus(
+        { user: { ...user, oauthLinks } },
+        {
+          ownerEmail: FIMA_OWNER_ACCOUNT_EMAIL,
+          ownerDiscordId: PARADISE_OWNER_DISCORD_ID
+        }
+      );
+      if (owner.ok) return next();
+    }
+  } catch {
+    // Fail closed.
+  }
+
+  for (const [name, value] of Object.entries(updatingModeHeaders())) {
+    res.setHeader(name, value);
+  }
+
+  if (isUpdatingModeApiRequest({
+    originalUrl: requestTarget,
+    accept: req.get("accept"),
+    contentType: req.get("content-type")
+  })) {
+    return res.status(503).json({ error: "site_updating", maintenance: true });
+  }
+
+  return res.status(503).sendFile(path.join(publicDir, "updating.html"));
 }
 
 async function getOptionalUser(req, res) {

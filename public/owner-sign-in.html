@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>FIMA · Owner access</title>
+    <link rel="stylesheet" href="/assets/css/updating.css">
+  </head>
+  <body class="owner-page">
+    <main class="owner-shell" aria-labelledby="owner-title">
+      <a class="brand" href="/updating.html" aria-label="FIMA"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>FIMA</span></a>
+      <section class="owner-card">
+        <p class="section-kicker">OWNER ACCESS</p>
+        <h1 id="owner-title">Güvenli giriş</h1>
+        <p>Bakım sırasında erişim, yapılandırılmış owner hesabı ve bağlı Discord kimliğiyle sınırlandırılmıştır.</p>
+        <form id="owner-login" novalidate>
+          <label>E-posta<input name="email" type="email" autocomplete="username" required></label>
+          <label>Şifre<input name="password" type="password" autocomplete="current-password" required></label>
+          <button type="submit"><span>Devam et</span><span aria-hidden="true">→</span></button>
+          <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+        </form>
+        <p class="owner-note">Girişten sonra owner doğrulaması için bağlı Discord hesabına yönlendirilirsiniz.</p>
+      </section>
+    </main>
+    <script type="module" src="/assets/js/owner-sign-in.js"></script>
+  </body>
+</html>
