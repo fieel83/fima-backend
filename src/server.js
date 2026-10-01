@@ -737,6 +737,26 @@ app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
 
 app.get("/paradise/dashboard", (_req, res) => res.redirect(302, "/paradise"));
 
+function protectOwnerContentStudioPages(req, res, next) {
+  let pathname;
+  try {
+    pathname = decodeURIComponent(req.path).replace(/\\/g, "/");
+  } catch {
+    return res.status(400).json({ error: "invalid_path" });
+  }
+  // Match Express static decoding and Windows filename aliases before serving HTML.
+  const normalized = path.posix.normalize(pathname).split("/")
+    .map((segment) => segment.replace(/[ .]+$/g, "")).join("/").toLowerCase();
+  if (!["/paradise/content-studio", "/paradise-content-studio", "/paradise-content-studio.html"].includes(normalized)) {
+    return next();
+  }
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return requireUser(req, res, () => requireParadiseOwner(req, res, next));
+}
+
+app.use(protectOwnerContentStudioPages);
+
 app.get("/paradise/content-studio", (_req, res) => {
   res.set("Cache-Control", "no-store");
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
