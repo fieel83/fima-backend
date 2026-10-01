@@ -12,6 +12,7 @@ import helmet from "helmet";
 import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import { OAuth2Client } from "google-auth-library";
+import { parseGoogleOAuthCookie } from "./googleOAuthCookie.js";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
@@ -2298,12 +2299,7 @@ app.get("/auth/google/start", oauthLimiter, async (req, res) => {
 
 app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
   try {
-    const cookieState = String(req.cookies?.[OAUTH_STATE_COOKIE] || "");
-    const separator = cookieState.lastIndexOf(".");
-    const stateValue = separator > 0 ? cookieState.slice(0, separator) : "";
-    const nonce = separator > 0
-      ? Buffer.from(cookieState.slice(separator + 1), "base64url").toString("utf8")
-      : "";
+    const { state: stateValue, nonce } = parseGoogleOAuthCookie(req.cookies?.[OAUTH_STATE_COOKIE]);
     const state = verifyOAuthState(req.query?.state, stateValue, "google");
     rememberUsedGoogleOAuthState(String(req.query?.state || ""));
     if (!nonce || nonce.length < 16) throw new Error("invalid_google_nonce");
