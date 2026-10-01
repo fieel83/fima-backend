@@ -7,6 +7,8 @@ const OPEN_PATHS = new Set([
   "/favicon.ico",
   "/robots.txt",
   "/auth/discord/callback",
+  "/auth/google/start",
+  "/auth/google/callback",
   "/api/auth/login"
 ]);
 

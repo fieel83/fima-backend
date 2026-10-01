@@ -11,6 +11,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import nodemailer from "nodemailer";
 import Stripe from "stripe";
+import { OAuth2Client } from "google-auth-library";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
@@ -201,6 +202,7 @@ const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
 const usedRobloxOAuthStates = new Map();
 const usedDiscordOAuthStates = new Map();
+const usedGoogleOAuthStates = new Map();
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 const REFERRAL_REWARD_VALID_INVITES = 3;
 const REFERRAL_REWARD_DAYS = 7;
@@ -2259,6 +2261,86 @@ app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
     console.error("Discord OAuth start failed", publicError(error));
     clearOAuthCookies(res);
     return res.redirect(`${frontendUrl()}/login?error=discord_oauth_unavailable`);
+  }
+});
+
+app.get("/auth/google/start", oauthLimiter, async (req, res) => {
+  try {
+    const clientId = env("GOOGLE_CLIENT_ID");
+    const clientSecret = env("GOOGLE_CLIENT_SECRET");
+    const redirectUri = env("GOOGLE_REDIRECT_URI", `${apiBaseUrl()}/auth/google/callback`);
+    if (!clientId || !clientSecret || !redirectUri) throw new Error("google_oauth_unavailable");
+    const currentUser = await getOptionalUser(req, res);
+    const state = createOAuthState("google", {
+      userId: currentUser?.id || null,
+      returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard/overview")
+    });
+    const nonce = crypto.randomBytes(16).toString("base64url");
+    const { verifier, challenge } = createPkcePair();
+    const client = new OAuth2Client({ clientId, clientSecret, redirectUri });
+    const url = client.generateAuthUrl({
+      scope: ["openid", "email", "profile"],
+      state,
+      nonce,
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      prompt: "select_account"
+    });
+    setOAuthCookie(res, OAUTH_STATE_COOKIE, `${state}.${nonce}`);
+    setOAuthCookie(res, OAUTH_PKCE_COOKIE, verifier);
+    return res.redirect(url);
+  } catch (error) {
+    console.error("Google OAuth start failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}/login?error=google_oauth_unavailable`);
+  }
+});
+
+app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
+  try {
+    const cookieState = String(req.cookies?.[OAUTH_STATE_COOKIE] || "");
+    const separator = cookieState.lastIndexOf(".");
+    const stateValue = separator > 0 ? cookieState.slice(0, separator) : "";
+    const nonce = separator > 0
+      ? Buffer.from(cookieState.slice(separator + 1), "base64url").toString("utf8")
+      : "";
+    const state = verifyOAuthState(req.query?.state, stateValue, "google");
+    rememberUsedGoogleOAuthState(String(req.query?.state || ""));
+    if (!nonce || nonce.length < 16) throw new Error("invalid_google_nonce");
+    const code = String(req.query?.code || "").trim();
+    const verifier = String(req.cookies?.[OAUTH_PKCE_COOKIE] || "");
+    if (!code || !/^[A-Za-z0-9_-]{43,128}$/u.test(verifier)) throw new Error("invalid_google_callback");
+    const clientId = env("GOOGLE_CLIENT_ID");
+    const clientSecret = env("GOOGLE_CLIENT_SECRET");
+    const redirectUri = env("GOOGLE_REDIRECT_URI", `${apiBaseUrl()}/auth/google/callback`);
+    if (!clientId || !clientSecret) throw new Error("google_oauth_unavailable");
+    const client = new OAuth2Client({ clientId, clientSecret, redirectUri });
+    const { tokens } = await client.getToken({ code, codeVerifier: verifier });
+    if (!tokens.id_token) throw new Error("google_identity_invalid");
+    const ticket = await client.verifyIdToken({ idToken: tokens.id_token, audience: clientId });
+    const payload = ticket.getPayload();
+    if (!payload || !["accounts.google.com", "https://accounts.google.com"].includes(payload.iss)
+      || payload.aud !== clientId || (payload.azp && payload.azp !== clientId)
+      || !payload.sub || !payload.email || payload.email_verified !== true
+      || payload.nonce !== nonce || !Number.isFinite(payload.exp) || payload.exp * 1000 <= Date.now()) {
+      throw new Error("google_identity_invalid");
+    }
+    const linked = await loginOrLinkGoogleAccount({
+      subject: String(payload.sub),
+      email: normalizeEmail(payload.email),
+      name: String(payload.name || "").slice(0, 200),
+      preferredUserId: state.userId
+    });
+    await issueUserSession(res, linked.user.id);
+    await createAuditLog(state.userId ? "google_account_linked" : "google_login_success", "user", linked.user.id, {
+      googleSubject: String(payload.sub), created: linked.created
+    });
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard/overview"}?google=connected`);
+  } catch (error) {
+    console.error("Google OAuth callback failed", publicError(error));
+    clearOAuthCookies(res);
+    return res.redirect(`${frontendUrl()}/login?error=google_oauth_failed`);
   }
 });
 
@@ -5963,6 +6045,10 @@ function rememberUsedDiscordOAuthState(state) {
   return rememberUsedOAuthState(usedDiscordOAuthStates, state);
 }
 
+function rememberUsedGoogleOAuthState(state) {
+  return rememberUsedOAuthState(usedGoogleOAuthStates, state);
+}
+
 function rememberUsedOAuthState(store, state) {
   const now = Date.now();
   for (const [key, expiresAt] of store) {
@@ -6070,6 +6156,78 @@ async function loginOrLinkDiscordAccount(profile, token, preferredUserId = null)
   });
 
   return { user, created };
+}
+
+async function loginOrLinkGoogleAccount({ subject, email, name, preferredUserId = null }) {
+  const provider = "google";
+  const providerSubject = String(subject || "").trim();
+  const normalizedEmail = normalizeAccountEmail(email);
+  if (!providerSubject || !isValidEmail(email)) throw new Error("google_identity_invalid");
+
+  return prisma.$transaction(async (tx) => {
+    const existingLink = await tx.oAuthLink.findUnique({
+      where: { provider_providerSubject: { provider, providerSubject } },
+      include: { user: true }
+    });
+
+    if (existingLink) {
+      if (preferredUserId && existingLink.userId !== preferredUserId) {
+        const error = new Error("provider_already_linked");
+        error.code = "provider_already_linked";
+        throw error;
+      }
+      const user = await tx.user.update({
+        where: { id: existingLink.userId },
+        data: { emailVerifiedAt: existingLink.user.emailVerifiedAt || new Date() }
+      });
+      return { user, created: false };
+    }
+
+    let user = preferredUserId
+      ? await tx.user.findUnique({ where: { id: preferredUserId } })
+      : null;
+    if (preferredUserId && !user) throw new Error("user_not_found");
+
+    if (!user) {
+      const emailCollision = await tx.user.findFirst({
+        where: { OR: [{ email }, { emailNormalized: normalizedEmail }] }
+      });
+      if (emailCollision) {
+        const error = new Error("provider_link_requires_login");
+        error.code = "provider_link_requires_login";
+        throw error;
+      }
+      user = await tx.user.create({
+        data: {
+          email,
+          emailNormalized: normalizedEmail,
+          passwordHash: await hashPassword(randomToken()),
+          emailVerifiedAt: new Date()
+        }
+      });
+    }
+
+    const conflictingLink = await tx.oAuthLink.findUnique({
+      where: { provider_providerSubject: { provider, providerSubject } },
+      select: { userId: true }
+    });
+    if (conflictingLink && conflictingLink.userId !== user.id) {
+      const error = new Error("provider_already_linked");
+      error.code = "provider_already_linked";
+      throw error;
+    }
+    await tx.oAuthLink.create({
+      data: {
+        userId: user.id,
+        provider,
+        providerSubject,
+        providerUsername: name || null,
+        providerEmail: email,
+        metadata: { emailVerified: true }
+      }
+    });
+    return { user, created: !preferredUserId };
+  });
 }
 
 async function getRobloxOidcDiscovery() {
