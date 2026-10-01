@@ -2348,6 +2348,10 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
   try {
     const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "discord");
     rememberUsedDiscordOAuthState(String(req.query?.state || ""));
+    if (state.userId) {
+      const currentUser = await getOptionalUser(req, res);
+      if (!currentUser || currentUser.id !== state.userId) throw new Error("discord_link_requires_login");
+    }
     const code = String(req.query?.code || "").trim();
     if (!code) throw new Error("missing_discord_code");
 
