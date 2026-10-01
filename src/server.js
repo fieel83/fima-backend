@@ -2302,6 +2302,10 @@ app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
     const { state: stateValue, nonce } = parseGoogleOAuthCookie(req.cookies?.[OAUTH_STATE_COOKIE]);
     const state = verifyOAuthState(req.query?.state, stateValue, "google");
     rememberUsedGoogleOAuthState(String(req.query?.state || ""));
+    if (state.userId) {
+      const currentUser = await getOptionalUser(req, res);
+      if (!currentUser || currentUser.id !== state.userId) throw new Error("google_link_requires_login");
+    }
     if (!nonce || nonce.length < 16) throw new Error("invalid_google_nonce");
     const code = String(req.query?.code || "").trim();
     const verifier = String(req.cookies?.[OAUTH_PKCE_COOKIE] || "");
