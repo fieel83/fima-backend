@@ -3097,10 +3097,13 @@
 
       const clearRobloxButton = event.target.closest("[data-clear-roblox-username]");
       if (clearRobloxButton) {
+        if (clearRobloxButton.disabled) return;
+        const password = await requestRemovalPassword();
+        if (password === null) return;
         clearRobloxButton.disabled = true;
         setMessage(t("working"));
         try {
-          const data = await post("/api/me/roblox/clear", {});
+          const data = await post("/api/me/roblox/clear", { password });
           currentUserPromise = null;
           window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
           renderAccountHeader(data.user || {});
@@ -3342,14 +3345,15 @@
         if (disconnectButton.disabled) return;
         disconnectButton.disabled = true;
         const provider = disconnectButton.dataset.disconnectProvider;
-        const password = provider === "discord" ? await requestRemovalPassword() : null;
-        if (provider === "discord" ? password === null : !window.confirm(t("disconnectConfirm"))) {
+        const requiresPassword = provider === "discord" || provider === "roblox";
+        const password = requiresPassword ? await requestRemovalPassword() : null;
+        if (requiresPassword ? password === null : !window.confirm(t("disconnectConfirm"))) {
           disconnectButton.disabled = false;
           return;
         }
         setMessage(t("working"));
         try {
-          const data = await post(`/api/auth/${provider}/disconnect`, provider === "discord" ? { password } : {});
+          const data = await post(`/api/auth/${provider}/disconnect`, requiresPassword ? { password } : {});
           renderConnectedAccounts(data.integrations || {});
           renderMonthlyTrial(data.trial || {});
           renderAccountSummary(data.user || {});

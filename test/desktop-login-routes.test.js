@@ -19,8 +19,10 @@ function matches(record, where = {}) {
 
 function fakePrisma() {
   const records = [];
-  const users = new Map([["user-a", { id: "user-a", email: "member@example.com", discordUserId: null }]]);
-  return {
+  const users = new Map([["user-a", { id: "user-a", email: "member@example.com", discordUserId: null, passwordHash: "password-v1" }]]);
+  let queue = Promise.resolve();
+  const clone = (value) => structuredClone(value);
+  const prisma = {
     records,
     users,
     desktopLoginRequest: {
@@ -36,10 +38,10 @@ function fakePrisma() {
           updatedAt: new Date()
         };
         records.push(record);
-        return record;
+        return clone(record);
       },
       async findUnique({ where }) {
-        return records.find((record) => matches(record, where)) || null;
+        return clone(records.find((record) => matches(record, where)) || null);
       },
       async updateMany({ where, data }) {
         const selected = records.filter((record) => matches(record, where));
@@ -49,10 +51,37 @@ function fakePrisma() {
     },
     user: {
       async findUnique({ where }) {
-        return users.get(where.id) || null;
+        return clone(users.get(where.id) || null);
       }
     }
   };
+  prisma.$transaction = async (callback) => {
+    const previous = queue;
+    let release;
+    queue = new Promise((resolve) => { release = resolve; });
+    await previous;
+    const savedRecords = clone(records);
+    const savedUsers = clone(users);
+    const tx = {
+      desktopLoginRequest: prisma.desktopLoginRequest,
+      user: prisma.user,
+      locked: false,
+      async $queryRaw(strings, userId) {
+        assert.equal(strings.join("?"), "SELECT id FROM users WHERE id = ? FOR UPDATE");
+        assert.equal(userId, "user-a");
+        tx.locked = true;
+        return users.has(userId) ? [{ id: userId }] : [];
+      }
+    };
+    try { return await callback(tx); }
+    catch (error) {
+      records.splice(0, records.length, ...savedRecords);
+      users.clear();
+      for (const [id, user] of savedUsers) users.set(id, user);
+      throw error;
+    } finally { release(); }
+  };
+  return prisma;
 }
 
 function response() {
@@ -97,14 +126,24 @@ function fixture() {
     normalizeHwid: (value) => String(value || "").trim().toUpperCase() || null,
     hashDeviceId: (value) => value ? crypto.createHash("sha256").update(value).digest("hex") : null,
     frontendUrl: () => "https://fimamacro.com/",
-    resolveEntitlementForUser: async ({ user }) => ({
+    assertInitiatingSession: async ({ req, db, userId }) => {
+      assert.equal(db.locked, true, "browser authority must be checked under the account lock");
+      const user = await db.user.findUnique({ where: { id: userId } });
+      if (req.browserSession !== "browser-v1" || user?.passwordHash !== "password-v1") return false;
+      return { userId };
+    },
+    resolveEntitlementForUser: async ({ user, db }) => {
+      assert.equal(db.locked, true, "entitlement resolver must share the consumption transaction");
+      assert.equal(user.id, "user-a");
+      return {
       valid: true,
       validLicense: false,
       reason: "account_only",
       accountConnected: true,
       entitlementToken: "signed-account-token",
       entitlement
-    })
+      };
+    }
   });
   const proof = { hwid, pkceVerifier: verifier, state };
   return { prisma, handlers, proof, verifier, state, entitlement };
@@ -147,7 +186,7 @@ test("desktop-login route lifecycle is pending, approved and consumed exactly on
   assert.equal(pending.body.status, "pending");
 
   const approved = response();
-  await subject.handlers.approve({ body: { userCode: login.userCode }, user: { id: "user-a" } }, approved);
+  await subject.handlers.approve({ body: { userCode: login.userCode }, user: { id: "user-a" }, browserSession: "browser-v1" }, approved);
   assert.equal(approved.body.status, "approved");
 
   const consumed = response();
@@ -189,7 +228,7 @@ test("desktop-login expires server-side and cannot be approved by another accoun
   const login = await initiate(subject);
 
   const approved = response();
-  await subject.handlers.approve({ body: { userCode: login.userCode }, user: { id: "user-a" } }, approved);
+  await subject.handlers.approve({ body: { userCode: login.userCode }, user: { id: "user-a" }, browserSession: "browser-v1" }, approved);
   assert.equal(approved.body.status, "approved");
 
   const otherAccount = response();

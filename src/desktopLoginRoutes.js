@@ -48,16 +48,27 @@ function requestExpired(request, now) {
   return !Number.isFinite(expiresAt) || expiresAt <= now.getTime();
 }
 
+function loginFailure(status = 410, code = "desktop_login_invalid_or_expired") {
+  return Object.assign(new Error(code), { desktopStatus: status, desktopCode: code });
+}
+
+async function lockAccount(db, userId) {
+  await db.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+}
+
 export function createDesktopLoginHandlers({
   prisma,
   normalizeHwid,
   hashDeviceId,
   frontendUrl,
   resolveEntitlementForUser,
+  assertInitiatingSession,
   onConsumed = async () => {}
 }) {
   if (!prisma?.desktopLoginRequest) throw new TypeError("desktopLoginRequest persistence is required");
+  if (typeof prisma.$transaction !== "function") throw new TypeError("transactional persistence is required");
   if (typeof resolveEntitlementForUser !== "function") throw new TypeError("resolveEntitlementForUser is required");
+  if (typeof assertInitiatingSession !== "function") throw new TypeError("assertInitiatingSession is required");
 
   return {
     initiate: async (req, res) => {
@@ -133,31 +144,42 @@ export function createDesktopLoginHandlers({
       noStore(res);
       const userCode = normalizeDesktopUserCode(req.body?.userCode);
       const userCodeHash = desktopUserCodeHash(userCode);
-      if (!userCodeHash) return publicFailure(res);
-      const now = new Date();
-      const request = await prisma.desktopLoginRequest.findUnique({ where: { userCodeHash } });
-      if (!request || requestExpired(request, now)) return publicFailure(res);
-
-      if (request.status === "approved" && request.userId === req.user.id) {
-        return res.json({ success: true, status: "approved", expiresAt: request.expiresAt.toISOString() });
+      if (!userCodeHash || !req.user?.id) return publicFailure(res);
+      try {
+        const approval = await prisma.$transaction(async (db) => {
+          await lockAccount(db, req.user.id);
+          let authority;
+          try {
+            authority = await assertInitiatingSession({ req, db, userId: req.user.id });
+          } catch {
+            throw loginFailure(403, "desktop_login_authorization_expired");
+          }
+          if (authority !== true && authority?.userId !== req.user.id) {
+            throw loginFailure(403, "desktop_login_authorization_expired");
+          }
+          const now = new Date();
+          const request = await db.desktopLoginRequest.findUnique({ where: { userCodeHash } });
+          if (!request || requestExpired(request, now)) throw loginFailure(400);
+          if (request.status === "approved" && request.userId === req.user.id) {
+            return { success: true, status: "approved", expiresAt: request.expiresAt.toISOString() };
+          }
+          if (request.status !== "pending" || request.userId) throw loginFailure(400);
+          const updated = await db.desktopLoginRequest.updateMany({
+            where: { id: request.id, status: "pending", userId: null, expiresAt: { gt: now } },
+            data: { status: "approved", userId: req.user.id, approvedAt: now }
+          });
+          if (updated.count !== 1) throw loginFailure(400);
+          return { success: true, status: "approved", expiresAt: request.expiresAt.toISOString() };
+        });
+        return res.json(approval);
+      } catch (error) {
+        return publicFailure(res, error.desktopStatus || 503, error.desktopCode || "desktop_login_unavailable");
       }
-      if (request.status !== "pending" || request.userId) return publicFailure(res);
-
-      const updated = await prisma.desktopLoginRequest.updateMany({
-        where: {
-          id: request.id,
-          status: "pending",
-          userId: null,
-          expiresAt: { gt: now }
-        },
-        data: { status: "approved", userId: req.user.id, approvedAt: now }
-      });
-      if (updated.count !== 1) return publicFailure(res);
-      return res.json({ success: true, status: "approved", expiresAt: request.expiresAt.toISOString() });
     },
 
     poll: async (req, res) => {
       noStore(res);
+      try {
       const deviceCodeHash = desktopDeviceCodeHash(req.body?.deviceCode);
       const hwid = normalizeHwid(req.body?.hwid);
       const deviceIdHash = hashDeviceId(hwid);
@@ -179,29 +201,41 @@ export function createDesktopLoginHandlers({
       }
       if (request.status !== "approved" || !request.userId) return publicFailure(res, 410);
 
-      const user = await prisma.user.findUnique({ where: { id: request.userId } });
-      if (!user) {
-        await prisma.desktopLoginRequest.updateMany({
-          where: { id: request.id, status: "approved", userId: request.userId },
-          data: { status: "cancelled", cancelledAt: now }
+      const result = await prisma.$transaction(async (db) => {
+        // Password reset and approval take this same account lock. Never issue a
+        // token from the stale pre-lock request or user snapshot.
+        await lockAccount(db, request.userId);
+        const current = await db.desktopLoginRequest.findUnique({ where: { deviceCodeHash } });
+        const lockedNow = new Date();
+        if (!current || current.id !== request.id || current.userId !== request.userId ||
+            current.status !== "approved" || requestExpired(current, lockedNow) ||
+            !epochProof(current, req.body, deviceIdHash).ok) throw loginFailure();
+        const user = await db.user.findUnique({ where: { id: current.userId } });
+        if (!user) throw loginFailure();
+        const consumed = await db.desktopLoginRequest.updateMany({
+          where: { id: current.id, status: "approved", userId: current.userId, expiresAt: { gt: lockedNow } },
+          data: { status: "consumed", consumedAt: lockedNow }
         });
-        return publicFailure(res, 410);
-      }
-
-      const session = await resolveEntitlementForUser({ user, hwid, appVersion: request.appVersion });
-      const consumed = await prisma.desktopLoginRequest.updateMany({
-        where: {
-          id: request.id,
-          status: "approved",
-          userId: request.userId,
-          expiresAt: { gt: new Date() }
-        },
-        data: { status: "consumed", consumedAt: new Date() }
+        if (consumed.count !== 1) throw loginFailure();
+        // All binding writes must use this transaction; failure rolls both
+        // request consumption and device/license binding back together.
+        const session = await resolveEntitlementForUser({ user, hwid, appVersion: current.appVersion, db });
+        if (requestExpired(current, new Date())) throw loginFailure();
+        return { request: current, user, session, hwid };
       });
-      if (consumed.count !== 1) return publicFailure(res, 410);
 
-      await onConsumed({ request, user, session, hwid }).catch(() => {});
-      return res.json({ success: true, status: "consumed", ...session });
+      await onConsumed(result).catch(() => {});
+      // A reset already waiting on issuance must finish before the response's
+      // credential check. A global read could observe its pre-commit snapshot.
+      const latestUser = await prisma.$transaction(async (db) => {
+        await lockAccount(db, result.user.id);
+        return db.user.findUnique({ where: { id: result.user.id } });
+      });
+      if (!latestUser || latestUser.passwordHash !== result.user.passwordHash) return publicFailure(res, 410);
+      return res.json({ ...result.session, success: true, status: "consumed" });
+      } catch (error) {
+        return publicFailure(res, error.desktopStatus || 503, error.desktopCode || "desktop_login_unavailable");
+      }
     },
 
     cancel: async (req, res) => {

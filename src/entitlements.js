@@ -44,6 +44,24 @@ export function hashDeviceId(hwid) {
   return crypto.createHash("sha256").update(normalized).digest("hex");
 }
 
+// An opaque, signed generation changes whenever the authoritative password
+// changes. Neither the password hash nor a guessable digest is sent to clients.
+export function entitlementCredentialGeneration(user) {
+  if (!user?.id) return null;
+  return hmac(`fima-account-credential-generation:v1:${JSON.stringify([user.id, user.passwordHash ?? null])}`, requiredEnv("ENTITLEMENT_SIGNING_SECRET"));
+}
+
+export function verifyEntitlementAccountGeneration(payload, user) {
+  if (!payload?.userId || payload.accountId !== payload.userId || !user?.id || user.id !== payload.userId) {
+    return { ok: false, reason: "entitlement_session_revoked" };
+  }
+  const generation = String(payload.accountGeneration || "");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(generation) || !timingSafeTextEqual(generation, entitlementCredentialGeneration(user))) {
+    return { ok: false, reason: "entitlement_session_revoked" };
+  }
+  return { ok: true };
+}
+
 export function entitlementSecretStatus(environment = process.env) {
   const secret = String(environment.ENTITLEMENT_SIGNING_SECRET || "").trim();
   return {
@@ -113,6 +131,7 @@ export function issueAppEntitlement({
   ownerAdminAccess = false
 }) {
   const secret = requiredEnv("ENTITLEMENT_SIGNING_SECRET");
+  if (ownerAdminAccess && !user?.id) throw new Error("entitlement_owner_account_required");
   const now = new Date();
   const expiresAt = new Date(now.getTime() + entitlementLifetimeMinutes() * 60 * 1000);
   const sessionVersion = env("ADMIN_SESSION_VERSION", env("ADMIN_SESSION_REVOKED_BEFORE", ""));
@@ -129,6 +148,7 @@ export function issueAppEntitlement({
     licenseId: license?.id || null,
     userId: user?.id || null,
     accountId: user?.id || null,
+    accountGeneration: entitlementCredentialGeneration(user),
     plan,
     allowedFeatures: safeFeatures,
     ownerAdminAccess: Boolean(ownerAdminAccess),
@@ -177,6 +197,15 @@ export function verifyAppEntitlement(token) {
   const secret = requiredEnv("ENTITLEMENT_SIGNING_SECRET");
   const expected = hmac(`${headerPart}.${payloadPart}`, secret);
   if (!timingSafeTextEqual(signature, expected)) return { ok: false, reason: "invalid_entitlement_signature" };
+
+  if (payload.userId || payload.accountId) {
+    if (!payload.userId || payload.accountId !== payload.userId || !/^[A-Za-z0-9_-]{43}$/.test(String(payload.accountGeneration || ""))) {
+      return { ok: false, reason: "entitlement_session_revoked", payload };
+    }
+  } else if (payload.ownerAdminAccess || payload.isOwner || payload.isAdmin || payload.adminTools
+    || (payload.capabilities || []).length || (payload.allowedFeatures || []).some((feature) => ["owner_admin", "admin_panel", "admin_macro_editor"].includes(feature))) {
+    return { ok: false, reason: "entitlement_session_revoked", payload };
+  }
 
   const expiresAt = new Date(payload.expiresAt || 0);
   if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {

@@ -121,6 +121,7 @@ import {
   updateManifestSecretStatus,
   verifyAppEntitlement
 } from "./entitlements.js";
+import { assertRefreshLicenseAccount, runEntitlementRefreshWithAccountLock } from "./entitlementRefreshSecurity.js";
 import { ownerIdentityStatus } from "./ownerAccess.js";
 import {
   isUpdatingModeApiRequest,
@@ -596,7 +597,13 @@ const desktopLoginHandlers = createDesktopLoginHandlers({
   normalizeHwid,
   hashDeviceId,
   frontendUrl,
-  resolveEntitlementForUser: resolveDesktopEntitlementForUser
+  resolveEntitlementForUser: resolveDesktopEntitlementForUser,
+  assertInitiatingSession: async ({ req, db, userId }) => {
+    const binding = await captureOAuthInitiatingSession(req, req.user, db);
+    const authority = { userId, ...binding, tokenHash: hashToken(req.cookies?.[USER_SESSION_COOKIE]) };
+    await assertOAuthInitiatingSession(db, authority, true);
+    return { userId };
+  }
 });
 app.post("/api/desktop-login/initiate", desktopLoginPublicLimiter, desktopLoginHandlers.initiate);
 app.post("/api/desktop-login/context", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.context);
@@ -2889,202 +2896,31 @@ app.patch("/api/me/profile/preferences", requireUser, async (req, res) => {
   }
 });
 
-app.post("/api/me/profile", requireUser, async (req, res) => {
-  try {
-    const rawRobloxUsername = String(req.body?.robloxUsername || "").trim();
-    const robloxUsername = normalizeRobloxUsername(rawRobloxUsername);
-    if (rawRobloxUsername && !robloxUsername) {
-      return res.status(400).json({ success: false, error: "invalid_roblox_username" });
-    }
+import { createRobloxAccountHandlers } from "./robloxAccountSecurity.js";
 
-    const user = await prisma.user.update({
-      where: { id: req.user.id },
-      data: {
-        robloxUsername: robloxUsername || null,
-        robloxUserId: null,
-        robloxAvatarUrl: null
-      }
-    });
-    await createAuditLog("profile_roblox_username_updated", "user", user.id, {
-      hasRobloxUsername: Boolean(robloxUsername),
-      proof: "manual_profile_only"
-    });
-    const integrations = await buildIntegrationSummary(user);
-    return res.json({ success: true, user: publicUser(user), integrations });
-  } catch (error) {
-    console.error("Profile update failed", publicError(error));
-    return res.status(500).json({ success: false, error: "profile_update_failed" });
-  }
+const robloxAccountHandlers = createRobloxAccountHandlers({
+  db: prisma,
+  captureAuthority: async (req) => ({
+    ...await captureOAuthInitiatingSession(req, req.user),
+    userId: req.user.id,
+    tokenHash: hashToken(req.cookies?.[USER_SESSION_COOKIE])
+  }),
+  assertAuthority: assertOAuthInitiatingSession,
+  normalizeUsername: normalizeRobloxUsername,
+  resolveProfile: resolveRobloxProfile,
+  resolveProfileWithDescription: resolveRobloxProfileWithDescription,
+  verifyPassword,
+  publicUser,
+  buildIntegrationSummary,
+  buildTrialSummary: buildMonthlyTrialSummary,
+  maskId: maskExternalId,
+  audit: createAuditLog,
+  logError: (name, error) => console.error(name, publicError(error))
 });
-
-app.post("/api/me/roblox/start-verification", requireUser, async (req, res) => {
-  try {
-    const rawRobloxUsername = String(req.body?.robloxUsername || "").trim();
-    const robloxUsername = normalizeRobloxUsername(rawRobloxUsername);
-    if (!robloxUsername) return res.status(400).json({ success: false, error: "invalid_roblox_username" });
-
-    const profile = await resolveRobloxProfile(robloxUsername);
-    if (!profile?.id) return res.status(404).json({ success: false, error: "roblox_profile_not_found" });
-
-    const duplicate = await prisma.user.findFirst({
-      where: { robloxUserId: profile.id, id: { not: req.user.id } },
-      select: { id: true }
-    });
-    if (duplicate) return res.status(409).json({ success: false, error: "roblox_profile_already_verified" });
-
-    const code = generateRobloxVerifyCode();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await prisma.$transaction(async (tx) => {
-      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "roblox_profile_verify" } });
-      await tx.oAuthLink.create({
-        data: {
-          userId: req.user.id,
-          provider: "roblox_profile_verify",
-          providerSubject: req.user.id,
-          providerUsername: profile.username,
-          metadata: {
-            code,
-            expiresAt: expiresAt.toISOString(),
-            robloxUserId: profile.id,
-            username: profile.username,
-            displayName: profile.displayName,
-            avatarUrl: profile.avatarUrl,
-            method: "profile_description"
-          }
-        }
-      });
-      await tx.user.update({
-        where: { id: req.user.id },
-        data: {
-          robloxUsername: profile.username,
-          robloxUserId: null,
-          robloxAvatarUrl: profile.avatarUrl || null
-        }
-      });
-    });
-    await createAuditLog("roblox_profile_verification_started", "user", req.user.id, {
-      robloxUserIdMasked: maskExternalId(profile.id),
-      username: profile.username,
-      expiresAt: expiresAt.toISOString()
-    });
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    const integrations = await buildIntegrationSummary(user);
-    return res.json({
-      success: true,
-      user: publicUser(user),
-      integrations,
-      trial: await buildMonthlyTrialSummary(user, new Date(), integrations)
-    });
-  } catch (error) {
-    console.error("Roblox verification start failed", publicError(error));
-    return res.status(500).json({ success: false, error: "roblox_verification_start_failed" });
-  }
-});
-
-app.post("/api/me/roblox/confirm-verification", requireUser, async (req, res) => {
-  try {
-    const pending = await prisma.oAuthLink.findFirst({
-      where: { userId: req.user.id, provider: "roblox_profile_verify" },
-      orderBy: { updatedAt: "desc" }
-    });
-    const metadata = pending?.metadata || {};
-    const expiresAt = metadata.expiresAt ? new Date(metadata.expiresAt) : null;
-    if (!pending || !metadata.code || !metadata.username || !expiresAt || expiresAt <= new Date()) {
-      return res.status(400).json({ success: false, error: "roblox_verification_expired" });
-    }
-
-    const profile = await resolveRobloxProfileWithDescription(metadata.username);
-    if (!profile?.id) return res.status(404).json({ success: false, error: "roblox_profile_not_found" });
-    if (String(profile.id) !== String(metadata.robloxUserId || "")) {
-      return res.status(409).json({ success: false, error: "roblox_profile_changed" });
-    }
-    const description = String(profile.description || "").toUpperCase();
-    const code = String(metadata.code || "").toUpperCase();
-    if (!description.includes(code)) {
-      return res.status(400).json({
-        success: false,
-        error: "roblox_code_not_found",
-        message: "Add the FIMA verification code to your Roblox profile About/Description, save it, then try again."
-      });
-    }
-
-    const duplicate = await prisma.user.findFirst({
-      where: { robloxUserId: profile.id, id: { not: req.user.id } },
-      select: { id: true }
-    });
-    if (duplicate) return res.status(409).json({ success: false, error: "roblox_profile_already_verified" });
-
-    const user = await prisma.$transaction(async (tx) => {
-      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "roblox_profile_verify" } });
-      await tx.oAuthLink.upsert({
-        where: { provider_providerSubject: { provider: "roblox", providerSubject: profile.id } },
-        create: {
-          userId: req.user.id,
-          provider: "roblox",
-          providerSubject: profile.id,
-          providerUsername: profile.username,
-          metadata: { verifiedBy: "profile_description", verifiedAt: new Date().toISOString(), displayName: profile.displayName }
-        },
-        update: {
-          userId: req.user.id,
-          providerUsername: profile.username,
-          metadata: { verifiedBy: "profile_description", verifiedAt: new Date().toISOString(), displayName: profile.displayName }
-        }
-      });
-      return tx.user.update({
-        where: { id: req.user.id },
-        data: {
-          robloxUsername: profile.username,
-          robloxUserId: profile.id,
-          robloxAvatarUrl: profile.avatarUrl || null
-        }
-      });
-    });
-    await createAuditLog("roblox_profile_verified", "user", user.id, {
-      robloxUserIdMasked: maskExternalId(profile.id),
-      username: profile.username,
-      method: "profile_description"
-    });
-    const integrations = await buildIntegrationSummary(user);
-    return res.json({
-      success: true,
-      user: publicUser(user),
-      integrations,
-      trial: await buildMonthlyTrialSummary(user, new Date(), integrations)
-    });
-  } catch (error) {
-    console.error("Roblox verification confirm failed", publicError(error));
-    return res.status(500).json({ success: false, error: "roblox_verification_confirm_failed" });
-  }
-});
-
-app.post("/api/me/roblox/clear", requireUser, async (req, res) => {
-  try {
-    const previousRobloxUserId = req.user.robloxUserId;
-    const user = await prisma.$transaction(async (tx) => {
-      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: { in: ["roblox", "roblox_profile_verify"] } } });
-      return tx.user.update({
-        where: { id: req.user.id },
-        data: {
-          robloxUsername: null,
-          robloxUserId: null,
-          robloxAvatarUrl: null
-        }
-      });
-    });
-    await createAuditLog("roblox_profile_cleared", "user", user.id, { previousRobloxUserIdMasked: maskExternalId(previousRobloxUserId) });
-    const integrations = await buildIntegrationSummary(user);
-    return res.json({
-      success: true,
-      user: publicUser(user),
-      integrations,
-      trial: await buildMonthlyTrialSummary(user, new Date(), integrations)
-    });
-  } catch (error) {
-    console.error("Roblox clear failed", publicError(error));
-    return res.status(500).json({ success: false, error: "roblox_clear_failed" });
-  }
-});
+app.post("/api/me/profile", authLimiter, requireUser, robloxAccountHandlers.profile);
+app.post("/api/me/roblox/start-verification", authLimiter, requireUser, robloxAccountHandlers.start);
+app.post("/api/me/roblox/confirm-verification", authLimiter, requireUser, robloxAccountHandlers.confirm);
+app.post("/api/me/roblox/clear", authLimiter, requireUser, robloxAccountHandlers.clear);
 
 app.get("/api/trial-promo", async (req, res) => {
   return res.json({
@@ -3264,32 +3100,7 @@ app.post(["/auth/discord/disconnect", "/api/auth/discord/disconnect"], requireUs
   }
 });
 
-app.post(["/auth/roblox/disconnect", "/api/auth/roblox/disconnect"], requireUser, async (req, res) => {
-  const previousRobloxUserId = req.user.robloxUserId;
-  try {
-    const user = await prisma.$transaction(async (tx) => {
-      await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: { in: ["roblox", "roblox_profile_verify"] } } });
-      return tx.user.update({
-        where: { id: req.user.id },
-        data: {
-          robloxUserId: null,
-          robloxUsername: null,
-          robloxAvatarUrl: null
-        }
-      });
-    });
-    await createAuditLog("roblox_account_disconnected", "user", user.id, { previousRobloxUserId });
-    return res.json({
-      success: true,
-      user: publicUser(user),
-      integrations: await buildIntegrationSummary(user),
-      trial: await buildMonthlyTrialSummary(user)
-    });
-  } catch (error) {
-    console.error("Roblox disconnect failed", publicError(error));
-    return res.status(500).json({ error: "roblox_disconnect_failed" });
-  }
-});
+app.post(["/auth/roblox/disconnect", "/api/auth/roblox/disconnect"], authLimiter, requireUser, robloxAccountHandlers.clear);
 
 app.post(["/trial/monthly/claim", "/api/trial/monthly/claim"], deprecatedTrialEndpointLimiter, async (req, res) => {
   return res.status(410).json({
@@ -4285,129 +4096,87 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       });
     }
 
-    if (verified.payload.licenseId === null) {
-      if (!isStrictAccountOnlyEntitlementPayload(verified.payload) || !verified.payload.userId) {
-        return res.status(401).json({
-          valid: false,
-          canUseApp: false,
-          reason: "invalid_entitlement_payload",
-          message: licenseReasonMessage("invalid_entitlement_payload")
+    const refreshed = await runEntitlementRefreshWithAccountLock({
+      db: prisma,
+      payload: verified.payload,
+      operation: async (tx, authoritativeUser) => {
+        if (verified.payload.licenseId === null) {
+          if (!isStrictAccountOnlyEntitlementPayload(verified.payload) || !authoritativeUser) {
+            return { status: 401, body: { valid: false, canUseApp: false, reason: "invalid_entitlement_payload", message: licenseReasonMessage("invalid_entitlement_payload") } };
+          }
+          return { status: 200, body: await resolveDesktopEntitlementForUser({ user: authoritativeUser, hwid, appVersion, db: tx }) };
+        }
+
+        let license = await tx.license.findUnique({ where: { id: verified.payload.licenseId } });
+        if (!license) {
+          return { status: 404, body: { valid: false, canUseApp: false, reason: "license_not_found", message: licenseReasonMessage("license_not_found") } };
+        }
+        const accountAccess = await buildLicenseAccountAccess(license, tx);
+        assertRefreshLicenseAccount(verified.payload, accountAccess);
+        // Sign only the locked, authoritative credential generation.
+        accountAccess.user = authoritativeUser;
+
+        const blockedReason = licenseBlockedReason(license);
+        if (blockedReason) {
+          return { status: 403, validationFailure: { license, reason: blockedReason }, body: licenseValidationPayload(license, { valid: false, reason: blockedReason, message: licenseReasonMessage(blockedReason), hwid }) };
+        }
+        if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() <= Date.now()) {
+          const expiredReason = licenseSource(license) === "Trial" ? "trial_expired" : "expired";
+          return { status: 403, validationFailure: { license, reason: expiredReason }, body: licenseValidationPayload(license, { valid: false, reason: expiredReason, message: licenseReasonMessage(expiredReason), hwid }) };
+        }
+        const ownerBinding = ownerLicenseBindingState(license, hwid);
+        if (!ownerBinding.ok) {
+          return { status: 403, ownerFailure: { license, reason: ownerBinding.reason }, body: licenseValidationPayload(license, { valid: false, reason: ownerBinding.reason, message: licenseReasonMessage(ownerBinding.reason), hwid, hwidMatches: false }) };
+        }
+        if (!normalizeHwid(license.hwid)) {
+          await tx.license.updateMany({ where: { id: license.id, hwid: license.hwid }, data: { hwid } });
+          license = await tx.license.findUnique({ where: { id: license.id } });
+        }
+        if (!license || normalizeHwid(license.hwid) !== hwid) {
+          return { status: 403, validationFailure: { license, reason: "hwid_mismatch" }, body: licenseValidationPayload(license, { valid: false, reason: "hwid_mismatch", message: licenseReasonMessage("hwid_mismatch"), hwid, hwidMatches: false }) };
+        }
+        const entitlement = issueAppEntitlement({
+          license,
+          user: authoritativeUser,
+          hwid,
+          appVersion,
+          minSupportedAppVersion,
+          licenseStatus: "active",
+          ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess)
         });
+        return {
+          status: 200,
+          validationSuccess: { licenseId: license.id, licenseKey: validationLogLicenseKey(license, license.licenseKey), result: "success", reason: "entitlement_refresh", hwidHash: hashHwid(hwid), appVersion },
+          body: {
+            ...licenseValidationPayload(license, { valid: true, reason: "valid", message: "License valid", accountAccess, hwid, hwidMatches: true }),
+            valid: true,
+            canUseApp: true,
+            entitlementToken: entitlement.token,
+            entitlement: publicEntitlementPayload(entitlement),
+            entitlementExpiresAt: entitlement.expiresAt,
+            minSupportedAppVersion
+          }
+        };
+      },
+      beforeResponse: async (result) => {
+        // Global pool work runs after issuance commits but before the final
+        // credential barrier, so an intervening reset cannot return success.
+        if (result.validationFailure) {
+          const { license, reason } = result.validationFailure;
+          await logValidation(license, license?.licenseKey || "-", "failed", reason, hwid, appVersion);
+        }
+        if (result.ownerFailure) {
+          const { license, reason } = result.ownerFailure;
+          await logOwnerKeyAttempt(license, hwid, appVersion, reason);
+        }
+        if (result.validationSuccess) await prisma.validationLog.create({ data: result.validationSuccess }).catch(() => {});
       }
-      const user = await prisma.user.findUnique({ where: { id: verified.payload.userId } });
-      if (!user) {
-        return res.status(401).json({
-          valid: false,
-          canUseApp: false,
-          reason: "entitlement_session_revoked",
-          message: licenseReasonMessage("entitlement_session_revoked")
-        });
-      }
-      return res.json(await resolveDesktopEntitlementForUser({ user, hwid, appVersion }));
-    }
-
-    let license = await prisma.license.findUnique({ where: { id: verified.payload.licenseId } });
-    if (!license) {
-      return res.status(404).json({
-        valid: false,
-        canUseApp: false,
-        reason: "license_not_found",
-        message: licenseReasonMessage("license_not_found")
-      });
-    }
-
-    const blockedReason = licenseBlockedReason(license);
-    if (blockedReason) {
-      await logValidation(license, license.licenseKey || "-", "failed", blockedReason, hwid, appVersion);
-      return res.status(403).json(licenseValidationPayload(license, {
-        valid: false,
-        reason: blockedReason,
-        message: licenseReasonMessage(blockedReason),
-        hwid
-      }));
-    }
-
-    if (!license.lifetime && license.expiresAt && license.expiresAt.getTime() < Date.now()) {
-      const expiredReason = licenseSource(license) === "Trial" ? "trial_expired" : "expired";
-      await logValidation(license, license.licenseKey || "-", "failed", expiredReason, hwid, appVersion);
-      return res.status(403).json(licenseValidationPayload(license, {
-        valid: false,
-        reason: expiredReason,
-        message: licenseReasonMessage(expiredReason),
-        hwid
-      }));
-    }
-
-    const ownerBinding = ownerLicenseBindingState(license, hwid);
-    if (!ownerBinding.ok) {
-      await logOwnerKeyAttempt(license, hwid, appVersion, ownerBinding.reason);
-      return res.status(403).json(licenseValidationPayload(license, {
-        valid: false,
-        reason: ownerBinding.reason,
-        message: licenseReasonMessage(ownerBinding.reason),
-        hwid,
-        hwidMatches: false
-      }));
-    }
-
-    if (!normalizeHwid(license.hwid)) {
-      await prisma.license.updateMany({
-        where: { id: license.id },
-        data: { hwid }
-      });
-      license = await prisma.license.findUnique({ where: { id: license.id } });
-    }
-
-    if (normalizeHwid(license.hwid) !== hwid) {
-      await logValidation(license, license.licenseKey || "-", "failed", "hwid_mismatch", hwid, appVersion);
-      return res.status(403).json(licenseValidationPayload(license, {
-        valid: false,
-        reason: "hwid_mismatch",
-        message: licenseReasonMessage("hwid_mismatch"),
-        hwid,
-        hwidMatches: false
-      }));
-    }
-
-    const accountAccess = await buildLicenseAccountAccess(license);
-    const entitlement = issueAppEntitlement({
-      license,
-      user: accountAccess.user,
-      hwid,
-      appVersion,
-      minSupportedAppVersion,
-      licenseStatus: "active",
-      ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess)
     });
-
-    await prisma.validationLog.create({
-      data: {
-        licenseId: license.id,
-        licenseKey: validationLogLicenseKey(license, license.licenseKey),
-        result: "success",
-        reason: "entitlement_refresh",
-        hwidHash: hashHwid(hwid),
-        appVersion
-      }
-    }).catch(() => {});
-
-    return res.json({
-      ...licenseValidationPayload(license, {
-        valid: true,
-        reason: "valid",
-        message: "License valid",
-        accountAccess,
-        hwid,
-        hwidMatches: true
-      }),
-      valid: true,
-      canUseApp: true,
-      entitlementToken: entitlement.token,
-      entitlement: publicEntitlementPayload(entitlement),
-      entitlementExpiresAt: entitlement.expiresAt,
-      minSupportedAppVersion
-    });
+    return res.status(refreshed.status).json(refreshed.body);
   } catch (error) {
+    if (error.entitlementReason && Number.isInteger(error.entitlementStatus)) {
+      return res.status(error.entitlementStatus).json({ valid: false, canUseApp: false, reason: error.entitlementReason, message: licenseReasonMessage(error.entitlementReason) });
+    }
     console.error("Entitlement refresh failed", publicError(error));
     return res.status(500).json({
       valid: false,
@@ -5210,11 +4979,12 @@ app.post(["/admin/api/users/:id/temporary-password", "/api/admin/users/:id/tempo
   if (!user) return res.status(404).json({ error: "user_not_found" });
 
   const temporaryPassword = generateTemporaryPassword();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashPassword(temporaryPassword) }
+  const passwordHash = await hashPassword(temporaryPassword);
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id} FOR UPDATE`;
+    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await revokeAccountCredentialProofs(tx, user.id, new Date());
   });
-  await prisma.userSession.deleteMany({ where: { userId: user.id } });
   await createAuditLog("admin_temporary_password_generated", "user", user.id, {
     email: maskEmail(user.email),
     expiresNotice: "Show once only. User should change it after login."
@@ -8547,7 +8317,7 @@ function ownerLicenseBindingState(license, hwid) {
   return { ok: true, reason: "owner_key_bound" };
 }
 
-async function resolveDesktopEntitlementForUser({ user, hwid, appVersion }) {
+async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, db = prisma }) {
   const normalizedHwid = normalizeHwid(hwid);
   if (!user?.id || !normalizedHwid) {
     const error = new Error("Desktop entitlement identity is invalid.");
@@ -8557,7 +8327,7 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion }) {
 
   const now = new Date();
   const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
-  const candidates = await prisma.license.findMany({
+  const candidates = await db.license.findMany({
     where: {
       customerEmail: { equals: user.email, mode: "insensitive" },
       status: "active",
@@ -8576,7 +8346,7 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion }) {
 
   for (const initialCandidate of candidates) {
     let license = initialCandidate;
-    const accountAccess = await buildLicenseAccountAccess(license);
+    const accountAccess = await buildLicenseAccountAccess(license, db);
     if (accountAccess.user?.id !== user.id) continue;
 
     if (isOwnerManagedLicense(license)) {
@@ -8589,17 +8359,17 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion }) {
     } else {
       const boundHwid = normalizeHwid(license.hwid);
       if (!boundHwid) {
-        const bound = await prisma.license.updateMany({
+        const bound = await db.license.updateMany({
           where: { id: license.id, hwid: null, status: "active" },
           data: { hwid: normalizedHwid }
         });
-        license = await prisma.license.findUnique({ where: { id: license.id } });
+        license = await db.license.findUnique({ where: { id: license.id } });
         if (bound.count !== 1 && normalizeHwid(license?.hwid) !== normalizedHwid) continue;
       }
       if (normalizeHwid(license?.hwid) !== normalizedHwid) continue;
     }
 
-    const refreshedAccess = await buildLicenseAccountAccess(license);
+    const refreshedAccess = await buildLicenseAccountAccess(license, db);
     if (refreshedAccess.user?.id !== user.id) continue;
     const ownerAdminAccess = ownerAdminAccessForLicense(license, normalizedHwid, "valid", refreshedAccess);
     const entitlement = issueAppEntitlement({
@@ -8853,8 +8623,8 @@ function licenseValidationPayload(license, options = {}) {
   };
 }
 
-async function buildLicenseAccountAccess(license) {
-  const user = await findUserForLicense(license);
+async function buildLicenseAccountAccess(license, db = prisma) {
+  const user = await findUserForLicense(license, db);
   const missingRequirements = [];
 
   if (!user) {
@@ -8869,7 +8639,7 @@ async function buildLicenseAccountAccess(license) {
     };
   }
 
-  const integrations = await buildIntegrationSummary(user);
+  const integrations = await buildIntegrationSummary(user, db);
   const discordLinked = Boolean(integrations.discord.connected);
   if (!discordLinked) missingRequirements.push("discord_optional");
 
@@ -8885,7 +8655,7 @@ async function buildLicenseAccountAccess(license) {
   };
 }
 
-async function findUserForLicense(license) {
+async function findUserForLicense(license, db = prisma) {
   const email = normalizeEmail(license?.customerEmail);
   if (!isValidEmail(email)) return null;
   return findUserByLoginEmail(email, {
@@ -8893,14 +8663,14 @@ async function findUserForLicense(license) {
       where: { provider: { in: ["discord"] } },
       orderBy: { updatedAt: "desc" }
     }
-  });
+  }, db);
 }
 
-async function findUserByLoginEmail(email, include = undefined) {
+async function findUserByLoginEmail(email, include = undefined, db = prisma) {
   const normalizedEmail = normalizeAccountEmail(email);
   const queryOptions = include ? { include } : {};
   try {
-    return await prisma.user.findFirst({
+    return await db.user.findFirst({
       where: { OR: [{ email }, { emailNormalized: normalizedEmail }] },
       ...queryOptions
     });
@@ -8912,7 +8682,7 @@ async function findUserByLoginEmail(email, include = undefined) {
     });
   }
 
-  return prisma.user.findFirst({
+  return db.user.findFirst({
     where: { email },
     ...queryOptions
   });
@@ -9390,6 +9160,16 @@ async function createPasswordResetTokenForUser(user, options = {}) {
   return { token, resetUrl };
 }
 
+async function revokeAccountCredentialProofs(tx, userId, now) {
+  await tx.passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: now } });
+  await tx.userSession.deleteMany({ where: { userId } });
+  await tx.desktopLoginRequest.updateMany({
+    where: { userId, status: { in: ["pending", "approved"] } },
+    data: { status: "cancelled", cancelledAt: now }
+  });
+  await tx.oAuthLink.deleteMany({ where: { userId, provider: "roblox_profile_verify" } });
+}
+
 async function consumePasswordReset(reset, passwordHash) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${reset.userId} FOR UPDATE`;
@@ -9400,8 +9180,7 @@ async function consumePasswordReset(reset, passwordHash) {
     });
     if (claimed.count !== 1) return false;
     await tx.user.update({ where: { id: reset.userId }, data: { passwordHash } });
-    await tx.passwordResetToken.updateMany({ where: { userId: reset.userId, usedAt: null }, data: { usedAt: now } });
-    await tx.userSession.deleteMany({ where: { userId: reset.userId } });
+    await revokeAccountCredentialProofs(tx, reset.userId, now);
     return true;
   });
 }
@@ -9945,11 +9724,11 @@ function oauthInitiatingSessionProof(session) {
     .digest("base64url");
 }
 
-async function captureOAuthInitiatingSession(req, user) {
+async function captureOAuthInitiatingSession(req, user, db = prisma) {
   if (!user) return null;
   const tokenHash = hashToken(req.cookies?.[USER_SESSION_COOKIE]);
-  const session = tokenHash ? await prisma.userSession.findUnique({ where: { tokenHash }, include: { user: true } }) : null;
-  if (!session || session.userId !== user.id || !session.user || session.expiresAt.getTime() <= Date.now()) {
+  const session = tokenHash ? await db.userSession.findUnique({ where: { tokenHash }, include: { user: true } }) : null;
+  if (!session || session.userId !== user.id || !session.user || session.user.passwordHash !== user.passwordHash || session.expiresAt.getTime() <= Date.now()) {
     throw new Error("oauth_initiating_session_invalid");
   }
   return { sessionId: session.id, proof: oauthInitiatingSessionProof(session) };
@@ -10069,11 +9848,11 @@ function publicUser(user) {
   };
 }
 
-async function buildIntegrationSummary(user) {
+async function buildIntegrationSummary(user, db = prisma) {
   const links = Array.isArray(user?.oauthLinks)
     ? user.oauthLinks
     : user?.id
-    ? await prisma.oAuthLink.findMany({
+    ? await db.oAuthLink.findMany({
         where: { userId: user.id, provider: { in: ["discord", "roblox", "roblox_profile_verify"] } },
         orderBy: { updatedAt: "desc" }
       }).catch(() => [])

@@ -21,7 +21,7 @@ const executable = [
   extract("function createOAuthState(", "function robloxOAuthPublicError("),
   extract("function safeFrontendPath(", "function createPkcePair("),
   extract("async function loginOrLinkDiscordAccount(", "async function getRobloxOidcDiscovery("),
-  extract("async function consumePasswordReset(", "async function sendPasswordResetEmail("),
+  extract("async function revokeAccountCredentialProofs(", "async function sendPasswordResetEmail("),
   extract("async function issueUserSession(", "function clearUserCookie("),
   extract("function oauthInitiatingSessionProof(", "async function getOptionalUser("),
   "({createOAuthState, captureOAuthInitiatingSession, validateOAuthInitiatingSession, consumePasswordReset, issueUserSession})"

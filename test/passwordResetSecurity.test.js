@@ -19,16 +19,17 @@ const token = (id, userId = "account-a", overrides = {}) => ({ id, userId, token
 const account = { id: "account-a", passwordHash: "old-hash", discordUserId: "1511058472748454019" };
 const copy = value => structuredClone(value);
 
-function fixture({ tokens = [token("reset-a")], failAt = null, currentUser = account,
+function fixture({ tokens = [token("reset-a")], failAt = null, currentUser = account, desktop = [],
   links = [{ userId: "account-a", provider: "discord", providerSubject: account.discordUserId }], dmImpl = async () => ({ sent: true, provider: "discord" }) } = {}) {
   let state = copy({ users: [currentUser, { id: "account-b", passwordHash: "other-hash" }], tokens,
     sessions: [{ id: "session-a", userId: "account-a" }, { id: "session-b", userId: "account-b" }],
-    links });
+    links, desktop });
   let tail = Promise.resolve();
   const events = [];
   const dmCalls = [];
   const matches = (row, where) => Object.entries(where).every(([key, value]) =>
-    value && typeof value === "object" && "gt" in value ? row[key] > value.gt : row[key] === value);
+    value && typeof value === "object" && "gt" in value ? row[key] > value.gt :
+      value && typeof value === "object" && "in" in value ? value.in.includes(row[key]) : row[key] === value);
   const prisma = {
     async $transaction(callback) {
       const previous = tail;
@@ -78,6 +79,15 @@ function fixture({ tokens = [token("reset-a")], failAt = null, currentUser = acc
             return { count: old - draft.sessions.length };
           }
         },
+        desktopLoginRequest: {
+          async updateMany({ where, data }) {
+            checkLock(); events.push("desktop-cancel");
+            let count = 0;
+            for (const row of draft.desktop) if (matches(row, where)) { Object.assign(row, copy(data)); count++; }
+            if (failAt === "desktop") throw new Error("desktop_failed");
+            return { count };
+          }
+        },
         oAuthLink: {
           async findUnique({ where }) {
             checkLock(); return copy(draft.links.find(row => matches(row, where.provider_providerSubject)) || null);
@@ -87,7 +97,10 @@ function fixture({ tokens = [token("reset-a")], failAt = null, currentUser = acc
           },
           async deleteMany({ where }) {
             checkLock(); events.push("identity-delete");
-            draft.links = draft.links.filter(row => !matches(row, where)); return { count: 1 };
+            const old = draft.links.length;
+            draft.links = draft.links.filter(row => !matches(row, where));
+            if (failAt === "proofs") throw new Error("proofs_failed");
+            return { count: old - draft.links.length };
           }
         }
       };
@@ -121,6 +134,41 @@ test("concurrent stale reads of one reset produce one success", async () => {
   assert.equal(results.filter(Boolean).length, 1);
   assert.equal(f.events.filter(event => event === "password-update").length, 1);
 });
+
+function revocationFixture(failAt = null) {
+  return fixture({ failAt, desktop: [
+    ...["pending", "approved", "exchanged", "cancelled", "expired"].map(status => ({ id: `a-${status}`, userId: account.id, status })),
+    ...["pending", "approved"].map(status => ({ id: `b-${status}`, userId: "account-b", status }))
+  ], links: [
+    { userId: account.id, provider: "discord", providerSubject: account.discordUserId },
+    { userId: account.id, provider: "google", providerSubject: "google-a" },
+    { userId: account.id, provider: "roblox", providerSubject: "123" },
+    { userId: account.id, provider: "roblox_profile_verify", providerSubject: "proof-a" },
+    { userId: "account-b", provider: "roblox_profile_verify", providerSubject: "proof-b" }
+  ] });
+}
+
+test("password reset cancels only own pending/approved desktop flows and deletes only own pending Roblox proofs", async () => {
+  const f = revocationFixture();
+  const before = f.state();
+  assert.equal(await f.api.consumePasswordReset(token("reset-a"), "new-hash"), true);
+  const after = f.state();
+  for (const row of after.desktop) {
+    if (row.id === "a-pending" || row.id === "a-approved") {
+      assert.equal(row.status, "cancelled"); assert.ok(row.cancelledAt instanceof Date);
+    } else assert.deepEqual(row, before.desktop.find(old => old.id === row.id));
+  }
+  assert.deepEqual(after.links, before.links.filter(row => row.providerSubject !== "proof-a"));
+  assert.deepEqual(f.events.slice(-3), ["session-revoke", "desktop-cancel", "identity-delete"]);
+});
+
+for (const failure of ["desktop", "proofs"]) {
+  test(`password reset rolls back token/password/session/desktop/proof mutations on ${failure} failure`, async () => {
+    const f = revocationFixture(failure); const before = f.state();
+    await assert.rejects(f.api.consumePasswordReset(token("reset-a"), "new-hash"), /failed/);
+    assert.deepEqual(f.state(), before);
+  });
+}
 
 test("concurrent sibling tokens cannot both reset the password", async () => {
   const f = fixture({ tokens: [token("reset-a"), token("sibling")] });
