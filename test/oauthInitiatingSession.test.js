@@ -34,13 +34,15 @@ async function fixture(t, provider, { loggedOut = false, oldState = false, pause
   let state = {
     users: [user], sessions: [{ id: "session-one", userId: user.id, tokenHash: hash("cookie-one"), expiresAt: new Date(Date.now() + 60_000) }],
     links: loggedOut ? [{ id: "existing-link", userId: user.id, provider, providerSubject: provider === "google" ? "google-subject" : "1511058472748454019" }] : [],
-    resets: [{ id: "reset-one", userId: user.id, usedAt: null, expiresAt: new Date(Date.now() + 60_000) }]
+    resets: [{ id: "reset-one", userId: user.id, usedAt: null, expiresAt: new Date(Date.now() + 60_000) }],
+    desktopRequests: [{ id: "desktop-one", userId: user.id, status: "approved" }]
   };
   const writes = [];
   const locks = [];
   let counter = 0;
   const matches = (row, where) => Object.entries(where).every(([key, value]) => {
     if (value && typeof value === "object" && "gt" in value) return row[key] > value.gt;
+    if (value && typeof value === "object" && "in" in value) return value.in.includes(row[key]);
     return row[key] === value;
   });
   function delegates(get) {
@@ -61,10 +63,14 @@ async function fixture(t, provider, { loggedOut = false, oldState = false, pause
         async findUnique({ where }) { const row = get().links.find((l) => matches(l, where.provider_providerSubject)); return row ? { ...copy(row), user: copy(get().users.find((u) => u.id === row.userId)) } : null; },
         async findFirst({ where }) { return copy(get().links.find((l) => matches(l, where)) || null); },
         async create({ data }) { const row = { id: `link-${++counter}`, ...copy(data) }; get().links.push(row); writes.push("link-create"); return copy(row); },
-        async update({ where, data }) { const row = get().links.find((l) => matches(l, where.provider_providerSubject)); Object.assign(row, copy(data)); writes.push("link-update"); return copy(row); }
+        async update({ where, data }) { const row = get().links.find((l) => matches(l, where.provider_providerSubject)); Object.assign(row, copy(data)); writes.push("link-update"); return copy(row); },
+        async deleteMany({ where }) { const before = get().links.length; get().links = get().links.filter((l) => !matches(l, where)); return { count: before - get().links.length }; }
       },
       passwordResetToken: {
         async updateMany({ where, data }) { const rows = get().resets.filter((r) => matches(r, where)); rows.forEach((r) => Object.assign(r, copy(data))); return { count: rows.length }; }
+      },
+      desktopLoginRequest: {
+        async updateMany({ where, data }) { const rows = get().desktopRequests.filter((r) => matches(r, where)); rows.forEach((r) => Object.assign(r, copy(data))); return { count: rows.length }; }
       }
     };
   }
@@ -94,7 +100,7 @@ async function fixture(t, provider, { loggedOut = false, oldState = false, pause
     hashPassword: async () => "setup-password-hash", encryptToken: (v) => v ? "encrypted" : null,
     env: (key, fallback) => ({ GOOGLE_CLIENT_ID: "local-client", GOOGLE_CLIENT_SECRET: "local-secret" })[key] || fallback,
     apiBaseUrl: () => "http://127.0.0.1", frontendUrl: () => "https://local-ui.invalid",
-    rememberUsedGoogleOAuthState: () => {}, rememberUsedDiscordOAuthState: () => {},
+    consumeOAuthState: async () => {},
     clearOAuthCookies: () => {}, createAuditLog: async () => {}, publicError: (error) => ({ message: error.message }),
     console: { error() {}, warn() {} },
     exchangeDiscordCode: exchange, fetchDiscordProfile: async () => profile,
@@ -107,7 +113,14 @@ async function fixture(t, provider, { loggedOut = false, oldState = false, pause
   const initiatingSession = loggedOut || oldState ? null : await api.captureOAuthInitiatingSession({ cookies: { fima_user_session: "cookie-one" } }, user);
   const signedState = api.createOAuthState(provider, { userId: loggedOut ? null : user.id, initiatingSession });
   const server = await new Promise((resolve) => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
-  t.after(() => new Promise((resolve) => server.close(resolve)));
+  t.after(() => {
+    // Assertion failures must not leave an exchange/referral barrier blocking teardown.
+    proceed.resolve(); referralProceed.resolve();
+    return new Promise((resolve) => {
+      server.close(resolve);
+      server.closeAllConnections();
+    });
+  });
   async function callback(cookie = loggedOut ? null : "cookie-one") {
     const cookies = [`fima_oauth_state=${provider === "google" ? `${signedState}.${nonce}` : signedState}`, `fima_oauth_pkce=${"a".repeat(43)}`];
     if (cookie) cookies.push(`fima_user_session=${cookie}`);
@@ -167,6 +180,10 @@ for (const provider of ["google", "discord"]) {
     test(`${provider}: ${mutation} during awaited provider exchange cannot link or resurrect session`, async (t) => {
       const f = await fixture(t, provider); const pending = f.callback(); await f.reached.promise;
       await f[mutation](); f.proceed.resolve(); rejected(await pending, provider);
+      if (mutation === "reset") {
+        assert.equal(f.state().desktopRequests[0].status, "cancelled");
+        assert.ok(f.state().resets.every((reset) => reset.usedAt instanceof Date));
+      }
       assert.equal(f.state().links.length, 0); assert.ok(!f.writes.includes("session-create"));
       assert.ok(f.locks.some((l) => l.sql.includes("FROM users ")));
     });

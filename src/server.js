@@ -13,6 +13,7 @@ import nodemailer from "nodemailer";
 import Stripe from "stripe";
 import { OAuth2Client } from "google-auth-library";
 import { parseGoogleOAuthCookie } from "./googleOAuthCookie.js";
+import { consumeOAuthState } from "./oauthStateReplay.js";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db.js";
 import { apiBaseUrl, env, frontendUrl, listEnv, requiredEnv } from "./env.js";
@@ -202,9 +203,6 @@ const FIMA_OWNER_ACCOUNT_EMAIL = "oyuncukaande@gmail.com";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
 const OAUTH_PKCE_COOKIE = "fima_oauth_pkce";
 const ROBLOX_OAUTH_COOLDOWN_COOKIE = "fima_roblox_oauth_cooldown";
-const usedRobloxOAuthStates = new Map();
-const usedDiscordOAuthStates = new Map();
-const usedGoogleOAuthStates = new Map();
 const MONTHLY_TRIAL_CLEANUP_MS = 15 * 60 * 1000;
 const REFERRAL_REWARD_VALID_INVITES = 3;
 const REFERRAL_REWARD_DAYS = 7;
@@ -2310,7 +2308,7 @@ app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
   try {
     const { state: stateValue, nonce } = parseGoogleOAuthCookie(req.cookies?.[OAUTH_STATE_COOKIE]);
     const state = verifyOAuthState(req.query?.state, stateValue, "google");
-    rememberUsedGoogleOAuthState(String(req.query?.state || ""));
+    await consumeOAuthState(prisma, { provider: "google", state: String(req.query?.state || ""), expiresAt: state.exp });
     const initiatingSession = await validateOAuthInitiatingSession(req, state);
     if (!nonce || nonce.length < 16) throw new Error("invalid_google_nonce");
     const code = String(req.query?.code || "").trim();
@@ -2354,7 +2352,7 @@ app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
 app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
   try {
     const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "discord");
-    rememberUsedDiscordOAuthState(String(req.query?.state || ""));
+    await consumeOAuthState(prisma, { provider: "discord", state: String(req.query?.state || ""), expiresAt: state.exp });
     const initiatingSession = await validateOAuthInitiatingSession(req, state);
     const code = String(req.query?.code || "").trim();
     if (!code) throw new Error("missing_discord_code");
@@ -5746,12 +5744,13 @@ function createOAuthState(provider, data = {}) {
 function verifyOAuthState(queryState, cookieState, provider) {
   const state = String(queryState || "");
   if (!state || state !== String(cookieState || "")) throw new Error("invalid_oauth_state");
+  if (state.length > 16384 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(state)) throw new Error("invalid_oauth_state_format");
   const [encoded, signature] = state.split(".");
-  if (!encoded || !signature) throw new Error("invalid_oauth_state_format");
+  if (Buffer.from(encoded, "base64url").toString("base64url") !== encoded || Buffer.from(signature, "base64url").toString("base64url") !== signature) throw new Error("invalid_oauth_state_format");
   const expected = crypto.createHmac("sha256", oauthSecret()).update(encoded).digest("base64url");
   if (!timingSafeTextEqual(signature, expected)) throw new Error("invalid_oauth_state_signature");
   const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-  if (payload.provider !== provider || payload.exp < Date.now()) throw new Error("expired_oauth_state");
+  if (payload.provider !== provider || !Number.isSafeInteger(payload.exp) || payload.exp <= Date.now()) throw new Error("expired_oauth_state");
   return payload;
 }
 
@@ -5779,7 +5778,7 @@ function createPkcePair() {
 
 async function finishRobloxOAuth(req, res, input) {
   const state = verifyOAuthState(input?.state, req.cookies?.[OAUTH_STATE_COOKIE], "roblox");
-  rememberUsedRobloxOAuthState(String(input?.state || ""));
+  await consumeOAuthState(prisma, { provider: "roblox", state: String(input?.state || ""), expiresAt: state.exp });
   const currentUser = await getOptionalUser(req, res);
   if (!currentUser || currentUser.id !== state.userId) {
     const error = new Error("roblox_link_requires_login");
@@ -5807,32 +5806,6 @@ async function finishRobloxOAuth(req, res, input) {
     user,
     redirectUrl: `${frontendUrl()}${state.returnTo || "/dashboard/overview"}?roblox=connected`
   };
-}
-
-function rememberUsedRobloxOAuthState(state) {
-  return rememberUsedOAuthState(usedRobloxOAuthStates, state);
-}
-
-function rememberUsedDiscordOAuthState(state) {
-  return rememberUsedOAuthState(usedDiscordOAuthStates, state);
-}
-
-function rememberUsedGoogleOAuthState(state) {
-  return rememberUsedOAuthState(usedGoogleOAuthStates, state);
-}
-
-function rememberUsedOAuthState(store, state) {
-  const now = Date.now();
-  for (const [key, expiresAt] of store) {
-    if (expiresAt <= now) store.delete(key);
-  }
-  const digest = crypto.createHash("sha256").update(state).digest("hex");
-  if (store.has(digest)) {
-    const error = new Error("duplicate_oauth_callback");
-    error.code = "duplicate_oauth_callback";
-    throw error;
-  }
-  store.set(digest, now + 10 * 60 * 1000);
 }
 
 async function exchangeDiscordCode(code) {
