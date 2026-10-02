@@ -6181,6 +6181,15 @@ async function loginOrLinkGoogleAccount({ subject, email, name, preferredUserId 
       : null;
     if (preferredUserId && !user) throw new Error("user_not_found");
 
+    const accountLink = user
+      ? await tx.oAuthLink.findFirst({ where: { userId: user.id, provider } })
+      : null;
+    if (accountLink && accountLink.providerSubject !== providerSubject) {
+      const error = new Error("provider_already_linked");
+      error.code = "provider_already_linked";
+      throw error;
+    }
+
     if (!user) {
       const emailCollision = await tx.user.findFirst({
         where: { OR: [{ email }, { emailNormalized: normalizedEmail }] }
@@ -6220,7 +6229,7 @@ async function loginOrLinkGoogleAccount({ subject, email, name, preferredUserId 
       }
     });
     return { user, created: !preferredUserId };
-  });
+  }, { isolationLevel: "Serializable" });
 }
 
 async function getRobloxOidcDiscovery() {
