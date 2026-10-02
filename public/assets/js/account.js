@@ -1414,6 +1414,19 @@
   Object.entries(recoveryCopy).forEach(([locale, values]) => Object.assign(copy[locale], Object.fromEntries(
     ["working", "resetGeneric", "resetTitle", "resetIntro", "resetButton", "token", "newPassword", "confirmPassword", "passwordMismatch", "passwordStrength", "resetComplete", "recoveryFailed", "recoveryRateLimited", "recoveryInvalidCode", "recoveryWeakPassword", "recoveryWeak", "recoveryModerate", "recoveryStrong", "recoveryNetwork", "recoveryLoginLabel"].map((key, index) => [key, values[index]])
   )));
+  const recoveryControls = {
+    en: ["Pricing", "Show password", "Hide password"],
+    tr: ["Fiyatlar", "Şifreyi göster", "Şifreyi gizle"],
+    de: ["Preise", "Passwort anzeigen", "Passwort verbergen"],
+    fr: ["Tarifs", "Afficher le mot de passe", "Masquer le mot de passe"],
+    bs: ["Cijene", "Prikaži lozinku", "Sakrij lozinku"],
+    ru: ["Цены", "Показать пароль", "Скрыть пароль"],
+    es: ["Precios", "Mostrar contraseña", "Ocultar contraseña"],
+    pt: ["Preços", "Mostrar senha", "Ocultar senha"],
+    ar: ["الأسعار", "إظهار كلمة المرور", "إخفاء كلمة المرور"]
+  };
+  Object.entries(recoveryControls).forEach(([locale, values]) => Object.assign(copy[locale],
+    Object.fromEntries(["pricingNav", "showPassword", "hidePassword"].map((key, index) => [key, values[index]]))));
   const t = (key) => (copy[language()] || copy.en)[key] || copy.en[key] || key;
   const requestRemovalPassword = () => new Promise(resolve => {
     const previousFocus = document.activeElement;
@@ -1858,7 +1871,7 @@
       <a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a>
       <div class="links account-main-links">
         ${user ? `
-          <a href="/pricing">Pricing</a>
+          <a href="/pricing">${t("pricingNav")}</a>
           <a href="/download">${t("downloadApp")}</a>
           <a href="/support">${t("supportNav")}</a>
         ` : `
@@ -3644,14 +3657,14 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "password-toggle";
-      button.setAttribute("aria-label", "Show password");
-      button.title = "Show password";
+      button.setAttribute("aria-label", t("showPassword"));
+      button.title = t("showPassword");
       button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M12 5c5.2 0 8.7 4.7 9.8 6.4.3.4.3.8 0 1.2C20.7 14.3 17.2 19 12 19s-8.7-4.7-9.8-6.4a1 1 0 0 1 0-1.2C3.3 9.7 6.8 5 12 5Zm0 2C8.2 7 5.4 10.1 4.3 12c1.1 1.9 3.9 5 7.7 5s6.6-3.1 7.7-5C18.6 10.1 15.8 7 12 7Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>';
       button.addEventListener("click", () => {
         const show = input.type === "password";
         input.type = show ? "text" : "password";
-        button.setAttribute("aria-label", show ? "Hide password" : "Show password");
-        button.title = show ? "Hide password" : "Show password";
+        button.setAttribute("aria-label", t(show ? "hidePassword" : "showPassword"));
+        button.title = t(show ? "hidePassword" : "showPassword");
         input.focus();
       });
       wrapper.appendChild(button);
