@@ -596,6 +596,9 @@ function tUi(source){
   const language=(()=>{try{return localStorage.getItem('paradiseUiLanguage')||byId('uiLanguage')?.value||'tr'}catch{return'tr'}})();
   return language==='tr'?(UI_TR[source]||source):source;
 }
+function setUiText(id,source){
+  const element=byId(id);element.dataset.enText=source;element.textContent=tUi(source);
+}
 function translateDirectText(element,lang){
   const node=[...element.childNodes].find(item=>item.nodeType===3&&item.nodeValue.trim());if(!node)return;
   if(!element.dataset.enDirectText)element.dataset.enDirectText=node.nodeValue.trim();
@@ -604,7 +607,7 @@ function translateDirectText(element,lang){
 }
 function applyUiLanguage(language){
   const lang=language==='en'?'en':'tr';document.documentElement.lang=lang;try{localStorage.setItem('paradiseUiLanguage',lang)}catch{}
-  document.querySelectorAll('h1,h2,h3,button,nav small,.help,.muted').forEach(element=>{
+  document.querySelectorAll('h1,h2,h3,button,nav small,.help,.muted,#accessActions a').forEach(element=>{
     if(element.childElementCount)return;
     if(!element.dataset.enText)element.dataset.enText=element.textContent.trim();
     element.textContent=lang==='tr'?(UI_TR[element.dataset.enText]||element.dataset.enText):element.dataset.enText;
@@ -711,21 +714,21 @@ function renderAccess(status){
   }
   gate.hidden=false;byId('console').hidden=true;
   if(status.reasonCode==='login_required'){
-    byId('accessTitle').textContent=tUi('Fima login required');
-    byId('accessMessage').textContent=tUi('Sign in with the Fima account that owns the Paradise console. You will return here after login.');
-    actions.innerHTML='<a class="button" href="/login?next=%2Fparadise">'+tUi('Sign in to Fima')+'</a>';
+    setUiText('accessTitle','Fima login required');
+    setUiText('accessMessage','Sign in with the Fima account that owns the Paradise console. You will return here after login.');
+    actions.innerHTML='<a class="button" href="/login?next=%2Fparadise" data-en-text="Sign in to Fima">'+tUi('Sign in to Fima')+'</a>';
   }else if(status.reasonCode==='discord_link_required'){
-    byId('accessTitle').textContent=tUi('Discord account required');
-    byId('accessMessage').textContent=tUi('Your Fima account is signed in, but Discord is not linked. Link the owner Discord account to continue.');
-    actions.innerHTML='<a class="button" href="'+API_BASE+'/auth/discord/start?returnTo=%2Fparadise">'+tUi('Link Discord account')+'</a><a class="button secondary" href="/dashboard/connected-accounts">'+tUi('Account settings')+'</a>';
+    setUiText('accessTitle','Discord account required');
+    setUiText('accessMessage','Your Fima account is signed in, but Discord is not linked. Link the owner Discord account to continue.');
+    actions.innerHTML='<a class="button" href="'+API_BASE+'/auth/discord/start?returnTo=%2Fparadise" data-en-text="Link Discord account">'+tUi('Link Discord account')+'</a><a class="button secondary" href="/dashboard/connected-accounts" data-en-text="Account settings">'+tUi('Account settings')+'</a>';
   }else if(status.reasonCode==='not_owner'){
-    byId('accessTitle').textContent=tUi('Paradise access is restricted');
-    byId('accessMessage').textContent=tUi('This signed-in account is not authorized to open the Paradise owner console.');
-    actions.innerHTML='<a class="button secondary" href="/dashboard/connected-accounts">'+tUi('Review linked accounts')+'</a>';
+    setUiText('accessTitle','Paradise access is restricted');
+    setUiText('accessMessage','This signed-in account is not authorized to open the Paradise owner console.');
+    actions.innerHTML='<a class="button secondary" href="/dashboard/connected-accounts" data-en-text="Review linked accounts">'+tUi('Review linked accounts')+'</a>';
   }else{
-    byId('accessTitle').textContent=tUi('Session check unavailable');
-    byId('accessMessage').textContent=tUi('The secure account check could not be completed. Refresh or try again shortly.');
-    actions.innerHTML='<button onclick="start()">'+tUi('Try again')+'</button>';
+    setUiText('accessTitle','Session check unavailable');
+    setUiText('accessMessage','The secure account check could not be completed. Refresh or try again shortly.');
+    actions.innerHTML='<button onclick="start()" data-en-text="Try again">'+tUi('Try again')+'</button>';
   }
   applyUiLanguage(byId('uiLanguage')?.value||'tr');
   return false;
