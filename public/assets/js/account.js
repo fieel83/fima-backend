@@ -1210,6 +1210,210 @@
   Object.entries(identityCopy).forEach(([locale, values]) => Object.assign(copy[locale], Object.fromEntries(
     ["usernameNotSet", "showUsername", "hideUsername", "showEmail", "hideEmail", "identityNotAvailable"].map((key, index) => [key, values[index]])
   )));
+  // Recovery messages are local copy; never expose server text or reset URLs.
+  const recoveryCopy = {
+  "en": [
+    "Working…",
+    "If this account has an available recovery method, a reset code will be sent.",
+    "Set a new password.",
+    "Enter the code sent to your email or linked Discord account, then choose a new password.",
+    "Update password",
+    "Reset code",
+    "New password",
+    "Confirm password",
+    "Passwords do not match.",
+    "Password strength",
+    "Password updated. Redirecting…",
+    "Recovery could not be completed. Check your recovery method or contact support.",
+    "Too many attempts. Please wait before trying again.",
+    "This reset code is invalid, expired or already used. Request a new code.",
+    "Choose a stronger password with at least 8 characters.",
+    "Weak",
+    "Moderate",
+    "Strong",
+    "Could not reach FIMA. Check your connection and try again.",
+    "FIMA username or email"
+  ],
+  "tr": [
+    "İşleniyor…",
+    "Bu hesapta kullanılabilir bir kurtarma yöntemi varsa sıfırlama kodu gönderilecek.",
+    "Yeni şifre belirle.",
+    "E-postana veya bağlı Discord hesabına gönderilen kodu gir, ardından yeni şifreni belirle.",
+    "Şifreyi güncelle",
+    "Sıfırlama kodu",
+    "Yeni şifre",
+    "Şifreyi doğrula",
+    "Şifreler eşleşmiyor.",
+    "Şifre gücü",
+    "Şifre güncellendi. Yönlendiriliyor…",
+    "Kurtarma tamamlanamadı. Kurtarma yöntemini kontrol et veya destekle iletişime geç.",
+    "Çok fazla deneme yapıldı. Tekrar denemeden önce bekle.",
+    "Bu sıfırlama kodu geçersiz, süresi dolmuş veya kullanılmış. Yeni kod iste.",
+    "En az 8 karakter içeren daha güçlü bir şifre seç.",
+    "Zayıf",
+    "Orta",
+    "Güçlü",
+    "FIMA’ya ulaşılamadı. Bağlantını kontrol edip tekrar dene.",
+    "FIMA kullanıcı adı veya e-posta"
+  ],
+  "de": [
+    "Wird verarbeitet…",
+    "Wenn für dieses Konto eine Wiederherstellungsmethode verfügbar ist, wird ein Rücksetzcode gesendet.",
+    "Neues Passwort festlegen.",
+    "Gib den Code aus deiner E-Mail oder deinem verknüpften Discord-Konto ein und wähle ein neues Passwort.",
+    "Passwort aktualisieren",
+    "Rücksetzcode",
+    "Neues Passwort",
+    "Passwort bestätigen",
+    "Die Passwörter stimmen nicht überein.",
+    "Passwortstärke",
+    "Passwort aktualisiert. Weiterleitung…",
+    "Die Wiederherstellung ist fehlgeschlagen. Prüfe deine Wiederherstellungsmethode oder kontaktiere den Support.",
+    "Zu viele Versuche. Bitte warte, bevor du es erneut versuchst.",
+    "Dieser Code ist ungültig, abgelaufen oder bereits verwendet. Fordere einen neuen Code an.",
+    "Wähle ein stärkeres Passwort mit mindestens 8 Zeichen.",
+    "Schwach",
+    "Mittel",
+    "Stark",
+    "FIMA ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.",
+    "FIMA-Benutzername oder E-Mail"
+  ],
+  "fr": [
+    "Traitement…",
+    "Si ce compte dispose d’une méthode de récupération, un code sera envoyé.",
+    "Définir un nouveau mot de passe.",
+    "Saisis le code reçu par e-mail ou sur ton compte Discord lié, puis choisis un nouveau mot de passe.",
+    "Mettre à jour le mot de passe",
+    "Code de réinitialisation",
+    "Nouveau mot de passe",
+    "Confirmer le mot de passe",
+    "Les mots de passe ne correspondent pas.",
+    "Robustesse du mot de passe",
+    "Mot de passe mis à jour. Redirection…",
+    "La récupération a échoué. Vérifie ta méthode de récupération ou contacte l’assistance.",
+    "Trop de tentatives. Patiente avant de réessayer.",
+    "Ce code est invalide, expiré ou déjà utilisé. Demande un nouveau code.",
+    "Choisis un mot de passe plus robuste d’au moins 8 caractères.",
+    "Faible",
+    "Moyen",
+    "Fort",
+    "FIMA est inaccessible. Vérifie ta connexion et réessaie.",
+    "Nom d’utilisateur FIMA ou e-mail"
+  ],
+  "bs": [
+    "Obrada…",
+    "Ako račun ima dostupan način oporavka, bit će poslan kod za poništavanje lozinke.",
+    "Postavi novu lozinku.",
+    "Unesi kod poslan na e-mail ili povezani Discord račun, zatim odaberi novu lozinku.",
+    "Ažuriraj lozinku",
+    "Kod za poništavanje lozinke",
+    "Nova lozinka",
+    "Potvrdi lozinku",
+    "Lozinke se ne podudaraju.",
+    "Jačina lozinke",
+    "Lozinka je ažurirana. Preusmjeravanje…",
+    "Oporavak nije uspio. Provjeri način oporavka ili kontaktiraj podršku.",
+    "Previše pokušaja. Sačekaj prije ponovnog pokušaja.",
+    "Kod je nevažeći, istekao ili već iskorišten. Zatraži novi kod.",
+    "Odaberi jaču lozinku s najmanje 8 znakova.",
+    "Slaba",
+    "Srednja",
+    "Jaka",
+    "FIMA nije dostupna. Provjeri vezu i pokušaj ponovo.",
+    "FIMA korisničko ime ili e-mail"
+  ],
+  "ru": [
+    "Обработка…",
+    "Если для этого аккаунта доступен способ восстановления, будет отправлен код сброса.",
+    "Задай новый пароль.",
+    "Введи код из электронной почты или связанного аккаунта Discord, затем выбери новый пароль.",
+    "Обновить пароль",
+    "Код сброса",
+    "Новый пароль",
+    "Подтверждение пароля",
+    "Пароли не совпадают.",
+    "Надёжность пароля",
+    "Пароль обновлён. Перенаправление…",
+    "Восстановление не удалось. Проверь способ восстановления или обратись в поддержку.",
+    "Слишком много попыток. Подожди перед повторной попыткой.",
+    "Код недействителен, истёк или уже использован. Запроси новый код.",
+    "Выбери более надёжный пароль длиной не менее 8 символов.",
+    "Слабый",
+    "Средний",
+    "Надёжный",
+    "Не удалось связаться с FIMA. Проверь подключение и повтори попытку.",
+    "Имя пользователя FIMA или почта"
+  ],
+  "es": [
+    "Procesando…",
+    "Si esta cuenta tiene un método de recuperación disponible, se enviará un código.",
+    "Establece una nueva contraseña.",
+    "Introduce el código enviado a tu correo o cuenta de Discord vinculada y elige una nueva contraseña.",
+    "Actualizar contraseña",
+    "Código de restablecimiento",
+    "Nueva contraseña",
+    "Confirmar contraseña",
+    "Las contraseñas no coinciden.",
+    "Seguridad de la contraseña",
+    "Contraseña actualizada. Redirigiendo…",
+    "No se pudo completar la recuperación. Revisa el método de recuperación o contacta con soporte.",
+    "Demasiados intentos. Espera antes de volver a intentarlo.",
+    "Este código no es válido, ha caducado o ya se ha usado. Solicita uno nuevo.",
+    "Elige una contraseña más segura de al menos 8 caracteres.",
+    "Débil",
+    "Media",
+    "Fuerte",
+    "No se pudo conectar con FIMA. Revisa tu conexión e inténtalo de nuevo.",
+    "Usuario de FIMA o correo"
+  ],
+  "pt": [
+    "Processando…",
+    "Se esta conta tiver um método de recuperação disponível, um código será enviado.",
+    "Defina uma nova senha.",
+    "Insira o código enviado ao seu e-mail ou à conta vinculada do Discord e escolha uma nova senha.",
+    "Atualizar senha",
+    "Código de redefinição",
+    "Nova senha",
+    "Confirmar senha",
+    "As senhas não coincidem.",
+    "Força da senha",
+    "Senha atualizada. Redirecionando…",
+    "Não foi possível concluir a recuperação. Verifique o método de recuperação ou contate o suporte.",
+    "Muitas tentativas. Aguarde antes de tentar novamente.",
+    "Este código é inválido, expirou ou já foi usado. Solicite um novo código.",
+    "Escolha uma senha mais forte com pelo menos 8 caracteres.",
+    "Fraca",
+    "Média",
+    "Forte",
+    "Não foi possível acessar a FIMA. Verifique sua conexão e tente novamente.",
+    "Nome de usuário FIMA ou e-mail"
+  ],
+  "ar": [
+    "جارٍ المعالجة…",
+    "إذا توفرت طريقة استرداد لهذا الحساب، فسيتم إرسال رمز إعادة التعيين.",
+    "عيّن كلمة مرور جديدة.",
+    "أدخل الرمز المرسل إلى بريدك الإلكتروني أو حساب Discord المرتبط، ثم اختر كلمة مرور جديدة.",
+    "تحديث كلمة المرور",
+    "رمز إعادة التعيين",
+    "كلمة مرور جديدة",
+    "تأكيد كلمة المرور",
+    "كلمتا المرور غير متطابقتين.",
+    "قوة كلمة المرور",
+    "تم تحديث كلمة المرور. جارٍ إعادة التوجيه…",
+    "تعذر إكمال الاسترداد. تحقق من طريقة الاسترداد أو تواصل مع الدعم.",
+    "محاولات كثيرة جدًا. انتظر قبل المحاولة مرة أخرى.",
+    "الرمز غير صالح أو منتهي الصلاحية أو مستخدم بالفعل. اطلب رمزًا جديدًا.",
+    "اختر كلمة مرور أقوى تتكون من 8 أحرف على الأقل.",
+    "ضعيفة",
+    "متوسطة",
+    "قوية",
+    "تعذر الاتصال بـ FIMA. تحقق من اتصالك وحاول مرة أخرى.",
+    "اسم مستخدم FIMA أو البريد الإلكتروني"
+  ]
+};
+  Object.entries(recoveryCopy).forEach(([locale, values]) => Object.assign(copy[locale], Object.fromEntries(
+    ["working", "resetGeneric", "resetTitle", "resetIntro", "resetButton", "token", "newPassword", "confirmPassword", "passwordMismatch", "passwordStrength", "resetComplete", "recoveryFailed", "recoveryRateLimited", "recoveryInvalidCode", "recoveryWeakPassword", "recoveryWeak", "recoveryModerate", "recoveryStrong", "recoveryNetwork", "recoveryLoginLabel"].map((key, index) => [key, values[index]])
+  )));
   const t = (key) => (copy[language()] || copy.en)[key] || copy.en[key] || key;
   const requestRemovalPassword = () => new Promise(resolve => {
     const previousFocus = document.activeElement;
@@ -1352,7 +1556,7 @@
     }
     if (page === "forgot") {
       setHeroCopy("Fima Account", t("forgotTitle"), t("forgotIntro"));
-      setLabel("input[name='login']", language() === "tr" ? "Fima kullanici adi veya e-posta" : "Fima username or email");
+      setLabel("input[name='login']", t("recoveryLoginLabel"));
       setText("button[type='submit']", t("forgotButton"));
     }
     if (page === "reset") {
@@ -1871,6 +2075,15 @@
     }
   };
 
+  const recoveryError = (error) => {
+    if (error.status === 429 || ["rate_limited", "too_many_requests"].includes(error.code)) return t("recoveryRateLimited");
+    if (error.code === "password_mismatch") return t("passwordMismatch");
+    if (error.code === "invalid_or_expired_token") return t("recoveryInvalidCode");
+    if (["invalid_reset_request", "weak_password"].includes(error.code)) return t("recoveryWeakPassword");
+    if (!error.code) return t("recoveryNetwork");
+    return t("recoveryFailed");
+  };
+
   const initForgotPassword = () => {
     const form = $("form[data-forgot-form]");
     if (!form) return;
@@ -1881,13 +2094,13 @@
       setMessage(t("working"));
       try {
         const login = (form.login?.value || form.email?.value || "").trim();
-        const data = await post("/api/auth/forgot-password", { login, username: login, method: "auto" });
-        setMessage(data.resetUrl ? `Dev reset URL: ${data.resetUrl}` : (data.message || t("resetCodeSent")), "good");
+        await post("/api/auth/forgot-password", { login, username: login, method: "auto" });
+        setMessage(t("resetGeneric"), "good");
         window.setTimeout(() => {
           window.location.href = "/reset-password";
         }, 850);
       } catch (error) {
-        setMessage(error.message, "error");
+        setMessage(recoveryError(error), "error");
       } finally {
         submit.disabled = false;
       }
@@ -1911,12 +2124,12 @@
     const updateStrength = () => {
       if (!strength) return;
       const score = scorePassword(form.password.value || "");
-      const labels = ["Easy", "Easy", "Normal", "Hard", "Hard", "Impossible"];
+      const labels = ["recoveryWeak", "recoveryWeak", "recoveryModerate", "recoveryModerate", "recoveryStrong", "recoveryStrong"];
       strength.dataset.score = String(score);
       const meter = strength.querySelector("span");
       const label = strength.querySelector("small");
       if (meter) meter.style.width = `${Math.max(8, score * 20)}%`;
-      if (label) label.textContent = `${t("passwordStrength")}: ${labels[score]}`;
+      if (label) label.textContent = `${t("passwordStrength")}: ${t(labels[score])}`;
     };
     form.password.addEventListener("input", updateStrength);
     updateStrength();
@@ -1927,13 +2140,13 @@
       setMessage(t("working"));
       try {
         if (form.confirmPassword && form.password.value !== form.confirmPassword.value) {
-          throw new Error(t("passwordMismatch"));
+          throw Object.assign(new Error(), { code: "password_mismatch" });
         }
         await post("/api/auth/reset-password", { token: form.token.value, password: form.password.value });
         setMessage(t("resetComplete"), "good");
         window.setTimeout(() => { window.location.href = "/login"; }, 900);
       } catch (error) {
-        setMessage(error.message, "error");
+        setMessage(recoveryError(error), "error");
       } finally {
         submit.disabled = false;
       }
