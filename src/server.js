@@ -73,6 +73,7 @@ import { buildParadiseReconciliation, summarizeParadiseReconciliation } from "./
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
+import { revealAccountIdentity } from "./accountIdentityReveal.js";
 import { minimumAppVersionStatus } from "./appVersionPolicy.js";
 import { registerDesktopCommerceRoutes } from "./desktopCommerceRoutes.js";
 import {
@@ -730,6 +731,9 @@ app.post("/api/auth/logout", async (req, res) => {
 app.get("/api/auth/me", requireUser, async (req, res) => {
   return res.json({ success: true, user: publicUser(req.user) });
 });
+
+// POST retains the existing cookie-session CSRF guard. Never expose another user's identity.
+app.post("/api/me/identity/reveal", authLimiter, requireUser, revealAccountIdentity);
 
 app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
   if (req.path === "/dashboard/paradise") return res.redirect(302, `${frontendUrl()}/paradise`);

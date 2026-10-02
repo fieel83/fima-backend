@@ -1196,6 +1196,20 @@
     }
 };
 
+  const identityCopy = {
+    en: ["Not set", "Show username", "Hide username", "Show email", "Hide email", "This account detail is not set yet."],
+    tr: ["Belirlenmedi", "Kullanıcı adını göster", "Kullanıcı adını gizle", "E-postayı göster", "E-postayı gizle", "Bu hesap bilgisi henüz belirlenmedi."],
+    de: ["Nicht festgelegt", "Benutzernamen anzeigen", "Benutzernamen verbergen", "E-Mail anzeigen", "E-Mail verbergen", "Diese Kontoinformation ist noch nicht festgelegt."],
+    fr: ["Non défini", "Afficher le nom d’utilisateur", "Masquer le nom d’utilisateur", "Afficher l’e-mail", "Masquer l’e-mail", "Cette information du compte n’est pas encore définie."],
+    bs: ["Nije postavljeno", "Prikaži korisničko ime", "Sakrij korisničko ime", "Prikaži e-mail", "Sakrij e-mail", "Ovaj podatak računa još nije postavljen."],
+    ru: ["Не задано", "Показать имя пользователя", "Скрыть имя пользователя", "Показать почту", "Скрыть почту", "Эти данные аккаунта ещё не заданы."],
+    es: ["Sin definir", "Mostrar usuario", "Ocultar usuario", "Mostrar correo", "Ocultar correo", "Este dato de la cuenta aún no está definido."],
+    pt: ["Não definido", "Mostrar nome de usuário", "Ocultar nome de usuário", "Mostrar e-mail", "Ocultar e-mail", "Este dado da conta ainda não foi definido."],
+    ar: ["غير محدد", "إظهار اسم المستخدم", "إخفاء اسم المستخدم", "إظهار البريد الإلكتروني", "إخفاء البريد الإلكتروني", "لم يتم تحديد هذه المعلومة للحساب بعد."]
+  };
+  Object.entries(identityCopy).forEach(([locale, values]) => Object.assign(copy[locale], Object.fromEntries(
+    ["usernameNotSet", "showUsername", "hideUsername", "showEmail", "hideEmail", "identityNotAvailable"].map((key, index) => [key, values[index]])
+  )));
   const t = (key) => (copy[language()] || copy.en)[key] || copy.en[key] || key;
   const requestRemovalPassword = () => new Promise(resolve => {
     const previousFocus = document.activeElement;
@@ -1665,6 +1679,8 @@
   };
 
   const formatError = (code) => ({
+    identity_not_available: t("identityNotAvailable"),
+    invalid_identity_field: t("identityNotAvailable"),
     invalid_email: t("invalidEmail"),
     invalid_username: t("invalidUsername"),
     email_domain_has_no_mail: t("invalidEmail"),
@@ -2066,12 +2082,17 @@
   const dashboardRevealValues = new Map();
 
   const renderAccountSummary = (user) => {
-    const username = user.username || user.loginName || t("accountNavProfileFallback");
+    const username = user.username || t("usernameNotSet");
     const emailMasked = user.emailMasked || maskEmailAddress(user.email);
     dashboardRevealValues.set("accountUsername", username);
-    dashboardRevealValues.set("accountEmail", user.email || emailMasked || "");
+    dashboardRevealValues.set("accountEmail", emailMasked || t("notConnected"));
     $("#accountUsername") && ($("#accountUsername").textContent = username);
-    $("#accountEmail") && ($("#accountEmail").textContent = emailMasked || (user.discordUserId ? t("connected") : t("notConnected")));
+    $("#accountEmail") && ($("#accountEmail").textContent = dashboardRevealValues.get("accountEmail"));
+    $$("[data-reveal-target]").forEach(button => {
+      button.disabled = false;
+      button.setAttribute("aria-pressed", "false");
+      button.setAttribute("aria-label", t(button.dataset.revealTarget === "accountUsername" ? "showUsername" : "showEmail"));
+    });
     $("#stripeCustomer") && ($("#stripeCustomer").textContent = user.stripeCustomerIdMasked || maskExternalId(user.stripeCustomerId) || t("willBeCreated"));
     const roblox = $("#accountRoblox");
     if (roblox) {
@@ -3070,12 +3091,27 @@
     document.addEventListener("click", async (event) => {
       const revealButton = event.target.closest("[data-reveal-target]");
       if (revealButton) {
-        const target = document.getElementById(revealButton.dataset.revealTarget || "");
-        const value = dashboardRevealValues.get(revealButton.dataset.revealTarget || "");
-        if (target && value) {
-          target.textContent = value;
-          revealButton.setAttribute("aria-label", "Shown");
-          revealButton.disabled = true;
+        const id = revealButton.dataset.revealTarget;
+        if (!["accountUsername", "accountEmail"].includes(id) || revealButton.disabled) return;
+        const target = document.getElementById(id);
+        if (!target) return;
+        const isUsername = id === "accountUsername";
+        if (revealButton.getAttribute("aria-pressed") === "true") {
+          target.textContent = dashboardRevealValues.get(id) || t("usernameNotSet");
+          revealButton.setAttribute("aria-pressed", "false");
+          revealButton.setAttribute("aria-label", t(isUsername ? "showUsername" : "showEmail"));
+          return;
+        }
+        revealButton.disabled = true;
+        try {
+          const identity = await post("/api/me/identity/reveal", { field: isUsername ? "username" : "email" });
+          target.textContent = identity.value;
+          revealButton.setAttribute("aria-pressed", "true");
+          revealButton.setAttribute("aria-label", t(isUsername ? "hideUsername" : "hideEmail"));
+        } catch (error) {
+          setMessage(error.message, "error");
+        } finally {
+          revealButton.disabled = false;
         }
         return;
       }

@@ -2040,12 +2040,19 @@ code { color: var(--primary-strong); }
 body[data-account-page="dashboard"] { background: #080a12; isolation: isolate; }
 body[data-account-page="dashboard"]::before {
   content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(ellipse at 12% 8%, #6939ba30, transparent 48%), radial-gradient(ellipse at 92% 32%, #17577d26, transparent 50%), radial-gradient(ellipse at 48% 95%, #42276c20, transparent 58%), linear-gradient(#ffffff02 1px, transparent 1px), linear-gradient(90deg,#ffffff02 1px, transparent 1px);
-  background-size: auto,auto,auto,64px 64px,64px 64px;
+  background:
+    radial-gradient(ellipse at 8% 12%, #7444ce4d, transparent 44%),
+    radial-gradient(ellipse at 94% 35%, #226b9b38, transparent 46%),
+    radial-gradient(ellipse at 48% 90%, #6733a931, transparent 55%),
+    radial-gradient(ellipse at 58% -20%, #a68bd92b, transparent 48%),
+    linear-gradient(#b6a1ef04 1px, transparent 1px),
+    linear-gradient(90deg,#b6a1ef04 1px, transparent 1px),
+    linear-gradient(155deg, #0e0c1b, #080b14 55%, #0b0916);
+  background-size: auto,auto,auto,auto,64px 64px,64px 64px,auto;
 }
 body[data-account-page="dashboard"] .account-shell { width: min(1480px, calc(100% - 64px)); padding: 36px 0 64px; }
 .account-dashboard-layout { grid-template-columns: 252px minmax(0,1fr); gap: 28px; align-items: start; }
-.account-dashboard-sidebar { top: 28px; padding: 18px 12px; border: 1px solid #b8b2e51c; border-radius: 20px; background: linear-gradient(145deg,#191a2bea,#0f111ded); box-shadow: 0 20px 60px #0004,inset 0 1px #ffffff08; }
+.account-dashboard-sidebar { top: 28px; padding: 18px 12px; border: 1px solid #b8b2e52b; border-radius: 20px; background: radial-gradient(ellipse at 0 0,#8658d124,transparent 65%),linear-gradient(145deg,#191a2bf5,#0f111df5); box-shadow: 0 20px 60px #0005,0 0 44px #7850bc0b,inset 0 1px #ffffff0d; }
 .account-dashboard-sidebar-title { padding: 4px 12px 20px; margin-bottom: 6px; border-color: #b8b2e51a; }
 .dashboard-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 9px; }
 .dashboard-brand img { width: 30px; height: 30px; object-fit: contain; }
@@ -2055,24 +2062,24 @@ body[data-account-page="dashboard"] .account-shell { width: min(1480px, calc(100
 .account-dashboard-nav a::before { content:""; position:absolute; left:15px; top:22px; width:10px; height:10px; border:1.5px solid #a6adc4; border-radius:3px; opacity:.65; }
 .account-dashboard-nav a span { font-size: .89rem; font-weight: 650; line-height: 1.35; }
 .account-dashboard-nav a small { font-size: .75rem; line-height:1.4; color:#8e96b1; }
-.account-dashboard-nav a:hover { background:#ffffff06; transform:none; }
-.account-dashboard-nav a.is-active { background:linear-gradient(100deg,#7653bc26,#7052a510); border-color:#a182e538; box-shadow:inset 0 1px #ffffff06; }
+.account-dashboard-nav a:hover { background:#a88bdc0c; border-color:#b8b2e52b; transform:none; }
+.account-dashboard-nav a.is-active { background:linear-gradient(100deg,#7653bc40,#7052a51b); border-color:#a182e552; box-shadow:0 4px 20px #7653bc14,inset 0 1px #ffffff0b; }
 .account-dashboard-nav a.is-active::before { background:#b6a1ef; border-color:#b6a1ef; opacity:1; }
 .account-dashboard-nav a::after { display:none; }
 .account-dashboard-nav a:focus-visible, body[data-account-page="dashboard"] button:focus-visible, body[data-account-page="dashboard"] .button:focus-visible { outline:2px solid #c8b3ff; outline-offset:3px; }
-.account-dashboard-content .panel { border:1px solid #b8b2e51c; border-radius:20px; background:linear-gradient(150deg,#1b1d2bd9,#11131fef); box-shadow:0 18px 60px #0003,inset 0 1px #ffffff07; }
+.account-dashboard-content .panel { border:1px solid #b8b2e52b; border-radius:20px; background:radial-gradient(ellipse at 0 0,#8e69ce18,transparent 55%),radial-gradient(ellipse at 100% 80%,#327b9920,transparent 55%),linear-gradient(150deg,#1b1d2be8,#11131ff2); box-shadow:0 24px 70px #0004,0 0 60px #7c53b008,inset 0 1px #ffffff0d; }
 .account-dashboard-content .panel-pad { padding:clamp(20px,3vw,36px); }
 .account-summary-card { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:28px; }
 .account-dashboard-content h2 { font-size:clamp(1.35rem,2vw,1.8rem); line-height:1.2; letter-spacing:-.035em; margin:0 0 12px; }
 .account-summary-card > div:first-child h2 { font-size:clamp(1.85rem,3vw,2.6rem); }
 .account-dashboard-content p { color:#a6aec4; line-height:1.65; font-size:.9rem; }
 .account-dashboard-content .eyebrow { color:#bba6ea; font-size:.69rem; letter-spacing:.12em; font-weight:750; margin:0 0 10px; }
-.summary-grid .row { padding:13px 15px; border:1px solid #a8b0d114; border-radius:10px; background:#ffffff03; gap:12px; }
+.summary-grid .row { padding:13px 15px; border:1px solid #a8b0d122; border-radius:10px; background:linear-gradient(110deg,#ffffff06,#ffffff02); box-shadow:inset 0 1px #ffffff04; gap:12px; }
 .summary-grid .reveal-row { grid-template-columns:minmax(90px,.65fr) minmax(0,1fr) auto; }
 .account-billing-reference { display:none !important; }
 .account-dashboard-content .overview-trial-hint { padding:18px; background:#7484ad0c; border:1px solid #94a7d026; border-radius:12px; font-size:.85rem; line-height:1.65; gap:20px; }
 .account-dashboard-content .overview-security-block { border-top:1px solid #a8b0d118; padding-top:28px; }
-.account-dashboard-content .verification-card, .account-dashboard-content .integration-card, .account-dashboard-content .community-profile-card { border-radius:13px; background:#0b0e1866; border-color:#b8b2e51f; }
+.account-dashboard-content .verification-card, .account-dashboard-content .integration-card, .account-dashboard-content .community-profile-card { border-radius:13px; background:radial-gradient(ellipse at 100% 0,#7860b312,transparent 65%),linear-gradient(120deg,#10131fde,#0b0e18b3); border-color:#b8b2e52b; box-shadow:0 8px 24px #0002,inset 0 1px #ffffff06; }
 .account-dashboard-content .verification-card { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; padding:18px; }
 .account-dashboard-content .verification-actions { min-width:0; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }
 .account-dashboard-content .roblox-profile-form { grid-template-columns:1fr; }

@@ -181,7 +181,7 @@
 
       .key-check {
         display: grid;
-        grid-template-columns: 44px 1fr;
+        grid-template-columns: 44px minmax(0, 1fr);
         gap: 0.8rem;
         align-items: start;
         border-radius: 18px;
@@ -190,7 +190,7 @@
         border: 1px solid rgba(255, 255, 255, 0.07);
       }
 
-      .key-check span {
+      .key-check > span {
         width: 44px;
         height: 44px;
         display: grid;
@@ -200,6 +200,11 @@
         font-weight: 950;
         background: radial-gradient(circle at 35% 30%, #d99aff, #7420df 72%);
         box-shadow: 0 0 24px rgba(172, 78, 255, 0.36);
+      }
+
+      .key-check p {
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
 
       .key-check strong {
@@ -414,6 +419,10 @@
       }
 
       @media (max-width: 900px) {
+        .key-steps-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
         .key-hero {
           grid-template-columns: 1fr;
         }
