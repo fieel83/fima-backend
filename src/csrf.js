@@ -37,14 +37,8 @@ function tokenFromRequest(req) {
   ).trim();
 }
 
-function requestHasAdminApiKey(req) {
-  if (String(req.get("x-admin-api-key") || "").trim()) return true;
-  return /^Bearer\s+.+$/i.test(String(req.get("authorization") || "").trim());
-}
-
 function isExemptMutationPath(pathname) {
   return pathname === "/admin/login" ||
-    pathname === "/admin/logout" ||
     pathname === "/api/auth/register" ||
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/forgot-password" ||
@@ -91,13 +85,14 @@ export function csrfTokenPayload(scope, sessionValue) {
 export function requireCsrfForCookieMutations({ adminCookieName, userCookieName }) {
   return (req, res, next) => {
     if (SAFE_METHODS.has(req.method)) return next();
-    if (requestHasAdminApiKey(req)) return next();
     if (isExemptMutationPath(req.path)) return next();
 
     const adminSession = req.cookies?.[adminCookieName];
     const userSession = req.cookies?.[userCookieName];
     const scope = adminSession ? "admin" : userSession ? "user" : "";
     const sessionValue = adminSession || userSession || "";
+    // Header credentials are verified by downstream authentication middleware.
+    // Their presence must never disable protection for ambient cookie sessions.
     if (!scope) return next();
 
     if (verifyCsrfToken(tokenFromRequest(req), scope, sessionValue)) return next();

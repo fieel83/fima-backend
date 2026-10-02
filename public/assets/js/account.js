@@ -32,6 +32,10 @@
 
   const copy = {
     "en": {
+        "unlinkReauthTitle": "Disconnect Discord",
+        "unlinkReauthHint": "Enter your FIMA password to remove this sign-in and recovery method. If you have not set a password, finish account setup first.",
+        "unlinkPassword": "FIMA password",
+        "cancelRemoval": "Cancel",
         "working": "Working...",
         "loadingProducts": "Loading products...",
         "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
@@ -290,6 +294,10 @@
         "rewardRule": "3 verified invites = 7 days free access"
     },
     "tr": {
+        "unlinkReauthTitle": "Discord bağlantısını kaldır",
+        "unlinkReauthHint": "Bu giriş ve kurtarma yöntemini kaldırmak için FIMA şifreni gir. Henüz şifre belirlemediysen önce hesap kurulumunu tamamla.",
+        "unlinkPassword": "FIMA şifresi",
+        "cancelRemoval": "Vazgeç",
         "working": "\u00c7al\u0131\u015f\u0131yor...",
         "loadingProducts": "\u00dcr\u00fcnler y\u00fckleniyor...",
         "noProducts": "Hen\u00fcz hesap \u00fcr\u00fcn\u00fc yok. Lisans al\u0131nca key ile birlikte burada g\u00f6r\u00fcnecek.",
@@ -536,6 +544,10 @@
         "rewardRule": "3 do\u011frulanm\u0131\u015f davet = 7 g\u00fcn \u00fccretsiz eri\u015fim"
     },
     "de": {
+        "unlinkReauthTitle": "Discord-Verknüpfung entfernen",
+        "unlinkReauthHint": "Gib dein FIMA-Passwort ein, um diese Anmelde- und Wiederherstellungsmethode zu entfernen. Falls du noch kein Passwort festgelegt hast, schließe zuerst die Kontoeinrichtung ab.",
+        "unlinkPassword": "FIMA-Passwort",
+        "cancelRemoval": "Abbrechen",
         "working": "Wird verarbeitet...",
         "loadingProducts": "Produkte werden geladen...",
         "noProducts": "Noch keine Produkte. Nach dem Kauf erscheint deine Lizenz hier.",
@@ -625,6 +637,10 @@
         "buyWithStripe": "Mit Stripe kaufen"
     },
     "fr": {
+        "unlinkReauthTitle": "Dissocier Discord",
+        "unlinkReauthHint": "Saisis ton mot de passe FIMA pour supprimer cette méthode de connexion et de récupération. Si tu n’as pas encore défini de mot de passe, termine d’abord la configuration du compte.",
+        "unlinkPassword": "Mot de passe FIMA",
+        "cancelRemoval": "Annuler",
         "working": "Traitement...",
         "loadingProducts": "Chargement des produits...",
         "noProducts": "Aucun produit pour le moment. Ta licence apparaitra ici apres achat.",
@@ -714,6 +730,10 @@
         "buyWithStripe": "Acheter avec Stripe"
     },
     "bs": {
+        "unlinkReauthTitle": "Prekini vezu s Discordom",
+        "unlinkReauthHint": "Unesi FIMA lozinku da ukloniš ovaj način prijave i oporavka. Ako još nemaš lozinku, prvo dovrši postavljanje računa.",
+        "unlinkPassword": "FIMA lozinka",
+        "cancelRemoval": "Odustani",
         "working": "Radim...",
         "loadingProducts": "Ucitavanje proizvoda...",
         "noProducts": "Jos nema proizvoda. Kupljena licenca ce se pojaviti ovdje.",
@@ -803,6 +823,10 @@
         "buyWithStripe": "Kupi preko Stripe"
     },
     "ru": {
+        "unlinkReauthTitle": "Отвязать Discord",
+        "unlinkReauthHint": "Введите пароль FIMA, чтобы удалить этот способ входа и восстановления. Если пароль ещё не задан, сначала завершите настройку аккаунта.",
+        "unlinkPassword": "Пароль FIMA",
+        "cancelRemoval": "Отмена",
         "working": "Working...",
         "loadingProducts": "Loading products...",
         "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
@@ -892,6 +916,10 @@
         "buyWithStripe": "Buy with Stripe"
     },
     "es": {
+        "unlinkReauthTitle": "Desvincular Discord",
+        "unlinkReauthHint": "Introduce tu contraseña de FIMA para eliminar este método de acceso y recuperación. Si aún no has establecido una contraseña, termina primero la configuración de la cuenta.",
+        "unlinkPassword": "Contraseña de FIMA",
+        "cancelRemoval": "Cancelar",
         "working": "Working...",
         "loadingProducts": "Loading products...",
         "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
@@ -981,6 +1009,10 @@
         "buyWithStripe": "Buy with Stripe"
     },
     "pt": {
+        "unlinkReauthTitle": "Desvincular Discord",
+        "unlinkReauthHint": "Introduz a tua palavra-passe FIMA para remover este método de acesso e recuperação. Se ainda não definiste uma palavra-passe, conclui primeiro a configuração da conta.",
+        "unlinkPassword": "Palavra-passe FIMA",
+        "cancelRemoval": "Cancelar",
         "working": "Working...",
         "loadingProducts": "Loading products...",
         "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
@@ -1070,6 +1102,10 @@
         "buyWithStripe": "Buy with Stripe"
     },
     "ar": {
+        "unlinkReauthTitle": "إلغاء ربط Discord",
+        "unlinkReauthHint": "أدخل كلمة مرور FIMA لإزالة طريقة تسجيل الدخول واستعادة الحساب هذه. إذا لم تعيّن كلمة مرور بعد، فأكمل إعداد الحساب أولاً.",
+        "unlinkPassword": "كلمة مرور FIMA",
+        "cancelRemoval": "إلغاء",
         "working": "Working...",
         "loadingProducts": "Loading products...",
         "noProducts": "No account products yet. Buy a license and it will appear here with the key.",
@@ -1161,6 +1197,36 @@
 };
 
   const t = (key) => (copy[language()] || copy.en)[key] || copy.en[key] || key;
+  const requestRemovalPassword = () => new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const dialog = document.createElement("dialog");
+    dialog.className = "account-reauth-dialog";
+    dialog.setAttribute("aria-labelledby", "unlink-reauth-title");
+    dialog.innerHTML = `<form method="dialog" class="account-reauth-form">
+      <h2 id="unlink-reauth-title">${escapeHtml(t("unlinkReauthTitle"))}</h2>
+      <p>${escapeHtml(t("unlinkReauthHint"))}</p>
+      <label for="unlink-password">${escapeHtml(t("unlinkPassword"))}</label>
+      <input id="unlink-password" name="password" type="password" autocomplete="current-password" maxlength="200" required>
+      <div class="account-reauth-actions"><button type="button" class="button secondary" data-reauth-cancel>${escapeHtml(t("cancelRemoval"))}</button>
+      <button type="submit" class="button danger">${escapeHtml(t("unlinkReauthTitle"))}</button></div>
+    </form>`;
+    document.body.append(dialog);
+    const finish = value => {
+      dialog.querySelector("input").value = "";
+      dialog.close();
+      dialog.remove();
+      previousFocus?.focus();
+      resolve(value);
+    };
+    dialog.addEventListener("cancel", event => { event.preventDefault(); finish(null); });
+    dialog.querySelector("[data-reauth-cancel]").addEventListener("click", () => finish(null));
+    dialog.querySelector("form").addEventListener("submit", event => {
+      event.preventDefault();
+      finish(dialog.querySelector("input").value);
+    });
+    dialog.showModal();
+    dialog.querySelector("input").focus();
+  });
   const licenseSecretStore = new Map();
   const maskSensitiveCode = (value) => {
     const text = String(value || "").trim();
@@ -1348,6 +1414,7 @@
   };
 
   let csrfTokenPromise = null;
+  let csrfTokenExpiresAt = 0;
   const csrfExemptPaths = new Set([
     "/api/auth/register",
     "/api/auth/login",
@@ -1356,7 +1423,10 @@
   ]);
 
   const getCsrfToken = async () => {
+    if (Date.now() >= csrfTokenExpiresAt) csrfTokenPromise = null;
     if (!csrfTokenPromise) {
+      // Refresh before the server's one-hour lifetime; a rejected token is refreshed once below.
+      csrfTokenExpiresAt = Date.now() + 50 * 60 * 1000;
       csrfTokenPromise = fetch(`${apiBase}/api/csrf-token`, {
         credentials: "include",
         cache: "no-store"
@@ -1368,6 +1438,7 @@
         })
         .catch((error) => {
           csrfTokenPromise = null;
+          csrfTokenExpiresAt = 0;
           throw error;
         });
     }
@@ -1376,10 +1447,12 @@
 
   const api = async (path, options = {}) => {
     let response;
+    let data;
     try {
       const method = String(options.method || "GET").toUpperCase();
       const headers = { "content-type": "application/json", ...(options.headers || {}) };
-      if (!["GET", "HEAD", "OPTIONS"].includes(method) && !csrfExemptPaths.has(path)) {
+      const requiresCsrf = !["GET", "HEAD", "OPTIONS"].includes(method) && !csrfExemptPaths.has(path);
+      if (requiresCsrf) {
         try {
           headers["x-fima-csrf"] = await getCsrfToken();
         } catch (error) {
@@ -1391,10 +1464,18 @@
         ...options,
         headers
       });
+      data = await response.json().catch(() => ({}));
+      // The CSRF middleware rejects before any mutation, making only this response safe to retry.
+      if (requiresCsrf && response.status === 403 && data.error === "csrf_required") {
+        csrfTokenPromise = null;
+        csrfTokenExpiresAt = 0;
+        headers["x-fima-csrf"] = await getCsrfToken();
+        response = await fetch(`${apiBase}${path}`, { credentials: "include", ...options, headers });
+        data = await response.json().catch(() => ({}));
+      }
     } catch (error) {
       throw new Error(t("networkError"));
     }
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(data.message || formatError(data.error || "request_failed"));
       error.status = response.status;
@@ -1687,11 +1768,18 @@
   const initLogout = () => {
     document.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-logout]");
-      if (!button) return;
+      if (!button || button.disabled) return;
+      event.preventDefault();
       button.disabled = true;
       currentUserPromise = null;
-      await post("/api/auth/logout", {});
-      window.location.href = "/login";
+      try {
+        await post("/api/auth/logout", {});
+        window.location.href = "/login";
+      } catch (error) {
+        setMessage(error.message || t("networkError"), "error");
+      } finally {
+        button.disabled = false;
+      }
     });
   };
 
@@ -3251,12 +3339,17 @@
 
       const disconnectButton = event.target.closest("[data-disconnect-provider]");
       if (disconnectButton) {
-        if (!window.confirm(t("disconnectConfirm"))) return;
-        const provider = disconnectButton.dataset.disconnectProvider;
+        if (disconnectButton.disabled) return;
         disconnectButton.disabled = true;
+        const provider = disconnectButton.dataset.disconnectProvider;
+        const password = provider === "discord" ? await requestRemovalPassword() : null;
+        if (provider === "discord" ? password === null : !window.confirm(t("disconnectConfirm"))) {
+          disconnectButton.disabled = false;
+          return;
+        }
         setMessage(t("working"));
         try {
-          const data = await post(`/api/auth/${provider}/disconnect`, {});
+          const data = await post(`/api/auth/${provider}/disconnect`, provider === "discord" ? { password } : {});
           renderConnectedAccounts(data.integrations || {});
           renderMonthlyTrial(data.trial || {});
           renderAccountSummary(data.user || {});

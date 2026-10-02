@@ -2246,6 +2246,7 @@ app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
     const currentUser = await getOptionalUser(req, res);
     const state = createOAuthState("discord", {
       userId: currentUser?.id || null,
+      initiatingSession: await captureOAuthInitiatingSession(req, currentUser),
       returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard/overview")
     });
     setOAuthCookie(res, OAUTH_STATE_COOKIE, state);
@@ -2274,6 +2275,7 @@ app.get("/auth/google/start", oauthLimiter, async (req, res) => {
     const currentUser = await getOptionalUser(req, res);
     const state = createOAuthState("google", {
       userId: currentUser?.id || null,
+      initiatingSession: await captureOAuthInitiatingSession(req, currentUser),
       returnTo: safeFrontendPath(req.query?.returnTo, "/dashboard/overview")
     });
     const nonce = crypto.randomBytes(16).toString("base64url");
@@ -2302,10 +2304,7 @@ app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
     const { state: stateValue, nonce } = parseGoogleOAuthCookie(req.cookies?.[OAUTH_STATE_COOKIE]);
     const state = verifyOAuthState(req.query?.state, stateValue, "google");
     rememberUsedGoogleOAuthState(String(req.query?.state || ""));
-    if (state.userId) {
-      const currentUser = await getOptionalUser(req, res);
-      if (!currentUser || currentUser.id !== state.userId) throw new Error("google_link_requires_login");
-    }
+    const initiatingSession = await validateOAuthInitiatingSession(req, state);
     if (!nonce || nonce.length < 16) throw new Error("invalid_google_nonce");
     const code = String(req.query?.code || "").trim();
     const verifier = String(req.cookies?.[OAUTH_PKCE_COOKIE] || "");
@@ -2329,9 +2328,10 @@ app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
       subject: String(payload.sub),
       email: normalizeEmail(payload.email),
       name: String(payload.name || "").slice(0, 200),
-      preferredUserId: state.userId
+      preferredUserId: state.userId,
+      initiatingSession
     });
-    await issueUserSession(res, linked.user.id);
+    await issueUserSession(res, linked.user.id, initiatingSession, { provider: "google", subject: String(payload.sub) });
     await createAuditLog(state.userId ? "google_account_linked" : "google_login_success", "user", linked.user.id, {
       googleSubject: String(payload.sub), created: linked.created
     });
@@ -2348,20 +2348,17 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
   try {
     const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "discord");
     rememberUsedDiscordOAuthState(String(req.query?.state || ""));
-    if (state.userId) {
-      const currentUser = await getOptionalUser(req, res);
-      if (!currentUser || currentUser.id !== state.userId) throw new Error("discord_link_requires_login");
-    }
+    const initiatingSession = await validateOAuthInitiatingSession(req, state);
     const code = String(req.query?.code || "").trim();
     if (!code) throw new Error("missing_discord_code");
 
     const token = await exchangeDiscordCode(code);
     const profile = await fetchDiscordProfile(token.access_token);
-    const linked = await loginOrLinkDiscordAccount(profile, token, state.userId);
+    const linked = await loginOrLinkDiscordAccount(profile, token, state.userId, initiatingSession);
     await evaluateReferralForUser(linked.user.id).catch((error) => {
       console.warn("Referral evaluation after Discord link failed", { userId: linked.user.id, ...publicError(error) });
     });
-    await issueUserSession(res, linked.user.id);
+    await issueUserSession(res, linked.user.id, initiatingSession, { provider: "discord", subject: String(profile.id) });
     await createAuditLog(state.userId ? "discord_account_linked" : "discord_login_success", "user", linked.user.id, {
       discordUserId: profile.id,
       created: linked.created
@@ -2512,9 +2509,6 @@ app.post("/api/auth/forgot-password", passwordResetLimiter, async (req, res) => 
           method: "discord",
           message: "A reset code was sent to your linked Discord DM."
         };
-        if (env("NODE_ENV", "development") !== "production") {
-          response.resetUrl = result.resetUrl;
-        }
         return response;
       } catch (error) {
         recoveryErrors.push(error.code || "discord_recovery_failed");
@@ -2583,17 +2577,9 @@ app.post("/api/auth/reset-password", passwordResetLimiter, async (req, res) => {
       return res.status(400).json({ error: "invalid_or_expired_token" });
     }
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: reset.userId },
-        data: { passwordHash: await hashPassword(password) }
-      }),
-      prisma.passwordResetToken.update({
-        where: { id: reset.id },
-        data: { usedAt: new Date() }
-      }),
-      prisma.userSession.deleteMany({ where: { userId: reset.userId } })
-    ]);
+    const passwordHash = await hashPassword(password);
+    const consumed = await consumePasswordReset(reset, passwordHash);
+    if (!consumed) return res.status(400).json({ error: "invalid_or_expired_token" });
     await createAuditLog("password_reset_completed", "user", reset.userId, {});
     clearUserCookie(res);
     return res.json({ success: true });
@@ -3235,15 +3221,20 @@ app.post("/api/referrals/apply", referralLimiter, requireUser, async (req, res) 
 app.post(["/auth/discord/disconnect", "/api/auth/discord/disconnect"], requireUser, async (req, res) => {
   const previousDiscordUserId = req.user.discordUserId;
   try {
-    const activeTrial = await findActiveMonthlyTrial(req.user);
-    if (previousDiscordUserId && activeTrial) {
-      removeDiscordRole(previousDiscordUserId, "trial").catch((error) => {
-        console.warn("Discord trial role removal after disconnect failed", publicError(error));
-      });
+    const password = String(req.body?.password || "");
+    if (!password || !await verifyPassword(password, req.user.passwordHash)) {
+      return res.status(403).json({ error: "password_confirmation_required" });
     }
+    const activeTrial = await findActiveMonthlyTrial(req.user);
 
     const user = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${req.user.id} FOR UPDATE`;
+      const current = await tx.user.findUnique({ where: { id: req.user.id } });
+      if (!current || current.passwordHash !== req.user.passwordHash || current.discordUserId !== previousDiscordUserId) {
+        throw new Error("account_changed_retry");
+      }
       await tx.oAuthLink.deleteMany({ where: { userId: req.user.id, provider: "discord" } });
+      await tx.passwordResetToken.updateMany({ where: { userId: req.user.id, usedAt: null }, data: { usedAt: new Date() } });
       return tx.user.update({
         where: { id: req.user.id },
         data: {
@@ -3254,6 +3245,11 @@ app.post(["/auth/discord/disconnect", "/api/auth/discord/disconnect"], requireUs
         }
       });
     });
+    if (previousDiscordUserId && activeTrial) {
+      removeDiscordRole(previousDiscordUserId, "trial").catch((error) => {
+        console.warn("Discord trial role removal after disconnect failed", publicError(error));
+      });
+    }
     await createAuditLog("discord_account_disconnected", "user", user.id, { previousDiscordUserId });
     return res.json({
       success: true,
@@ -3262,6 +3258,7 @@ app.post(["/auth/discord/disconnect", "/api/auth/discord/disconnect"], requireUs
       trial: await buildMonthlyTrialSummary(user)
     });
   } catch (error) {
+    if (error.message === "account_changed_retry") return res.status(409).json({ error: "account_changed_retry" });
     console.error("Discord disconnect failed", publicError(error));
     return res.status(500).json({ error: "discord_disconnect_failed" });
   }
@@ -5968,6 +5965,7 @@ function createOAuthState(provider, data = {}) {
     iat: Date.now(),
     exp: Date.now() + 10 * 60 * 1000,
     userId: data.userId || null,
+    initiatingSession: data.initiatingSession || null,
     returnTo: safeFrontendPath(data.returnTo, "/dashboard/overview")
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -6095,80 +6093,69 @@ async function fetchDiscordProfile(accessToken) {
   return profile;
 }
 
-async function loginOrLinkDiscordAccount(profile, token, preferredUserId = null) {
-  const discordUserId = String(profile.id);
+async function loginOrLinkDiscordAccount(profile, token, preferredUserId = null, initiatingSession = null) {
+  const discordUserId = String(profile.id || "");
+  if (!/^\d{15,22}$/.test(discordUserId)) throw new Error("discord_identity_invalid");
   const discordUsername = profile.global_name || profile.username || discordUserId;
   const discordEmail = isValidEmail(profile.email) ? normalizeEmail(profile.email) : null;
   const discordAvatarUrl = profile.avatar
-    ? `https://cdn.discordapp.com/avatars/${discordUserId}/${profile.avatar}.png?size=128`
-    : null;
-
-  let user = preferredUserId
-    ? await prisma.user.findUnique({ where: { id: preferredUserId } })
-    : await prisma.user.findFirst({
-        where: {
-          OR: [
-            { discordUserId },
-            ...(discordEmail ? [{ email: discordEmail }, { emailNormalized: normalizeAccountEmail(discordEmail) }] : [])
-          ]
-        }
-      });
-
-  let created = false;
-  if (!user) {
-    if (!discordEmail) {
-      const error = new Error("discord_email_required");
-      error.code = "discord_email_required";
-      throw error;
+    ? `https://cdn.discordapp.com/avatars/${discordUserId}/${profile.avatar}.png?size=128` : null;
+  return prisma.$transaction(async (tx) => {
+    if (initiatingSession) {
+      if (preferredUserId !== initiatingSession.userId) throw new Error("oauth_initiating_session_invalid");
+      await assertOAuthInitiatingSession(tx, initiatingSession, true);
     }
-    user = await prisma.user.create({
-      data: {
-        email: discordEmail,
-        emailNormalized: normalizeAccountEmail(discordEmail),
+    const identity = { provider: "discord", providerSubject: discordUserId };
+    const link = await tx.oAuthLink.findUnique({ where: { provider_providerSubject: identity } });
+    const legacyUser = await tx.user.findUnique({ where: { discordUserId } });
+    if (link && legacyUser && link.userId !== legacyUser.id) throw new Error("provider_identity_conflict");
+    const linkedUserId = link?.userId || legacyUser?.id;
+    if (preferredUserId && linkedUserId && preferredUserId !== linkedUserId) throw new Error("provider_already_linked");
+    let user = (preferredUserId || linkedUserId)
+      ? await tx.user.findUnique({ where: { id: preferredUserId || linkedUserId } }) : null;
+    if ((preferredUserId || linkedUserId) && !user) throw new Error("provider_account_missing");
+    if (user?.discordUserId && user.discordUserId !== discordUserId) throw new Error("provider_already_linked");
+    const otherLink = user ? await tx.oAuthLink.findFirst({ where: { userId: user.id, provider: "discord" } }) : null;
+    if (otherLink && otherLink.providerSubject !== discordUserId) throw new Error("provider_already_linked");
+    const created = !user;
+    if (!user) {
+      if (!discordEmail) throw new Error("discord_email_required");
+      const emailOwner = await tx.user.findFirst({ where: { OR: [
+        { email: discordEmail }, { emailNormalized: normalizeAccountEmail(discordEmail) }
+      ] } });
+      if (emailOwner) throw new Error("provider_link_requires_login");
+      user = await tx.user.create({ data: {
+        email: discordEmail, emailNormalized: normalizeAccountEmail(discordEmail),
         passwordHash: await hashPassword(randomToken()),
-        stripeCustomerId: await createStripeCustomerIfPossible(discordEmail),
-        discordUserId,
-        discordUsername,
-        discordEmail,
-        discordAvatarUrl,
         emailVerifiedAt: profile.verified ? new Date() : null
-      }
-    });
-    created = true;
-    await ensureCustomer(discordEmail);
-  } else {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        discordUserId,
-        discordUsername,
-        discordEmail,
-        discordAvatarUrl,
-        emailVerifiedAt: user.emailVerifiedAt || (profile.verified ? new Date() : undefined)
-      }
-    });
-  }
-
-  await upsertOAuthLink(user.id, "discord", discordUserId, {
-    providerUsername: discordUsername,
-    providerEmail: discordEmail,
-    accessToken: token.access_token,
-    refreshToken: token.refresh_token,
-    expiresIn: token.expires_in,
-    scopes: token.scope,
-    metadata: { verified: Boolean(profile.verified), avatar: profile.avatar || null }
-  });
-
-  return { user, created };
+      } });
+    }
+    user = await tx.user.update({ where: { id: user.id }, data: {
+      discordUserId, discordUsername, discordEmail, discordAvatarUrl
+    } });
+    const data = {
+      providerUsername: discordUsername, providerEmail: discordEmail,
+      accessTokenCipher: encryptToken(token.access_token), refreshTokenCipher: encryptToken(token.refresh_token),
+      tokenExpiresAt: token.expires_in ? new Date(Date.now() + Number(token.expires_in) * 1000) : null,
+      scopes: token.scope || null, metadata: { verified: Boolean(profile.verified), avatar: profile.avatar || null }
+    };
+    if (link) await tx.oAuthLink.update({ where: { provider_providerSubject: identity }, data });
+    else await tx.oAuthLink.create({ data: { ...identity, userId: user.id, ...data } });
+    return { user, created };
+  }, { isolationLevel: "Serializable" });
 }
 
-async function loginOrLinkGoogleAccount({ subject, email, name, preferredUserId = null }) {
+async function loginOrLinkGoogleAccount({ subject, email, name, preferredUserId = null, initiatingSession = null }) {
   const provider = "google";
   const providerSubject = String(subject || "").trim();
   const normalizedEmail = normalizeAccountEmail(email);
   if (!providerSubject || !isValidEmail(email)) throw new Error("google_identity_invalid");
 
   return prisma.$transaction(async (tx) => {
+    if (initiatingSession) {
+      if (preferredUserId !== initiatingSession.userId) throw new Error("oauth_initiating_session_invalid");
+      await assertOAuthInitiatingSession(tx, initiatingSession, true);
+    }
     const existingLink = await tx.oAuthLink.findUnique({
       where: { provider_providerSubject: { provider, providerSubject } },
       include: { user: true }
@@ -6182,7 +6169,9 @@ async function loginOrLinkGoogleAccount({ subject, email, name, preferredUserId 
       }
       const user = await tx.user.update({
         where: { id: existingLink.userId },
-        data: { emailVerifiedAt: existingLink.user.emailVerifiedAt || new Date() }
+        data: normalizeAccountEmail(existingLink.user.email || "") === normalizedEmail
+          ? { emailVerifiedAt: existingLink.user.emailVerifiedAt || new Date() }
+          : {}
       });
       return { user, created: false };
     }
@@ -9329,8 +9318,22 @@ async function createPasswordResetForUser(user, auditAction = "password_reset_re
 }
 
 async function createDiscordPasswordResetForUser(user, auditAction = "password_reset_discord_sent", metadata = {}) {
-  const { token, resetUrl } = await createPasswordResetTokenForUser(user);
-  const dmResult = await sendPasswordResetDm(user.discordUserId, token, resetUrl);
+  const { token, resetUrl } = await createPasswordResetTokenForUser(user, { expectedDiscordUserId: user.discordUserId });
+  let dmResult;
+  try {
+    dmResult = await sendPasswordResetDm(user.discordUserId, token, resetUrl);
+    if (!dmResult?.sent) throw new Error("discord_reset_delivery_failed");
+  } catch (error) {
+    // Do not leave a usable challenge after failed delivery, or invalidate a newer request.
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id} FOR UPDATE`;
+      await tx.passwordResetToken.updateMany({
+        where: { userId: user.id, tokenHash: hashToken(token), usedAt: null },
+        data: { usedAt: new Date() }
+      });
+    });
+    throw error;
+  }
   await createAuditLog(auditAction, "user", user.id, {
     ...metadata,
     provider: "discord_dm",
@@ -9345,23 +9348,53 @@ async function createDiscordPasswordResetForUser(user, auditAction = "password_r
   };
 }
 
-async function createPasswordResetTokenForUser(user) {
-  const token = await generateUniquePasswordResetCode();
+async function createPasswordResetTokenForUser(user, options = {}) {
+  const token = crypto.randomBytes(32).toString("hex");
   const resetUrl = `${frontendUrl()}/reset-password?token=${encodeURIComponent(token)}`;
-  await prisma.$transaction([
-    prisma.passwordResetToken.updateMany({
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id} FOR UPDATE`;
+    if (Object.prototype.hasOwnProperty.call(options, "expectedDiscordUserId")) {
+      const subject = String(options.expectedDiscordUserId || "");
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      const identity = await tx.oAuthLink.findUnique({ where: { provider_providerSubject: { provider: "discord", providerSubject: subject } } });
+      const accountIdentity = await tx.oAuthLink.findFirst({ where: { userId: user.id, provider: "discord" } });
+      if (!/^\d{15,22}$/.test(subject) || !current || current.discordUserId !== subject
+        || current.passwordHash !== user.passwordHash || (identity && identity.userId !== user.id)
+        || (accountIdentity && accountIdentity.providerSubject !== subject)) {
+        const error = new Error("discord_recovery_identity_changed");
+        error.code = "discord_recovery_identity_changed";
+        throw error;
+      }
+    }
+    await tx.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
       data: { usedAt: new Date() }
-    }),
-    prisma.passwordResetToken.create({
+    });
+    await tx.passwordResetToken.create({
       data: {
         userId: user.id,
         tokenHash: hashToken(token),
         expiresAt: new Date(Date.now() + 15 * 60 * 1000)
       }
-    })
-  ]);
+    });
+  });
   return { token, resetUrl };
+}
+
+async function consumePasswordReset(reset, passwordHash) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${reset.userId} FOR UPDATE`;
+    const now = new Date();
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: { id: reset.id, userId: reset.userId, usedAt: null, expiresAt: { gt: now } },
+      data: { usedAt: now }
+    });
+    if (claimed.count !== 1) return false;
+    await tx.user.update({ where: { id: reset.userId }, data: { passwordHash } });
+    await tx.passwordResetToken.updateMany({ where: { userId: reset.userId, usedAt: null }, data: { usedAt: now } });
+    await tx.userSession.deleteMany({ where: { userId: reset.userId } });
+    return true;
+  });
 }
 
 async function sendPasswordResetEmail(email, code) {
@@ -9579,16 +9612,33 @@ async function sendFimaEmail({ to, subject, text, html }) {
   return { configured: true, sent: true, provider: "resend" };
 }
 
-async function issueUserSession(res, userId) {
+async function issueUserSession(res, userId, initiatingSession = null, providerIdentity = null) {
   const token = randomToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  await prisma.userSession.create({
-    data: {
-      userId,
-      tokenHash: hashToken(token),
-      expiresAt
-    }
-  });
+  const data = { userId, tokenHash: hashToken(token), expiresAt };
+  if (initiatingSession || providerIdentity) {
+    if (initiatingSession && userId !== initiatingSession.userId) throw new Error("oauth_initiating_session_invalid");
+    await prisma.$transaction(async (tx) => {
+      if (initiatingSession) {
+        await assertOAuthInitiatingSession(tx, initiatingSession, true);
+      } else {
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      }
+      if (providerIdentity) {
+        const link = await tx.oAuthLink.findUnique({
+          where: { provider_providerSubject: { provider: providerIdentity.provider, providerSubject: providerIdentity.subject } }
+        });
+        if (!link || link.userId !== userId) throw new Error("oauth_provider_identity_changed");
+        if (providerIdentity.provider === "discord") {
+          const user = await tx.user.findUnique({ where: { id: userId } });
+          if (!user || user.discordUserId !== providerIdentity.subject) throw new Error("oauth_provider_identity_changed");
+        }
+      }
+      await tx.userSession.create({ data });
+    });
+  } else {
+    await prisma.userSession.create({ data });
+  }
   res.cookie(USER_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: apiBaseUrl().startsWith("https"),
@@ -9878,6 +9928,49 @@ async function siteUpdatingModeGate(req, res, next) {
   }
 
   return res.status(503).sendFile(path.join(publicDir, "updating.html"));
+}
+
+function oauthInitiatingSessionProof(session) {
+  return crypto.createHmac("sha256", oauthSecret())
+    .update(JSON.stringify(["fima.oauth.initiating-session.v1", session.id, session.userId, session.tokenHash, session.user.passwordHash]))
+    .digest("base64url");
+}
+
+async function captureOAuthInitiatingSession(req, user) {
+  if (!user) return null;
+  const tokenHash = hashToken(req.cookies?.[USER_SESSION_COOKIE]);
+  const session = tokenHash ? await prisma.userSession.findUnique({ where: { tokenHash }, include: { user: true } }) : null;
+  if (!session || session.userId !== user.id || !session.user || session.expiresAt.getTime() <= Date.now()) {
+    throw new Error("oauth_initiating_session_invalid");
+  }
+  return { sessionId: session.id, proof: oauthInitiatingSessionProof(session) };
+}
+
+async function validateOAuthInitiatingSession(req, state) {
+  if (!state.userId) return null;
+  const binding = state.initiatingSession;
+  const tokenHash = hashToken(req.cookies?.[USER_SESSION_COOKIE]);
+  if (!binding || typeof binding.sessionId !== "string" || typeof binding.proof !== "string" || !tokenHash) {
+    throw new Error("oauth_initiating_session_invalid");
+  }
+  const authority = { userId: state.userId, sessionId: binding.sessionId, proof: binding.proof, tokenHash };
+  await assertOAuthInitiatingSession(prisma, authority);
+  return authority;
+}
+
+async function assertOAuthInitiatingSession(db, authority, lock = false) {
+  // Password reset uses this same account lock before revoking all sessions.
+  if (lock) {
+    await db.$queryRaw`SELECT id FROM users WHERE id = ${authority.userId} FOR UPDATE`;
+    // Also serialize direct logout/session deletion with the authorization check.
+    await db.$queryRaw`SELECT id FROM user_sessions WHERE id = ${authority.sessionId} FOR UPDATE`;
+  }
+  const session = await db.userSession.findUnique({ where: { id: authority.sessionId }, include: { user: true } });
+  if (!session || !session.user || session.userId !== authority.userId
+    || session.tokenHash !== authority.tokenHash || session.expiresAt.getTime() <= Date.now()
+    || !timingSafeTextEqual(authority.proof, oauthInitiatingSessionProof(session))) {
+    throw new Error("oauth_initiating_session_invalid");
+  }
 }
 
 async function getOptionalUser(req, res) {

@@ -2009,3 +2009,29 @@ code { color: var(--primary-strong); }
     scroll-snap-align: start;
   }
 }
+:root .account-reauth-dialog {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  padding: 28px;
+  color: #eef0f8;
+  background: #141621;
+  border: 1px solid #3a3e52;
+  border-radius: 16px;
+}
+.account-reauth-dialog::backdrop { background: rgb(3 5 12 / 78%); }
+.account-reauth-form { display: grid; gap: 16px; }
+.account-reauth-form h2 { margin: 0; font-size: 1.35rem; }
+.account-reauth-form p { margin: 0; color: #b4bbcc; line-height: 1.6; }
+.account-reauth-form input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  color: #fff;
+  background: #0b0d15;
+  border: 1px solid #50576f;
+  border-radius: 8px;
+}
+.account-reauth-form input:focus-visible { outline: 2px solid #a89bff; outline-offset: 3px; }
+.account-reauth-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.account-reauth-actions button { white-space: normal; overflow-wrap: anywhere; }

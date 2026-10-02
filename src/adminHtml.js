@@ -62,7 +62,7 @@ export function adminPage() {
     <aside>
       <div class="brand"><div class="brand-mark">FM</div><div><strong>Fima Macro</strong><span>Admin Control</span></div></div>
       <div class="nav" id="nav"></div>
-      <form class="logout" method="post" action="/admin/logout"><button type="submit">Logout</button></form>
+      <form class="logout" id="adminLogout" method="post" action="/admin/logout"><input type="hidden" name="csrfToken" value=""><button type="submit">Logout</button><p class="danger-text" role="alert" hidden></p></form>
     </aside>
     <main>
       <div class="topbar"><div><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Sales, licenses and system health.</p></div><button class="btn primary" onclick="refreshCurrent()">Refresh</button></div>
@@ -131,6 +131,30 @@ export function adminPage() {
       }
       return csrfTokenPromise;
     }
+    async function submitAdminLogout(event){
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      if(button.disabled) return;
+      const tokenInput = form.querySelector('input[name="csrfToken"]');
+      const error = form.querySelector('[role="alert"]');
+      button.disabled = true;
+      tokenInput.value = '';
+      error.hidden = true;
+      error.textContent = '';
+      try{
+        // A long-lived admin page must obtain a fresh token at logout time.
+        csrfTokenPromise = null;
+        tokenInput.value = await csrfToken();
+        HTMLFormElement.prototype.submit.call(form);
+      }catch(_error){
+        tokenInput.value = '';
+        button.disabled = false;
+        error.textContent = 'Could not sign out securely. Please try again.';
+        error.hidden = false;
+      }
+    }
+    $('adminLogout').addEventListener('submit', submitAdminLogout);
     async function api(path, options={}) {
       const method = String(options.method || 'GET').toUpperCase();
       const headers = {'content-type':'application/json', ...(options.headers || {})};

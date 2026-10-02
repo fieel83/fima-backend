@@ -923,13 +923,29 @@ async function handleDiscordInteraction(interaction) {
   }
 
   if (interaction.commandName === "fima_recovery") {
+    await interaction.deferReply({ ephemeral: true });
     const user = await prisma.user.findFirst({ where: { discordUserId: interaction.user.id } });
     if (!user) {
-      return interaction.reply({ content: "No Fima account is linked to this Discord user. Link Discord from Account Settings or contact support.", ephemeral: true });
+      return interaction.editReply({ content: "No Fima account is linked to this Discord user. Link Discord from Account Settings or contact support." });
     }
-    const { token, resetUrl } = await createDiscordResetToken(user.id);
-    await sendPasswordResetDm(interaction.user.id, token, resetUrl);
-    return interaction.reply({ content: "I sent your Fima password reset code by DM. It expires in 15 minutes.", ephemeral: true });
+    let recovery;
+    try {
+      recovery = await createDiscordResetToken(user.id, interaction.user.id);
+      await sendPasswordResetDm(interaction.user.id, recovery.token, recovery.resetUrl);
+      await auditDiscordBotAction("discord_recovery_sent", "user", user.id, { delivery: "discord_dm", expiresInSeconds: 900 });
+      return interaction.editReply({ content: "I sent your Fima password reset link by DM. It expires in 15 minutes." });
+    } catch (error) {
+      if (recovery) {
+        await prisma.passwordResetToken.updateMany({
+          where: { userId: user.id, tokenHash: crypto.createHash("sha256").update(recovery.token).digest("hex"), usedAt: null },
+          data: { usedAt: new Date() }
+        });
+      }
+      await auditDiscordBotAction("discord_recovery_failed", "user", user.id, { reason: error.code || "recovery_delivery_failed" });
+      return interaction.editReply({ content: error.code === "discord_recovery_rate_limited"
+        ? "Too many recovery requests. Please wait before requesting another link."
+        : "Recovery could not be completed. Check your Discord DM settings or contact support." });
+    }
   }
 
   if (["fima_embed", "fima_announce", "fima_update"].includes(interaction.commandName)) {
@@ -2689,23 +2705,39 @@ async function handleFimaSupportTicketHint(message) {
   });
 }
 
-async function createDiscordResetToken(userId) {
-  const token = String(crypto.randomInt(100000, 1000000));
-  const resetUrl = `${(env("FRONTEND_URL") || "https://fimamacro.com").replace(/\/+$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
-  await prisma.$transaction([
-    prisma.passwordResetToken.updateMany({
-      where: { userId, usedAt: null, expiresAt: { gt: new Date() } },
-      data: { usedAt: new Date() }
-    }),
-    prisma.passwordResetToken.create({
-      data: {
-        userId,
-        tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000)
-      }
-    })
-  ]);
-  return { token, resetUrl };
+async function createDiscordResetToken(userId, discordUserId) {
+  const subject = String(discordUserId || "");
+  const fail = (code) => { const error = new Error(code); error.code = code; throw error; };
+  if (!userId || !/^\d{15,22}$/.test(subject)) fail("discord_recovery_identity_invalid");
+  const base = new URL(env("FRONTEND_URL") || "https://fimamacro.com");
+  if (base.protocol !== "https:" || base.username || base.password) fail("discord_recovery_url_invalid");
+  return prisma.$transaction(async (tx) => {
+    // Lock the immutable account before rechecking ownership and charging its durable budget.
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    const user = await tx.user.findUnique({ where: { id: userId } });
+    const identity = await tx.oAuthLink.findUnique({ where: { provider_providerSubject: { provider: "discord", providerSubject: subject } } });
+    const accountIdentity = await tx.oAuthLink.findFirst({ where: { userId, provider: "discord" } });
+    if (!user || user.discordUserId !== subject || (identity && identity.userId !== userId)
+      || (accountIdentity && accountIdentity.providerSubject !== subject)) fail("discord_recovery_identity_changed");
+    const now = Date.now();
+    const key = `discordRecovery:${userId}`;
+    const saved = await tx.setting.findUnique({ where: { key } });
+    const previous = saved ? saved.value?.attempts : [];
+    if (!Array.isArray(previous) || previous.length > 3 || previous.some((value) => !Number.isSafeInteger(value) || value < 0 || value > now)) {
+      fail("discord_recovery_budget_invalid");
+    }
+    const attempts = previous.filter((value) => value > now - 60 * 60 * 1000);
+    if (attempts.length >= 3 || attempts.some((value) => value > now - 60 * 1000)) fail("discord_recovery_rate_limited");
+    // A high-entropy bearer challenge is account-bound by the authoritative token row.
+    // No globally guessable six-digit code remains in the bot recovery path.
+    const token = crypto.randomBytes(32).toString("base64url");
+    await tx.setting.upsert({ where: { key }, create: { key, value: { attempts: [...attempts, now] } }, update: { value: { attempts: [...attempts, now] } } });
+    await tx.passwordResetToken.updateMany({ where: { userId, usedAt: null, expiresAt: { gt: new Date(now) } }, data: { usedAt: new Date(now) } });
+    await tx.passwordResetToken.create({ data: { userId, tokenHash: crypto.createHash("sha256").update(token).digest("hex"), expiresAt: new Date(now + 15 * 60 * 1000) } });
+    const resetUrl = new URL("/reset-password", base);
+    resetUrl.searchParams.set("token", token);
+    return { token, resetUrl: resetUrl.href };
+  }, { isolationLevel: "Serializable" });
 }
 
 function displayFimaUser(user) {
