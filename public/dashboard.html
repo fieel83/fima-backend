@@ -18,7 +18,7 @@
     <meta name="twitter:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
     <title>Dashboard | Fima Macro</title>
     <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
-    <link rel="stylesheet" href="/assets/css/account.css?v=20261002-discord-reauth">
+    <link rel="stylesheet" href="/assets/css/account.css?v=20261002-account-premium">
   </head>
   <body data-account-page="dashboard">
     <header class="account-header dashboard-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
@@ -26,7 +26,7 @@
       <div class="account-dashboard-layout">
         <aside class="account-dashboard-sidebar" aria-label="Account sections">
           <div class="account-dashboard-sidebar-title">
-            <span>Fima Account</span>
+            <a class="dashboard-brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><span>FIMA ACCOUNT</span></a>
             <strong>Dashboard</strong>
           </div>
           <nav class="account-dashboard-nav">
@@ -40,6 +40,7 @@
             <a href="/dashboard/support" data-dashboard-link="support"><span>Support</span><small>Tickets and help</small></a>
             <a href="/paradise"><span>Paradise Dashboard</span><small>Discord bot console</small></a>
           </nav>
+          <button class="dashboard-signout link-button" data-logout>Logout</button>
         </aside>
 
         <div class="account-dashboard-content">
@@ -51,11 +52,11 @@
             <div class="summary-grid">
               <div class="row reveal-row"><span>Username</span><strong id="accountUsername">Loading...</strong><button class="reveal-button" type="button" data-reveal-target="accountUsername" aria-label="Show username"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5c5.1 0 8.4 4.6 9.3 6.1.2.3.2.5 0 .8-.9 1.5-4.2 6.1-9.3 6.1s-8.4-4.6-9.3-6.1a.8.8 0 0 1 0-.8c.9-1.5 4.2-6.1 9.3-6.1Zm0 2c-3.7 0-6.4 3-7.3 4.5.9 1.5 3.6 4.5 7.3 4.5s6.4-3 7.3-4.5C18.4 10.5 15.7 7.5 12 7.5Zm0 2.1a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z"/></svg></button></div>
               <div class="row reveal-row"><span>Email</span><strong id="accountEmail">Loading...</strong><button class="reveal-button" type="button" data-reveal-target="accountEmail" aria-label="Show email"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5c5.1 0 8.4 4.6 9.3 6.1.2.3.2.5 0 .8-.9 1.5-4.2 6.1-9.3 6.1s-8.4-4.6-9.3-6.1a.8.8 0 0 1 0-.8c.9-1.5 4.2-6.1 9.3-6.1Zm0 2c-3.7 0-6.4 3-7.3 4.5.9 1.5 3.6 4.5 7.3 4.5s6.4-3 7.3-4.5C18.4 10.5 15.7 7.5 12 7.5Zm0 2.1a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z"/></svg></button></div>
-              <div class="row"><span>Stripe Customer</span><code id="stripeCustomer">Loading...</code></div>
+              <div class="row account-billing-reference"><span>Stripe Customer</span><code id="stripeCustomer">Loading...</code></div>
               <div class="row"><span>Roblox profile</span><strong id="accountRoblox">Loading...</strong></div>
             </div>
             <div class="trial-hint is-ready overview-trial-hint">
-              <span>Activity Rewards have replaced the universal first-use trial. Every month, the Top 3 text and Top 3 voice members earn 15, 10 and 7 days of FIMA Macro access; rewards can stack. Each verified active server boost adds 3 days for that month.</span>
+              <span>Every month, the Top 3 text and Top 3 voice members earn 15, 10 and 7 days of FIMA Macro access; rewards can stack. Each verified active server boost adds 3 days for that month.</span>
               <a class="button secondary" href="#redeem">View Activity Rewards</a>
             </div>
 
@@ -165,5 +166,6 @@
     </main>
     <script src="/assets/js/config.js?v=20260526-9"></script>
     <script src="/assets/js/account.js?v=20261002-discord-reauth" defer></script>
+    <script src="/assets/js/dashboard-shell.js?v=20261002-account-premium" defer></script>
   </body>
 </html>

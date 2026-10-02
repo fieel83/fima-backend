@@ -2035,3 +2035,76 @@ code { color: var(--primary-strong); }
 .account-reauth-form input:focus-visible { outline: 2px solid #a89bff; outline-offset: 3px; }
 .account-reauth-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
 .account-reauth-actions button { white-space: normal; overflow-wrap: anywhere; }
+
+/* Account workspace: shared ambient palette, contained controls, responsive navigation. */
+body[data-account-page="dashboard"] { background: #080a12; isolation: isolate; }
+body[data-account-page="dashboard"]::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at 12% 8%, #6939ba30, transparent 48%), radial-gradient(ellipse at 92% 32%, #17577d26, transparent 50%), radial-gradient(ellipse at 48% 95%, #42276c20, transparent 58%), linear-gradient(#ffffff02 1px, transparent 1px), linear-gradient(90deg,#ffffff02 1px, transparent 1px);
+  background-size: auto,auto,auto,64px 64px,64px 64px;
+}
+body[data-account-page="dashboard"] .account-shell { width: min(1480px, calc(100% - 64px)); padding: 36px 0 64px; }
+.account-dashboard-layout { grid-template-columns: 252px minmax(0,1fr); gap: 28px; align-items: start; }
+.account-dashboard-sidebar { top: 28px; padding: 18px 12px; border: 1px solid #b8b2e51c; border-radius: 20px; background: linear-gradient(145deg,#191a2bea,#0f111ded); box-shadow: 0 20px 60px #0004,inset 0 1px #ffffff08; }
+.account-dashboard-sidebar-title { padding: 4px 12px 20px; margin-bottom: 6px; border-color: #b8b2e51a; }
+.dashboard-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 9px; }
+.dashboard-brand img { width: 30px; height: 30px; object-fit: contain; }
+.account-dashboard-sidebar-title strong { font-size: 1.15rem; letter-spacing: -.03em; }
+.account-dashboard-nav { gap: 5px; }
+.account-dashboard-nav a { min-height: 62px; padding: 12px 14px 12px 38px; border-radius: 11px; position: relative; transition: background .18s,border-color .18s; transform: none; }
+.account-dashboard-nav a::before { content:""; position:absolute; left:15px; top:22px; width:10px; height:10px; border:1.5px solid #a6adc4; border-radius:3px; opacity:.65; }
+.account-dashboard-nav a span { font-size: .89rem; font-weight: 650; line-height: 1.35; }
+.account-dashboard-nav a small { font-size: .75rem; line-height:1.4; color:#8e96b1; }
+.account-dashboard-nav a:hover { background:#ffffff06; transform:none; }
+.account-dashboard-nav a.is-active { background:linear-gradient(100deg,#7653bc26,#7052a510); border-color:#a182e538; box-shadow:inset 0 1px #ffffff06; }
+.account-dashboard-nav a.is-active::before { background:#b6a1ef; border-color:#b6a1ef; opacity:1; }
+.account-dashboard-nav a::after { display:none; }
+.account-dashboard-nav a:focus-visible, body[data-account-page="dashboard"] button:focus-visible, body[data-account-page="dashboard"] .button:focus-visible { outline:2px solid #c8b3ff; outline-offset:3px; }
+.account-dashboard-content .panel { border:1px solid #b8b2e51c; border-radius:20px; background:linear-gradient(150deg,#1b1d2bd9,#11131fef); box-shadow:0 18px 60px #0003,inset 0 1px #ffffff07; }
+.account-dashboard-content .panel-pad { padding:clamp(20px,3vw,36px); }
+.account-summary-card { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:28px; }
+.account-dashboard-content h2 { font-size:clamp(1.35rem,2vw,1.8rem); line-height:1.2; letter-spacing:-.035em; margin:0 0 12px; }
+.account-summary-card > div:first-child h2 { font-size:clamp(1.85rem,3vw,2.6rem); }
+.account-dashboard-content p { color:#a6aec4; line-height:1.65; font-size:.9rem; }
+.account-dashboard-content .eyebrow { color:#bba6ea; font-size:.69rem; letter-spacing:.12em; font-weight:750; margin:0 0 10px; }
+.summary-grid .row { padding:13px 15px; border:1px solid #a8b0d114; border-radius:10px; background:#ffffff03; gap:12px; }
+.summary-grid .reveal-row { grid-template-columns:minmax(90px,.65fr) minmax(0,1fr) auto; }
+.account-billing-reference { display:none !important; }
+.account-dashboard-content .overview-trial-hint { padding:18px; background:#7484ad0c; border:1px solid #94a7d026; border-radius:12px; font-size:.85rem; line-height:1.65; gap:20px; }
+.account-dashboard-content .overview-security-block { border-top:1px solid #a8b0d118; padding-top:28px; }
+.account-dashboard-content .verification-card, .account-dashboard-content .integration-card, .account-dashboard-content .community-profile-card { border-radius:13px; background:#0b0e1866; border-color:#b8b2e51f; }
+.account-dashboard-content .verification-card { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; padding:18px; }
+.account-dashboard-content .verification-actions { min-width:0; width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.account-dashboard-content .roblox-profile-form { grid-template-columns:1fr; }
+.account-dashboard-content .roblox-profile-form .verification-actions { grid-template-columns:minmax(0,1fr) auto; min-width:0; }
+.account-dashboard-content .roblox-profile-form .verification-actions > input { grid-column:auto; }
+.account-dashboard-content input, .account-dashboard-content select, .account-dashboard-content textarea { min-width:0; max-width:100%; background:#080b14; border-color:#5b648c50; border-radius:9px; }
+.account-dashboard-content .button, .account-dashboard-content button { white-space:normal; overflow-wrap:anywhere; max-width:100%; border-radius:9px; min-height:40px; line-height:1.35; }
+.account-dashboard-content .button.secondary { background:#9a9fc611; border-color:#a4acd62c; }
+.account-dashboard-content .integration-actions { flex-wrap:wrap; }
+.account-dashboard-content .verification-status .status-pill { flex-shrink:0; }
+.account-dashboard-content .account-divider { background:#a8b0d118; margin:28px 0; }
+@media (max-width:1050px) {
+  body[data-account-page="dashboard"] .account-shell { width:calc(100% - 40px); }
+  .account-dashboard-layout { grid-template-columns:220px minmax(0,1fr); gap:20px; }
+  .account-summary-card, .account-dashboard-content .verification-card { grid-template-columns:1fr; }
+}
+@media (max-width:760px) {
+  body[data-account-page="dashboard"] .account-shell { width:calc(100% - 28px); padding:16px 0 36px; }
+  .account-dashboard-layout { grid-template-columns:minmax(0,1fr); gap:16px; }
+  .account-dashboard-sidebar { position:static; padding:16px 12px 8px; border-radius:16px; min-width:0; }
+  .account-dashboard-sidebar-title { padding:0 8px 12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .dashboard-brand { margin:0; }
+  .account-dashboard-nav { display:flex; gap:6px; margin:0; overflow-x:auto; padding:3px 2px 10px; scroll-snap-type:x proximity; }
+  .account-dashboard-nav a { flex:0 0 160px; min-height:58px; scroll-snap-align:start; }
+  .account-dashboard-content .panel { border-radius:16px; }
+  .account-dashboard-content .verification-actions, .account-dashboard-content .roblox-profile-form .verification-actions { grid-template-columns:1fr; }
+  .account-dashboard-content .verification-actions .button { width:100%; }
+  .account-dashboard-content .integration-actions .button { flex:0 0 auto; }
+  .summary-grid .reveal-row { grid-template-columns:minmax(70px,.55fr) minmax(0,1fr) auto; }
+  .summary-grid .row { padding:12px; font-size:.82rem; }
+}
+@media(prefers-reduced-motion:reduce) { .account-dashboard-nav a { transition:none; } }
+.dashboard-signout { width:100%; margin-top:16px; padding:12px 14px; color:#a7acc3; text-align:left; border-top:1px solid #a8b0d118; font-weight:600; }
+.dashboard-signout:hover { color:#fff; background:#a9a7ff0c; }
+.dashboard-signout:focus-visible { outline:2px solid #a59cff; outline-offset:2px; }
