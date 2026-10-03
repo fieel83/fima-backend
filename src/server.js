@@ -2250,6 +2250,16 @@ app.post("/api/paradise/actions/run-test-smoke", requireUser, requireParadiseOwn
   }
 });
 
+app.get("/api/auth/providers", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({
+    providers: [
+      ...(env("DISCORD_CLIENT_ID") && env("DISCORD_CLIENT_SECRET") ? ["discord"] : []),
+      ...(env("GOOGLE_CLIENT_ID") && env("GOOGLE_CLIENT_SECRET") ? ["google"] : [])
+    ]
+  });
+});
+
 app.get("/auth/discord/start", oauthLimiter, async (req, res) => {
   try {
     const currentUser = await getOptionalUser(req, res);
