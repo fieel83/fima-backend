@@ -1,3 +1,4 @@
+import {prepareRobloxVerification} from "./roblox-v2/bootstrap.mjs";
 import "dotenv/config";
 import { usernameHandler } from "./accountIdentity.js";
 import { execSync } from "node:child_process";
@@ -6513,6 +6514,14 @@ setInterval(flushVideoAssetTraffic, 15 * 60 * 1000).unref?.();
 app.use("/assets/videos", recordVideoAssetTraffic, videoAssetLimiter, (req, res, next) => {
   if (videoAssetHotlinkAllowed(req)) return next();
   return res.status(403).type("text/plain").send("Cross-site video embedding is not allowed.");
+});
+
+prepareRobloxVerification({
+  db: prisma, router: app, authenticate: requireUser, rateLimit: oauthLimiter,
+  csrf: requireCsrfForCookieMutations({adminCookieName: ADMIN_COOKIE_NAME, userCookieName: USER_SESSION_COOKIE}),
+  captureOAuthInitiatingSession, assertOAuthInitiatingSession,
+  // Current integration summary is DB-backed; no in-process account cache exists.
+  invalidateAccountCache: async () => {}
 });
 
 app.use(express.static(publicDir, {

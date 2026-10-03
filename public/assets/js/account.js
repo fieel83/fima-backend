@@ -2590,34 +2590,14 @@
         ${profileUrl ? `<a class="button secondary" href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener">${t("openRobloxProfile")}</a>` : ""}
       </div>
     ` : "";
-    const pendingCard = pending ? `
-      <div class="roblox-verify-pending">
-        <p>${t("robloxVerifyInstructions")}</p>
-        <div class="verify-code-box">
-          <code>${escapeHtml(pending.code || "")}</code>
-          <button class="button secondary" type="button" data-copy-roblox-code="${escapeHtml(pending.code || "")}">${t("copyVerifyCode")}</button>
-        </div>
-        <div class="verification-actions">
-          ${pending.profileUrl ? `<a class="button secondary" href="${escapeHtml(pending.profileUrl)}" target="_blank" rel="noopener">${t("openRobloxProfile")}</a>` : ""}
-          <button class="button" type="button" data-confirm-roblox-verification>${t("confirmRobloxVerification")}</button>
-        </div>
-      </div>
-    ` : "";
     target.innerHTML = `
       <form class="verification-card roblox-profile-form ${verified ? "is-verified" : ""}" id="roblox-profile" data-roblox-profile-form>
-        <div class="verification-status">
-          <span class="status-pill">${verified ? t("robloxVerified") : pending ? t("robloxPending") : t("notConnected")}</span>
-          <div>
-            <strong>${t("robloxUsername")}</strong>
-            <small>${verified ? t("robloxProfileNote") : t("robloxVerifyIntro")}</small>
-          </div>
+        <div class="verification-status"><span class="status-pill">${verified ? t("robloxVerified") : t("notConnected")}</span>
+          <div><strong>Roblox</strong><small>${verified ? t("robloxProfileNote") : "Verify securely with your Roblox account."}</small></div>
         </div>
         ${verifiedCard}
-        ${pendingCard}
-        <div class="verification-actions roblox-username-actions">
-          <input name="robloxUsername" type="text" autocomplete="off" minlength="3" maxlength="20" value="${escapeHtml(current)}" placeholder="${escapeHtml(t("robloxUsername"))}">
-          <button class="button" type="submit">${t("saveRobloxUsername")}</button>
-          ${current || verified || pending ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}
+        <div class="verification-actions"><button class="button" type="submit">${verified ? "Verify Roblox again" : "Connect Roblox"}</button>
+          ${current || verified ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}
         </div>
       </form>
     `;
@@ -3245,15 +3225,10 @@
         submit.disabled = true;
         setMessage(t("working"));
         try {
-          const data = await post("/api/me/roblox/start-verification", { robloxUsername: robloxProfileForm.robloxUsername.value });
-          currentUserPromise = null;
-          window.fimaAccountProductContext = { user: data.user || {}, integrations: data.integrations || {} };
-          renderAccountHeader(data.user || {});
-          renderAccountSummary(data.user || {});
-          renderConnectedAccounts(data.integrations || {});
-          renderRobloxProfileSettings(data.user || {});
-          renderMonthlyTrial(data.trial || {});
-          setMessage(t("robloxPending"), "good");
+          const data = await post("/api/roblox/v2/start", {});
+          const destination = new URL(data.authorizationUrl);
+          if (destination.origin !== "https://apis.roblox.com" || destination.pathname !== "/oauth/v1/authorize") throw new Error("Invalid Roblox authorization destination");
+          window.location.assign(destination.href);
         } catch (error) {
           setMessage(error.message, "error");
         } finally {
