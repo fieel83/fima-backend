@@ -1,3 +1,4 @@
+import {robloxCallbackRelay} from './callbackRelay.mjs';
 // Narrow activation adapter; live acceptance is recorded separately from mounting.
 export function mountRobloxVerificationCandidate({router,candidate,enabled=false,authenticate,csrf,validateOrigin,rateLimit,invalidateAccountCache,resultUrl}) {
   for(const fn of [authenticate,csrf,validateOrigin,rateLimit,invalidateAccountCache]) {
@@ -26,7 +27,7 @@ export function mountRobloxVerificationCandidate({router,candidate,enabled=false
   });
   // GET callback is bound to initiating cookie session + consumed PKCE state;
   // a CSRF POST token cannot be required on the provider redirect.
-  router.get('/api/roblox/v2/callback',headers,feature,authenticate,session,rateLimit,async(req,res)=>{
+  router.get('/api/roblox/v2/callback',headers,feature,robloxCallbackRelay,authenticate,session,rateLimit,async(req,res)=>{
     try {
       const {state,code}=req.query||{};
       if(typeof state!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(state)||typeof code!=='string'||!code||code.length>4096||req.query.error!==undefined) {
