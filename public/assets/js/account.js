@@ -2107,7 +2107,8 @@
       setMessage(t("working"));
       try {
         const login = (form.login?.value || form.email?.value || "").trim();
-        await post("/api/auth/forgot-password", { login, username: login, method: "auto" });
+        const method = new URLSearchParams(window.location.search).get("method") === "discord" ? "discord" : "auto";
+        await post("/api/auth/forgot-password", { login, username: login, method });
         setMessage(t("resetGeneric"), "good");
         window.setTimeout(() => {
           window.location.href = "/reset-password";
@@ -2380,7 +2381,7 @@
           </div>
         ` : `
           <div class="verification-actions">
-            <a class="button secondary" href="/forgot-password">Test recovery DM</a>
+            <a class="button secondary" href="/forgot-password?method=discord">Test recovery DM</a>
           </div>
         `}
       </div>
