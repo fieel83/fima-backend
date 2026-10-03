@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { usernameHandler } from "./accountIdentity.js";
 import { execSync } from "node:child_process";
 import crypto from "node:crypto";
 import dns from "node:dns/promises";
@@ -629,7 +630,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
 
     const emailNormalized = normalizeAccountEmail(email);
     const existing = await prisma.user.findFirst({
-      where: { OR: [{ email }, { emailNormalized }] }
+      where: { OR: [{ email }, { emailNormalized }, ...(usernameOnly ? [{ username: requestedUsername }] : [])] }
     });
     if (existing) return res.status(409).json({ error: "email_already_registered" });
 
@@ -638,6 +639,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       data: {
         email,
         emailNormalized,
+        username: usernameOnly ? requestedUsername : null,
         passwordHash: await hashPassword(password),
         stripeCustomerId,
         robloxUsername: null,
@@ -679,6 +681,7 @@ app.post("/api/auth/register", authLimiter, async (req, res) => {
       warning: usernameOnly ? "Without a linked email, password recovery is not possible. Link an email later in Account Settings." : null
     });
   } catch (error) {
+    if (error.code === "P2002") return res.status(409).json({ error: "email_already_registered" });
     console.error("User registration failed", publicError(error));
     return res.status(500).json({ error: "registration_failed" });
   }
@@ -697,7 +700,9 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     const login = String(req.body?.email || req.body?.login || req.body?.username || "").trim();
     const email = login.includes("@") ? normalizeEmail(login) : syntheticEmailForUsername(login);
     const password = String(req.body?.password || "");
-    const user = await findUserByLoginEmail(email);
+    const user = login.includes("@")
+      ? await findUserByLoginEmail(email)
+      : (normalizeUsername(login) ? await prisma.user.findUnique({ where: { username: normalizeUsername(login) } }) : null) || await findUserByLoginEmail(email);
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       await createAuditLog("user_login_failed", "user", null, { emailMasked: maskEmail(email) });
       return res.status(401).json({ error: "invalid_credentials" });
@@ -734,6 +739,12 @@ app.get("/api/auth/me", requireUser, async (req, res) => {
 
 // POST retains the existing cookie-session CSRF guard. Never expose another user's identity.
 app.post("/api/me/identity/reveal", authLimiter, requireUser, revealAccountIdentity);
+
+app.patch("/api/me/username", authLimiter, requireUser, usernameHandler({
+  client: prisma, normalize: normalizeUsername,
+  reserved: new Set(["admin", "administrator", "support", "fima", "fimamacro", "system"]),
+  serialize: publicUser
+}));
 
 app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
   if (req.path === "/dashboard/paradise") return res.redirect(302, `${frontendUrl()}/paradise`);
@@ -9791,7 +9802,7 @@ function usernameFromSyntheticEmail(email) {
 
 function publicUser(user) {
   const usernameOnly = isSyntheticUsernameEmail(user.email);
-  const username = usernameOnly ? usernameFromSyntheticEmail(user.email) : null;
+  const username = user.username || (usernameOnly ? usernameFromSyntheticEmail(user.email) : null);
   const maskedEmail = usernameOnly ? null : maskEmail(user.email);
   return {
     id: user.id,

@@ -81,6 +81,7 @@ model Customer {
 }
 
 model User {
+  username                      String?                  @unique
   id                            String                   @id @default(cuid())
   email                         String                   @unique
   emailNormalized               String?                  @unique @map("email_normalized")

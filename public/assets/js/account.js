@@ -2306,20 +2306,30 @@
       : `<div class="panel panel-pad">${t("noLicenses")}</div>`;
   };
 
-  const dashboardRevealValues = new Map();
-
+  const accountIdentityCopy = () => language() === "tr"
+    ? { unset: "Belirlenmedi", username: "Kullanıcı adı", save: "Kullanıcı adını kaydet", saved: "Kullanıcı adı kaydedildi", show: "Göster", hide: "Gizle", email: "E-posta" }
+    : { unset: "Not set", username: "Username", save: "Save username", saved: "Username saved", show: "Show", hide: "Hide", email: "Email" };
+  let identityReveal;
   const renderAccountSummary = (user) => {
-    const username = user.username || t("usernameNotSet");
-    const emailMasked = user.emailMasked || maskEmailAddress(user.email);
-    dashboardRevealValues.set("accountUsername", username);
-    dashboardRevealValues.set("accountEmail", emailMasked || t("notConnected"));
-    $("#accountUsername") && ($("#accountUsername").textContent = username);
-    $("#accountEmail") && ($("#accountEmail").textContent = dashboardRevealValues.get("accountEmail"));
-    $$("[data-reveal-target]").forEach(button => {
-      button.disabled = false;
-      button.setAttribute("aria-pressed", "false");
-      button.setAttribute("aria-label", t(button.dataset.revealTarget === "accountUsername" ? "showUsername" : "showEmail"));
+    identityReveal ||= window.FimaAccountIdentity.create({
+      post, target: id => document.getElementById(id), message: (text, type) => {
+        setMessage(text, type);
+        const feedback = $("[data-username-message]");
+        if (feedback) feedback.textContent = text;
+      },
+      label: (id, shown) => `${shown ? accountIdentityCopy().hide : accountIdentityCopy().show} ${id === "accountUsername" ? accountIdentityCopy().username : accountIdentityCopy().email}`
     });
+    const username = user.username ? "••••••" : accountIdentityCopy().unset;
+    const emailMasked = user.emailMasked || maskEmailAddress(user.email);
+    document.querySelectorAll("[data-reveal-target]").forEach(button => {
+      const isUsername = button.dataset.revealTarget === "accountUsername";
+      identityReveal.reset(button, isUsername ? username : emailMasked || t("notConnected"),
+        isUsername ? Boolean(user.username) : !user.usernameOnly && Boolean(emailMasked));
+    });
+    const summary = $("#accountUsername")?.closest(".summary-grid");
+    if (summary && !$("[data-account-username-form]")) {
+      summary.insertAdjacentHTML("afterend", `<form data-account-username-form><label for="accountUsernameInput">${accountIdentityCopy().username}</label><input id="accountUsernameInput" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" required><button class="button secondary" type="submit">${accountIdentityCopy().save}</button><p data-username-message role="status"></p></form>`);
+    }
     $("#stripeCustomer") && ($("#stripeCustomer").textContent = user.stripeCustomerIdMasked || maskExternalId(user.stripeCustomerId) || t("willBeCreated"));
     const roblox = $("#accountRoblox");
     if (roblox) {
@@ -3169,6 +3179,28 @@
 
   const initAccountActions = () => {
     document.addEventListener("submit", async (event) => {
+      const usernameForm = event.target.closest("[data-account-username-form]");
+      if (usernameForm) {
+        event.preventDefault();
+        const button = usernameForm.querySelector("button[type='submit']");
+        const feedback = usernameForm.querySelector("[data-username-message]");
+        if (button.disabled) return;
+        button.disabled = true;
+        feedback.textContent = t("working");
+        try {
+          const data = await patch("/api/me/username", { username: usernameForm.elements.username.value });
+          currentUserPromise = null;
+          window.fimaAccountProductContext = { ...(window.fimaAccountProductContext || {}), user: data.user };
+          renderAccountHeader(data.user);
+          renderAccountSummary(data.user);
+          feedback.textContent = accountIdentityCopy().saved;
+        } catch (error) {
+          feedback.textContent = error.message;
+        } finally {
+          button.disabled = false;
+        }
+        return;
+      }
       const communityProfileForm = event.target.closest("[data-community-profile-form]");
       if (communityProfileForm) {
         event.preventDefault();
@@ -3318,28 +3350,7 @@
     document.addEventListener("click", async (event) => {
       const revealButton = event.target.closest("[data-reveal-target]");
       if (revealButton) {
-        const id = revealButton.dataset.revealTarget;
-        if (!["accountUsername", "accountEmail"].includes(id) || revealButton.disabled) return;
-        const target = document.getElementById(id);
-        if (!target) return;
-        const isUsername = id === "accountUsername";
-        if (revealButton.getAttribute("aria-pressed") === "true") {
-          target.textContent = dashboardRevealValues.get(id) || t("usernameNotSet");
-          revealButton.setAttribute("aria-pressed", "false");
-          revealButton.setAttribute("aria-label", t(isUsername ? "showUsername" : "showEmail"));
-          return;
-        }
-        revealButton.disabled = true;
-        try {
-          const identity = await post("/api/me/identity/reveal", { field: isUsername ? "username" : "email" });
-          target.textContent = identity.value;
-          revealButton.setAttribute("aria-pressed", "true");
-          revealButton.setAttribute("aria-label", t(isUsername ? "hideUsername" : "hideEmail"));
-        } catch (error) {
-          setMessage(error.message, "error");
-        } finally {
-          revealButton.disabled = false;
-        }
+        await identityReveal.toggle(revealButton);
         return;
       }
 
