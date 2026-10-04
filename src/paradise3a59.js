@@ -2404,14 +2404,14 @@ async function saveVerifiedProfile(discordId, profile) {
   return saved;
 }
 
-async function snapshotGuild(guild) {
+export async function snapshotGuild(guild) {
   await guild.channels.fetch();
   await guild.roles.fetch();
   return {
     capturedAt: new Date().toISOString(), guildId: guild.id, guildName: guild.name,
-    channels: [...guild.channels.cache.values()].map(c => ({
+    channels: [...guild.channels.cache.values()].filter(Boolean).map(c => ({
       id: c.id, name: c.name, type: c.type, parentId: c.parentId,
-      position: c.rawPosition, permissionOverwrites: [...c.permissionOverwrites.cache.values()].map(p => p.toJSON())
+      position: c.rawPosition, permissionOverwrites: [...(c.permissionOverwrites?.cache?.values() || [])].map(p => p.toJSON())
     })),
     roles: [...guild.roles.cache.values()].map(r => ({
       id: r.id, name: r.name, position: r.position, color: r.color, permissions: r.permissions.bitfield.toString(), managed: r.managed

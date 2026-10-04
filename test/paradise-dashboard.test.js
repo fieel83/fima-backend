@@ -10,6 +10,35 @@ const applicationHtml = fs.readFileSync(new URL("../public/paradise-apply.html",
 const contentStudioHtml = fs.readFileSync(new URL("../public/paradise-content-studio.html", import.meta.url), "utf8");
 const publicConfigSource = fs.readFileSync(new URL("../public/assets/js/config.js", import.meta.url), "utf8");
 
+test('logs actions dispatch to the selected guild and restore buttons after failures', async () => {
+  const html = paradiseDashboardHtml({ clientId: '123' });
+  const section = html.match(/async function runManagedOperation\(kind\)\{[\s\S]*?\nbyId\('brandPicker'\)/)[0].replace(/\nbyId\('brandPicker'\)$/, '');
+  const elements = new Map();
+  const byId = id => {
+    if (!elements.has(id)) elements.set(id, { value: 'community', disabled: false, textContent: '' });
+    return elements.get(id);
+  };
+  const buttons = ['audit', 'backup', 'preview'].map(kind => ({ dataset: { managedOperation: kind }, disabled: false, addEventListener(event, listener) { this.click = listener; } }));
+  const document = { querySelectorAll: selector => selector === '[data-managed-operation]' ? buttons : buttons.filter(button => selector.includes('"' + button.dataset.managedOperation + '"')) };
+  const calls = [];
+  let fail = false;
+  const mutate = async (path, body) => {
+    calls.push({ path, body });
+    assert.equal(buttons.find(button => path.endsWith(button.dataset.managedOperation)).disabled, true);
+    if (fail) throw new Error('unavailable');
+    return { response: { ok: true }, result: { backup: { status: 'verified', guild: { id: '123456789', name: 'Community' }, channels: [{ id: 'channel' }] } } };
+  };
+  new Function('selectedGuildId', 'byId', 'document', 'mutate', 'show', 'setLoading', section)('guild', byId, document, mutate, () => {}, () => {});
+  await buttons[1].click();
+  assert.deepEqual(calls[0], { path: '/api/fima-bot/actions/backup', body: { guildId: 'guild' } });
+  assert.equal(JSON.parse(byId('managedOperationStatus').textContent).channels, 1);
+  assert.equal(byId('managedOperationStatus').textContent, byId('realAuditStatus').textContent);
+  fail = true;
+  await buttons[0].click();
+  assert.equal(buttons[0].disabled, false);
+  assert.equal(byId('runRealAudit').disabled, false);
+});
+
 test('owner shell supports API-host sessions without exposing owner API data', () => {
   assert.match(serverSource, /app\.get\(\["\/fima-bot\/owner", "\/fima-bot\/owner\/dashboard"\], renderFimaBotOwnerDashboard\)/);
   assert.match(serverSource, /app\.get\("\/api\/fima-bot\/config", requireUser, requireParadiseOwner/);

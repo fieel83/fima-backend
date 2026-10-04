@@ -536,10 +536,11 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
           <div class="permission-item"><strong>Restore gate</strong><span class="muted">Requires an exact typed confirmation in Discord.</span></div>
         </div>
         <div class="operation-actions">
-          <button class="audit-action" onclick="runManagedOperation('audit')">Refresh audit</button>
-          <button class="backup-action" onclick="runManagedOperation('backup')">Create backup</button>
-          <button class="preview-action" onclick="runManagedOperation('preview')">Preview selected template</button>
+          <button class="audit-action" data-managed-operation="audit">Refresh audit</button>
+          <button class="backup-action" data-managed-operation="backup">Create backup</button>
+          <button class="preview-action" data-managed-operation="preview">Preview selected template</button>
         </div>
+        <pre id="managedOperationStatus" aria-live="polite"></pre>
       </section>
 
       <section class="panel" data-page="advanced">
@@ -1535,7 +1536,8 @@ async function executeProductionRebuild(){
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):byId('runSetupPreview');
-  button.disabled=true;setLoading(true);
+  const buttons=[button,...document.querySelectorAll('[data-managed-operation="'+kind+'"]')];
+  buttons.forEach(item=>item.disabled=true);setLoading(true);
   try{
     const body={guildId:selectedGuildId};if(kind==='preview')body.mode=byId('template').value;
     const{response,result}=await mutate('/api/fima-bot/actions/'+kind,body);
@@ -1546,9 +1548,10 @@ async function runManagedOperation(kind){
       :kind==='backup'
         ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6)}:null,categories:(value.categories||[]).length,channels:(value.channels||[]).length,roles:(value.roles||[]).length}
         :{status:value.status,generatedAt:value.generatedAt,template:value.templateLabel,createResources:(value.createResources||[]).length,keepResources:(value.keepResources||[]).length,extraResources:(value.extraResources||[]).length,createRoles:(value.createRoles||[]).length,warning:value.warning};
-    byId('realAuditStatus').textContent=JSON.stringify(safe,null,2);show(kind+' completed for the selected server');
-  }catch{show(kind+' failed safely.',false)}finally{button.disabled=false;setLoading(false)}
+    byId('realAuditStatus').textContent=JSON.stringify(safe,null,2);byId('managedOperationStatus').textContent=JSON.stringify(safe,null,2);show(kind+' completed for the selected server');
+  }catch{show(kind+' failed safely.',false)}finally{buttons.forEach(item=>item.disabled=false);setLoading(false)}
 }
+document.querySelectorAll('[data-managed-operation]').forEach(button=>button.addEventListener('click',()=>runManagedOperation(button.dataset.managedOperation)));
 byId('brandPicker').oninput=e=>{const v=e.target.value.toUpperCase();byId('brandHex').value=v;applyBrand(v);markDirty()};byId('brandHex').oninput=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value)){byId('brandPicker').value=e.target.value;applyBrand(e.target.value);markDirty()}};
 byId('addApplicationQuestion').onclick=()=>{
   if(applicationQuestionRows.length>=20)return show('At most 20 additional questions can be added.',false);
