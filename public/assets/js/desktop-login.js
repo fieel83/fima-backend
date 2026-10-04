@@ -1,6 +1,7 @@
 (() => {
   "use strict";
 
+  const { t } = window.FIMA_DESKTOP_I18N;
   const apiBase = String(window.FIMA_API_BASE_URL || window.location.origin).replace(/\/+$/, "");
   const form = document.getElementById("code-form");
   const input = document.getElementById("user-code");
@@ -24,8 +25,8 @@
 
   const setStatus = (title, message, kind = "info") => {
     status.dataset.kind = kind;
-    status.querySelector("strong").textContent = title;
-    status.querySelector("p").textContent = message;
+    status.querySelector("strong").textContent = t(title);
+    status.querySelector("p").textContent = t(message);
   };
 
   const api = async (pathname, { method = "GET", body } = {}) => {
@@ -109,9 +110,9 @@
     try {
       const context = await api("/api/desktop-login/context", { method: "POST", body: { requestId, state } });
       approvedCode = requestId;
-      document.getElementById("approval-title").textContent = `Sen ${accountName} misin?`;
-      approveButton.querySelector("span").textContent = `${accountName} olarak devam et`;
-      differentCodeButton.textContent = "Başka bir hesapla giriş yap";
+      document.getElementById("approval-title").textContent = t("Sen {name} misin?", {name: accountName});
+      approveButton.querySelector("span").textContent = t("{name} olarak devam et", {name: accountName});
+      differentCodeButton.textContent = t("Başka bir hesapla giriş yap");
       document.getElementById("device-name").textContent = context.device?.name || "Windows PC";
       document.getElementById("device-meta").textContent = `${context.device?.platform || "Windows"} · FIMA ${context.appVersion || "Desktop"}`;
       devicePanel.hidden = false; approvalActions.hidden = false;
@@ -138,7 +139,7 @@
         window.location.replace(target.href);
       }
       setStatus("Cihaz onaylandı", "FIMA uygulamasına dönebilirsin. Bu pencereyi güvenle kapatabilirsin.", "success");
-      approveButton.querySelector("span").textContent = "Onaylandı";
+      approveButton.querySelector("span").textContent = t("Onaylandı");
     } catch (error) {
       if (error.status === 401) return redirectToLogin();
       approveButton.disabled = false;
