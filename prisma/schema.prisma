@@ -38,6 +38,7 @@ model License {
   @@index([hwid])
   @@index([expiresAt])
   @@map("licenses")
+  runtimeHandoffGrants RuntimeHandoffGrant[]
 }
 
 model Order {
@@ -131,6 +132,8 @@ model User {
   @@index([nextTrialAvailableAt])
   @@index([trialStatus])
   @@map("users")
+  desktopAuthSessions DesktopAuthSession[]
+  runtimeHandoffGrants RuntimeHandoffGrant[]
 }
 
 model ReferralCode {
@@ -402,6 +405,12 @@ model DesktopLoginRequest {
   @@index([status, expiresAt])
   @@index([userId])
   @@map("desktop_login_requests")
+  callbackRequired Boolean @default(false) @map("callback_required")
+  authorizationCodeHash String? @unique @map("authorization_code_hash")
+  authorizationCodeExpiresAt DateTime? @map("authorization_code_expires_at")
+  authorizationCodeConsumedAt DateTime? @map("authorization_code_consumed_at")
+  environmentRisk Json? @map("environment_risk")
+  authSession DesktopAuthSession?
 }
 
 model PasswordResetToken {
@@ -854,4 +863,55 @@ model MacroBoosterEntitlementGrant {
   @@index([userId, createdAt])
   @@index([licenseId])
   @@map("macro_booster_entitlement_grants")
+}
+
+
+model DesktopAuthSession {
+  id             String              @id
+  loginRequestId String              @unique @map("login_request_id")
+  loginRequest   DesktopLoginRequest @relation(fields: [loginRequestId], references: [id], onDelete: Cascade)
+  userId         String              @map("user_id")
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceIdHash   String              @map("device_id_hash")
+  revokedAt      DateTime?           @map("revoked_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@index([userId, deviceIdHash])
+  @@map("desktop_auth_sessions")
+}
+
+model RuntimeHandoffGrant {
+  id               String    @id @default(cuid())
+  grantHash        String    @unique @map("grant_hash")
+  protocol         String
+  productId        String    @map("product_id")
+  licenseId        String    @map("license_id")
+  license          License   @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  userId           String    @map("user_id")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId        String    @map("account_id")
+  hwidHash         String    @map("hwid_hash")
+  executableSha256 String    @map("executable_sha256")
+  packageIdentity  String    @map("package_identity")
+  entitlementId    String?   @map("entitlement_id")
+  authSessionId    String?   @map("auth_session_id")
+  sessionVersion   String    @map("session_version")
+  issuedAt         DateTime  @map("issued_at")
+  expiresAt        DateTime  @map("expires_at")
+  consumedAt       DateTime? @map("consumed_at")
+  revokedAt        DateTime? @map("revoked_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt, consumedAt])
+  @@index([licenseId, productId])
+  @@index([userId, productId])
+  @@map("runtime_handoff_grants")
+}
+
+model AuthRateBucket {
+  key       String @id
+  attempts  Int
+  expiresAt DateTime @map("expires_at")
+  @@index([expiresAt])
+  @@map("auth_rate_buckets")
 }

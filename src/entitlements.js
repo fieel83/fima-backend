@@ -128,8 +128,10 @@ export function issueAppEntitlement({
   minSupportedAppVersion = "",
   licenseStatus = null,
   allowedFeatures = null,
-  ownerAdminAccess = false
+  ownerAdminAccess = false,
+  authSessionId = null
 }) {
+  if (authSessionId !== null && (typeof authSessionId !== "string" || !authSessionId.trim() || !user?.id || !hashDeviceId(hwid))) throw new Error("entitlement_session_binding_invalid");
   const secret = requiredEnv("ENTITLEMENT_SIGNING_SECRET");
   if (ownerAdminAccess && !user?.id) throw new Error("entitlement_owner_account_required");
   const now = new Date();
@@ -144,7 +146,8 @@ export function issueAppEntitlement({
     tokenType: TOKEN_TYPE,
     entitlementVersion: TOKEN_VERSION,
     entitlementId: crypto.randomUUID(),
-    sessionId: crypto.randomUUID(),
+    sessionId: authSessionId || crypto.randomUUID(),
+    ...(authSessionId ? { desktopAuthSession: true } : {}),
     licenseId: license?.id || null,
     userId: user?.id || null,
     accountId: user?.id || null,
@@ -227,6 +230,7 @@ export function publicEntitlementPayload(entitlement) {
     entitlementVersion: payload.entitlementVersion || TOKEN_VERSION,
     entitlementId: payload.entitlementId || null,
     sessionId: payload.sessionId || null,
+    ...(payload.desktopAuthSession === true ? { desktopAuthSession: true } : {}),
     licenseId: payload.licenseId || null,
     userId: payload.userId || null,
     accountId: payload.accountId || null,

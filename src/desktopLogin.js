@@ -8,6 +8,7 @@ const PKCE_VERIFIER_PATTERN = /^[A-Za-z0-9._~-]{43,128}$/;
 const PKCE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const STATE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 const DEVICE_HASH_PATTERN = /^[a-f0-9]{64}$/;
+const AUTHORIZATION_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 function secretHash(namespace, value) {
   return crypto
@@ -87,6 +88,25 @@ export function desktopUserCodeHash(value) {
   return normalized ? secretHash("user-code", normalized) : null;
 }
 
+export function desktopStateHash(value) {
+  const normalized = normalizeDesktopState(value);
+  return normalized ? secretHash("state", normalized) : null;
+}
+
+export function normalizeDesktopAuthorizationCode(value) {
+  const normalized = String(value || "").trim();
+  return AUTHORIZATION_CODE_PATTERN.test(normalized) ? normalized : null;
+}
+
+export function desktopAuthorizationCodeHash(value) {
+  const normalized = normalizeDesktopAuthorizationCode(value);
+  return normalized ? secretHash("authorization-code", normalized) : null;
+}
+
+export function createDesktopAuthorizationCode(randomBytes = crypto.randomBytes) {
+  return randomBase64Url(randomBytes, 32);
+}
+
 export function createDesktopLoginRequest({
   pkceChallenge,
   deviceIdHash,
@@ -113,6 +133,7 @@ export function createDesktopLoginRequest({
   return {
     deviceCode,
     userCode,
+    state: normalizedState,
     record: {
       deviceCodeHash: secretHash("device-code", deviceCode),
       userCodeHash: secretHash("user-code", userCode),

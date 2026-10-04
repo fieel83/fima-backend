@@ -1,5 +1,6 @@
 import {prepareRobloxVerification} from "./roblox-v2/bootstrap.mjs";
 import "dotenv/config";
+import { createMacroHandoffCandidate, mountMacroHandoffCandidate } from "./macroHandoffCandidate.mjs";
 import { usernameHandler } from "./accountIdentity.js";
 import { execSync } from "node:child_process";
 import crypto from "node:crypto";
@@ -125,7 +126,7 @@ import {
   updateManifestSecretStatus,
   verifyAppEntitlement
 } from "./entitlements.js";
-import { assertRefreshLicenseAccount, runEntitlementRefreshWithAccountLock } from "./entitlementRefreshSecurity.js";
+import { assertRefreshDesktopSession, assertRefreshLicenseAccount, runEntitlementRefreshWithAccountLock } from "./entitlementRefreshSecurity.js";
 import { ownerIdentityStatus } from "./ownerAccess.js";
 import {
   isUpdatingModeApiRequest,
@@ -593,12 +594,28 @@ app.use(requireCsrfForCookieMutations({
   userCookieName: USER_SESSION_COOKIE
 }));
 
+import { activateDesktopAuthSession, createDesktopLogoutHandler } from "./desktopAuthSessions.js";
+
 const desktopLoginHandlers = createDesktopLoginHandlers({
   prisma,
   normalizeHwid,
   hashDeviceId,
   frontendUrl,
-  resolveEntitlementForUser: resolveDesktopEntitlementForUser,
+  resolveEntitlementForUser: async (args) => {
+    const result = await resolveDesktopEntitlementForUser(args);
+    const verified = verifyAppEntitlement(result?.entitlementToken);
+    const payload = verified.payload;
+    // Require the exact signed session/account/device produced in the caller transaction.
+    if (!args.authSessionId || !verified.ok || payload?.desktopAuthSession !== true
+        || payload.sessionId !== args.authSessionId || payload.userId !== args.user?.id
+        || payload.hwidHash !== hashDeviceId(args.hwid)) {
+      throw new Error("desktop_entitlement_session_binding_required");
+    }
+    return result;
+  },
+  resolveAuthSession: ({ request, user, deviceIdHash, db, retry }) => activateDesktopAuthSession({
+    prisma, db, request, userId: user.id, deviceIdHash, retry
+  }),
   assertInitiatingSession: async ({ req, db, userId }) => {
     const binding = await captureOAuthInitiatingSession(req, req.user, db);
     const authority = { userId, ...binding, tokenHash: hashToken(req.cookies?.[USER_SESSION_COOKIE]) };
@@ -610,7 +627,22 @@ app.post("/api/desktop-login/initiate", desktopLoginPublicLimiter, desktopLoginH
 app.post("/api/desktop-login/context", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.context);
 app.post("/api/desktop-login/approve", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.approve);
 app.post("/api/desktop-login/poll", desktopLoginPublicLimiter, desktopLoginHandlers.poll);
+app.post("/api/desktop-login/exchange", desktopLoginPublicLimiter, desktopLoginHandlers.exchange);
 app.post("/api/desktop-login/cancel", desktopLoginPublicLimiter, desktopLoginHandlers.cancel);
+app.post("/api/desktop-login/logout", entitlementRefreshLimiter, createDesktopLogoutHandler({
+  prisma,
+  normalizeHwid,
+  hashDeviceId,
+  verifyAppEntitlement,
+  extractEntitlementToken,
+  logError: (error) => console.error("Desktop logout failed", publicError(error))
+}));
+
+import { registerAccountDeviceRoutes } from "./accountDeviceRoutes.js";
+registerAccountDeviceRoutes(app, {
+  prisma, requireUser, authLimiter, isOwnerManagedLicense, createAuditLog,
+  logError: error => console.error("Device management failed", publicError(error))
+});
 
 app.get("/api/public/site-settings", async (_req, res) => {
   const settings = await getSiteSettings();
@@ -3851,6 +3883,14 @@ app.get("/api/download", downloadLimiter, async (req, res) => {
   });
 });
 
+mountMacroHandoffCandidate({
+  router: app,
+  candidate: createMacroHandoffCandidate({ db: prisma, resolveEntitlement: resolveDesktopEntitlementForUser }),
+  rateLimit: entitlementRefreshLimiter,
+  extractToken: extractEntitlementToken,
+  enabled: env("FIMA_MACRO_HANDOFF_CANDIDATE_ENABLED", "0") === "1"
+});
+
 app.post("/api/license/validate", validateLimiter, async (req, res) => {
   const licenseKey = normalizeLicenseKey(req.body?.licenseKey);
   const hwid = normalizeHwid(req.body?.hwid);
@@ -4128,7 +4168,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
           if (!isStrictAccountOnlyEntitlementPayload(verified.payload) || !authoritativeUser) {
             return { status: 401, body: { valid: false, canUseApp: false, reason: "invalid_entitlement_payload", message: licenseReasonMessage("invalid_entitlement_payload") } };
           }
-          return { status: 200, body: await resolveDesktopEntitlementForUser({ user: authoritativeUser, hwid, appVersion, db: tx }) };
+          return { status: 200, body: await resolveDesktopEntitlementForUser({ user: authoritativeUser, hwid, appVersion, db: tx, authSessionId: verified.payload.desktopAuthSession === true ? verified.payload.sessionId : null }) };
         }
 
         let license = await tx.license.findUnique({ where: { id: verified.payload.licenseId } });
@@ -4166,7 +4206,8 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
           appVersion,
           minSupportedAppVersion,
           licenseStatus: "active",
-          ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess)
+          ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess),
+          authSessionId: verified.payload.desktopAuthSession === true ? verified.payload.sessionId : null
         });
         return {
           status: 200,
@@ -8324,7 +8365,7 @@ function ownerLicenseBindingState(license, hwid) {
   return { ok: true, reason: "owner_key_bound" };
 }
 
-async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, db = prisma }) {
+async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, authSessionId = null, db = prisma }) {
   const normalizedHwid = normalizeHwid(hwid);
   if (!user?.id || !normalizedHwid) {
     const error = new Error("Desktop entitlement identity is invalid.");
@@ -8332,6 +8373,10 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, db = p
     throw error;
   }
 
+  if (authSessionId) await assertRefreshDesktopSession(db, {
+    desktopAuthSession: true, sessionId: authSessionId, userId: user.id,
+    accountId: user.id, hwidHash: hashDeviceId(normalizedHwid)
+  });
   const now = new Date();
   const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
   const candidates = await db.license.findMany({
@@ -8386,7 +8431,8 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, db = p
       appVersion,
       minSupportedAppVersion,
       licenseStatus: "active",
-      ownerAdminAccess
+      ownerAdminAccess,
+      authSessionId
     });
     return {
       ...licenseValidationPayload(license, {
@@ -8415,7 +8461,8 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, db = p
     minSupportedAppVersion,
     licenseStatus: "account_only",
     allowedFeatures: [],
-    ownerAdminAccess: false
+    ownerAdminAccess: false,
+    authSessionId
   });
   return {
     valid: true,
