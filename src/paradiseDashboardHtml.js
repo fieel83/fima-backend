@@ -1177,11 +1177,11 @@ function renderAccess(status){
   if(status.reasonCode==='login_required'){
     setUiText('accessTitle','FIMA login required');
     setUiText('accessMessage','Sign in with the FIMA account that owns the FIMA console. You will return here after login.');
-    actions.innerHTML='<a class="button" href="/login?next=%2Ffima-bot%2Fdashboard">'+tUi('Sign in to FIMA')+'</a>';
+    actions.innerHTML='<a class="button" href="/login?next=%2Ffima-bot%2Fowner">'+tUi('Sign in to FIMA')+'</a>';
   }else if(status.reasonCode==='discord_link_required'){
     setUiText('accessTitle','Discord account required');
     setUiText('accessMessage','Your FIMA account is signed in, but Discord is not linked. Link the owner Discord account to continue.');
-    actions.innerHTML='<a class="button" href="'+API_BASE+'/auth/discord/start?returnTo=%2Ffima-bot%2Fdashboard">'+tUi('Link Discord account')+'</a><a class="button secondary" href="/dashboard/connected-accounts">'+tUi('Account settings')+'</a>';
+    actions.innerHTML='<a class="button" href="'+API_BASE+'/auth/discord/start?returnTo=%2Ffima-bot%2Fowner">'+tUi('Link Discord account')+'</a><a class="button secondary" href="/dashboard/connected-accounts">'+tUi('Account settings')+'</a>';
   }else if(status.reasonCode==='not_owner'){
     setUiText('accessTitle','FIMA access is restricted');
     setUiText('accessMessage','This signed-in account is not authorized to open the FIMA owner console.');

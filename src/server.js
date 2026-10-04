@@ -942,7 +942,9 @@ app.get("/fima-bot/dashboard", sendFimaBotCustomerDashboard);
 app.get("/fima-bot/dashboard/servers/:guildId/:module", sendFimaBotCustomerDashboard);
 app.get("/fima-bot/dashboard/:guildId", sendFimaBotCustomerDashboard);
 app.get("/fima-bot/dashboard/:guildId/:module", sendFimaBotCustomerDashboard);
-app.get(["/fima-bot/owner", "/fima-bot/owner/dashboard"], requireUser, requireParadiseOwner, renderFimaBotOwnerDashboard);
+// Public UI shell checks the API-host session before loading any owner data.
+// Owner API routes remain protected by requireUser and requireParadiseOwner.
+app.get(["/fima-bot/owner", "/fima-bot/owner/dashboard"], renderFimaBotOwnerDashboard);
 app.get("/dashboard/fima-bot", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/dashboard"));
 app.get(["/paradise-bot", "/paradise-bot.html"], (_req, res) => res.redirect(301, "/fima-bot"));
 

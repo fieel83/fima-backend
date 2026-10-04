@@ -1,6 +1,6 @@
 // Operations and durable recovery plans are scoped to the authorized guild and actor.
 export async function renderFimaOperations(panel, payload, context) {
-  const { request, csrfToken, escapeHtml: esc, setDirty, refresh } = context;
+  const { request, csrfToken, escapeHtml: esc, setDirty, refresh, apiUrl } = context;
   const root = `/api/fima-bot/customer/workspaces/${encodeURIComponent(payload.workspace.guildId)}/operations`;
   const marker = {};
   panel.fimaOperationMarker = marker;
@@ -10,7 +10,7 @@ export async function renderFimaOperations(panel, payload, context) {
   const body = panel.querySelector('[data-operation-body]');
   const say = message => { if (current()) status.textContent = message; };
   async function post(path, value) {
-    const response = await fetch(root + path, { method: 'POST', credentials: 'include', headers: { 'Content-Type':'application/json', 'x-fima-csrf': await csrfToken(), Accept:'application/json' }, body: JSON.stringify(value) });
+    const response = await fetch(apiUrl(root + path), { method: 'POST', credentials: 'include', headers: { 'Content-Type':'application/json', 'x-fima-csrf': await csrfToken(), Accept:'application/json' }, body: JSON.stringify(value) });
     const data = await response.json();
     if (!response.ok || data.success === false) throw new Error(data.error || 'operation_failed');
     return data;

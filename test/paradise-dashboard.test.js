@@ -10,6 +10,14 @@ const applicationHtml = fs.readFileSync(new URL("../public/paradise-apply.html",
 const contentStudioHtml = fs.readFileSync(new URL("../public/paradise-content-studio.html", import.meta.url), "utf8");
 const publicConfigSource = fs.readFileSync(new URL("../public/assets/js/config.js", import.meta.url), "utf8");
 
+test('owner shell supports API-host sessions without exposing owner API data', () => {
+  assert.match(serverSource, /app\.get\(\["\/fima-bot\/owner", "\/fima-bot\/owner\/dashboard"\], renderFimaBotOwnerDashboard\)/);
+  assert.match(serverSource, /app\.get\("\/api\/fima-bot\/config", requireUser, requireParadiseOwner/);
+  assert.match(serverSource, /app\.post\("\/api\/fima-bot\/actions\/ft-community-production", requireUser, requireParadiseOwner/);
+  assert.match(htmlSource, /next=%2Ffima-bot%2Fowner/);
+  assert.match(htmlSource, /returnTo=%2Ffima-bot%2Fowner/);
+});
+
 test("Paradise dashboard client script parses", () => {
   const html = paradiseDashboardHtml({ clientId: "123", apiBaseUrl: "https://api.example.test", frontendUrl: "https://example.test" });
   const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] || "";

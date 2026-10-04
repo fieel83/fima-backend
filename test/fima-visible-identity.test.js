@@ -164,10 +164,10 @@ test("public identity is FIMA while safe internal routes and legacy aliases rema
   assert.match(contentStudioSource, /FIMA Content Studio/);
 });
 
-test("FIMA Bot dashboard authentication returns use the canonical public route", () => {
+test("FIMA owner authentication returns use the owner route", () => {
   assert.doesNotMatch(dashboardSource, /%2Fparadise/);
-  assert.match(dashboardSource, /\/login\?next=%2Ffima-bot%2Fdashboard/);
-  assert.match(dashboardSource, /\/auth\/discord\/start\?returnTo=%2Ffima-bot%2Fdashboard/);
+  assert.match(dashboardSource, /\/login\?next=%2Ffima-bot%2Fowner/);
+  assert.match(dashboardSource, /\/auth\/discord\/start\?returnTo=%2Ffima-bot%2Fowner/);
   assert.doesNotMatch(serverSource, /dashboardUrl:\s*`\$\{frontendUrl\(\)\}\/paradise`/);
   assert.equal(
     (serverSource.match(/dashboardUrl:\s*`\$\{frontendUrl\(\)\}\/fima-bot\/dashboard`/g) || []).length,

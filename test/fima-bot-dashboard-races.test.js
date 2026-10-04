@@ -39,6 +39,25 @@ function harness() {
   return { context, element, run: code => vm.runInContext(code, context) };
 }
 
+test('dashboard reads and writes use the session-owning API origin with CSRF', async () => {
+  const h = harness();
+  const calls = [];
+  h.context.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, json: async () => url.endsWith('/csrf-token') ? { csrfToken: 'fixture-csrf' } : { success: true } };
+  };
+  await h.run(`request(LIST_ENDPOINT)`);
+  await h.run(`patchWorkspaceConfig('${guildId}', 'branding', { language: 'en' }, 4)`);
+  assert.deepEqual(calls.map(call => call.url), [
+    'https://api.fimamacro.com/api/fima-bot/customer/workspaces',
+    'https://api.fimamacro.com/api/csrf-token',
+    `https://api.fimamacro.com/api/fima-bot/customer/workspaces/${guildId}/config`
+  ]);
+  assert.ok(calls.every(call => call.options.credentials === 'include'));
+  assert.equal(calls[2].options.headers['x-fima-csrf'], 'fixture-csrf');
+  assert.equal(calls[2].options.method, 'PATCH');
+});
+
 for (const [status, code, expected] of [[401, 'unauthorized', 'login_required'], [403, 'discord_connection_required', 'discord_connection_required']]) {
   test(`directory HTTP ${status} displays the actionable authentication error`, async () => {
     const h = harness();

@@ -1,4 +1,6 @@
-import { renderFimaOperations } from './fima-guild-operations.js';
+import { renderFimaOperations } from './fima-guild-operations.js?v=20261005-1';
+const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
+function apiUrl(path) { return API_BASE + path; }
 const LIST_ENDPOINT = "/api/fima-bot/customer/workspaces";
 const DASHBOARD_ROOT = "/fima-bot/dashboard";
 const DEFAULT_ROUTE = "overview";
@@ -236,7 +238,7 @@ function errorCode(error) {
 }
 
 async function request(url) {
-  const response = await fetch(url, { credentials: "include", headers: { Accept: "application/json" } });
+  const response = await fetch(apiUrl(url), { credentials: "include", headers: { Accept: "application/json" } });
   let payload = {};
   try { payload = await response.json(); } catch {}
   if (!response.ok || payload.success === false) {
@@ -266,7 +268,7 @@ async function csrfToken(force = false) {
 
 async function patchWorkspaceConfig(guildId, route, value, expectedVersion, retry = true) {
   const csrf = await csrfToken();
-  const response = await fetch(`${LIST_ENDPOINT}/${encodeURIComponent(guildId)}/config`, {
+  const response = await fetch(apiUrl(`${LIST_ENDPOINT}/${encodeURIComponent(guildId)}/config`), {
     method: "PATCH",
     credentials: "include",
     headers: {
@@ -309,7 +311,8 @@ function actionState(target, { title, message, action, href, tone = "neutral", l
   target.setAttribute("aria-live", tone === "error" ? "assertive" : "polite");
   target.toggleAttribute("aria-busy", loading);
   target.hidden = false;
-  target.innerHTML = `${loading ? '<div class="loader" aria-hidden="true"></div>' : '<span class="state-icon" aria-hidden="true">✦</span>'}<div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p>${action ? `<a class="state-action" href="${escapeHtml(href)}">${escapeHtml(action)}</a>` : ""}</div>`;
+  const actionHref = typeof href === 'string' && href.startsWith('/auth/') ? apiUrl(href) : href;
+  target.innerHTML = `${loading ? '<div class="loader" aria-hidden="true"></div>' : '<span class="state-icon" aria-hidden="true">✦</span>'}<div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(message)}</p>${action ? `<a class="state-action" href="${escapeHtml(actionHref)}">${escapeHtml(action)}</a>` : ""}</div>`;
 }
 
 function showError(target, code, retry) {
@@ -746,7 +749,7 @@ function renderModule(payload, { saved = false } = {}) {
   if (['setup', 'content', 'polls', 'integrations'].includes(payload.route)) {
     panel.hidden = false;
     renderFimaOperations(panel, payload, {
-      request, csrfToken, escapeHtml,
+      request, csrfToken, escapeHtml, apiUrl,
       isCurrent: () => state.payload === payload,
       setDirty: value => { if (panel.isConnected && state.payload === payload) state.dirty = value; },
       refresh: () => openWorkspace(payload.workspace.guildId, payload.route, { skipConfirm: true, urlMode: 'none' })
