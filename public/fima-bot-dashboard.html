@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="tr" data-fima-design-system="teal-obsidian">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="FIMA Bot sunucu yönetim merkezi">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>FIMA Bot | Sunucu Merkezi</title>
+    <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="/assets/css/fima-bot-dashboard.css?v=20260928-2">
+    <link rel="stylesheet" href="/assets/css/fima-design-system.css?v=20260928-2">
+  </head>
+  <body data-fima-product="bot">
+    <a class="skip-link" href="#main">İçeriğe geç</a>
+    <header class="topbar">
+      <a class="brand" href="/fima-bot" aria-label="FIMA Bot ana sayfa">
+        <img src="/assets/images/fima-logo.png?v=20260526-2" alt="">
+        <span>FIMA</span><small>BOT</small>
+      </a>
+      <div class="topbar-controls">
+        <nav class="topnav" aria-label="Ürün bağlantıları">
+          <a href="/fima-bot">Ürün</a>
+          <a href="/fima-bot/commands">Komutlar</a>
+          <a href="/fima-bot/apply">Başvurular</a>
+          <a href="/fima-bot/invite">Invite</a>
+          <a href="/fima-bot/premium">Premium</a>
+          <a href="/fima-bot/feedback">Destek</a>
+          <a href="/fima-bot/content-studio">Content Studio</a>
+          <a href="/fima-bot/embed-builder">Embed Builder</a>
+          <a href="/fima-bot/dashboard" aria-current="page">Dashboard</a>
+          <a class="account-link" href="/dashboard">Hesabım</a>
+        </nav>
+        <label class="fima-language-control" for="fimaUiLanguage">
+          <span>Dil / Language</span>
+          <select id="fimaUiLanguage" aria-label="Arayüz dili">
+            <option value="tr">Türkçe</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="server-directory" data-server-directory aria-labelledby="directory-title">
+        <div class="directory-layout">
+          <div class="directory-hero">
+            <p class="eyebrow"><span></span> FIMA BOT / SUNUCU MERKEZİ</p>
+            <h1 id="directory-title">Sunucunu seç.<br><em>Kontrolü sadeleştir.</em></h1>
+            <p>Önce yöneteceğin sunucuyu seç. Discord’da yönetme yetkin bulunan her sunucu ayrı bir çalışma alanıdır; ayarlar ve modüller sunucular arasında karışmaz.</p>
+            <div class="trust-row" aria-label="Güvenlik özellikleri">
+              <span>Sunucuya özel erişim</span><span>Discord ile doğrulama</span><span>Güvenli düzenleme</span>
+            </div>
+          </div>
+          <aside class="directory-brief" aria-label="Dashboard özeti">
+            <p class="brief-label">OPERASYON NABZI</p>
+            <strong data-directory-count>—</strong>
+            <span>yönetilebilir sunucu</span>
+            <div class="brief-meter"><i data-directory-meter></i></div>
+            <p data-directory-brief>Discord yetkilerin kontrol ediliyor.</p>
+          </aside>
+        </div>
+        <div class="state-card" data-directory-state role="status" aria-live="polite">
+          <div class="loader" aria-hidden="true"></div>
+          <div><strong>Sunucuların hazırlanıyor</strong><p>Discord yetkilerin güvenli biçimde kontrol ediliyor.</p></div>
+        </div>
+        <label class="config-field server-search">Sunucu ara<input data-server-search type="search" placeholder="Sunucu adı veya ID" aria-label="Sunucu ara"></label>
+        <p data-search-empty hidden role="status">Aramana uygun sunucu bulunamadı.</p>
+        <div class="server-grid" data-server-grid hidden></div>
+      </section>
+
+      <section class="workspace" data-workspace hidden aria-labelledby="workspace-title">
+        <nav class="server-rail" data-server-rail aria-label="Sunucu değiştir"></nav>
+        <aside class="workspace-sidebar">
+          <a class="back-button" href="/fima-bot/dashboard" data-back-to-servers>← Tüm sunucular</a>
+          <div class="selected-server" data-selected-server></div>
+          <label class="mobile-module-picker">
+            <span>Modül seç</span>
+            <select data-module-select aria-label="FIMA Bot modülü" aria-describedby="mobile-module-status" disabled></select>
+            <small id="mobile-module-status" data-module-select-status>Modüller yükleniyor.</small>
+          </label>
+          <nav class="module-nav" data-module-nav aria-label="FIMA Bot modülleri"></nav>
+          <div class="sidebar-help">
+            <span aria-hidden="true">◇</span>
+            <p><strong>Bir sorun mu var?</strong> Önce komut rehberine bakabilir veya geri bildirim gönderebilirsin.</p>
+            <a href="/fima-bot/feedback">Destek seçenekleri →</a>
+          </div>
+        </aside>
+        <div class="workspace-main">
+          <div class="workspace-heading">
+            <div>
+              <p class="eyebrow"><span></span> SEÇİLİ SUNUCU</p>
+              <h1 id="workspace-title" data-workspace-title>Yönetim merkezi</h1>
+            </div>
+            <div class="workspace-pills">
+              <span class="health-pill" data-bot-pill>BOT DURUMU</span>
+              <span class="plan-pill" data-plan-pill>FREE</span>
+            </div>
+          </div>
+          <div class="workspace-facts" data-workspace-facts hidden></div>
+          <div class="state-card" data-workspace-state role="status" aria-live="polite"></div>
+          <section class="module-panel" data-module-panel hidden aria-live="polite" tabindex="-1"></section>
+        </div>
+      </section>
+    </main>
+    <noscript>FIMA Bot yönetim merkezini kullanmak için JavaScript etkin olmalıdır.</noscript>
+    <script src="/assets/js/fima-surface-i18n.js?v=20260809-1"></script>
+    <script src="/assets/js/fima-bot-dashboard-i18n.js?v=20260928-2"></script>
+    <script type="module" src="/assets/js/fima-bot-dashboard.js?v=20260928-2"></script>
+  </body>
+</html>

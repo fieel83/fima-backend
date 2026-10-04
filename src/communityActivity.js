@@ -1,7 +1,13 @@
 import crypto from "node:crypto";
 import { prisma } from "./db.js";
 import { generateUniqueLicenseKey } from "./license.js";
-import { PARADISE_TEST_GUILD_ID, assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
+import { PARADISE_TEST_GUILD_ID } from "./runtimeEnvironment.js";
+import {
+  FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+  assertCommunityRewardGuild,
+  communityRewardGuildIds,
+  communityRewardGuildPolicy
+} from "./communityGuildPolicy.js";
 
 export const COMMUNITY_ACTIVITY_PRIZE_DAYS = Object.freeze({ 1: 15, 2: 10, 3: 7 });
 export const COMMUNITY_ACTIVITY_BOARDS = Object.freeze(["text", "voice"]);
@@ -76,7 +82,7 @@ export function qualifyCommunityTextMessage(message, { source = process.env } = 
 }
 
 function assertActivityMutation(guildId, source) {
-  return assertParadiseTestGuildMutation({ guildId, operation: "community_activity_mutation", source });
+  return assertCommunityRewardGuild({ guildId, source });
 }
 
 async function ensureSeason(db, guildId, now) {
@@ -269,12 +275,8 @@ export async function handleCommunityVoiceActivity(oldState, newState, options =
   return reconcileCommunityVoiceGuild(guild, options);
 }
 
-function assertActivityReadGuild(guildId) {
-  if (String(guildId || "") !== PARADISE_TEST_GUILD_ID) {
-    const error = new Error("activity_test_guild_only");
-    error.code = "activity_test_guild_only";
-    throw error;
-  }
+function assertActivityReadGuild(guildId, source) {
+  return assertCommunityRewardGuild({ guildId, source });
 }
 
 async function findSeasonForDate(db, guildId, now) {
@@ -282,8 +284,8 @@ async function findSeasonForDate(db, guildId, now) {
   return db.communityActivitySeason.findUnique({ where: { guildId_startsAt: { guildId, startsAt: window.startsAt } } });
 }
 
-export async function communityActivityLeaderboard({ guildId, board = "text", limit = 10, now = new Date(), db = prisma } = {}) {
-  assertActivityReadGuild(guildId);
+export async function communityActivityLeaderboard({ guildId, board = "text", limit = 10, now = new Date(), db = prisma, source = process.env } = {}) {
+  assertActivityReadGuild(guildId, source);
   const normalizedBoard = COMMUNITY_ACTIVITY_BOARDS.includes(board) ? board : "text";
   const season = await findSeasonForDate(db, guildId, now);
   if (!season) return { guildId, board: normalizedBoard, season: communityActivitySeasonWindow(now), entries: [] };
@@ -308,8 +310,8 @@ export async function communityActivityLeaderboard({ guildId, board = "text", li
   };
 }
 
-export async function communityActivityRank({ guildId, discordUserId, now = new Date(), db = prisma } = {}) {
-  assertActivityReadGuild(guildId);
+export async function communityActivityRank({ guildId, discordUserId, now = new Date(), db = prisma, source = process.env } = {}) {
+  assertActivityReadGuild(guildId, source);
   const result = { guildId, discordUserId, season: null, text: null, voice: null };
   const season = await findSeasonForDate(db, guildId, now);
   result.season = season || communityActivitySeasonWindow(now);
@@ -329,8 +331,8 @@ export async function communityActivityRank({ guildId, discordUserId, now = new 
   return result;
 }
 
-export async function communityActivityRewards({ guildId, discordUserId, db = prisma } = {}) {
-  assertActivityReadGuild(guildId);
+export async function communityActivityRewards({ guildId, discordUserId, db = prisma, source = process.env } = {}) {
+  assertActivityReadGuild(guildId, source);
   return db.communityActivityReward.findMany({
     where: { guildId, discordUserId },
     include: { season: true, entitlementGrant: true },
@@ -462,15 +464,122 @@ export async function finalizeCommunityActivitySeason(seasonId, { db = prisma, s
 export async function runCommunityActivityWorker(client, { db = prisma, source = process.env, now = new Date() } = {}) {
   const config = communityActivityConfig(source);
   if (!config.enabled) return { ran: false, reason: "activity_disabled" };
-  const guild = client?.guilds?.cache?.get?.(PARADISE_TEST_GUILD_ID) || null;
-  if (!guild) return { ran: false, reason: "test_guild_unavailable" };
-  const voice = await reconcileCommunityVoiceGuild(guild, { db, source, now });
-  const finalized = [];
-  if (config.rewardWorkerEnabled) {
-    const ended = await db.communityActivitySeason.findMany({ where: { guildId: PARADISE_TEST_GUILD_ID, endsAt: { lte: now }, status: { in: ["active", "finalized"] } } });
-    for (const season of ended) finalized.push(await finalizeCommunityActivitySeason(season.id, { db, source, now }));
+  const guildResults = [];
+  for (const guildId of communityRewardGuildIds(source)) {
+    const guild = client?.guilds?.cache?.get?.(guildId) || null;
+    if (!guild) {
+      guildResults.push({ guildId, ran: false, reason: "guild_unavailable" });
+      continue;
+    }
+    const voice = await reconcileCommunityVoiceGuild(guild, { db, source, now });
+    const finalized = [];
+    if (config.rewardWorkerEnabled) {
+      const ended = await db.communityActivitySeason.findMany({ where: { guildId, endsAt: { lte: now }, status: { in: ["active", "finalized"] } } });
+      for (const season of ended) finalized.push(await finalizeCommunityActivitySeason(season.id, { db, source, now }));
+    }
+    guildResults.push({ guildId, ran: true, voice, finalized });
   }
-  return { ran: true, voice, finalized };
+  const completed = guildResults.filter(result => result.ran);
+  if (!completed.length) return { ran: false, reason: "community_guilds_unavailable", guilds: guildResults };
+  return { ran: true, guilds: guildResults };
+}
+
+function activityReadinessErrorCode(error, fallback) {
+  return String(error?.code || fallback)
+    .replace(/[^a-z0-9_-]/gi, "_")
+    .slice(0, 96) || fallback;
+}
+
+export async function inspectCommunityActivityReadiness(
+  client,
+  { db = prisma, source = process.env, now = new Date() } = {}
+) {
+  const config = communityActivityConfig(source);
+  const guild = client?.guilds?.cache?.get?.(PARADISE_TEST_GUILD_ID) || null;
+  const workerActive = Boolean(client && (typeof client === "object" || typeof client === "function") && activeWorkers.has(client));
+  const season = communityActivitySeasonWindow(now);
+  const productionRewardPolicy = communityRewardGuildPolicy({
+    guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+    source
+  });
+  const errors = [];
+  let databaseReady = false;
+  let textLeaderboardReady = false;
+  let voiceLeaderboardReady = false;
+  let textLeaderboard = null;
+  let voiceLeaderboard = null;
+
+  try {
+    await db.communityActivitySeason.count({ where: { guildId: PARADISE_TEST_GUILD_ID } });
+    databaseReady = true;
+  } catch (error) {
+    errors.push(activityReadinessErrorCode(error, "activity_database_unavailable"));
+  }
+
+  if (databaseReady) {
+    const [textResult, voiceResult] = await Promise.allSettled([
+      communityActivityLeaderboard({ guildId: PARADISE_TEST_GUILD_ID, board: "text", limit: 3, now, db }),
+      communityActivityLeaderboard({ guildId: PARADISE_TEST_GUILD_ID, board: "voice", limit: 3, now, db })
+    ]);
+    if (textResult.status === "fulfilled") {
+      textLeaderboardReady = true;
+      textLeaderboard = textResult.value;
+    } else {
+      errors.push(activityReadinessErrorCode(textResult.reason, "text_activity_read_failed"));
+    }
+    if (voiceResult.status === "fulfilled") {
+      voiceLeaderboardReady = true;
+      voiceLeaderboard = voiceResult.value;
+    } else {
+      errors.push(activityReadinessErrorCode(voiceResult.reason, "voice_activity_read_failed"));
+    }
+  }
+
+  const guildCached = Boolean(guild);
+  const rewardPolicyReady = COMMUNITY_ACTIVITY_PRIZE_DAYS[1] === 15
+    && COMMUNITY_ACTIVITY_PRIZE_DAYS[2] === 10
+    && COMMUNITY_ACTIVITY_PRIZE_DAYS[3] === 7;
+  const ready = Boolean(
+    config.enabled
+    && config.rewardWorkerEnabled
+    && config.messageContentIntent
+    && workerActive
+    && guildCached
+    && databaseReady
+    && textLeaderboardReady
+    && voiceLeaderboardReady
+    && rewardPolicyReady
+  );
+
+  return {
+    ready,
+    enabled: config.enabled,
+    rewardWorkerEnabled: config.rewardWorkerEnabled,
+    messageContentIntent: config.messageContentIntent,
+    workerActive,
+    guildCached,
+    databaseReady,
+    textLeaderboardReady,
+    voiceLeaderboardReady,
+    rewardPolicyReady,
+    productionRewards: {
+      enabled: productionRewardPolicy.allowed,
+      code: productionRewardPolicy.code,
+      runtime: productionRewardPolicy.environment.name
+    },
+    prizeDays: { ...COMMUNITY_ACTIVITY_PRIZE_DAYS },
+    season: {
+      type: "utc_monthly",
+      key: season.key,
+      startsAt: season.startsAt,
+      endsAt: season.endsAt
+    },
+    leaderboards: {
+      text: textLeaderboard,
+      voice: voiceLeaderboard
+    },
+    errors: [...new Set(errors)]
+  };
 }
 
 export function startCommunityActivityWorker(client, { db = prisma, source = process.env } = {}) {

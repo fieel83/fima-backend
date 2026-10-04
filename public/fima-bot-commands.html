@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="tr" data-fima-design-system="teal-obsidian">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="FIMA Bot komutlarını kullanım amacı, yetki düzeyi ve sunucu şablonuna göre keşfet.">
+    <meta name="theme-color" content="#030908">
+    <meta name="robots" content="index,follow">
+    <title>Komutlar | FIMA Bot</title>
+    <link rel="canonical" href="https://fimamacro.com/fima-bot/commands">
+    <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
+    <link rel="stylesheet" href="/assets/css/fima-bot-pages.css?v=20260813-1">
+    <link rel="stylesheet" href="/assets/css/fima-design-system.css?v=20260928-2">
+  </head>
+  <body data-fima-product="bot" data-fima-surface="commands">
+    <a class="skip-link" href="#main">İçeriğe geç</a>
+    <header class="page-header">
+      <nav class="page-nav page-shell" aria-label="FIMA Bot ürün menüsü">
+        <a class="page-brand" href="/fima-bot" aria-label="FIMA Bot ana sayfası">
+          <img src="/assets/images/fima-logo.png?v=20260526-2" alt="">
+          <span>FIMA <small>BOT</small></span>
+        </a>
+        <div class="page-links">
+          <a href="/fima-bot">Ürün</a>
+          <a href="/fima-bot/commands" aria-current="page">Komutlar</a>
+          <a href="/fima-bot/apply">Başvurular</a>
+          <a href="/fima-bot/invite">Invite</a>
+          <a href="/fima-bot/premium">Premium</a>
+          <a href="/fima-bot/feedback">Destek</a>
+          <a href="/fima-bot/content-studio">Content Studio</a>
+          <a href="/fima-bot/embed-builder">Embed Builder</a>
+          <a class="dashboard-link" href="/fima-bot/dashboard">Dashboard</a>
+        </div>
+        <label class="fima-language-control" for="fimaUiLanguage">
+          <span>Dil / Language</span>
+          <select id="fimaUiLanguage" aria-label="Arayüz dili">
+            <option value="tr">Türkçe</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page-hero page-shell" aria-labelledby="page-title">
+        <p class="eyebrow">FIMA BOT / KOMUT REHBERİ</p>
+        <h1 id="page-title">Doğru komutu <em>hemen bul.</em></h1>
+        <p class="page-lead">Üyelere açık araçlardan yetkili ekip iş akışlarına kadar komutları ara. Görebilmen, komutu kullanmaya yetkili olduğun anlamına gelmez; FIMA Bot her istekte sunucu rolünü ve kanal kapsamını yeniden doğrular.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="/fima-bot/invite">FIMA Bot’u ekle</a>
+          <a class="button" href="/fima-bot/dashboard">Sunucunu yönet</a>
+        </div>
+      </section>
+
+      <section class="section page-shell" aria-labelledby="catalog-title">
+        <div class="section-heading">
+          <h2 id="catalog-title">Komut kataloğu</h2>
+          <p>Kullanılabilir komutlar sunucu şablonuna, etkin modüllere ve görevlinin yetkisine göre değişir.</p>
+        </div>
+        <div class="toolbar" role="search">
+          <label class="search-field">
+            <span aria-hidden="true">⌕</span>
+            <span class="skip-link">Komutlarda ara</span>
+            <input type="search" data-command-search placeholder="Komut veya özellik ara…" autocomplete="off" aria-label="Komutlarda ara">
+          </label>
+          <div class="filters" aria-label="Komut kategorileri">
+            <button class="filter-button" type="button" data-command-filter="all" aria-pressed="true">Tümü</button>
+            <button class="filter-button" type="button" data-command-filter="member" aria-pressed="false">Üye</button>
+            <button class="filter-button" type="button" data-command-filter="staff" aria-pressed="false">Ekip</button>
+            <button class="filter-button" type="button" data-command-filter="competitive" aria-pressed="false">Rekabetçi</button>
+          </div>
+        </div>
+
+        <div class="safety-note" role="note"><span aria-hidden="true">◆</span><div><strong>Yetki her çalıştırmada kontrol edilir.</strong> Yönetim komutları gizli bir istemci anahtarına güvenmez; sunucu, rol, kanal ve modül sınırları backend tarafından doğrulanır.</div></div>
+        <div class="command-grid" data-command-grid>
+          <article class="command-card" data-command-card data-category="member" data-search="help yardım komut liste">
+            <div class="command-top"><span class="command-icon">01</span><span class="status">ÜYE</span></div>
+            <h2><code>/help</code></h2><p>Kullanıcının erişebildiği güvenli komutları ve ilgili rehberleri gösterir.</p>
+            <div class="command-meta"><span>Tüm şablonlar</span><span>Üye güvenli</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="member" data-search="ticket open destek talep">
+            <div class="command-top"><span class="command-icon">02</span><span class="status">ÜYE</span></div>
+            <h2><code>/ticket open</code></h2><p>Yapılandırılmış destek alanında kullanıcıya özel bir destek talebi açar.</p>
+            <div class="command-meta"><span>Tickets</span><span>Topluluk</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="member" data-search="application apply başvuru staff support video team creator">
+            <div class="command-top"><span class="command-icon">03</span><span class="status">ÜYE</span></div>
+            <h2><code>/application apply</code></h2><p>Sunucunun açtığı staff, support, video team ve diğer uygun başvuru türlerinden birini başlatır.</p>
+            <div class="command-meta"><span>Applications</span><span>Şablona özel</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="staff" data-search="ticket claim destek üstlen staff">
+            <div class="command-top"><span class="command-icon">04</span><span class="status staff">EKİP</span></div>
+            <h2><code>/ticket claim</code></h2><p>Destek talebini yetkili görevliye atar ve işlemi denetim kaydına ekler.</p>
+            <div class="command-meta"><span>Ticket yetkisi</span><span>Kayıtlı işlem</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="staff" data-search="ticket close transcript kapat arşiv">
+            <div class="command-top"><span class="command-icon">05</span><span class="status staff">EKİP</span></div>
+            <h2><code>/ticket close</code></h2><p>Talebi kapatmadan önce redakte edilmiş transcript akışını tamamlar.</p>
+            <div class="command-meta"><span>Transcript-first</span><span>Denetlenebilir</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="staff" data-search="mod warn uyarı moderation yetkili">
+            <div class="command-top"><span class="command-icon">06</span><span class="status staff">EKİP</span></div>
+            <h2><code>/mod warn</code></h2><p>Sunucu politikasına göre yapılandırılmış ve denetlenebilir bir uyarı kaydı oluşturur.</p>
+            <div class="command-meta"><span>Moderation</span><span>Rol kontrollü</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="competitive" data-search="profile create oyuncu profil clan tsbtr">
+            <div class="command-top"><span class="command-icon">07</span><span class="status planned">CLAN / TSBTR</span></div>
+            <h2><code>/profile create</code></h2><p>Clan ve TSBTR şablonlarında doğrulanmış oyuncu profili oluşturma akışını başlatır.</p>
+            <div class="command-meta"><span>Profiles</span><span>Üye güvenli</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="competitive" data-search="challenge create rakip düello clan tsbtr">
+            <div class="command-top"><span class="command-icon">08</span><span class="status planned">CLAN / TSBTR</span></div>
+            <h2><code>/challenge create</code></h2><p>Uygun bir rakiple denetlenebilir challenge talebi ve özel işlem alanı oluşturur.</p>
+            <div class="command-meta"><span>Challenge</span><span>Kanal kapsamlı</span></div>
+          </article>
+          <article class="command-card" data-command-card data-category="competitive" data-search="training start eğitim host clan tsbtr">
+            <div class="command-top"><span class="command-icon">09</span><span class="status planned">CLAN / TSBTR</span></div>
+            <h2><code>/training start</code></h2><p>Yetkili host için aktif eğitim duyurusu ve katılım akışını başlatır.</p>
+            <div class="command-meta"><span>Training</span><span>Host yetkisi</span></div>
+          </article>
+        </div>
+        <p class="empty-state" data-command-empty hidden role="status">Bu aramayla eşleşen komut bulunamadı.</p>
+      </section>
+    </main>
+
+    <footer class="page-footer"><div class="page-shell footer-row"><span>© FIMA · Güvenli Discord operasyonları</span><nav aria-label="Alt menü"><a href="/fima-bot">Ürün</a><a href="/fima-bot/apply">Başvurular</a><a href="/fima-bot/feedback">Destek</a></nav></div></footer>
+    <script src="/assets/js/fima-surface-i18n.js?v=20260808-1"></script>
+    <script src="/assets/js/fima-bot-pages-i18n.js?v=20260813-1"></script>
+    <script type="module" src="/assets/js/fima-bot-commands.js?v=20260809-1"></script>
+  </body>
+</html>

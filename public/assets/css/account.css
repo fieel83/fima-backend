@@ -74,6 +74,33 @@ body[data-account-page="dashboard"] .dashboard-header {
   gap: 10px;
   min-width: 0;
 }
+.account-language-control {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+}
+.account-language-control select {
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, transparent);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0 28px 0 9px;
+  color: var(--text);
+  background: var(--panel-strong);
+  cursor: pointer;
+}
+.account-language-control select:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  outline-offset: 2px;
+}
 .links a, .link-button {
   min-height: 38px;
   display: inline-flex;
@@ -2009,6 +2036,69 @@ code { color: var(--primary-strong); }
     scroll-snap-align: start;
   }
 }
+
+/* Backend-driven setup and account-time tools share a single compact surface. */
+.fima-account-experience{margin-block:24px;border:1px solid rgba(165,145,227,.22);border-radius:22px;background:radial-gradient(ellipse at 5% 0,rgba(128,77,218,.14),transparent 65%),rgba(15,19,33,.86);box-shadow:0 14px 50px rgba(0,0,0,.2);overflow:hidden;min-width:0}
+.fima-exp-toolbar{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(170,155,216,.12);flex-wrap:wrap}
+.fima-exp-setup-toggle{display:flex;align-items:center;gap:12px;margin-inline-end:auto;background:transparent;color:var(--text,#f4f2ff);border:0;font:inherit;cursor:pointer;text-align:start;padding:6px 0}
+.fima-exp-setup-toggle strong,.fima-exp-count{background:rgba(155,119,241,.15);padding:4px 9px;border-radius:8px;font-variant-numeric:tabular-nums}
+.fima-exp-icon{width:36px;height:36px;display:grid;place-items:center;border:1px solid rgba(180,161,232,.24);border-radius:10px;background:rgba(180,161,232,.06);color:#eee9ff;font:inherit;font-size:21px;flex-shrink:0;cursor:pointer}
+.fima-exp-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:18px 20px}
+.fima-exp-steps[hidden]{display:none}
+.fima-exp-step{display:flex;align-items:center;gap:9px;padding:13px 10px;border:1px solid rgba(175,157,223,.16);border-radius:12px;background:rgba(40,35,61,.45);color:#c4bdd4;text-align:start;cursor:pointer;min-width:0;font:inherit;font-size:12px;line-height:1.5}
+.fima-exp-step strong{overflow-wrap:anywhere}
+.fima-exp-step>span{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:rgba(163,149,193,.13);flex-shrink:0;font-variant-numeric:tabular-nums}
+.fima-exp-step.is-complete{border-color:rgba(103,202,170,.25);color:#b6e8d8}
+.fima-exp-step.is-complete>span{background:rgba(71,176,140,.16)}
+.fima-exp-time{padding:22px 20px;display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,.9fr);gap:24px;border-top:1px solid rgba(170,155,216,.12);align-items:center}
+.fima-exp-time p{color:#aaa4be;max-width:58ch;font-size:13px;line-height:1.7;margin:8px 0 0}
+.fima-exp-eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#b9b0cb;display:block}
+.fima-exp-duration{font-size:29px;display:block;margin-top:7px;color:#f7f4ff;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.fima-exp-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.fima-exp-actions .button{white-space:normal;text-align:center;max-width:100%}
+.fima-exp-error{padding:16px 20px;color:#e0c2ba;line-height:1.65}
+.fima-account-drawer{color:#eee9fa;background:radial-gradient(ellipse at 100% 0,rgba(118,74,199,.17),transparent 70%),#151827;border:1px solid rgba(183,159,235,.3);border-radius:22px;padding:0;width:min(560px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 40px);box-shadow:0 24px 100px #0009;overflow:auto;overflow-wrap:anywhere;position:fixed}
+.fima-account-drawer::backdrop{background:rgba(5,7,16,.73);backdrop-filter:blur(5px)}
+.fima-account-drawer header{display:flex;align-items:center;gap:16px;padding:20px 24px;border-bottom:1px solid #ffffff12;position:sticky;top:0;background:#151827;z-index:1}
+.fima-account-drawer h2{font-size:19px;line-height:1.5;flex:1;margin:0}
+.fima-exp-drawer-body{padding:24px;line-height:1.7}
+.fima-exp-drawer-body>p:first-child{margin-top:0;color:#beb6ce}
+.fima-exp-drawer-body h3{font-size:15px;margin-top:24px}
+.fima-exp-status{padding:0 24px 16px;color:#e3bcb5;line-height:1.6;margin:0}
+.fima-exp-status:empty{padding:0}
+.fima-exp-grant,.fima-exp-request,.fima-exp-notice{padding:16px 0;border-bottom:1px solid #ffffff13}
+.fima-exp-grant{display:flex;gap:12px;align-items:center;justify-content:space-between}
+.fima-exp-grant small{display:block;color:#aaa3bc}
+.fima-exp-request small,.fima-exp-notice time{color:#aaa3bc}
+.fima-exp-request .fima-exp-actions{margin-top:12px}
+.fima-exp-search{display:flex;gap:8px;margin:10px 0 18px;align-items:stretch}
+.fima-exp-search input{min-width:0;flex:1;border:1px solid #ffffff25;border-radius:10px;background:#0c1020;color:#fff;padding:12px;font:inherit}
+.fima-exp-recipient{display:flex;gap:14px;align-items:center;padding:16px;background:#9e7bea12;border-radius:12px}
+.fima-exp-recipient img{width:56px;height:56px;border-radius:12px;object-fit:cover}
+.fima-exp-recipient strong,.fima-exp-recipient code{display:block}
+.fima-exp-recipient code{font-size:11px;overflow-wrap:anywhere;color:#b8aaca}
+.fima-exp-confirm{display:flex;gap:12px;align-items:flex-start;cursor:pointer;line-height:1.6;margin:18px 0}
+.fima-exp-confirm input{margin-top:5px;accent-color:#a387f5;flex-shrink:0}
+.fima-exp-warning{border-inline-start:3px solid #d8b66e;background:#d8b66e10;padding:14px;color:#eadbb8}
+.fima-account-experience button:hover,.fima-account-drawer button:hover{filter:brightness(1.15)}
+.fima-account-experience button:focus-visible,.fima-account-drawer :is(button,input):focus-visible{outline:2px solid #c5aaff;outline-offset:4px}
+.fima-account-drawer button:disabled{opacity:.45;cursor:not-allowed}
+.fima-feedback{margin-top:28px;padding-top:24px;border-top:1px solid rgba(183,159,235,.18);scroll-margin-top:100px}
+.fima-feedback>p,.fima-feedback-form small{color:#b4adc6;line-height:1.65;max-width:75ch}
+.fima-feedback-form{display:grid;gap:16px;max-width:760px}
+.fima-feedback-form label{display:grid;gap:8px;color:#d8d1e7;font-size:14px;min-width:0}
+.fima-feedback-form :is(input,select,textarea){box-sizing:border-box;width:100%;min-width:0;border:1px solid #ffffff25;border-radius:10px;background:#0c1020;color:#f1edfa;padding:12px;font:inherit;line-height:1.5}
+.fima-feedback-form textarea{resize:vertical}
+.fima-feedback-form :is(input,select,textarea):focus-visible{outline:2px solid #c5aaff;outline-offset:3px}
+.fima-feedback-form .button{justify-self:start;white-space:normal}
+.fima-feedback-form [data-feedback-status]{overflow-wrap:anywhere;line-height:1.65;margin:0;color:#c7ded5}
+.fima-guide-target{position:relative;z-index:80!important;outline:3px solid #c5aaff!important;outline-offset:7px;box-shadow:0 0 0 9999px rgba(5,7,16,.63)!important;scroll-margin-block:120px}
+.fima-account-drawer.is-spotlight{inset:auto 24px 24px auto;margin:0;z-index:90;max-height:45dvh;width:min(430px,calc(100vw - 48px))}
+[dir=rtl] .fima-account-drawer.is-spotlight{inset:auto auto 24px 24px}
+@media(max-width:900px){.fima-exp-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.fima-exp-time{grid-template-columns:1fr}}
+@media(max-width:560px){.fima-exp-toolbar,.fima-exp-time{padding:16px}.fima-exp-steps{padding:12px 16px;grid-template-columns:repeat(2,minmax(0,1fr))}.fima-exp-toolbar .button{font-size:12px;padding:9px}.fima-exp-step{font-size:12px}.fima-exp-search{flex-direction:column}.fima-exp-grant{align-items:flex-start;flex-direction:column}.fima-account-drawer header,.fima-exp-drawer-body{padding:18px}.fima-account-drawer.is-spotlight{inset:auto 16px 16px 16px;width:auto;max-height:36dvh}.fima-exp-actions{align-items:stretch}.fima-exp-actions .button{flex:1 1 160px}.fima-exp-duration{font-size:25px}}
+@media(prefers-reduced-motion:reduce){.fima-account-experience *,.fima-account-drawer *{scroll-behavior:auto!important;transition:none!important}}
+
 :root .account-reauth-dialog {
   box-sizing: border-box;
   width: min(480px, calc(100vw - 32px));

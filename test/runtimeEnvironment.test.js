@@ -38,8 +38,10 @@ test("only the exact owner-designated test guild can mutate in every environment
 
 test("high-risk Paradise setup and smoke routines use the exact test-guild assertion", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
-  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "create_missing" \}\)/);
-  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "rebuild" \}\)/);
+  assert.match(source, /assertParadiseMutationPolicy\(guild, mode, null, mutationPolicy, \{ confirmationRequired: false \}\)/);
+  assert.match(source, /await requireParadiseRebuildPreflight\(/);
+  assert.match(source, /production_community_only/);
+  assert.match(source, /production_guild_only/);
   assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "test_smoke" \}\)/);
   assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "auto_smoke" \}\)/);
 });

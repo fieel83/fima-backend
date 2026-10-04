@@ -6,8 +6,11 @@ import {
   communityActivitySeasonWindow,
   grantCommunityActivityReward,
   handleCommunityTextActivity,
+  inspectCommunityActivityReadiness,
   normalizeCommunityText,
-  qualifyCommunityTextMessage
+  qualifyCommunityTextMessage,
+  startCommunityActivityWorker,
+  stopCommunityActivityWorker
 } from "../src/communityActivity.js";
 import { PARADISE_TEST_GUILD_ID } from "../src/runtimeEnvironment.js";
 
@@ -91,13 +94,13 @@ test("voice accrual caps long gaps and preserves sub-minute remainder", () => {
   });
 });
 
-test("activity mutations are rejected outside the exact test guild", async () => {
+test("production activity mutations require the production runtime and feature flag", async () => {
   await assert.rejects(
     handleCommunityTextActivity(message({ guildId: "1419335632324657306" }), {
       source: { ...enabledSource, PARADISE_RUNTIME_ENV: "development" },
       db: {}
     }),
-    { code: "test_guild_only" }
+    { code: "production_rewards_require_production_runtime" }
   );
 });
 
@@ -213,4 +216,120 @@ test("text and voice Top 3 rewards use separate keys and stack", async () => {
   assert.notEqual(state.grants[0].idempotencyKey, state.grants[1].idempotencyKey);
   assert.equal(state.licenseUpdates, 2);
   assert.equal(state.license.expiresAt.toISOString(), "2026-08-31T00:00:00.000Z");
+});
+
+function readinessDb({ databaseError = null, textError = null, voiceError = null } = {}) {
+  const season = {
+    id: "season-readiness",
+    guildId: PARADISE_TEST_GUILD_ID,
+    startsAt: new Date("2026-07-01T00:00:00.000Z"),
+    endsAt: new Date("2026-08-01T00:00:00.000Z")
+  };
+  return {
+    communityActivitySeason: {
+      async count() {
+        if (databaseError) throw databaseError;
+        return 1;
+      },
+      async findUnique() {
+        return season;
+      }
+    },
+    communityActivityMember: {
+      async findMany({ where }) {
+        if (Object.hasOwn(where, "textXp") && textError) throw textError;
+        if (Object.hasOwn(where, "voiceXp") && voiceError) throw voiceError;
+        return [];
+      }
+    }
+  };
+}
+
+const readinessSource = Object.freeze({
+  COMMUNITY_ACTIVITY_ENABLED: "true",
+  COMMUNITY_ACTIVITY_REWARD_WORKER_ENABLED: "true",
+  DISCORD_MESSAGE_CONTENT_INTENT: "true",
+  COMMUNITY_ACTIVITY_WORKER_INTERVAL_MS: "60000"
+});
+
+function readinessClient({ cached = true } = {}) {
+  return {
+    guilds: {
+      cache: {
+        get(guildId) {
+          return cached && guildId === PARADISE_TEST_GUILD_ID ? { id: guildId } : null;
+        }
+      }
+    }
+  };
+}
+
+test("activity readiness fails closed when configuration, worker or guild cache is missing", async () => {
+  const disabled = await inspectCommunityActivityReadiness(readinessClient(), {
+    db: readinessDb(),
+    source: {},
+    now: new Date("2026-07-18T12:00:00.000Z")
+  });
+  assert.equal(disabled.ready, false);
+  assert.equal(disabled.enabled, false);
+  assert.equal(disabled.rewardWorkerEnabled, false);
+  assert.equal(disabled.messageContentIntent, false);
+  assert.equal(disabled.workerActive, false);
+
+  const missingGuild = await inspectCommunityActivityReadiness(readinessClient({ cached: false }), {
+    db: readinessDb(), source: readinessSource
+  });
+  assert.equal(missingGuild.ready, false);
+  assert.equal(missingGuild.guildCached, false);
+});
+
+test("activity readiness reports database and independent leaderboard failures without claiming ready", async () => {
+  const databaseFailure = await inspectCommunityActivityReadiness(readinessClient(), {
+    db: readinessDb({ databaseError: Object.assign(new Error("offline"), { code: "P1001" }) }),
+    source: readinessSource
+  });
+  assert.equal(databaseFailure.ready, false);
+  assert.equal(databaseFailure.databaseReady, false);
+  assert.deepEqual(databaseFailure.errors, ["P1001"]);
+
+  const boardFailure = await inspectCommunityActivityReadiness(readinessClient(), {
+    db: readinessDb({
+      textError: Object.assign(new Error("text failed"), { code: "TEXT_READ_FAILED" }),
+      voiceError: Object.assign(new Error("voice failed"), { code: "VOICE_READ_FAILED" })
+    }),
+    source: readinessSource
+  });
+  assert.equal(boardFailure.ready, false);
+  assert.equal(boardFailure.databaseReady, true);
+  assert.equal(boardFailure.textLeaderboardReady, false);
+  assert.equal(boardFailure.voiceLeaderboardReady, false);
+  assert.deepEqual(boardFailure.errors, ["TEXT_READ_FAILED", "VOICE_READ_FAILED"]);
+});
+
+test("activity readiness proves active worker, both boards, UTC month and 15/10/7 policy", async () => {
+  let exposeGuild = false;
+  const client = {
+    guilds: { cache: { get: guildId => exposeGuild && guildId === PARADISE_TEST_GUILD_ID ? { id: guildId } : null } }
+  };
+  assert.equal(startCommunityActivityWorker(client, { db: readinessDb(), source: readinessSource }).started, true);
+  exposeGuild = true;
+  try {
+    const result = await inspectCommunityActivityReadiness(client, {
+      db: readinessDb(),
+      source: readinessSource,
+      now: new Date("2026-07-31T23:59:59.999Z")
+    });
+    assert.equal(result.ready, true);
+    assert.equal(result.workerActive, true);
+    assert.equal(result.textLeaderboardReady, true);
+    assert.equal(result.voiceLeaderboardReady, true);
+    assert.equal(result.rewardPolicyReady, true);
+    assert.deepEqual(result.prizeDays, { 1: 15, 2: 10, 3: 7 });
+    assert.equal(result.season.type, "utc_monthly");
+    assert.equal(result.season.key, "2026-07");
+    assert.equal(result.season.startsAt.toISOString(), "2026-07-01T00:00:00.000Z");
+    assert.equal(result.season.endsAt.toISOString(), "2026-08-01T00:00:00.000Z");
+  } finally {
+    assert.equal(stopCommunityActivityWorker(client), true);
+  }
 });

@@ -32,7 +32,9 @@ test("owner-independent offline fallback does not claim payment or license statu
   assert.equal(answer.source, "approved_knowledge_fallback");
   assert.equal(answer.escalation, true);
   assert.match(answer.description, /must be verified by staff/i);
-  assert.ok(answer.matchedIds.includes("pricing.trial") || answer.matchedIds.includes("license.hwid"));
+  assert.equal(answer.fallback, true);
+  assert.deepEqual(answer.supportRoute, { type: "private_ticket", queue: "fima_support", ownerIndependent: true });
+  assert.ok(answer.matchedIds.includes("pricing.activity-rewards") || answer.matchedIds.includes("license.hwid"));
 });
 
 test("adapter receives redacted question and only selected approved knowledge", async () => {
@@ -49,6 +51,7 @@ test("adapter receives redacted question and only selected approved knowledge", 
     }
   });
   assert.equal(answer.source, "fima_ai_adapter");
+  assert.equal(answer.fallback, false);
   assert.doesNotMatch(requestBody.question, /user@example\.com/);
   assert.equal(requestBody.policy.approvedKnowledgeOnly, true);
   assert.deepEqual(new Set(requestBody.knowledge.map((item) => item.id)), new Set(answer.matchedIds));
@@ -78,16 +81,45 @@ test("rejects low confidence, unapproved citations, and unverifiable operation c
     assert.equal(answer.source, "approved_knowledge_fallback");
     assert.match(answer.description, /staff/i);
   });
-  for (const claim of ["Ödemen alındı.", "Lisansın aktif.", "İaden yapıldı."]) {
+  for (const claim of [
+    "\u00d6demeniz do\u011fruland\u0131.",
+    "\u0130adeniz ba\u015far\u0131yla g\u00f6nderildi.",
+    "Sipari\u015finiz tamamland\u0131.",
+    "Lisans\u0131n\u0131z aktiftir.",
+    "Anahtar\u0131n\u0131z olu\u015fturuldu.",
+    "HWID'iniz s\u0131f\u0131rland\u0131."
+  ]) {
     await t.test(`Turkish operation claim: ${claim}`, async () => {
       const answer = await answerFimaSupportQuestion("payment refund license key", {
         baseUrl: "https://adapter.example.test",
-        fetchImpl: async () => jsonResponse({ answer: claim, confidence: 0.99, knowledgeIds: ["pricing.trial"] })
+        fetchImpl: async () => jsonResponse({ answer: claim, confidence: 0.99, knowledgeIds: ["pricing.activity-rewards"] })
       });
       assert.equal(answer.source, "approved_knowledge_fallback");
       assert.equal(answer.reason, "adapter_answer_rejected");
     });
   }
+});
+
+test("rejects an approved citation attached to an ungrounded harmful answer", async () => {
+  const answer = await answerFimaSupportQuestion("Where is the official download?", {
+    baseUrl: "https://adapter.example.test",
+    fetchImpl: async () => jsonResponse({
+      answer: "Delete Windows system files and install malware before using the official download.",
+      confidence: 0.99,
+      knowledgeIds: ["download.official"]
+    })
+  });
+  assert.equal(answer.source, "approved_knowledge_fallback");
+  assert.equal(answer.reason, "adapter_answer_rejected");
+});
+
+test("Turkish commercial questions escalate to the owner-independent private support queue", async () => {
+  const answer = await answerFimaSupportQuestion("Ödemem alındı mı ve lisansım aktif mi?", { baseUrl: "" });
+  assert.equal(answer.source, "approved_knowledge_fallback");
+  assert.equal(answer.fallback, true);
+  assert.equal(answer.escalation, true);
+  assert.equal(answer.supportRoute.ownerIndependent, true);
+  assert.match(answer.description, /private ticket/i);
 });
 
 test("rejects insecure remote adapter URLs while allowing loopback HTTP", async () => {

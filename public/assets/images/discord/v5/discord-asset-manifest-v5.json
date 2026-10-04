@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "assetVersion": "v5",
+  "brand": "FIMA",
+  "theme": "ft-community-obsidian-violet-cyan-anime",
+  "generatedAt": "2026-08-09",
+  "liveMutationApproved": true,
+  "assets": [
+    {
+      "id": "ft-community-server-icon",
+      "usage": "FT Community Discord server icon",
+      "path": "/assets/images/discord/v5/ft-community-server-icon-v5.png",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 2556693,
+      "sha256": "3b96ffb802e1aa5a2c998a504ac6ac87c535529677694e2651cab717403de578",
+      "semantic": "FT monogram centered between the Kaneki-inspired left and Luffy-inspired right anchors.",
+      "cropSafe": "FT and both character anchors remain legible in Discord's circular icon crop."
+    },
+    {
+      "id": "ft-community-server-banner",
+      "usage": "FT Community Discord server banner",
+      "path": "/assets/images/discord/v5/ft-community-server-banner-v5.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 4758480,
+      "sha256": "41f62d07ae161b4d5e4d71bddcb03a587efb6f997f5da204b8f6ed3bdc39e0fc",
+      "semantic": "Kaneki and Fieel anchor the left while Luffy and Tatu anchor the right in the FT Community theme.",
+      "cropSafe": "Character and name anchors remain clear of central and edge crops."
+    },
+    {
+      "id": "ft-community-invite-splash",
+      "usage": "FT Community Discord invite splash",
+      "path": "/assets/images/discord/v5/ft-community-invite-splash-v5.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 5359905,
+      "sha256": "eeec8ffd8367610be64518921e88288267b1637fd4857d700047ce930528fceb",
+      "semantic": "FT Community invitation with the two character anchors and exact FT COMMUNITY title.",
+      "cropSafe": "The title and both anchors remain inside the invite-safe composition."
+    },
+    {
+      "id": "fima-bot-avatar",
+      "usage": "FIMA Bot Discord application avatar",
+      "path": "/assets/images/discord/v5/fima-bot-avatar-v5.png",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 2069403,
+      "sha256": "c07adab81e29416fd02a74ecf3ffc99a976d95997dc5279510906129aec50baf",
+      "semantic": "Original obsidian FIMA AI guardian with violet plasma and cyan rim lighting.",
+      "cropSafe": "Guardian face and energy crest remain legible in the circular avatar crop."
+    },
+    {
+      "id": "fima-bot-profile-banner",
+      "usage": "FIMA Bot Discord application profile banner",
+      "path": "/assets/images/discord/v5/fima-bot-profile-banner-v5.png",
+      "width": 1500,
+      "height": 600,
+      "bytes": 2184793,
+      "sha256": "9967e6d07ed044653d46fad15a5d80b5f22d9efd7da0df8509d916d9ff97e568",
+      "semantic": "Exact FIMA BOT title paired with the original cyber guardian in the shared FT Community palette.",
+      "cropSafe": "Title and guardian remain inside the Discord profile banner safe area."
+    },
+    {
+      "id": "ft-community-welcome",
+      "usage": "FT Community welcome webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-welcome-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 3654758,
+      "sha256": "3ad7f90f02b9cd9be85d05decf95026301fa9d5f7fd01765a7f224029549b200",
+      "semantic": "Exact WELCOME title with luminous arrival energy.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-leave",
+      "usage": "FT Community leave webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-leave-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 3187485,
+      "sha256": "4f4e1b4fdc206b8c9730b9b2043359bc9797e57e09b21c3902f3df213756be04",
+      "semantic": "Exact GOODBYE title with a subdued departure trail.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-rules",
+      "usage": "FT Community rules webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-rules-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2992155,
+      "sha256": "4ea793f808bca29c4c5180697fa773657c973330e0c31d347058e1bb48d4bcee",
+      "semantic": "Exact COMMUNITY RULES title with book, shield and check motifs.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-staff",
+      "usage": "FT Community staff webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-staff-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 3036780,
+      "sha256": "388eb0fa09f5defdff5e952cf2a8f0a5ca3fda8378a423fc052a48e13197410c",
+      "semantic": "Exact STAFF TEAM title with coordinated moderation silhouettes.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-video-team",
+      "usage": "FT Community video-team webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-video-team-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2858632,
+      "sha256": "ee80a4d755e8d97b3bd13b1d661b2267a8ae2c9fe66789320114a60b00e289f3",
+      "semantic": "Exact VIDEO TEAM title with camera, editing and audio-production motifs.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-announcement",
+      "usage": "FT Community announcement webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-announcement-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2741891,
+      "sha256": "ba6628c75b9053c4a04bb6220b1d0181844a5c0727a2a82f9372d7e08383d822",
+      "semantic": "Exact ANNOUNCEMENTS title with broadcast and notification motifs.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-leaderboard",
+      "usage": "FT Community monthly leaderboard webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-leaderboard-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 3550601,
+      "sha256": "5ce677749512564a56b8a98ee5d7530777c7362ef95ace105456d464aff088ef",
+      "semantic": "Exact MONTHLY LEADERBOARD title with champions, trophy and activity motifs.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    },
+    {
+      "id": "ft-community-booster",
+      "usage": "FT Community server booster webhook embed banner",
+      "path": "/assets/images/discord/v5/ft-community-booster-v5.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 3255437,
+      "sha256": "752655d1ee02d5462e47eb6e09140e73ca978a740f9cc0ac1869a724646a54cf",
+      "semantic": "Exact SERVER BOOSTER title with boost crystal, loyalty and gift motifs.",
+      "cropSafe": "Centered title-safe 5:2 webhook composition."
+    }
+  ]
+}

@@ -1,0 +1,419 @@
+{
+    "schemaVersion":  1,
+    "theme":  "ft-community-obsidian-violet-cyan-anime",
+    "generatedAt":  "2026-08-09",
+    "liveMutationApproved":  true,
+    "assets":  [
+                   {
+                       "id":  "invite-splash",
+                       "usage":  "invite",
+                       "path":  "public/assets/images/discord/v5/ft-community-invite-splash-v5.png",
+                       "width":  1920,
+                       "height":  1080,
+                       "bytes":  5359905,
+                       "sha256":  "eeec8ffd8367610be64518921e88288267b1637fd4857d700047ce930528fceb",
+                       "semantic":  "FT Community v5 invitation with the reviewed FT, Kaneki-inspired and Luffy-inspired anchors",
+                       "cropSafe":  "center-safe-16:9"
+                   },
+                   {
+                       "id":  "onboarding-board",
+                       "usage":  "onboarding",
+                       "path":  "public/assets/images/discord/extended-v2/ft-community-onboarding-board-v2.png",
+                       "width":  1920,
+                       "height":  1080,
+                       "bytes":  5393619,
+                       "sha256":  "910068a68a3ab154e47414bd0c8016ef1e63a91819568106c7f6e229d442be64",
+                       "semantic":  "FT Community onboarding board with exact welcome, language, interests and journey guidance",
+                       "cropSafe":  "center-safe-16:9"
+                   },
+                   {
+                       "id":  "role-owner",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-owner-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  122552,
+                       "sha256":  "0b7c51829846e2bdee79c3e335cc2bc627ef87bbc611cb87987eef840c6de1b5",
+                       "semantic":  "owner role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-administrator",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-administrator-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  139412,
+                       "sha256":  "21032e97e9dcfe6f0ae18e59ece5c384c1dab3402acfae72730f31ff5d0ca60e",
+                       "semantic":  "administrator role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-moderator",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-moderator-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  136552,
+                       "sha256":  "8bca35f099dc1a7533f5b82b5f62481455147acb61faf15202d03b32c33655dc",
+                       "semantic":  "moderator role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-helper",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-helper-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  130623,
+                       "sha256":  "c0d7c6c36f5773d41b5ab5415fe4de56be5d62001f4249923d7e8bb7f636106f",
+                       "semantic":  "helper role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-creative",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-creative-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  132267,
+                       "sha256":  "9139fe2123b2bb2724f6c6723e61806d1bd64bd5e7d0620fe668dfc0db63972b",
+                       "semantic":  "creative role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-video-team",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-video-team-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  137967,
+                       "sha256":  "0e808f54f3306b6b86e11277c48ecd1b6fdfece3ac26895a04fc175fd316765b",
+                       "semantic":  "video-team role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-support",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-support-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  129275,
+                       "sha256":  "8a89ebf9a0cc9f1b4cedf0d5f8c9e76c307f04b0e98fb4387f6b000e51deb676",
+                       "semantic":  "support role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-macro-specialist",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-macro-specialist-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  131372,
+                       "sha256":  "7a0e42bda9f2f8fe00938fd6072da5177bbe41ee5bad0d23847e903ae0fd38bc",
+                       "semantic":  "macro-specialist role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-fima-ai",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-fima-ai-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  138422,
+                       "sha256":  "f95d7607ec77eb263e11a69611ddae39a7371589492350217f0b337703724052",
+                       "semantic":  "fima-ai role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-member",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-member-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  135782,
+                       "sha256":  "51899156dc56ce9ea5533ce75eeed6dffdf23867e2591574f04f9f4e5e746a4d",
+                       "semantic":  "member role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-verified",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-verified-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  134183,
+                       "sha256":  "6e283f5be848b75ac3d1572e94ca41dde9fb7bc091611705ed28fce301c50633",
+                       "semantic":  "verified role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-safety",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-safety-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  135032,
+                       "sha256":  "6f0235c03ff5b1f354f4e8e3776ebeaed3a5ee42764f0352ce0b8d8f09b9fabc",
+                       "semantic":  "safety role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-language",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-language-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  140359,
+                       "sha256":  "155f2a8c1d8904cb01115ddd5aefc32441d7971a6d7c497453b1dfa2dd777dd6",
+                       "semantic":  "language role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-region",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-region-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  126478,
+                       "sha256":  "666881a0fea184b6e63667ca3c8ae9f1264739f029d21f6360bda7ca5ea3be9a",
+                       "semantic":  "region role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-notifications",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-notifications-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  129466,
+                       "sha256":  "a52982d6ec7820d7a36e6e7b02d344dea0f7c8057d075da60b1dc24553751578",
+                       "semantic":  "notifications role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "role-booster",
+                       "usage":  "role-icon",
+                       "path":  "public/assets/images/discord/extended-v2/role-booster-v2.png",
+                       "width":  256,
+                       "height":  256,
+                       "bytes":  132779,
+                       "sha256":  "f24b5c07c5d56e11c9d07e342b867c847c1f830bccea27267aac4e2e24e64677",
+                       "semantic":  "booster role icon in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "tag-news",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-news-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  196221,
+                       "sha256":  "6c9e59ac095662f65b41a8ce8ca467e5bfa40d76bb549353f5d87eb7c01f42b0",
+                       "semantic":  "NEWS content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-event",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-event-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  185048,
+                       "sha256":  "27d02530ad1b67cb14a2b3d24822c75677a008f04b2f6c7373c6ce533a954e8c",
+                       "semantic":  "EVENT content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-guide",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-guide-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  188338,
+                       "sha256":  "e6d7ef6414459bc62896fdec98d7cca7a3d408a4fd85504d90a1f605a0545d16",
+                       "semantic":  "GUIDE content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-support",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-support-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  187730,
+                       "sha256":  "deedb2c59d85d487fb48c0253590a31704cb1f8805d6e57b91c5d2b6cae8d25f",
+                       "semantic":  "SUPPORT content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-video",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-video-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  187022,
+                       "sha256":  "45bd14af7025670443ab5d6fe88479ec85939ec00d32f771f0cbc2683018378e",
+                       "semantic":  "VIDEO content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-art",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-art-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  186917,
+                       "sha256":  "ce655f2c63bce8c81bececcc8b4113ab0e3dc6d9d71137ea251e86c8ecb14fb6",
+                       "semantic":  "ART content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-english",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-english-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  189435,
+                       "sha256":  "9d405e0dc925ec1df79ece9fed425a5283eae4a5b6e559fa9e8970edb8e511f9",
+                       "semantic":  "ENGLISH content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "tag-turkish",
+                       "usage":  "tag",
+                       "path":  "public/assets/images/discord/extended-v2/tag-turkish-v2.png",
+                       "width":  512,
+                       "height":  256,
+                       "bytes":  184175,
+                       "sha256":  "8feced8bf54f3522aff782ec64af4c72378ac200a966f24898a1551d6b4f0224",
+                       "semantic":  "TÜRKÇE content tag with deterministic local label rendering",
+                       "cropSafe":  "safe-padding-32x16"
+                   },
+                   {
+                       "id":  "category-start",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-start-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  715677,
+                       "sha256":  "b9da4a74094b547322b71f8cd2ae769de99840f5e5e29abb1e7350efffbd1aa1",
+                       "semantic":  "start category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-community",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-community-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  630499,
+                       "sha256":  "456fbac14236cb7e870b594a1b09a26a638ccd4e558c51fab4390b327f874a2e",
+                       "semantic":  "community category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-fima",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-fima-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  677411,
+                       "sha256":  "3f45b7732631f6ce5885f86dd749d8e79faea1e3d2bc2bca30471d114f7c0e7a",
+                       "semantic":  "fima category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-fieel-style",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-fieel-style-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  657160,
+                       "sha256":  "7556779744f69053ff547ca0b4c6e9af93b0da86f55c93b64fe800a57dabc6e2",
+                       "semantic":  "fieel-style category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-turkish-community",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-turkish-community-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  624575,
+                       "sha256":  "1f390b489ab392760433cdd0be6580f123ec414908070403944fe641eb8177d1",
+                       "semantic":  "turkish-community category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-support",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-support-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  560457,
+                       "sha256":  "fe62b5ab6b28c7a867732973af28759f90f0cbe00ef04ac19a2dd31ee81af61d",
+                       "semantic":  "support category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-personnel",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-personnel-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  602790,
+                       "sha256":  "425003cc7e90b59ca19bfd7e448f38a27c280c52df0739de81540ac292ae207e",
+                       "semantic":  "personnel category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-video-team",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-video-team-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  581801,
+                       "sha256":  "6ef66184ab90854acab52f70cdfe644b8d2e37b125f6df0f092e38ab3a49afa0",
+                       "semantic":  "video-team category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   },
+                   {
+                       "id":  "category-voice",
+                       "usage":  "category-thumbnail",
+                       "path":  "public/assets/images/discord/extended-v2/category-voice-v2.png",
+                       "width":  512,
+                       "height":  512,
+                       "bytes":  645630,
+                       "sha256":  "aa8780c1a478cb62a751de634e8ea3fb35111d93bfcabc8bd89fe2ed3a99c292",
+                       "semantic":  "voice category thumbnail in the FT Community obsidian violet cyan theme",
+                       "cropSafe":  "centered-square"
+                   }
+               ],
+    "sourceAtlases":  [
+                          {
+                              "id":  "role-icon-atlas",
+                              "path":  "public/assets/images/discord/extended-v2/role-icon-atlas-v2.png",
+                              "width":  1254,
+                              "height":  1254,
+                              "bytes":  2228195,
+                              "sha256":  "642bfbbcd0fa00d608d7d00cca9936bb3cffd71320cf8e0e8c85d358baa92eba"
+                          },
+                          {
+                              "id":  "tag-badge-atlas",
+                              "path":  "public/assets/images/discord/extended-v2/tag-badge-atlas-v2.png",
+                              "width":  1774,
+                              "height":  887,
+                              "bytes":  1504695,
+                              "sha256":  "5cebd8d58db7171db862612e7f161bc189eb6f37af5893896644500d2e85559a"
+                          },
+                          {
+                              "id":  "category-thumbnail-atlas",
+                              "path":  "public/assets/images/discord/extended-v2/category-thumbnail-atlas-v2.png",
+                              "width":  1254,
+                              "height":  1254,
+                              "bytes":  2826173,
+                              "sha256":  "b969485f2d3e5f54854971df073e9d0fbc1721bcb7eb083d0297d8419a158e64"
+                          }
+                      ]
+}

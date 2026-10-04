@@ -1,24 +1,1424 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { ChannelType, Collection, PermissionsBitField } from "discord.js";
 import {
   applicationQuestionChunks, applyApprovedParadiseChallengeResult, assertUniqueParadiseRobloxIdentity, buildParadiseSafeLogEvent, canAssignRank, canRoleNamesApproveScore, challengeBlockReason, challengedLines, challengeTargetSpots, compareRanks,
-  isQuestionAnswerMatch,
+  isQuestionAnswerMatch, isFimaCommunityManagedGuild, inspectParadiseCanonicalTextEncoding,
   meetsMinimumChallengeRank, normalizeChallengeGroups,
   canViewParadiseLogEvent, evaluateParadiseContentSafety, localizeParadiseGuide, normalizeParadiseBrandColor, normalizeParadiseChallengeScore, paradiseBrandColorInteger, paradiseGuildContentLanguage, paradiseLogPolicy, PARADISE_GUIDE_TR_COPY, recordParadiseChallengeAudit, recordParadiseLeaderboardAudit,
   paradiseCommandAllowedForMode, paradiseCommands, paradiseRuntimeCommandAccess, paradiseSetupChannelType, paradiseSetupChannelTypeMismatch, PARADISE_CHANNEL_MAPPINGS, PARADISE_CLAN_ROLES, PARADISE_COMMUNITY_ROLES, PARADISE_SETUP_SCHEMAS, PARADISE_VOICE_CHANNEL_NAMES, rankPower, rankToRoleName, shortVerificationCode,
   maskParadiseTranscriptText, normalizeParadiseTicketCategory, paradiseSupportPanelPayload, paradiseSupportTicketControls, paradiseTicketCategoriesForMode, renderParadiseTicketChannelName, transitionParadiseSupportTicket,
   paradiseMainerAnnouncement, sanitizeTemporaryVoiceName, sessionLanguageCopy, trainingAnnouncementMarkdown, transitionParadiseWar, tryoutAnnouncementMarkdown,
   timedAvailabilityLines, paradiseXpPolicy, paradiseApplicationEvidenceRequirement, applicationPrivateReviewTarget,
-  createBlacklistAppealPrivateReview, inspectParadiseLiveSecurityReadiness, inspectParadiseLiveTestLabReadiness, paradiseAutoSmokeRepairAction
+  createBlacklistAppealPrivateReview, inspectParadiseCommunityLiveEvidenceReadiness, inspectParadiseLiveSecurityReadiness, paradiseAutoSmokeRepairAction,
+  paradiseChannelNameMatches, paradiseTextChannelByName,
+  paradiseCommunitySmokeEvidenceReadiness,
+  cleanupParadiseDesiredChannelDuplicates, cleanupParadiseDesiredRoleDuplicates,
+  ensureRole, repairParadiseCategoryVisibilityPermissions, repairParadiseCommunityChannelPermissions,
+  legacyPingRoleOptionsForTemplate, localizedHelp, memberHelpPayload,
+  paradiseAutoModRuleNamesForTemplate, paradiseGuildMutationLockStatus,
+  paradiseHelpCategoryKeysForTemplate, planParadiseAutoModRuleReconciliation,
+  planParadiseDesiredRoleDeduplication,
+  buildParadiseCommunityOperationalSemantics,
+  mergeParadiseCommunityAssetDefaults, paradiseCommunityGuideBannerUrl, paradiseCommunityVideoTeamPanelPayload,
+  inspectParadiseRoleIconReadiness, reconcileParadiseCommunityRoleIcons,
+  inspectParadiseCommunityExtendedRoleIconReadiness, reconcileParadiseCommunityExtendedRoleIcons,
+  isParadiseUnknownChannelError,
+  PARADISE_COMMUNITY_ASSETS, PARADISE_COMMUNITY_ROLE_ICONS,
+  PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS, PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN,
+  paradiseCommunityGuideThumbnailAttachment, paradiseCommunityGuideThumbnailUrl,
+  sanitizeParadiseCommunityRoleIconDescriptor, sanitizeParadiseHttpsUrl, sanitizeParadisePublicAssetBase,
+  publishParadiseGuidesFromDashboard, syncParadiseMappedPanels,
+  rebuildFimaCommunityProduction, rebuildParadiseTestTemplate,
+  rolePanelOptionsForTemplate, rolePanelRows,
+  verifyParadiseTemplateStructure, withParadiseGuildMutationLock,
+  FIMA_COMMUNITY_PRODUCTION_GUILD_ID, PARADISE_TEST_GUILD_ID
 } from "../src/paradise3a59.js";
+
+test("Unknown Channel is the only channel-delete error treated as idempotent", () => {
+  assert.equal(isParadiseUnknownChannelError({ code: 10003 }), true);
+  assert.equal(isParadiseUnknownChannelError({ rawError: { code: "10003" } }), true);
+  assert.equal(isParadiseUnknownChannelError({ cause: { code: 10003 } }), true);
+  assert.equal(isParadiseUnknownChannelError({ code: 50013 }), false);
+  assert.equal(isParadiseUnknownChannelError({ code: 50001 }), false);
+  assert.equal(isParadiseUnknownChannelError(new Error("Unknown Channel")), false);
+});
+
+test("canonical Discord rebuild templates are free of mojibake", () => {
+  for (const mode of Object.keys(PARADISE_SETUP_SCHEMAS)) {
+    const inspection = inspectParadiseCanonicalTextEncoding(mode);
+    assert.equal(inspection.ready, true, `${mode}: ${inspection.affected.join(", ")}`);
+    assert.equal(inspection.code, "canonical_text_encoding_verified");
+    assert.deepEqual(inspection.affected, []);
+  }
+  const unknown = inspectParadiseCanonicalTextEncoding("missing-template");
+  assert.equal(unknown.ready, false);
+  assert.equal(unknown.code, "canonical_template_unknown");
+});
+
+const deferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { promise, resolve, reject };
+};
+
+function canonicalizeExecutionProofValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalizeExecutionProofValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.keys(value).sort().map(key => [key, canonicalizeExecutionProofValue(value[key])])
+  );
+}
+
+function signedProductionExecutionProof(overrides = {}) {
+  const secret = "test-only-production-proof-secret-32-bytes";
+  const now = Date.now();
+  const unsigned = {
+    kind: "fima_production_rebuild_execution_proof",
+    schemaVersion: 1,
+    planId: "00000000-0000-4000-8000-000000000001",
+    guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+    mode: "community",
+    backupDigest: "a".repeat(64),
+    issuedAt: new Date(now - 1_000).toISOString(),
+    expiresAt: new Date(now + 60_000).toISOString(),
+    ...overrides
+  };
+  return {
+    secret,
+    proof: {
+      ...unsigned,
+      signature: crypto.createHmac("sha256", secret)
+        .update(JSON.stringify(canonicalizeExecutionProofValue(unsigned)))
+        .digest("hex")
+    }
+  };
+}
+
+function communityLiveEvidenceFixture({
+  applicationTitle = "FIMA APPLICATIONS",
+  fetchErrorKey = null,
+  staffChannelName = "staff-team"
+} = {}) {
+  const botUserId = "synthetic-bot-user";
+  const definitions = [
+    ["textActivity", "channel-text", "⌁・text-activity", "message-text", "FIMA · TEXT ACTIVITY"],
+    ["voiceActivity", "channel-voice", "⌁・voice-activity", "message-voice", "FIMA · VOICE ACTIVITY"],
+    ["activityRewards", "channel-rewards", "⌁・activity-rewards", "message-rewards", "FIMA · ACTIVITY REWARDS"],
+    ["application", "channel-application", "⌁・applications", "message-application", applicationTitle],
+    ["support", "channel-support", "⌁・support", "message-support", "FIMA SUPPORT"],
+    ["moderation", "channel-moderation", "〆・staff-security-logs", "message-moderation", "FIMA MODERATION · SAFE TEST"],
+    ["security", "channel-security", "quarantine-review", "message-security", "FIMA SECURITY · LIVE STATUS"],
+    ["help", "channel-help", "⌁・faq-help", "message-help", "✦ FIMA MEMBER HELP"],
+    ["staff", "channel-staff", staffChannelName, "message-staff", "✦ FIMA STAFF TEAM"]
+  ];
+  const messages = new Map();
+  const channels = definitions.map(([key, channelId, name, messageId, title]) => {
+    const message = { id: messageId, channelId, author: { id: botUserId }, embeds: [{ title }] };
+    messages.set(key, message);
+    return {
+      id: channelId,
+      name,
+      isTextBased: () => true,
+      messages: {
+        fetch: async requestedId => {
+          if (fetchErrorKey === key) throw new Error(`private-fetch-error-${messageId}`);
+          const current = messages.get(key);
+          return current?.id === requestedId ? current : null;
+        }
+      }
+    };
+  });
+  const channelByKey = new Map(definitions.map(([key, channelId]) => [
+    key,
+    channels.find(channel => channel.id === channelId)
+  ]));
+  const guild = {
+    id: PARADISE_TEST_GUILD_ID,
+    client: { user: { id: botUserId } },
+    channels: {
+      cache: new Collection(channels.map(channel => [channel.id, channel])),
+      fetch: async channelId => channels.find(channel => channel.id === channelId) || null
+    }
+  };
+  const guildConfig = {
+    language: "en",
+    channelMappings: {
+      level_channel: channelByKey.get("textActivity").id,
+      application_ticket_channel: channelByKey.get("application").id,
+      support_ticket_channel: channelByKey.get("support").id,
+      moderation_requests_channel: channelByKey.get("moderation").id,
+      quarantine_review_channel: channelByKey.get("security").id,
+      member_help_channel: channelByKey.get("help").id
+    },
+    smokePanelMessageIds: {
+      textActivity: messages.get("textActivity").id,
+      voiceActivity: messages.get("voiceActivity").id,
+      activityRewards: messages.get("activityRewards").id,
+      application: messages.get("application").id,
+      support: messages.get("support").id,
+      moderation: messages.get("moderation").id,
+      security: messages.get("security").id
+    },
+    commandGuideMessageIds: { community: messages.get("help").id },
+    staffTeamMessageId: messages.get("staff").id,
+    applicationSettings: { panelTitle: applicationTitle }
+  };
+  return { guild, guildConfig, messages, channelByKey };
+}
+
+test("Decorated Discord channel names resolve by normalized suffix", () => {
+  assert.equal(paradiseChannelNameMatches("⟡・top-10", "top-10"), true);
+  assert.equal(paradiseChannelNameMatches("〢・PERSONEL-MERKEZİ", "personel-merkezi"), true);
+  assert.equal(paradiseChannelNameMatches("ＳＴＡＦＦ－ＴＥＡＭ", "staff-team"), true);
+  assert.equal(paradiseChannelNameMatches("top-100", "top-10"), false);
+
+  const category = { id: "category", name: "⟡・top-10", isTextBased: () => false };
+  const textChannel = { id: "text", name: "⟡・top-10", isTextBased: () => true };
+  const guild = {
+    channels: { cache: new Collection([[category.id, category], [textChannel.id, textChannel]]) }
+  };
+  assert.equal(paradiseTextChannelByName(guild, "top-10"), textChannel);
+});
+
+test("Community live evidence readiness requires all nine canonical messages", async () => {
+  const fixture = communityLiveEvidenceFixture();
+  const result = await inspectParadiseCommunityLiveEvidenceReadiness(fixture.guild, fixture.guildConfig);
+  assert.equal(result.liveEvidenceAvailable, true);
+  assert.equal(result.ready, true);
+  assert.equal(result.verifiedCount, 9);
+  assert.equal(result.requiredCount, 9);
+});
+
+test("Community live evidence resolves the decorated personnel staff channel and fails closed if its message moved", async () => {
+  const fixture = communityLiveEvidenceFixture({ staffChannelName: "〢・personel-merkezi" });
+  const ready = await inspectParadiseCommunityLiveEvidenceReadiness(fixture.guild, fixture.guildConfig);
+  assert.equal(ready.staffTeamReady, true);
+  assert.equal(ready.ready, true);
+
+  fixture.messages.get("staff").channelId = "different-channel";
+  const moved = await inspectParadiseCommunityLiveEvidenceReadiness(fixture.guild, fixture.guildConfig);
+  assert.equal(moved.staffTeamReady, false);
+  assert.equal(moved.ready, false);
+});
+
+test("Community live evidence fails closed for deleted, moved, or retitled messages", async () => {
+  const deleted = communityLiveEvidenceFixture();
+  deleted.messages.delete("support");
+  const deletedResult = await inspectParadiseCommunityLiveEvidenceReadiness(deleted.guild, deleted.guildConfig);
+  assert.equal(deletedResult.ready, false);
+  assert.equal(deletedResult.supportPanelReady, false);
+
+  const moved = communityLiveEvidenceFixture();
+  moved.messages.get("moderation").channelId = "different-channel";
+  const movedResult = await inspectParadiseCommunityLiveEvidenceReadiness(moved.guild, moved.guildConfig);
+  assert.equal(movedResult.ready, false);
+  assert.equal(movedResult.moderationPanelReady, false);
+
+  const retitled = communityLiveEvidenceFixture();
+  retitled.messages.get("security").embeds[0].title = "UNVERIFIED SECURITY";
+  const retitledResult = await inspectParadiseCommunityLiveEvidenceReadiness(retitled.guild, retitled.guildConfig);
+  assert.equal(retitledResult.ready, false);
+  assert.equal(retitledResult.securityPanelReady, false);
+});
+
+test("Community live evidence accepts the sanitized configured application title", async () => {
+  const fixture = communityLiveEvidenceFixture({ applicationTitle: "  FIMA   HELPER APPLICATIONS  " });
+  fixture.messages.get("application").embeds[0].title = "FIMA HELPER APPLICATIONS";
+  const result = await inspectParadiseCommunityLiveEvidenceReadiness(fixture.guild, fixture.guildConfig);
+  assert.equal(result.applicationPanelReady, true);
+  assert.equal(result.ready, true);
+});
+
+test("Community live evidence hides fetch errors and never returns Discord identifiers or contents", async () => {
+  const fixture = communityLiveEvidenceFixture({ fetchErrorKey: "help" });
+  const result = await inspectParadiseCommunityLiveEvidenceReadiness(fixture.guild, fixture.guildConfig);
+  const serialized = JSON.stringify(result);
+  assert.equal(result.ready, false);
+  assert.equal(result.helpGuideReady, false);
+  assert.equal(serialized.includes("message-help"), false);
+  assert.equal(serialized.includes("channel-help"), false);
+  assert.equal(serialized.includes("private-fetch-error"), false);
+});
+
+test("Community live evidence rejects a canonical message posted by another author without leaking identifiers", async () => {
+  const fixture = communityLiveEvidenceFixture();
+  fixture.messages.get("help").author.id = "synthetic-untrusted-user";
+  const result = await inspectParadiseCommunityLiveEvidenceReadiness(fixture.guild, fixture.guildConfig);
+  const serialized = JSON.stringify(result);
+
+  assert.equal(result.ready, false);
+  assert.equal(result.helpGuideReady, false);
+  for (const sensitive of [
+    "synthetic-bot-user",
+    "synthetic-untrusted-user",
+    "message-help",
+    "channel-help",
+    "FIMA MEMBER HELP"
+  ]) {
+    assert.equal(serialized.includes(sensitive), false);
+  }
+});
+
+function communityRoleIconGuild({
+  guildId = PARADISE_TEST_GUILD_ID,
+  feature = true,
+  premiumTier = 0,
+  manageRoles = true,
+  correct = true,
+  roleIcons = PARADISE_COMMUNITY_ROLE_ICONS
+} = {}) {
+  const calls = [];
+  const everyone = {
+    id: guildId,
+    name: "@everyone",
+    managed: false,
+    editable: false,
+    position: 0,
+    icon: null,
+    unicodeEmoji: null,
+    permissions: new PermissionsBitField()
+  };
+  const roles = PARADISE_COMMUNITY_ROLES.map((name, index) => {
+    const descriptor = roleIcons[name] || null;
+    const sanitizedDescriptor = descriptor
+      ? sanitizeParadiseCommunityRoleIconDescriptor(descriptor)
+      : null;
+    const role = {
+      id: `role-${index + 1}`,
+      name,
+      managed: false,
+      editable: true,
+      position: index + 1,
+      icon: correct && sanitizedDescriptor?.kind === "icon"
+        ? sanitizedDescriptor.discordContentHash
+        : null,
+      _iconUrl: null,
+      unicodeEmoji: correct ? descriptor?.unicodeEmoji || null : null,
+      permissions: new PermissionsBitField(),
+      iconURL() {
+        return this._iconUrl || null;
+      },
+      async setUnicodeEmoji(unicodeEmoji) {
+        calls.push({ operation: "setUnicodeEmoji", roleName: name, unicodeEmoji });
+        this.icon = null;
+        this._iconUrl = null;
+        this.unicodeEmoji = unicodeEmoji;
+        return this;
+      },
+      async setIcon(iconBuffer) {
+        const contentHash = iconBuffer
+          ? crypto.createHash("md5").update(iconBuffer).digest("hex")
+          : null;
+        calls.push({
+          operation: "setIcon",
+          roleName: name,
+          isBuffer: Buffer.isBuffer(iconBuffer),
+          bytes: iconBuffer?.length || 0,
+          contentHash
+        });
+        this.icon = contentHash;
+        this._iconUrl = null;
+        this.unicodeEmoji = null;
+        return this;
+      },
+      async edit(options) {
+        calls.push({ operation: "edit", roleName: name, options });
+        if (Object.hasOwn(options, "icon")) {
+          this.icon = options.icon
+            ? crypto.createHash("md5").update(options.icon).digest("hex")
+            : null;
+          this._iconUrl = null;
+        }
+        if (Object.hasOwn(options, "unicodeEmoji")) this.unicodeEmoji = options.unicodeEmoji;
+        return this;
+      }
+    };
+    return role;
+  });
+  const cache = new Collection([[everyone.id, everyone], ...roles.map(role => [role.id, role])]);
+  const me = {
+    id: "fima-bot",
+    permissions: new PermissionsBitField(manageRoles ? [PermissionsBitField.Flags.ManageRoles] : []),
+    roles: { highest: { position: 1000 } }
+  };
+  const guild = {
+    id: guildId,
+    features: feature ? ["ROLE_ICONS"] : [],
+    premiumTier,
+    members: { me },
+    roles: {
+      everyone,
+      cache,
+      fetch: async () => cache
+    },
+    channels: { cache: new Collection() }
+  };
+  return {
+    guild,
+    calls,
+    rolesByName: new Map(roles.map(role => [role.name, role]))
+  };
+}
+
+test("Community role icon manifest covers semantic roles and rejects unsafe descriptors", () => {
+  const semanticRoles = PARADISE_COMMUNITY_ROLES.filter(name => !name.includes("━"));
+  assert.deepEqual(
+    new Set(Object.keys(PARADISE_COMMUNITY_ROLE_ICONS)),
+    new Set(semanticRoles)
+  );
+  assert.deepEqual(
+    sanitizeParadiseCommunityRoleIconDescriptor(PARADISE_COMMUNITY_ROLE_ICONS.Owner),
+    { kind: "unicode", unicodeEmoji: "👑" }
+  );
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({ unicodeEmoji: "🧨" }), null);
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({ iconUrl: "https://fimamacro.com/assets/role.png" }), null);
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({ assetId: "missing-role-asset" }), null);
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({ assetId: "category-start" }), null);
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({ assetId: "role-owner", unicodeEmoji: "👑" }), null);
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({ assetId: "role-owner" }), null);
+  assert.equal(sanitizeParadiseCommunityRoleIconDescriptor({
+    assetId: "role-owner",
+    sha256: "0".repeat(64)
+  }), null);
+  const reviewedIcon = sanitizeParadiseCommunityRoleIconDescriptor(
+    PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS.Owner
+  );
+  assert.equal(reviewedIcon.kind, "icon");
+  assert.equal(reviewedIcon.assetId, "role-owner");
+  assert.match(reviewedIcon.sha256, /^[a-f0-9]{64}$/);
+  assert.match(reviewedIcon.discordContentHash, /^[a-f0-9]{32}$/);
+});
+
+test("Community role icon reconciliation is hard-blocked outside managed community guilds", async () => {
+  const fixture = communityRoleIconGuild({ guildId: "unknown-guild", correct: false });
+  const result = await reconcileParadiseCommunityRoleIcons(fixture.guild);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.changed, 0);
+  assert.ok(result.blockers.some(blocker => blocker.code === "managed_community_guild_only"));
+  assert.equal(fixture.calls.length, 0);
+});
+
+test("Production FT Community role icons use the same managed reconciliation path", async () => {
+  const fixture = communityRoleIconGuild({
+    guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+    correct: true
+  });
+  const result = await reconcileParadiseCommunityRoleIcons(fixture.guild);
+  assert.equal(result.status, "verified");
+  assert.equal(result.blockers.length, 0);
+  assert.equal(result.readiness.scope, "managed_fima_community_guilds");
+});
+
+test("Community role icon preflight fails closed without ROLE_ICONS or sufficient boost tier", async () => {
+  const fixture = communityRoleIconGuild({ feature: false, premiumTier: 1, correct: false });
+  const result = await reconcileParadiseCommunityRoleIcons(fixture.guild);
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.some(blocker => blocker.code === "role_icons_feature_unavailable"));
+  assert.equal(fixture.calls.length, 0);
+
+  const boosted = communityRoleIconGuild({ feature: false, premiumTier: 2, correct: true });
+  const readiness = inspectParadiseRoleIconReadiness(boosted.guild);
+  assert.equal(readiness.capability.roleIconsAvailable, true);
+  assert.equal(readiness.ready, true);
+});
+
+test("Community role icon preflight requires ManageRoles and bot hierarchy", async () => {
+  const noPermission = communityRoleIconGuild({ manageRoles: false, correct: false });
+  const permissionResult = await reconcileParadiseCommunityRoleIcons(noPermission.guild);
+  assert.equal(permissionResult.status, "blocked");
+  assert.ok(permissionResult.blockers.some(blocker => blocker.code === "manage_roles_missing"));
+  assert.equal(noPermission.calls.length, 0);
+
+  const hierarchy = communityRoleIconGuild({ correct: true });
+  const owner = hierarchy.rolesByName.get("Owner");
+  owner.unicodeEmoji = null;
+  owner.position = 1001;
+  const hierarchyResult = await reconcileParadiseCommunityRoleIcons(hierarchy.guild);
+  assert.equal(hierarchyResult.status, "blocked");
+  assert.ok(hierarchyResult.blockers.some(blocker =>
+    blocker.code === "role_icon_target_above_bot" && blocker.roleName === "Owner"
+  ));
+  assert.equal(hierarchy.calls.length, 0);
+});
+
+test("Community role icon reconciliation is idempotent and clears divider icons", async () => {
+  const fixture = communityRoleIconGuild({ correct: true });
+  const first = await reconcileParadiseCommunityRoleIcons(fixture.guild);
+  assert.equal(first.status, "verified");
+  assert.equal(first.changed, 0);
+  assert.equal(fixture.calls.length, 0);
+
+  const divider = fixture.rolesByName.get(PARADISE_COMMUNITY_ROLES.find(name => name.includes("━")));
+  divider.unicodeEmoji = "👑";
+  const repaired = await reconcileParadiseCommunityRoleIcons(fixture.guild);
+  assert.equal(repaired.status, "verified");
+  assert.equal(repaired.changed, 1);
+  assert.equal(divider.unicodeEmoji, null);
+  assert.equal(fixture.calls.length, 1);
+
+  const repeated = await reconcileParadiseCommunityRoleIcons(fixture.guild);
+  assert.equal(repeated.changed, 0);
+  assert.equal(fixture.calls.length, 1);
+});
+
+test("Community role icon Discord failures retain live error evidence", async () => {
+  const fixture = communityRoleIconGuild({ correct: true });
+  const owner = fixture.rolesByName.get("Owner");
+  const discordFailure = Object.assign(new Error("Missing Permissions"), { code: "50013" });
+  owner.unicodeEmoji = null;
+  owner.setUnicodeEmoji = async () => { throw discordFailure; };
+
+  await assert.rejects(
+    reconcileParadiseCommunityRoleIcons(fixture.guild),
+    error => error.code === "role_icon_reconcile_failed"
+      && error.roleId === owner.id
+      && error.roleName === "Owner"
+      && error.discordCode === "50013"
+      && error.cause === discordFailure
+  );
+});
+
+test("Extended FT Community role icons fail closed when the visual plan is not approved", async () => {
+  const unapprovedVisualPlan = {
+    ...PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN,
+    liveMutationApproved: false
+  };
+  const fixture = communityRoleIconGuild({
+    correct: false,
+    roleIcons: PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS
+  });
+  const readiness = inspectParadiseCommunityExtendedRoleIconReadiness(fixture.guild, {
+    visualPlan: unapprovedVisualPlan
+  });
+  assert.equal(readiness.canReconcile, false);
+  assert.ok(readiness.blockers.some(blocker => blocker.code === "ft_community_visual_live_mutation_not_approved"));
+
+  const result = await reconcileParadiseCommunityExtendedRoleIcons(fixture.guild, {
+    visualPlan: unapprovedVisualPlan
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.changed, 0);
+  assert.deepEqual(fixture.calls, []);
+});
+
+test("Approved extended FT Community role icons reconcile once and remain idempotent", async () => {
+  const approvedVisualPlan = {
+    ...PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN,
+    liveMutationApproved: true
+  };
+  const fixture = communityRoleIconGuild({
+    correct: false,
+    roleIcons: PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS
+  });
+
+  const first = await reconcileParadiseCommunityExtendedRoleIcons(fixture.guild, {
+    visualPlan: approvedVisualPlan,
+    roleIconEvidence: {}
+  });
+  assert.equal(first.status, "verified");
+  assert.equal(first.changed, Object.keys(PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS).length);
+  assert.equal(fixture.calls.length, Object.keys(PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS).length);
+  assert.ok(fixture.calls.every(call => call.operation === "setIcon"));
+  assert.ok(fixture.calls.every(call => call.isBuffer === true));
+  assert.ok(fixture.calls.every(call => call.bytes > 0));
+  assert.ok(fixture.calls.every(call => /^[a-f0-9]{32}$/.test(call.contentHash)));
+  assert.equal(Object.keys(first.roleIconEvidence).length, Object.keys(PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS).length);
+  for (const [roleId, evidence] of Object.entries(first.roleIconEvidence)) {
+    assert.equal(fixture.guild.roles.cache.get(roleId).icon, evidence.iconHash);
+    assert.match(evidence.sha256, /^[a-f0-9]{64}$/);
+  }
+
+  fixture.calls.length = 0;
+  const repeated = await reconcileParadiseCommunityExtendedRoleIcons(fixture.guild, {
+    visualPlan: approvedVisualPlan,
+    roleIconEvidence: first.roleIconEvidence
+  });
+  assert.equal(repeated.status, "verified");
+  assert.equal(repeated.changed, 0);
+  assert.deepEqual(fixture.calls, []);
+});
+
+test("FT Community guide thumbnails resolve from the approved manifest and fail closed otherwise", () => {
+  const expected = PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN.surfaces.categoryThumbnails.start;
+  assert.equal(paradiseCommunityGuideThumbnailUrl("rules"), expected);
+  assert.equal(paradiseCommunityGuideThumbnailUrl("unknown"), null);
+
+  const unapprovedVisualPlan = {
+    ...PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN,
+    liveMutationApproved: false
+  };
+  assert.match(expected, /^https:\/\//);
+  assert.equal(paradiseCommunityGuideThumbnailUrl("rules", unapprovedVisualPlan), null);
+  assert.equal(paradiseCommunityGuideThumbnailUrl("unknown", unapprovedVisualPlan), null);
+
+  const attachment = paradiseCommunityGuideThumbnailAttachment("rules");
+  assert.equal(attachment.assetId, "category-start");
+  assert.match(attachment.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(attachment.url, `attachment://${attachment.file.name}`);
+  assert.ok(Buffer.isBuffer(attachment.file.attachment));
+  assert.ok(attachment.file.attachment.length > 0);
+  assert.equal(paradiseCommunityGuideThumbnailAttachment("unknown"), null);
+  assert.equal(paradiseCommunityGuideThumbnailAttachment("rules", unapprovedVisualPlan), null);
+  assert.equal(paradiseCommunityGuideThumbnailAttachment("rules", {
+    ...PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN,
+    assetBindings: {
+      ...PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN.assetBindings,
+      categoryThumbnails: {
+        ...PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN.assetBindings.categoryThumbnails,
+        start: { assetId: "category-start", sha256: "0".repeat(64) }
+      }
+    }
+  }), null);
+});
+
+test("Community template verification enforces approved extended bitmap role icon evidence", () => {
+  const fixture = communityRoleIconGuild({
+    correct: true,
+    roleIcons: PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS
+  });
+  const roleIconEvidence = Object.fromEntries(
+    [...fixture.guild.roles.cache.values()]
+      .filter(role => PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS[role.name])
+      .map(role => {
+        const expected = sanitizeParadiseCommunityRoleIconDescriptor(
+          PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS[role.name]
+        );
+        return [role.id, {
+          assetId: expected.assetId,
+          sha256: expected.sha256,
+          iconHash: role.icon
+        }];
+      })
+  );
+  const verified = verifyParadiseTemplateStructure(
+    fixture.guild,
+    PARADISE_SETUP_SCHEMAS.community,
+    { roleIconEvidence }
+  );
+  assert.equal(verified.roleIconReadiness.ready, true);
+  assert.deepEqual(verified.roleIconMismatches, []);
+  assert.deepEqual(verified.roleIconBlockers, []);
+
+  fixture.rolesByName.get("Owner").icon = null;
+  const mismatch = verifyParadiseTemplateStructure(
+    fixture.guild,
+    PARADISE_SETUP_SCHEMAS.community,
+    { roleIconEvidence }
+  );
+  assert.equal(mismatch.ready, false);
+  assert.ok(mismatch.roleIconMismatches.some(item => item.roleName === "Owner"));
+});
+
+test("Community setup, missing-only repair, and smoke readiness use extended bitmap role icons", async () => {
+  const source = await (await import("node:fs/promises"))
+    .readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(source, /await reconcileParadiseCommunityExtendedRoleIcons\(interaction\.guild\)/);
+  assert.match(source, /await reconcileParadiseCommunityExtendedRoleIcons\(guild\)/);
+  assert.match(source, /inspectParadiseCommunityExtendedRoleIconReadiness\(guild, roleIconOptions\)/);
+  assert.equal(
+    (source.match(/inspectParadiseCommunityExtendedRoleIconReadiness\(guild\)/g) || []).length,
+    2
+  );
+});
+
+test("Community managed guild scope includes only test and production FT Community", () => {
+  assert.equal(isFimaCommunityManagedGuild(PARADISE_TEST_GUILD_ID), true);
+  assert.equal(isFimaCommunityManagedGuild(FIMA_COMMUNITY_PRODUCTION_GUILD_ID), true);
+  assert.equal(isFimaCommunityManagedGuild("unknown-guild"), false);
+  assert.equal(isFimaCommunityManagedGuild(null), false);
+});
+
+test("Community branding defaults are HTTPS-only, scoped to managed guilds, and non-mutating", () => {
+  const input = {
+    welcomeSettings: {
+      bannerUrl: "https://cdn.example.test/custom-welcome.png",
+      leaveBannerUrl: "http://cdn.example.test/unsafe-leave.png"
+    },
+    staffTeamBannerUrl: "https://cdn.example.test/custom-staff.png",
+    videoTeamBannerUrl: "https://user:secret@cdn.example.test/unsafe-video.png",
+    banners: {
+      staffTeam: "javascript:alert(1)",
+      videoTeam: "https://cdn.example.test/custom-video.png"
+    },
+    videoTeamMessageId: "video-message-42",
+    untouched: { enabled: true }
+  };
+  const before = structuredClone(input);
+  const merged = mergeParadiseCommunityAssetDefaults(input, {
+    guildId: PARADISE_TEST_GUILD_ID,
+    mode: "community"
+  });
+
+  assert.deepEqual(input, before);
+  assert.notEqual(merged, input);
+  assert.equal(merged.welcomeSettings.bannerUrl, input.welcomeSettings.bannerUrl);
+  assert.equal(merged.welcomeSettings.leaveBannerUrl, PARADISE_COMMUNITY_ASSETS.leave);
+  assert.equal(merged.staffTeamBannerUrl, input.staffTeamBannerUrl);
+  assert.equal(merged.banners.staffTeam, PARADISE_COMMUNITY_ASSETS.staffTeam);
+  assert.equal(merged.videoTeamBannerUrl, PARADISE_COMMUNITY_ASSETS.videoTeam);
+  assert.equal(merged.banners.videoTeam, input.banners.videoTeam);
+  assert.equal(merged.videoTeamMessageId, "video-message-42");
+  assert.deepEqual(merged.untouched, { enabled: true });
+
+  const production = mergeParadiseCommunityAssetDefaults(input, {
+    guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+    mode: "community"
+  });
+  assert.equal(production.welcomeSettings.bannerUrl, input.welcomeSettings.bannerUrl);
+  assert.equal(production.welcomeSettings.leaveBannerUrl, PARADISE_COMMUNITY_ASSETS.leave);
+  assert.equal(production.videoTeamBannerUrl, PARADISE_COMMUNITY_ASSETS.videoTeam);
+  assert.deepEqual(
+    mergeParadiseCommunityAssetDefaults(input, { guildId: "unknown-guild", mode: "community" }),
+    input
+  );
+  assert.deepEqual(
+    mergeParadiseCommunityAssetDefaults(input, { guildId: PARADISE_TEST_GUILD_ID, mode: "clan" }),
+    input
+  );
+});
+
+test("Community canonical image URLs and Video Team payload use the versioned banner assets", () => {
+  for (const [key, value] of Object.entries(PARADISE_COMMUNITY_ASSETS)) {
+    assert.equal(new URL(value).protocol, "https:", key);
+    assert.match(
+      value,
+      /\/assets\/images\/discord\/v5\/ft-community-(?:welcome|leave|rules|staff|video-team|announcement|leaderboard|booster)-v5\.png$/
+    );
+  }
+  assert.equal(paradiseCommunityGuideBannerUrl("rules"), PARADISE_COMMUNITY_ASSETS.rules);
+  assert.equal(paradiseCommunityGuideBannerUrl("challenge_rules"), null);
+  assert.equal(paradiseCommunityGuideBannerUrl("announcement"), PARADISE_COMMUNITY_ASSETS.announcement);
+  assert.equal(paradiseCommunityGuideBannerUrl("booster"), PARADISE_COMMUNITY_ASSETS.booster);
+  const payload = paradiseCommunityVideoTeamPanelPayload({ language: "tr" });
+  const embed = payload.embeds[0].toJSON();
+  assert.equal(embed.title, "✦ FIMA VIDEO TEAM");
+  assert.equal(embed.image.url, PARADISE_COMMUNITY_ASSETS.videoTeam);
+  assert.match(embed.description, /〆・video-upload-schedule/);
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("〆・video-hub")));
+});
+
+test("Paradise image URL sanitizer rejects insecure, credentialed, script, and malformed values", () => {
+  assert.equal(sanitizeParadiseHttpsUrl("https://cdn.example.test/banner.png"), "https://cdn.example.test/banner.png");
+  assert.equal(sanitizeParadiseHttpsUrl("http://cdn.example.test/banner.png"), null);
+  assert.equal(sanitizeParadiseHttpsUrl("https://user:secret@cdn.example.test/banner.png"), null);
+  assert.equal(sanitizeParadiseHttpsUrl("javascript:alert(1)"), null);
+  assert.equal(sanitizeParadiseHttpsUrl("not a URL"), null);
+});
+
+test("Paradise public asset base is HTTPS-only and strips query or fragment state", () => {
+  assert.equal(sanitizeParadisePublicAssetBase("https://cdn.example.test/fima/?cache=1#asset"), "https://cdn.example.test/fima");
+  assert.equal(sanitizeParadisePublicAssetBase("http://cdn.example.test"), "https://fimamacro.com");
+  assert.equal(sanitizeParadisePublicAssetBase("https://user:secret@cdn.example.test"), "https://fimamacro.com");
+  assert.equal(sanitizeParadisePublicAssetBase("javascript:alert(1)"), "https://fimamacro.com");
+});
+
+test("Community staff and lifecycle consumers never accept HTTP image URLs", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  const staffStart = source.indexOf("async function updateStaffTeamEmbed");
+  const staffEnd = source.indexOf("export async function handleParadiseGuildMemberUpdate", staffStart);
+  const lifecycleStart = source.indexOf("async function sendMemberLifecycleMessage");
+  const lifecycleEnd = source.indexOf("export async function handleParadiseGuildMemberAdd", lifecycleStart);
+  assert.ok(staffStart >= 0 && staffEnd > staffStart);
+  assert.ok(lifecycleStart >= 0 && lifecycleEnd > lifecycleStart);
+  assert.match(source.slice(staffStart, staffEnd), /sanitizeParadiseHttpsUrl/);
+  assert.match(source.slice(staffStart, staffEnd), /〆・staff-hub/);
+  assert.doesNotMatch(source.slice(staffStart, staffEnd), /\^https\?:/);
+  assert.match(source.slice(lifecycleStart, lifecycleEnd), /sanitizeParadiseHttpsUrl/);
+  assert.match(source.slice(lifecycleStart, lifecycleEnd), /mergeParadiseCommunityAssetDefaults/);
+});
+
+test("community help excludes competitive commands while clan help preserves them", () => {
+  const community = localizedHelp("en-US", "community");
+  assert.match(community, /FIMA commands/);
+  assert.doesNotMatch(community, /profile|rank|leaderboard|verifyroblox|challenge|training|tryout|referee/i);
+  assert.match(community, /\/help/);
+
+  const communityCategories = paradiseHelpCategoryKeysForTemplate("community");
+  for (const scope of ["profile", "leaderboard", "challenge", "training", "tryout", "referee"]) {
+    assert.equal(communityCategories.includes(scope), false);
+  }
+
+  const clan = localizedHelp("en-US", "clan");
+  assert.match(clan, /\/tryout start/);
+  assert.match(clan, /\/training start/);
+  assert.doesNotMatch(clan, /\/paradise(?:training|help)/);
+  assert.match(clan, /\/challenge create/);
+  for (const scope of ["profile", "leaderboard", "challenge", "training", "tryout", "referee"]) {
+    assert.equal(paradiseHelpCategoryKeysForTemplate("clan").includes(scope), true);
+    assert.equal(paradiseHelpCategoryKeysForTemplate("tsbtr").includes(scope), true);
+  }
+});
+
+test("template-aware AutoMod names migrate safely without deleting managed duplicates", () => {
+  const community = paradiseAutoModRuleNamesForTemplate("community");
+  const clan = paradiseAutoModRuleNamesForTemplate("clan");
+  assert.equal(community.link, "FIMA Invite & Scam Link Guard");
+  assert.equal(community.mention, "FIMA Mention Spam Guard");
+  assert.equal(clan.link, "FIMA Bot Invite & Scam Link Guard");
+  assert.equal(clan.mention, "FIMA Bot Mention Spam Guard");
+  for (const name of [community.link, community.mention, clan.link, clan.mention]) {
+    assert.equal(community.managed.includes(name), true);
+  }
+
+  const migration = planParadiseAutoModRuleReconciliation([clan.link], "community");
+  assert.equal(migration.rules.find(item => item.key === "link").action, "rename");
+  const duplicate = planParadiseAutoModRuleReconciliation([community.link, clan.link], "community");
+  assert.deepEqual(duplicate.rules.find(item => item.key === "link"), {
+    key: "link",
+    desiredName: community.link,
+    existingName: community.link,
+    action: "keep",
+    duplicateNames: [clan.link]
+  });
+});
+
+test("community notification panel exposes only the eight canonical FIMA roles", () => {
+  const options = rolePanelOptionsForTemplate("ping", "community");
+  assert.deepEqual(options.map(option => option.role), [
+    "Product Notifications", "FIMA Updates", "FIMA Macro Updates", "FIMA AI Updates",
+    "Fieel Content Notifications", "Tatu Content Notifications", "Event Notifications", "Security Alerts"
+  ]);
+  assert.equal(options.some(option => /Training|Tryout|Spar|Tournament/.test(option.role)), false);
+
+  const rows = rolePanelRows("ping", "en", "community").map(row => row.toJSON());
+  assert.deepEqual(rows.map(row => row.components.length), [5, 3]);
+  assert.equal(rows.flatMap(row => row.components).length, 8);
+});
+
+test("clan notification panel retains competitive role choices", () => {
+  const roles = rolePanelOptionsForTemplate("ping", "clan").map(option => option.role);
+  assert.ok(roles.includes("Training Ping"));
+  assert.ok(roles.includes("Tryout Ping"));
+  assert.ok(roles.includes("Spar Ping"));
+  assert.ok(roles.includes("Tournament Ping"));
+});
+
+test("legacy Community ping compatibility cannot create competitive roles", () => {
+  assert.deepEqual(legacyPingRoleOptionsForTemplate("community"), [
+    { value: "Event", role: "Event Notifications" }
+  ]);
+  assert.ok(legacyPingRoleOptionsForTemplate("clan").some(option => option.role === "Training Ping"));
+});
+
+test("member help uses the visible brand selected by the server template", () => {
+  const community = memberHelpPayload([], "en", null, "community").embeds[0].toJSON();
+  const clan = memberHelpPayload([], "en", null, "clan").embeds[0].toJSON();
+  assert.equal(community.title, "✦ FIMA MEMBER HELP");
+  assert.match(community.description, /No FIMA member command/);
+  assert.equal(clan.title, "✦ FIMA BOT MEMBER HELP");
+  assert.match(clan.description, /No FIMA Bot member command/);
+});
+
+test("guild mutation lock is re-entrant for nested work on the same guild", async () => {
+  const events = [];
+  const result = await withParadiseGuildMutationLock("guild-lock-nested", "outer", async () => {
+    const outerStatus = paradiseGuildMutationLockStatus("guild-lock-nested");
+    events.push(["outer", outerStatus.active?.operation, outerStatus.active?.depth]);
+    return withParadiseGuildMutationLock("guild-lock-nested", "inner", async () => {
+      const nestedStatus = paradiseGuildMutationLockStatus("guild-lock-nested");
+      events.push(["inner", nestedStatus.active?.operation, nestedStatus.active?.depth]);
+      return "nested-result";
+    });
+  });
+
+  assert.equal(result, "nested-result");
+  assert.deepEqual(events, [["outer", "outer", 1], ["inner", "outer", 1]]);
+  await new Promise(resolve => queueMicrotask(resolve));
+  assert.deepEqual(paradiseGuildMutationLockStatus("guild-lock-nested"), {
+    guildId: "guild-lock-nested", locked: false, acquiring: false, waiting: 0, active: null
+  });
+});
+
+test("guild mutation lock serializes concurrent work and reports waiting operations", async () => {
+  const firstEntered = deferred();
+  const releaseFirst = deferred();
+  const events = [];
+  const first = withParadiseGuildMutationLock("guild-lock-serial", "first", async () => {
+    events.push("first:start");
+    firstEntered.resolve();
+    await releaseFirst.promise;
+    events.push("first:end");
+  });
+  await firstEntered.promise;
+  const second = withParadiseGuildMutationLock("guild-lock-serial", "second", async () => {
+    events.push("second:start");
+    events.push("second:end");
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  const queuedStatus = paradiseGuildMutationLockStatus("guild-lock-serial");
+  assert.equal(queuedStatus.locked, true);
+  assert.equal(queuedStatus.waiting, 1);
+  assert.equal(queuedStatus.active?.operation, "first");
+  assert.deepEqual(events, ["first:start"]);
+
+  releaseFirst.resolve();
+  await Promise.all([first, second]);
+  assert.deepEqual(events, ["first:start", "first:end", "second:start", "second:end"]);
+});
+
+test("guild mutation queue continues after a failed operation", async () => {
+  const failure = withParadiseGuildMutationLock("guild-lock-failure", "failing", async () => {
+    throw Object.assign(new Error("expected failure"), { code: "expected_failure" });
+  });
+  const recovery = withParadiseGuildMutationLock("guild-lock-failure", "recovery", async () => "recovered");
+
+  await assert.rejects(failure, { code: "expected_failure" });
+  assert.equal(await recovery, "recovered");
+});
+
+test("guild mutation locks allow different guilds to progress in parallel", async () => {
+  const releaseA = deferred();
+  const enteredA = deferred();
+  const first = withParadiseGuildMutationLock("guild-lock-a", "hold", async () => {
+    enteredA.resolve();
+    await releaseA.promise;
+  });
+  await enteredA.promise;
+
+  const second = withParadiseGuildMutationLock("guild-lock-b", "parallel", async () => "guild-b-finished");
+  assert.equal(await second, "guild-b-finished");
+  assert.equal(paradiseGuildMutationLockStatus("guild-lock-a").locked, true);
+  releaseA.resolve();
+  await first;
+});
+
+test("guide publishing and mapped-panel sync serialize on the same guild lease", async () => {
+  const guideSendEntered = deferred();
+  const releaseGuideSend = deferred();
+  const guideChannel = {
+    id: "guide-channel",
+    name: "bot-commands",
+    isTextBased: () => true,
+    messages: { fetch: async () => null },
+    send: async () => {
+      guideSendEntered.resolve();
+      await releaseGuideSend.promise;
+      return { id: "guide-message", pin: async () => null };
+    }
+  };
+  const guild = {
+    id: "guild-guide-panel-serial",
+    channels: {
+      cache: new Collection([[guideChannel.id, guideChannel]]),
+      fetch: async () => null
+    }
+  };
+
+  const guides = publishParadiseGuidesFromDashboard(guild, "community");
+  await guideSendEntered.promise;
+  const panels = syncParadiseMappedPanels(guild);
+  await new Promise(resolve => setImmediate(resolve));
+
+  const queued = paradiseGuildMutationLockStatus(guild.id);
+  assert.equal(queued.active?.operation, "publish_guides");
+  assert.equal(queued.waiting, 1);
+
+  releaseGuideSend.resolve();
+  const [guideResult, panelResult] = await Promise.all([guides, panels]);
+  assert.equal(guideResult.posted, 1);
+  assert.equal(guideResult.verified, 0);
+  assert.equal(guideResult.ready, false);
+  assert.deepEqual(panelResult, { updated: 0, skipped: 1, details: [
+    { panel: "challenge_create", status: "skipped", reason: "not_mapped" }
+  ] });
+});
+
+test("role deduplication prefers member-bearing canonical roles and protects unsafe duplicates", () => {
+  const member = { id: "member" };
+  const emptyLow = { id: "empty-low", name: "Helper", managed: false, position: 2, members: new Collection() };
+  const populated = {
+    id: "populated", name: "Helper", managed: false, position: 3,
+    members: new Collection([[member.id, member]])
+  };
+  const populatedHigher = {
+    id: "populated-higher", name: "Helper", managed: false, position: 4,
+    members: new Collection([[member.id, member]])
+  };
+  const managed = { id: "managed", name: "Helper", managed: true, position: 1, members: new Collection() };
+  const aboveBot = { id: "above-bot", name: "Helper", managed: false, position: 20, members: new Collection() };
+  const everyone = { id: "guild-role", name: "Helper", managed: false, position: 0, members: new Collection() };
+
+  const plan = planParadiseDesiredRoleDeduplication(
+    [emptyLow, populated, populatedHigher, managed, aboveBot, everyone],
+    { everyoneRoleId: everyone.id, botHighestPosition: 10 }
+  );
+
+  assert.equal(plan.canonical, populatedHigher);
+  assert.deepEqual(
+    plan.duplicateActions.map(({ role, protection }) => [role.id, protection]),
+    [
+      ["empty-low", null],
+      ["populated", null],
+      ["managed", "managed_role"],
+      ["above-bot", "above_bot_hierarchy"],
+      ["guild-role", "everyone_role"]
+    ]
+  );
+});
+
+test("role deduplication never chooses a member-heavy role above the bot hierarchy", () => {
+  const members = new Collection(Array.from({ length: 20 }, (_, index) => [
+    `member-${index}`,
+    { id: `member-${index}` }
+  ]));
+  const safe = { id: "safe", name: "Helper", managed: false, position: 4, members: new Collection() };
+  const unsafe = { id: "unsafe", name: "Helper", managed: false, position: 12, members };
+
+  const plan = planParadiseDesiredRoleDeduplication([unsafe, safe], {
+    everyoneRoleId: "guild",
+    botHighestPosition: 10
+  });
+
+  assert.equal(plan.canonical, safe);
+  assert.deepEqual(plan.duplicateActions.map(({ role, protection }) => [role.id, protection]), [
+    ["unsafe", "above_bot_hierarchy"]
+  ]);
+});
+
+function duplicateRoleCleanupFixture({ migrationFails = false } = {}) {
+  const migrations = [];
+  const deleted = [];
+  const canonicalMembers = new Collection([
+    ["canonical-member-1", { id: "canonical-member-1" }],
+    ["canonical-member-2", { id: "canonical-member-2" }]
+  ]);
+  const duplicateMember = {
+    id: "duplicate-member",
+    roles: {
+      cache: new Collection(),
+      add: async role => {
+        if (migrationFails) throw Object.assign(new Error("migration failed"), { code: "missing_permissions" });
+        migrations.push(["duplicate-member", role.id]);
+        return role;
+      }
+    }
+  };
+  const canonical = {
+    id: "canonical", name: "Helper", managed: false, editable: true, position: 5,
+    members: canonicalMembers,
+    delete: async () => { deleted.push("canonical"); }
+  };
+  const duplicate = {
+    id: "duplicate", name: "Helper", managed: false, editable: true, position: 4,
+    members: new Collection([[duplicateMember.id, duplicateMember]]),
+    delete: async () => { deleted.push("duplicate"); }
+  };
+  const guild = {
+    id: PARADISE_TEST_GUILD_ID,
+    roles: { cache: new Collection([[canonical.id, canonical], [duplicate.id, duplicate]]) }
+  };
+  const me = { roles: { highest: { position: 10 } } };
+  return { guild, me, migrations, deleted };
+}
+
+test("duplicate role cleanup migrates members before deleting and removes the stale cache entry", async () => {
+  const fixture = duplicateRoleCleanupFixture();
+  const report = await cleanupParadiseDesiredRoleDuplicates(fixture.guild, ["Helper"], fixture.me);
+
+  assert.deepEqual(fixture.migrations, [["duplicate-member", "canonical"]]);
+  assert.deepEqual(fixture.deleted, ["duplicate"]);
+  assert.equal(fixture.guild.roles.cache.has("duplicate"), false);
+  assert.equal(report.memberMigrations, 1);
+  assert.deepEqual(report.deleted, [{ id: "duplicate", name: "Helper", canonicalId: "canonical" }]);
+  assert.deepEqual(report.failed, []);
+});
+
+test("duplicate role cleanup preserves the role when member migration fails", async () => {
+  const fixture = duplicateRoleCleanupFixture({ migrationFails: true });
+  const report = await cleanupParadiseDesiredRoleDuplicates(fixture.guild, ["Helper"], fixture.me);
+
+  assert.deepEqual(fixture.deleted, []);
+  assert.equal(fixture.guild.roles.cache.has("duplicate"), true);
+  assert.equal(report.deleted.length, 0);
+  assert.deepEqual(report.failed, [{
+    id: "duplicate", name: "Helper", reason: "member_migration_failed", code: "missing_permissions"
+  }]);
+});
+
+test("normalized duplicate-role cleanup keeps the exact canonical role and protects managed roles", async () => {
+  const migrations = [];
+  const deleted = [];
+  const member = {
+    id: "normalized-member",
+    roles: {
+      cache: new Collection(),
+      add: async role => { migrations.push(["normalized-member", role.id]); }
+    }
+  };
+  const canonical = {
+    id: "exact", name: "Helper", managed: false, editable: true, position: 3,
+    members: new Collection(), delete: async () => { deleted.push("exact"); }
+  };
+  const normalizedDuplicate = {
+    id: "normalized", name: "  helper  ", managed: false, editable: true, position: 5,
+    members: new Collection([[member.id, member]]), delete: async () => { deleted.push("normalized"); }
+  };
+  const managed = {
+    id: "managed", name: "HELPER", managed: true, editable: false, position: 1,
+    members: new Collection(), delete: async () => { deleted.push("managed"); }
+  };
+  const guild = {
+    id: PARADISE_TEST_GUILD_ID,
+    roles: { cache: new Collection([
+      [canonical.id, canonical], [normalizedDuplicate.id, normalizedDuplicate], [managed.id, managed]
+    ]) }
+  };
+  const me = { roles: { highest: { position: 10 } } };
+
+  const report = await cleanupParadiseDesiredRoleDuplicates(guild, ["Helper"], me);
+
+  assert.deepEqual(migrations, [[member.id, canonical.id]]);
+  assert.deepEqual(deleted, [normalizedDuplicate.id]);
+  assert.equal(guild.roles.cache.has(canonical.id), true);
+  assert.equal(guild.roles.cache.has(managed.id), true);
+  assert.deepEqual(report.protected, [{ id: managed.id, name: "Helper", reason: "managed_role" }]);
+});
+
+const setupChannel = ({ id, name, type, parentId = null, rawPosition = 0, deleted, reparented }) => ({
+  id,
+  name,
+  type,
+  parentId,
+  rawPosition,
+  isThread: () => false,
+  delete: async () => { deleted.push(id); },
+  setParent: async parent => { reparented.push([id, parent]); }
+});
+
+test("duplicate channel cleanup deletes duplicate categories and wrong-type channels from cache", async () => {
+  const deleted = [];
+  const reparented = [];
+  const channels = [
+    setupChannel({ id: "category", name: "GENERAL", type: ChannelType.GuildCategory, rawPosition: 1, deleted, reparented }),
+    setupChannel({ id: "category-copy", name: "GENERAL", type: ChannelType.GuildCategory, rawPosition: 2, deleted, reparented }),
+    setupChannel({ id: "chat", name: "chat", type: ChannelType.GuildText, parentId: "category", deleted, reparented }),
+    setupChannel({ id: "chat-copy", name: "chat", type: ChannelType.GuildText, parentId: "category-copy", deleted, reparented }),
+    setupChannel({ id: "chat-wrong-type", name: "chat", type: ChannelType.GuildVoice, parentId: "category", deleted, reparented })
+  ];
+  const guild = { id: PARADISE_TEST_GUILD_ID, channels: { cache: new Collection(channels.map(channel => [channel.id, channel])) } };
+  const selected = { schema: [["GENERAL", ["chat"], false]] };
+
+  const report = await cleanupParadiseDesiredChannelDuplicates(guild, selected);
+
+  assert.deepEqual(new Set(deleted), new Set(["category-copy", "chat-copy", "chat-wrong-type"]));
+  assert.equal(guild.channels.cache.has("category-copy"), false);
+  assert.equal(guild.channels.cache.has("chat-copy"), false);
+  assert.equal(guild.channels.cache.has("chat-wrong-type"), false);
+  assert.deepEqual(reparented, []);
+  assert.equal(report.deleted.length, 3);
+  assert.deepEqual(report.failed, []);
+});
+
+test("normalized channel cleanup preserves mapped canonical channels, reparents them and ignores threads", async () => {
+  const deleted = [];
+  const reparented = [];
+  const category = setupChannel({
+    id: "category", name: "GENERAL", type: ChannelType.GuildCategory, deleted, reparented
+  });
+  const exact = setupChannel({
+    id: "chat-exact", name: "chat", type: ChannelType.GuildText, parentId: category.id, deleted, reparented
+  });
+  const mapped = setupChannel({
+    id: "chat-mapped", name: "  CHAT  ", type: ChannelType.GuildText, parentId: "legacy-category", deleted, reparented
+  });
+  const wrongType = setupChannel({
+    id: "chat-wrong", name: "Chat", type: ChannelType.GuildVoice, parentId: category.id, deleted, reparented
+  });
+  const thread = {
+    id: "chat-thread", name: "CHAT", type: ChannelType.PublicThread,
+    isThread: () => true, delete: async () => { deleted.push("chat-thread"); }
+  };
+  const guild = {
+    id: PARADISE_TEST_GUILD_ID,
+    channels: { cache: new Collection([category, exact, mapped, wrongType, thread].map(channel => [channel.id, channel])) }
+  };
+
+  const report = await cleanupParadiseDesiredChannelDuplicates(
+    guild,
+    { schema: [["GENERAL", ["chat"], false]] },
+    { mappedChannelIds: new Set([mapped.id]) }
+  );
+
+  assert.deepEqual(new Set(deleted), new Set([exact.id, wrongType.id]));
+  assert.deepEqual(reparented, [[mapped.id, category.id]]);
+  assert.equal(guild.channels.cache.has(mapped.id), true);
+  assert.equal(guild.channels.cache.has(thread.id), true);
+  assert.deepEqual(report.reparented, [{ id: mapped.id, name: "chat", parentId: category.id }]);
+});
+
+test("duplicate cleanup is hard-blocked outside the fixed test guild", async () => {
+  const guild = {
+    id: "production-guild",
+    roles: { cache: new Collection() },
+    channels: { cache: new Collection() }
+  };
+  const me = { roles: { highest: { position: 10 } } };
+
+  await assert.rejects(
+    cleanupParadiseDesiredRoleDuplicates(guild, ["Helper"], me),
+    error => error.code === "test_guild_only"
+  );
+  await assert.rejects(
+    cleanupParadiseDesiredChannelDuplicates(guild, { schema: [] }),
+    error => error.code === "test_guild_only"
+  );
+});
+
+test("template verification treats Unicode-normalized desired names as canonical duplicates", () => {
+  const deleted = [];
+  const reparented = [];
+  const category = setupChannel({
+    id: "category", name: "  general  ", type: ChannelType.GuildCategory, deleted, reparented
+  });
+  const chat = setupChannel({
+    id: "chat", name: " CHAT ", type: ChannelType.GuildText, parentId: category.id, deleted, reparented
+  });
+  const everyone = { id: PARADISE_TEST_GUILD_ID, name: "@everyone", managed: false, position: 0 };
+  const helper = {
+    id: "helper", name: " helper ", managed: false, position: 2,
+    permissions: new PermissionsBitField()
+  };
+  const managed = { id: "managed", name: "HELPER", managed: true, position: 3 };
+  const guild = {
+    id: PARADISE_TEST_GUILD_ID,
+    channels: { cache: new Collection([[category.id, category], [chat.id, chat]]) },
+    roles: { everyone, cache: new Collection([[everyone.id, everyone], [helper.id, helper], [managed.id, managed]]) }
+  };
+  const selected = { roles: ["Helper"], schema: [["GENERAL", ["chat"], false]] };
+
+  const normalized = verifyParadiseTemplateStructure(guild, selected);
+  assert.equal(normalized.ready, true);
+  assert.deepEqual(normalized.extraChannels, []);
+  assert.deepEqual(normalized.extraRoles, []);
+
+  const duplicateRole = { ...helper, id: "helper-copy", name: "HELPER" };
+  const duplicateChat = setupChannel({
+    id: "chat-copy", name: "chat", type: ChannelType.GuildText, parentId: category.id, deleted, reparented
+  });
+  guild.roles.cache.set(duplicateRole.id, duplicateRole);
+  guild.channels.cache.set(duplicateChat.id, duplicateChat);
+  const duplicated = verifyParadiseTemplateStructure(guild, selected);
+  assert.deepEqual(duplicated.duplicateDesiredRoles, [{ name: "Helper", count: 2 }]);
+  assert.deepEqual(duplicated.duplicateDesiredChannels, [{ name: "chat", type: ChannelType.GuildText, count: 2 }]);
+});
+
+test("template verification fails for wrong-type names and extra roles but ignores managed roles", () => {
+  const deleted = [];
+  const reparented = [];
+  const category = setupChannel({
+    id: "category", name: "GENERAL", type: ChannelType.GuildCategory, deleted, reparented
+  });
+  const chat = setupChannel({
+    id: "chat", name: "chat", type: ChannelType.GuildText, parentId: category.id, deleted, reparented
+  });
+  const wrongType = setupChannel({
+    id: "chat-voice", name: "chat", type: ChannelType.GuildVoice, parentId: category.id, deleted, reparented
+  });
+  const desiredRole = { id: "helper", name: "Helper", managed: false, position: 2 };
+  const extraRole = { id: "legacy", name: "Legacy", managed: false, position: 3 };
+  const managedRole = { id: "managed", name: "FIMA", managed: true, position: 4 };
+  const guildRole = { id: "guild", name: "@everyone", managed: false, position: 0 };
+  const guild = {
+    id: "guild",
+    channels: { cache: new Collection([[category.id, category], [chat.id, chat], [wrongType.id, wrongType]]) },
+    roles: { cache: new Collection([
+      [guildRole.id, guildRole], [desiredRole.id, desiredRole], [extraRole.id, extraRole], [managedRole.id, managedRole]
+    ]) }
+  };
+  const selected = { roles: ["Helper"], schema: [["GENERAL", ["chat"], false]] };
+
+  const result = verifyParadiseTemplateStructure(guild, selected);
+
+  assert.equal(result.ready, false);
+  assert.deepEqual(result.extraChannels, [{ id: "chat-voice", name: "chat", type: ChannelType.GuildVoice }]);
+  assert.deepEqual(result.extraRoles, [{ id: "legacy", name: "Legacy", position: 3 }]);
+  assert.equal(result.extraRoles.some(role => role.id === "managed"), false);
+});
+
+test("role permission repair fails closed and preserves Discord failure evidence", async () => {
+  const discordFailure = Object.assign(new Error("Missing Permissions"), { code: "50013" });
+  const role = {
+    id: "admin",
+    name: "Admin",
+    managed: false,
+    editable: true,
+    permissions: new PermissionsBitField(),
+    setPermissions: async () => { throw discordFailure; }
+  };
+  const guild = { id: "guild", roles: { cache: new Collection([[role.id, role]]) } };
+
+  await assert.rejects(
+    ensureRole(guild, "Admin", true),
+    error => error.code === "role_permission_repair_failed"
+      && error.roleId === role.id
+      && error.discordCode === "50013"
+      && error.cause === discordFailure
+  );
+});
+
+test("category permission repair reports a denied overwrite instead of claiming success", async () => {
+  const everyone = { id: "guild" };
+  const admin = { id: "admin", name: "Admin", managed: false };
+  const category = {
+    id: "private",
+    name: "PRIVATE",
+    permissionOverwrites: {
+      edit: async target => {
+        if (target.id === admin.id) throw Object.assign(new Error("Missing Permissions"), { code: "50013" });
+      }
+    }
+  };
+  const guild = {
+    roles: { everyone, cache: new Collection([[everyone.id, everyone], [admin.id, admin]]) }
+  };
+
+  await assert.rejects(
+    repairParadiseCategoryVisibilityPermissions(guild, category, ["Admin"], true),
+    error => error.code === "category_permission_repair_failed"
+      && error.categoryId === category.id
+      && error.targetId === admin.id
+      && error.discordCode === "50013"
+  );
+});
+
+test("community channel repair enforces read-only Turkish announcements and private voice connect rules", async () => {
+  const everyone = { id: "guild", name: "@everyone" };
+  const turkish = { id: "turkish", name: "Turkish", managed: false };
+  const helper = { id: "helper", name: "Helper", managed: false };
+  const guild = {
+    roles: {
+      everyone,
+      cache: new Collection([[everyone.id, everyone], [turkish.id, turkish], [helper.id, helper]])
+    }
+  };
+  const edits = [];
+  const channel = {
+    id: "announcements",
+    type: ChannelType.GuildText,
+    permissionOverwrites: {
+      edit: async (target, permissions) => edits.push({ target: target.id, permissions })
+    }
+  };
+
+  await repairParadiseCommunityChannelPermissions(
+    guild,
+    channel,
+    "〆・turkish-announcements",
+    "〆・PRIVATE TURKISH"
+  );
+
+  assert.deepEqual(edits, [
+    { target: everyone.id, permissions: { ViewChannel: false, SendMessages: false } },
+    { target: turkish.id, permissions: { ViewChannel: true, SendMessages: false } },
+    { target: helper.id, permissions: { ViewChannel: true, SendMessages: true } }
+  ]);
+
+  edits.length = 0;
+  channel.type = ChannelType.GuildVoice;
+  await repairParadiseCommunityChannelPermissions(
+    guild,
+    channel,
+    "〆・turkish-voice",
+    "〆・PRIVATE TURKISH"
+  );
+  assert.deepEqual(edits, [
+    { target: everyone.id, permissions: { ViewChannel: false, Connect: false } },
+    { target: turkish.id, permissions: { ViewChannel: true, Connect: true } },
+    { target: helper.id, permissions: { ViewChannel: true, Connect: true } }
+  ]);
+});
+
+test("community channel permission repair fails closed with redacted Discord evidence", async () => {
+  const everyone = { id: "guild", name: "@everyone" };
+  const channel = {
+    id: "voice",
+    type: ChannelType.GuildVoice,
+    permissionOverwrites: {
+      edit: async () => { throw Object.assign(new Error("sensitive Discord response"), { code: "50013" }); }
+    }
+  };
+  const guild = { roles: { everyone, cache: new Collection([[everyone.id, everyone]]) } };
+
+  await assert.rejects(
+    repairParadiseCommunityChannelPermissions(
+      guild,
+      channel,
+      "〆・video-voice",
+      "〆・PRIVATE VIDEO TEAM"
+    ),
+    error => error.code === "channel_permission_repair_failed"
+      && error.channelId === channel.id
+      && error.discordCode === "50013"
+  );
+});
+
+test("template verification proves exact role permissions and private category visibility", () => {
+  const deleted = [];
+  const reparented = [];
+  const everyone = { id: "guild", name: "@everyone", managed: false, position: 0 };
+  const admin = {
+    id: "admin",
+    name: "Admin",
+    managed: false,
+    position: 2,
+    permissions: new PermissionsBitField([PermissionsBitField.Flags.Administrator])
+  };
+  const category = setupChannel({
+    id: "private", name: "PRIVATE", type: ChannelType.GuildCategory, deleted, reparented
+  });
+  category.permissionOverwrites = { cache: new Collection([
+    [everyone.id, viewOverwrite("deny")],
+    [admin.id, viewOverwrite("allow")]
+  ]) };
+  const chat = setupChannel({
+    id: "staff-chat", name: "staff-chat", type: ChannelType.GuildText,
+    parentId: category.id, deleted, reparented
+  });
+  const guild = {
+    id: "guild",
+    channels: { cache: new Collection([[category.id, category], [chat.id, chat]]) },
+    roles: { everyone, cache: new Collection([[everyone.id, everyone], [admin.id, admin]]) }
+  };
+  const selected = { roles: ["Admin"], schema: [["PRIVATE", ["staff-chat"], true]] };
+
+  const verified = verifyParadiseTemplateStructure(guild, selected);
+  assert.equal(verified.ready, true);
+  assert.deepEqual(verified.rolePermissionMismatches, []);
+  assert.deepEqual(verified.categoryPermissionMismatches, []);
+
+  admin.permissions = new PermissionsBitField();
+  category.permissionOverwrites.cache.delete(admin.id);
+  const failed = verifyParadiseTemplateStructure(guild, selected);
+  assert.equal(failed.ready, false);
+  assert.deepEqual(failed.rolePermissionMismatches, [{
+    id: admin.id,
+    name: "Admin",
+    expected: PermissionsBitField.Flags.Administrator.toString(),
+    actual: "0"
+  }]);
+  assert.deepEqual(failed.categoryPermissionMismatches, [{
+    categoryId: category.id,
+    categoryName: "PRIVATE",
+    targetId: admin.id,
+    targetName: "Admin",
+    expected: "allow",
+    actual: "inherit"
+  }]);
+});
 
 const viewOverwrite = decision => ({
   allow: new PermissionsBitField(decision === "allow" ? [PermissionsBitField.Flags.ViewChannel] : []),
   deny: new PermissionsBitField(decision === "deny" ? [PermissionsBitField.Flags.ViewChannel] : [])
 });
 
-function securityReadinessFixture({ layout = "compact", badStaffOverwrite = false, botThreadPermissions = true, panelTitle = "PARADISE SECURITY · LIVE STATUS" } = {}) {
+function securityReadinessFixture({ layout = "compact", badStaffOverwrite = false, botThreadPermissions = true, panelTitle = "FIMA SECURITY · LIVE STATUS" } = {}) {
   const everyone = { id: "guild" };
   const blacklisted = { id: "blacklisted", name: "BLACKLISTED" };
   const channel = ({ id, name, everyoneView = null, blacklistedView = null, panel = false, privateThreads = false }) => {
@@ -63,6 +1463,7 @@ function securityReadinessFixture({ layout = "compact", badStaffOverwrite = fals
   const cache = new Collection(channels.map(item => [item.id, item]));
   const guild = {
     id: "guild",
+    name: "FT Community",
     roles: { everyone, cache: new Collection([[everyone.id, everyone], [blacklisted.id, blacklisted]]) },
     channels: { cache, fetch: async id => cache.get(id) || null },
     members: { me: { id: "bot" } }
@@ -122,55 +1523,6 @@ test("live security readiness fails closed for a missing compact appeal mapping 
   );
   assert.equal(unknownBotPermissionsResult.blacklistPermissionReady, false);
   assert.equal(unknownBotPermissionsResult.blacklistLayout, null);
-});
-
-test("live test-lab readiness verifies decorated leaderboard and staff message IDs", async () => {
-  const fixture = securityReadinessFixture();
-  const addMessageChannel = (id, name, messages) => {
-    fixture.guild.channels.cache.set(id, {
-      id,
-      name,
-      type: ChannelType.GuildText,
-      parent: null,
-      parentId: null,
-      isTextBased: () => true,
-      permissionOverwrites: { cache: new Collection() },
-      messages: {
-        fetch: async messageId => messages[messageId]
-          ? { id: messageId, channelId: id, embeds: [{ title: messages[messageId] }] }
-          : null
-      }
-    });
-  };
-  addMessageChannel("top-10-channel", "⟡・top-10", { "top-10-message": "✦ #1 — Owner" });
-  addMessageChannel("top-20-channel", "⟡・top-20", { "top-20-message": "✦ #11 — Vacant" });
-  addMessageChannel("top-30-channel", "⟡・top-30", { "top-30-message": "✦ #21 — Vacant" });
-  addMessageChannel("staff-channel", "〢・personel-merkezi", { "staff-message": "✦ PARADISE STAFF TEAM" });
-  fixture.config.rankedLeaderboardMessageIds = {
-    "top-10:1-10": "top-10-message",
-    "top-20:11-20": "top-20-message",
-    "top-30:21-30": "top-30-message"
-  };
-  fixture.config.staffTeamMessageId = "staff-message";
-
-  assert.deepEqual(await inspectParadiseLiveTestLabReadiness(fixture.guild, fixture.config), {
-    liveReadinessAvailable: true,
-    blacklistedRoleReady: true,
-    blacklistPermissionReady: true,
-    blacklistLayout: "compact_private_thread",
-    securityPanelReady: true,
-    leaderboardBoardCount: 3,
-    leaderboardBoardExpectedCount: 3,
-    leaderboardBoardsReady: true,
-    staffTeamReady: true
-  });
-
-  delete fixture.config.rankedLeaderboardMessageIds["top-20:11-20"];
-  fixture.config.staffTeamMessageId = "missing-staff-message";
-  const incomplete = await inspectParadiseLiveTestLabReadiness(fixture.guild, fixture.config);
-  assert.equal(incomplete.leaderboardBoardCount, 2);
-  assert.equal(incomplete.leaderboardBoardsReady, false);
-  assert.equal(incomplete.staffTeamReady, false);
 });
 
 test("blacklist appeals add applicant and reviewer before sending the first private-thread message", async () => {
@@ -459,7 +1811,7 @@ test("Paradise support panel has state-aware transcript-first ticket controls", 
   assert.match(source, /paradise_support_delete_confirm:/);
   assert.match(source, /saveParadiseSupportTranscript\(interaction\.guild, interaction\.channel, locked, "delete"\)/);
   assert.match(source, /action: "transcript_failed"/);
-  assert.match(source, /await interaction\.channel\.delete\("Paradise transcript-first support ticket deletion"\)/);
+  assert.match(source, /await interaction\.channel\.delete\("FIMA Bot transcript-first support ticket deletion"\)/);
   assert.match(source, /const canDelete = canApproveModeration\(interaction\.member\)/);
   assert.match(source, /\["support_logs_channel", "Private support ticket logs"\]/);
   assert.doesNotMatch(source.slice(source.indexOf("export function paradiseSupportTicketControls"), source.indexOf("function supportTicketStatusLabel")), /paradise_support_transcript/);
@@ -510,17 +1862,19 @@ test("war and spar state is guild-scoped, audited and requires safe evidence bef
   assert.equal(paradiseCommandAllowedForMode("war", "community"), false);
 });
 
-test("XP defaults grant separate progression roles without weakening link or scam safety", async () => {
+test("XP defaults grant separate text progression roles without weakening link or scam safety", async () => {
   assert.ok(PARADISE_COMMUNITY_ROLES.includes("Media Trusted"));
   assert.ok(PARADISE_COMMUNITY_ROLES.includes("Link Trusted"));
+  assert.ok(PARADISE_COMMUNITY_ROLES.includes("Text Level 5"));
+  assert.ok(PARADISE_COMMUNITY_ROLES.includes("Voice Level 5"));
   const defaults = paradiseXpPolicy();
-  assert.equal(defaults.roleRewards["5"], "Media Trusted");
-  assert.equal(defaults.roleRewards["10"], "Link Trusted");
+  assert.equal(defaults.roleRewards["5"], "Text Level 5");
+  assert.equal(defaults.roleRewards["10"], "Text Level 10");
   const overridden = paradiseXpPolicy({ xpSettings: { chatCooldownSeconds: 1, levelUpDeleteSeconds: 99999, roleRewards: { "5": "Manual Media" } } });
   assert.equal(overridden.chatCooldownSeconds, 15);
   assert.equal(overridden.levelUpDeleteSeconds, 3600);
   assert.equal(overridden.roleRewards["5"], "Manual Media");
-  assert.equal(overridden.roleRewards["10"], "Link Trusted");
+  assert.equal(overridden.roleRewards["10"], "Text Level 10");
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /ensureCommunityProgressionPermissions/);
   assert.match(source, /AttachFiles: mediaChannel \? true : false/);
@@ -616,10 +1970,6 @@ test("repeat smoke refreshes boards without replaying a full template repair", a
   assert.match(source, /const staffTeam = await updateStaffTeamEmbed\(guild\)/);
   assert.match(source, /leaderboardBoardCount/);
   assert.match(source, /staffTeamReady/);
-  assert.match(source, /preSmokeReadiness\?\.leaderboardBoardsReady/);
-  assert.match(source, /preSmokeReadiness\?\.staffTeamReady/);
-  assert.match(source, /paradiseTextChannelByName\(guild, group\.channel\)/);
-  assert.match(source, /paradiseTextChannelByName\(guild, "staff-team", "personel-merkezi"\)/);
 });
 
 test("repeat smoke repairs an existing lab when blacklist permissions are unhealthy", () => {
@@ -633,6 +1983,67 @@ test("repeat smoke repairs an existing lab when blacklist permissions are unheal
     needsCompactLab: false,
     blacklistPermissionReady: false
   }), "repair_permissions");
+});
+
+test("repeat Community smoke repairs stale role icons instead of claiming the lab is healthy", () => {
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: true,
+    needsCompactLab: false,
+    blacklistPermissionReady: true,
+    roleIconReady: false
+  }), "repair_permissions");
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: true,
+    needsCompactLab: false,
+    blacklistPermissionReady: true,
+    roleIconReady: true
+  }), "skip_existing_lab");
+});
+
+test("repeat Community smoke repairs canonical structure drift", () => {
+  assert.equal(paradiseAutoSmokeRepairAction({
+    existingTestLab: true,
+    needsCompactLab: false,
+    blacklistPermissionReady: true,
+    roleIconReady: true,
+    structureReady: false
+  }), "repair_permissions");
+});
+
+test("Community smoke evidence requires every workflow and exactly two leaderboards", () => {
+  const complete = {
+    welcomeLeaveReady: true,
+    leaderboardBoardCount: 2,
+    staffTeamReady: true,
+    helpGuideReady: true,
+    applicationPanelReady: true,
+    supportPanelReady: true,
+    supportTicketReady: true,
+    supportTicketTranscriptReady: true,
+    supportTicketReopenReady: true,
+    moderationPanelReady: true,
+    securityPanelReady: true,
+    textActivityReady: true,
+    voiceActivityReady: true,
+    activityRewardsPanelReady: true,
+    rewardPolicyReady: true,
+    activityWorkerReady: true,
+    activityDatabaseReady: true,
+    blacklistedRoleReady: true,
+    blacklistPermissionReady: true
+  };
+  const ready = paradiseCommunitySmokeEvidenceReadiness(complete);
+  assert.equal(ready.ready, true);
+  assert.equal(ready.missingCount, 0);
+
+  const incomplete = paradiseCommunitySmokeEvidenceReadiness({
+    ...complete,
+    helpGuideReady: false,
+    supportTicketTranscriptReady: false
+  });
+  assert.equal(incomplete.ready, false);
+  assert.equal(incomplete.missingCount, 2);
+  assert.deepEqual(incomplete.missing, ["helpGuideReady", "supportTicketTranscriptReady"]);
 });
 
 test("compact lab revision still takes precedence over permission-only repair", () => {
@@ -661,33 +2072,167 @@ test("reconciliation is a test-guild-canary, rate-limited, and performs no Disco
   assert.doesNotMatch(source.slice(source.indexOf("async function runParadiseGuildReconciliation"), source.indexOf("async function runParadiseMaintenance")), /\.delete\(|\.create\(/);
 });
 
-test("compact lab rebuild remains hard-guarded to the disposable test guild", async () => {
+test("production rebuild rejects absent, forged, mismatched, and expired execution proofs before mutation", async t => {
+  const guild = { id: FIMA_COMMUNITY_PRODUCTION_GUILD_ID };
+  const planId = "00000000-0000-4000-8000-000000000001";
+  const backupDigest = "a".repeat(64);
+  const base = signedProductionExecutionProof();
+  const cases = [
+    ["absent", undefined, base.secret, "production_rebuild_execution_proof_schema_invalid"],
+    ["forged", { ...base.proof, signature: "0".repeat(64) }, base.secret, "production_rebuild_execution_proof_authenticity_invalid"],
+    ["scope mismatch", signedProductionExecutionProof({ guildId: "wrong-guild" }).proof, base.secret, "production_rebuild_execution_proof_scope_mismatch"],
+    ["expired", signedProductionExecutionProof({
+      issuedAt: new Date(0).toISOString(),
+      expiresAt: new Date(1).toISOString()
+    }).proof, base.secret, "production_rebuild_execution_proof_expired"]
+  ];
+
+  for (const [name, executionProof, executionProofSecret, code] of cases) {
+    await t.test(name, async () => {
+      await assert.rejects(
+        rebuildFimaCommunityProduction(guild, "community", "unused-production-confirmation", {
+          expectedBackupDigest: backupDigest,
+          executionProof,
+          planId,
+          executionProofSecret
+        }),
+        error => error?.code === code
+      );
+    });
+  }
+});
+
+test("test-guild rebuild still requires its exact typed confirmation", async () => {
+  await assert.rejects(
+    rebuildParadiseTestTemplate({ id: PARADISE_TEST_GUILD_ID }, "community", "wrong"),
+    error => error?.code === "typed_confirmation_mismatch"
+  );
+});
+
+test("valid production execution proof cannot authorize destructive rebuilding", async () => {
+  const { secret, proof } = signedProductionExecutionProof();
+  let accesses = 0;
+  const guild = new Proxy({ id: FIMA_COMMUNITY_PRODUCTION_GUILD_ID }, {
+    get(target, key) {
+      if (key === 'id') return target.id;
+      accesses++;
+      throw new Error('Discord must not be accessed');
+    }
+  });
+  await assert.rejects(rebuildFimaCommunityProduction(guild, 'community', 'unused', {
+    expectedBackupDigest: proof.backupDigest, executionProof: proof,
+    executionProofSecret: secret, planId: proof.planId
+  }), error => error.code === 'production_destructive_rebuild_disabled');
+  assert.equal(accesses, 0);
+});
+
+test("test and production rebuilds remain isolated behind explicit mutation policies", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  const guardStart = source.indexOf("function assertParadiseMutationPolicy");
+  const guardEnd = source.indexOf("async function requireParadiseRebuildPreflight", guardStart);
+  const publicRebuildStart = source.indexOf("export async function rebuildParadiseTestTemplate");
+  const publicRebuildEnd = source.indexOf("async function rebuildParadiseTemplateWithPolicy", publicRebuildStart);
+  const policyRebuildStart = publicRebuildEnd;
+  const policyRebuildEnd = source.indexOf("function roleMemberCount", policyRebuildStart);
+  const rebuildStart = source.indexOf("async function rebuildParadiseTemplateUnlocked");
+  const rebuildEnd = source.indexOf("async function upsertParadiseCommunitySmokePanel", rebuildStart);
+  assert.ok(guardStart >= 0 && guardEnd > guardStart);
+  assert.ok(publicRebuildStart >= 0 && publicRebuildEnd > publicRebuildStart);
+  assert.ok(policyRebuildStart >= 0 && policyRebuildEnd > policyRebuildStart);
+  assert.ok(rebuildStart >= 0 && rebuildEnd > rebuildStart);
+  const guardSource = source.slice(guardStart, guardEnd);
+  const publicRebuildSource = source.slice(publicRebuildStart, publicRebuildEnd);
+  const policyRebuildSource = source.slice(policyRebuildStart, policyRebuildEnd);
+  const rebuildSource = source.slice(rebuildStart, rebuildEnd);
   assert.match(source, /const PARADISE_TEST_LAB_LAYOUT_REVISION/);
-  assert.match(source, /rebuildParadiseTestTemplate\(guild, "tsbtr", "REBUILD TEST TSBTR"\)/);
-  assert.match(source, /assertParadiseTestGuildMutation\(\{ guildId: guild\?\.id, operation: "rebuild" \}\)/);
-  assert.match(source, /3a65-test-server-pre-rebuild-backup\.json/);
-  assert.match(source, /buildParadiseRestoreDryRun\(\{ backup, currentSnapshot: snapshot \}\)/);
-  assert.match(source, /backup_restore_dry_run_failed/);
+  assert.match(source, /const PARADISE_TEST_REBUILD_POLICY = Object\.freeze\(\{/);
+  assert.match(source, /allowedGuildId: PARADISE_TEST_GUILD_ID/);
+  assert.match(source, /const FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY = Object\.freeze\(\{/);
+  assert.match(source, /allowedGuildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID/);
+  assert.match(source, /expectedConfirmation: FIMA_COMMUNITY_REBUILD_CONFIRMATION/);
+  assert.match(guardSource, /policy\.isProduction && mode !== "community"/);
+  assert.match(guardSource, /production_community_only/);
+  assert.match(source, /const rebuildConfirmation = smokeTemplate === "community"/);
+  assert.match(source, /"REBUILD TEST COMMUNITY"/);
+  assert.match(source, /"REBUILD TEST CLAN"/);
+  assert.match(source, /"REBUILD TEST TSBTR"/);
+  assert.match(source, /rebuildParadiseTestTemplate\(guild, smokeTemplate, rebuildConfirmation\)/);
+  assert.match(guardSource, /policy\.isProduction && guildId === PARADISE_TEST_GUILD_ID/);
+  assert.match(guardSource, /typed_confirmation_mismatch/);
+  assert.match(guardSource, /return \{ selected, expected \}/);
+  assert.match(publicRebuildSource, /rebuildParadiseTemplateWithPolicy\(guild, mode, confirmation, PARADISE_TEST_REBUILD_POLICY\)/);
+  assert.match(publicRebuildSource, /FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY/);
+  assert.match(policyRebuildSource, /assertParadiseMutationPolicy\(guild, mode, confirmation, policy/);
+  const firstExecutionProofCheck = policyRebuildSource.indexOf("assertParadiseProductionExecutionCapability(guild, mode, policy)");
+  const firstPreflight = policyRebuildSource.indexOf("await requireParadiseRebuildPreflight(guild, inheritedCorrelationId, policy)");
+  const lockStart = policyRebuildSource.indexOf("return withParadiseGuildMutationLock");
+  const lockedPreflight = policyRebuildSource.indexOf("await requireParadiseRebuildPreflight(guild, ownedLease?.correlationId || null, policy)");
+  const phaseUpdate = policyRebuildSource.indexOf('await updateParadiseMutationLease({ phase: "backup_and_rebuild" })');
+  const unlockedCall = policyRebuildSource.indexOf("return rebuildParadiseTemplateUnlocked(guild, mode, confirmation, policy)");
+  assert.ok(firstExecutionProofCheck >= 0 && firstExecutionProofCheck < firstPreflight);
+  assert.ok(firstPreflight >= 0 && firstPreflight < lockStart);
+  assert.ok(lockStart >= 0 && lockedPreflight > lockStart);
+  assert.ok(phaseUpdate > lockedPreflight && unlockedCall > phaseUpdate);
+  assert.match(rebuildSource, /const \{ selected, expected \} = assertParadiseMutationPolicy\(guild, mode, confirmation, mutationPolicy/);
+  assert.match(rebuildSource, /assertParadiseProductionExecutionCapability\(guild, mode, mutationPolicy\)/);
+  assert.match(rebuildSource, /assertNoUnresolvedParadiseRollback\(guild\.id\)/);
+  assert.match(rebuildSource, /captureParadiseGuildBackupSnapshot\(guild, \{ state \}\)/);
+  assert.match(rebuildSource, /createParadiseBackupEnvelope\(snapshot\)/);
+  assert.match(rebuildSource, /validateParadiseBackupEnvelope\(backup\)/);
+  assert.match(rebuildSource, /buildParadiseRestoreDryRun\(\{[\s\S]*?backup,[\s\S]*?currentSnapshot: snapshot,[\s\S]*?expectedGuildId: guild\.id,[\s\S]*?allowedGuildId: mutationPolicy\.allowedGuildId[\s\S]*?\}\)/);
+  assert.match(rebuildSource, /backup_restore_dry_run_failed/);
+  assert.match(rebuildSource, /`\$\{mutationPolicy\.artifactPrefix\}-pre-rebuild-backup\.json`/);
+  assert.match(rebuildSource, /readPersistedBackup\("timestamped", timestampedBackupPath\)/);
+  assert.match(rebuildSource, /readPersistedBackup\("canonical", canonicalBackupPath\)/);
+  assert.match(rebuildSource, /validateParadiseBackupArtifactCopies\(\{/);
+  assert.match(rebuildSource, /persisted_backup_validation_failed/);
+  assert.match(rebuildSource, /armParadiseRollbackMarker\(\{/);
+  assert.match(rebuildSource, /status: "rebuild_in_progress"/);
+  assert.match(rebuildSource, /status: "rollback_in_progress"/);
+  assert.match(rebuildSource, /restoreParadiseGuildBackup\(\{[\s\S]*?persistRestoredState/);
+  assert.match(rebuildSource, /status: "restored_pending_reconciliation"/);
+  assert.match(rebuildSource, /mutationsPlanned !== 0/);
+  assert.match(rebuildSource, /resolveParadiseRollbackMarker\(/);
+  assert.match(rebuildSource, /status: "rollback_required"/);
+  assert.match(rebuildSource, /originalError\.rollback = rollback/);
+  assert.match(rebuildSource, /originalError\.rollbackError = rollbackError/);
+  assert.match(rebuildSource, /originalError\.reconciliation = reconciliation/);
+  assert.match(rebuildSource, /originalError\.rollbackMarker = rollbackMarker/);
 });
 
 test("application panel follows the selected server language and defaults to Turkish", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /function paradiseApplicationPanelPayload\(color, language = "tr", applicationSettings = \{\}\)/);
-  assert.match(source, /FIEEL'S COMMUNITY BAŞVURULARI/);
+  assert.match(source, /FIMA BA\\u015eVURU MERKEZ\\u0130/);
   assert.match(source, /paradiseApplicationPanelPayload\(\s*await paradiseBrandColor\(\), language, guildConfig\.applicationSettings\s*\)/);
 });
 
-test("Discord application panels are website-first and link only the public Helper staff entry", async () => {
+test("Discord application panels link multi-role staff and business workflows to the shared website queue", async () => {
   const paradiseSource = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   const legacyBotSource = await (await import("node:fs/promises")).readFile(new URL("../src/discordBot.js", import.meta.url), "utf8");
 
-  assert.match(paradiseSource, /setStyle\(ButtonStyle\.Link\)[\s\S]*paradise-apply\?workflow=staff&type=helper/);
+  assert.match(paradiseSource, /setStyle\(ButtonStyle\.Link\)[\s\S]*fima-bot\/apply\?workflow=staff`/);
+  assert.match(paradiseSource, /fima-bot\/apply\?workflow=business`/);
+  assert.match(paradiseSource, /uygun personel, topluluk, i\\u015f birli\\u011fi ve i\\u00e7erik rollerini/);
+  assert.match(paradiseSource, /hi\\u00e7bir rol otomatik verilmez/);
+  assert.doesNotMatch(paradiseSource, /paradiseApplicationPanelPayloadLegacy/);
+  assert.doesNotMatch(paradiseSource, /personel başlangıcı yalnızca \*\*Helper\*\*/);
   assert.doesNotMatch(paradiseSource, /setCustomId\("paradise_application_open"\)[\s\S]{0,300}setLabel\(safeApplicationPanelText/);
-  assert.doesNotMatch(paradiseSource, /paradise-apply\?workflow=business/);
-  assert.match(legacyBotSource, /function applicationPanelPayload\(\)[\s\S]*setLabel\("Apply as Helper"\)[\s\S]*setStyle\(ButtonStyle\.Link\)[\s\S]*workflow=staff&type=helper/);
-  assert.doesNotMatch(legacyBotSource, /paradise-apply\?workflow=business/);
-  assert.doesNotMatch(legacyBotSource, /function applicationPanelPayload\(\)[\s\S]{0,1800}(?:Moderator|support staff|event staff|giveaway staff).*application/i);
+  assert.match(legacyBotSource, /function applicationPanelPayload\(\)[\s\S]*setLabel\("Open application center"\)[\s\S]*setStyle\(ButtonStyle\.Link\)[\s\S]*workflow=staff`/);
+  assert.match(legacyBotSource, /setLabel\("Business application"\)[\s\S]*workflow=business&type=partnership/);
+  assert.match(legacyBotSource, /same private review queue and are never auto-granted/);
+  assert.doesNotMatch(legacyBotSource, /setLabel\("Apply as Helper"\)|workflow=staff&type=helper/);
+  assert.match(paradiseSource, /website-first application center and choose an available staff, support, event, content or FIMA product role/);
+  assert.match(paradiseSource, /website-first başvuru merkezini açar; uygun staff, support, etkinlik, içerik veya FIMA ürün rolünü seçersin/);
+  assert.doesNotMatch(paradiseSource, /Product support, events, Helper applications|Ürün desteği, etkinlikler, Helper başvuruları/);
+});
+
+test("application draft interaction messages preserve Turkish characters", async () => {
+  const paradiseSource = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  assert.match(paradiseSource, /Başvuru bölümü kaydedildi/);
+  assert.match(paradiseSource, /Sonraki bölümü doldurmak için devam et/);
+  assert.match(paradiseSource, /Başvuru taslağı iptal edildi\. İstersen panelden tekrar başlayabilirsin/);
+  assert.doesNotMatch(paradiseSource, /Basvuru (?:bolumu|taslagi)/);
 });
 
 test("application forms stay within Discord's five-input modal limit and retain the required role-specific scenario", () => {
@@ -717,9 +2262,12 @@ test("server templates hide irrelevant command families", () => {
   assert.equal(paradiseCommandAllowedForMode("challenge", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("roster", "community"), false);
   assert.equal(paradiseCommandAllowedForMode("fima_ticket", "community"), true);
+  assert.equal(paradiseCommandAllowedForMode("fima_support_ai", "community"), true);
   assert.equal(paradiseCommandAllowedForMode("challenge", "clan"), true);
   assert.equal(paradiseCommandAllowedForMode("fima_ticket", "clan"), false);
+  assert.equal(paradiseCommandAllowedForMode("fima_support_ai", "clan"), false);
   assert.equal(paradiseCommandAllowedForMode("fima_update", "tsbtr"), false);
+  assert.equal(paradiseCommandAllowedForMode("fima_support_ai", "tsbtr"), false);
 });
 
 test("runtime command access uses the registry even when a command is still registered", () => {
@@ -766,6 +2314,7 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   const commands = paradiseCommands().map(command => command.toJSON());
   const names = commands.map(command => command.name);
   assert.equal(new Set(names).size, names.length);
+  assert.equal(names.some(name => name.startsWith("paradise")), false);
   assert.ok(names.includes("challenge"));
   assert.ok(names.includes("activity"));
   assert.ok(names.includes("whitelist"));
@@ -788,6 +2337,7 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(names.includes("appeal"));
   assert.ok(names.includes("bail"));
   assert.ok(names.includes("setlogchannel"));
+  assert.ok(names.includes("setcommunitychannel"));
   assert.ok(names.includes("qotd"));
   assert.ok(names.includes("answer"));
   assert.ok(names.includes("application"));
@@ -799,10 +2349,11 @@ test("all Paradise slash command schemas serialize and names are unique", () => 
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "autowin"));
   assert.ok(commands.find(command => command.name === "challenge").options.some(option => option.name === "close"));
   assert.deepEqual(commands.find(command => command.name === "profile").options.map(option => option.name), ["create", "view", "edit", "privacy", "verify-status"]);
-  const mappingCommands = ["set", "setlogchannel"].flatMap(name => commands.find(command => command.name === name).options);
+  const mappingCommands = ["set", "setlogchannel", "setcommunitychannel"].flatMap(name => commands.find(command => command.name === name).options);
   assert.equal(mappingCommands.length, PARADISE_CHANNEL_MAPPINGS.length);
   assert.ok(commands.find(command => command.name === "set").options.length <= 25);
   assert.ok(commands.find(command => command.name === "setlogchannel").options.length <= 25);
+  assert.ok(commands.find(command => command.name === "setcommunitychannel").options.length <= 25);
   assert.deepEqual(commands.find(command => command.name === "lineup").options.map(option => option.name), ["add", "remove", "move", "edit", "clear", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "roster").options.map(option => option.name), ["add", "update", "remove", "panel", "repost"]);
   assert.deepEqual(commands.find(command => command.name === "application").options.map(option => option.name), ["panel", "apply", "status", "continue"]);
@@ -887,7 +2438,7 @@ test("Paradise brand color accepts safe HEX and rejects malformed values", () =>
 
 test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.deepEqual(Object.keys(PARADISE_SETUP_SCHEMAS), ["community", "clan", "tsbtr"]);
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("◇・destek")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("⌁・support")));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("◆・lineuplar")));
   assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.some(([, channels]) => channels.includes("⟡・top-30")));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("⟡・müsaitlik-ve-loa")));
@@ -897,9 +2448,17 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.ok(PARADISE_CLAN_ROLES.includes("BLACKLISTED"));
   assert.ok(PARADISE_COMMUNITY_ROLES.includes("BLACKLISTED"));
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("⟡・sonuçlar"), false);
-  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("◇・destek"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("◇・destek"), false);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("⌁・support"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("◇・destek"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("◜・oda-oluştur"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("〢・incelemeler"), true);
+  const communitySurface = [
+    ...PARADISE_SETUP_SCHEMAS.community.schema.map(([category]) => category),
+    ...PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels),
+    ...PARADISE_SETUP_SCHEMAS.community.roles
+  ];
+  assert.equal(communitySurface.some(value => /(?:^|[・\s_-])(challenge|referee|training|tryout|competitive|savaş|war)(?:$|[・\s_-])/i.test(value)), false);
 });
 
 test("voice-purpose setup entries are real voice channels and wrong text mappings are detectable", async () => {
@@ -916,7 +2475,7 @@ test("voice-purpose setup entries are real voice channels and wrong text mapping
   assert.match(source, /joined\?\.type === ChannelType\.GuildVoice/);
 });
 
-test("compact templates keep the critical panels without flooding the channel list", () => {
+test("canonical templates keep their required public and private surfaces", () => {
   const count = mode => PARADISE_SETUP_SCHEMAS[mode].schema.flatMap(([, channels]) => channels).length;
   const publicCount = mode => PARADISE_SETUP_SCHEMAS[mode].schema
     .filter(([, , privateCategory]) => !privateCategory)
@@ -925,21 +2484,51 @@ test("compact templates keep the critical panels without flooding the channel li
   const privateCount = mode => PARADISE_SETUP_SCHEMAS[mode].schema
     .filter(([, , privateCategory]) => privateCategory)
     .flatMap(([, channels]) => channels).length;
-  assert.ok(count("community") <= 20);
-  assert.ok(count("clan") <= 28);
-  assert.ok(count("tsbtr") <= 25);
-  assert.ok(publicCount("community") >= 10 && publicCount("community") <= 12);
-  assert.ok(publicCount("clan") >= 15 && publicCount("clan") <= 18);
-  assert.ok(publicCount("tsbtr") >= 14 && publicCount("tsbtr") <= 17);
-  for (const mode of ["community", "clan", "tsbtr"]) assert.equal(privateCount(mode), 6);
+  assert.equal(count("community"), 46);
+  assert.equal(count("clan"), 28);
+  assert.equal(count("tsbtr"), 25);
+  assert.equal(publicCount("community"), 26);
+  assert.equal(publicCount("clan"), 18);
+  assert.equal(publicCount("tsbtr"), 16);
+  assert.equal(privateCount("community"), 17);
+  for (const mode of ["clan", "tsbtr"]) assert.equal(privateCount(mode), 6);
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "〆・PRIVATE TURKISH"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "〆・PRIVATE VIDEO TEAM"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "〆・PRIVATE STAFF"));
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("role-guide"), false);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("〢・personel-rehberleri"), true);
+});
+
+test("FT Community operational projection preserves identity, private access and voice semantics", () => {
+  const projection = buildParadiseCommunityOperationalSemantics();
+  assert.equal(projection.identity, "FT Community");
+  assert.equal(projection.publicLanguage, "en");
+  assert.deepEqual(projection.privateCategories.map(category => category.purpose), [
+    "turkish", "video_team", "staff"
+  ]);
+  assert.equal(
+    projection.privateCategories.find(category => category.purpose === "turkish")
+      .channels.find(channel => channel.purpose === "turkish_voice").type,
+    "voice"
+  );
+  assert.equal(
+    projection.privateCategories.find(category => category.purpose === "video_team")
+      .channels.find(channel => channel.purpose === "video_voice").type,
+    "voice"
+  );
+  assert.ok(projection.privateCategories.find(category => category.purpose === "staff")
+    .accessClasses.includes("staff"));
+  assert.ok(projection.channelNames.includes(projection.mappings.applications));
+  assert.equal(projection.mappings.announcements, "⟐・announcements");
+  assert.equal(projection.mappings.activityRewards, "⌁・activity-rewards");
+  assert.ok(PARADISE_CHANNEL_MAPPINGS.some(([key]) => key === "announcement_channel"));
+  assert.ok(PARADISE_CHANNEL_MAPPINGS.some(([key]) => key === "activity_rewards_channel"));
 });
 
 test("canonical handbooks are pinned and operational guides do not receive the global footer", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /const GUIDE_FOOTER_KEYS = new Set\(\["rules", "role_guide", "faq_trust"\]\)/);
-  assert.match(source, /message\.pin\?\.\("Paradise canonical channel handbook"\)/);
+  assert.match(source, /message\.pin\?\.\("FIMA Bot canonical channel handbook"\)/);
   assert.doesNotMatch(source, /\*\*SERVER LOCKED\*\*, \*\*UNLOCK\*\*, \*\*END\*\*/);
 });
 
@@ -974,6 +2563,16 @@ test("canonical guide text has Turkish copy for every non-dynamic handbook", asy
   }
   const english = localizeParadiseGuide({ key: "rules", title: "English", body: "English body" }, "en");
   assert.equal(english.title, "English");
+});
+
+test("announcement and booster handbooks are canonical mapped visual consumers", async () => {
+  const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
+  const guideSection = source.slice(source.indexOf("const GUIDE_POSTS"), source.indexOf("const GUIDE_MAPPING_KEYS"));
+  const mappingSection = source.slice(source.indexOf("const GUIDE_MAPPING_KEYS"), source.indexOf("const GUIDE_FOOTER_KEYS"));
+  assert.match(guideSection, /key: "announcement"[\s\S]*channel: "⟐・announcements"/);
+  assert.match(guideSection, /key: "booster"[\s\S]*channel: "⌁・activity-rewards"/);
+  assert.match(mappingSection, /announcement: "announcement_channel"/);
+  assert.match(mappingSection, /booster: "activity_rewards_channel"/);
 });
 
 test("availability board separates timed entries and active tickets", () => {
@@ -1042,7 +2641,7 @@ test("challenge score submissions require a referee, valid score and the open ti
   assert.throws(() => normalizeParadiseChallengeScore("10-10"), { code: "invalid_challenge_score" });
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   assert.match(source, /if \(!await canWorkReferee\(interaction\.member\)\) return interaction\.reply/);
-  assert.match(source, /Submit the score inside an open Paradise challenge ticket/);
+  assert.match(source, /Submit the score inside an open FIMA Bot challenge ticket/);
   assert.match(source, /Winner and loser must be the two fighters recorded in this challenge ticket/);
   assert.match(source, /resolveParadiseChallengeCoReferee/);
   assert.match(source, /recordParadiseChallengeAudit/);

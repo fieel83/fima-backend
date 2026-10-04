@@ -3,26 +3,26 @@
   if (document.body.dataset.accountPage !== 'dashboard') return;
   const language = localStorage.getItem('fima.language') || 'en';
   const labels = {
-    en: ['Home','Overview','Products','Billing','Redeem / Gift','Referrals','Downloads','Support','Paradise Dashboard','Logout'],
-    tr: ['Ana sayfa','Genel bakış','Ürünler','Ödemeler','Kod / Hediye','Davetler','İndirmeler','Destek','Paradise Paneli','Çıkış yap'],
-    de: ['Startseite','Übersicht','Produkte','Abrechnung','Code / Geschenk','Empfehlungen','Downloads','Support','Paradise Dashboard','Abmelden'],
-    fr: ['Accueil','Aperçu','Produits','Facturation','Code / Cadeau','Parrainages','Téléchargements','Assistance','Tableau Paradise','Déconnexion'],
-    bs: ['Početna','Pregled','Proizvodi','Plaćanja','Kod / Poklon','Preporuke','Preuzimanja','Podrška','Paradise panel','Odjava'],
-    es: ['Inicio','Resumen','Productos','Facturación','Código / Regalo','Referidos','Descargas','Soporte','Panel Paradise','Salir'],
-    pt: ['Início','Visão geral','Produtos','Faturação','Código / Presente','Indicações','Downloads','Suporte','Painel Paradise','Sair'],
-    it: ['Home','Panoramica','Prodotti','Fatturazione','Codice / Regalo','Inviti','Download','Assistenza','Dashboard Paradise','Esci'],
-    nl: ['Home','Overzicht','Producten','Facturering','Code / Cadeau','Verwijzingen','Downloads','Ondersteuning','Paradise-dashboard','Uitloggen'],
-    pl: ['Strona główna','Przegląd','Produkty','Płatności','Kod / Prezent','Polecenia','Pobieranie','Pomoc','Panel Paradise','Wyloguj'],
-    ru: ['Главная','Обзор','Продукты','Оплата','Код / Подарок','Приглашения','Загрузки','Поддержка','Панель Paradise','Выйти'],
-    uk: ['Головна','Огляд','Продукти','Оплата','Код / Подарунок','Запрошення','Завантаження','Підтримка','Панель Paradise','Вийти'],
-    ar: ['الرئيسية','نظرة عامة','المنتجات','الفوترة','رمز / هدية','الإحالات','التنزيلات','الدعم','لوحة Paradise','تسجيل الخروج'],
-    hi: ['होम','अवलोकन','उत्पाद','भुगतान','कोड / उपहार','रेफ़रल','डाउनलोड','सहायता','Paradise डैशबोर्ड','लॉग आउट'],
-    id: ['Beranda','Ringkasan','Produk','Tagihan','Kode / Hadiah','Referal','Unduhan','Bantuan','Dasbor Paradise','Keluar'],
-    ja: ['ホーム','概要','製品','請求','コード / ギフト','紹介','ダウンロード','サポート','Paradise ダッシュボード','ログアウト'],
-    ko: ['홈','개요','제품','결제','코드 / 선물','추천','다운로드','지원','Paradise 대시보드','로그아웃'],
-    zh: ['首页','概览','产品','账单','兑换 / 礼物','推荐','下载','支持','Paradise 控制台','退出'],
-    ro: ['Acasă','Prezentare','Produse','Facturare','Cod / Cadou','Recomandări','Descărcări','Asistență','Panou Paradise','Deconectare'],
-    sr: ['Početna','Pregled','Proizvodi','Plaćanja','Kod / Poklon','Preporuke','Preuzimanja','Podrška','Paradise panel','Odjava']
+    en: ['Home','Overview','Products','Billing','Redeem / Gift','Referrals','Downloads','Support','FIMA Dashboard','Logout'],
+    tr: ['Ana sayfa','Genel bakış','Ürünler','Ödemeler','Kod / Hediye','Davetler','İndirmeler','Destek','FIMA Paneli','Çıkış yap'],
+    de: ['Startseite','Übersicht','Produkte','Abrechnung','Code / Geschenk','Empfehlungen','Downloads','Support','FIMA Dashboard','Abmelden'],
+    fr: ['Accueil','Aperçu','Produits','Facturation','Code / Cadeau','Parrainages','Téléchargements','Assistance','Tableau FIMA','Déconnexion'],
+    bs: ['Početna','Pregled','Proizvodi','Plaćanja','Kod / Poklon','Preporuke','Preuzimanja','Podrška','FIMA panel','Odjava'],
+    es: ['Inicio','Resumen','Productos','Facturación','Código / Regalo','Referidos','Descargas','Soporte','Panel FIMA','Salir'],
+    pt: ['Início','Visão geral','Produtos','Faturação','Código / Presente','Indicações','Downloads','Suporte','Painel FIMA','Sair'],
+    it: ['Home','Panoramica','Prodotti','Fatturazione','Codice / Regalo','Inviti','Download','Assistenza','Dashboard FIMA','Esci'],
+    nl: ['Home','Overzicht','Producten','Facturering','Code / Cadeau','Verwijzingen','Downloads','Ondersteuning','FIMA-dashboard','Uitloggen'],
+    pl: ['Strona główna','Przegląd','Produkty','Płatności','Kod / Prezent','Polecenia','Pobieranie','Pomoc','Panel FIMA','Wyloguj'],
+    ru: ['Главная','Обзор','Продукты','Оплата','Код / Подарок','Приглашения','Загрузки','Поддержка','Панель FIMA','Выйти'],
+    uk: ['Головна','Огляд','Продукти','Оплата','Код / Подарунок','Запрошення','Завантаження','Підтримка','Панель FIMA','Вийти'],
+    ar: ['الرئيسية','نظرة عامة','المنتجات','الفوترة','رمز / هدية','الإحالات','التنزيلات','الدعم','لوحة FIMA','تسجيل الخروج'],
+    hi: ['होम','अवलोकन','उत्पाद','भुगतान','कोड / उपहार','रेफ़रल','डाउनलोड','सहायता','FIMA डैशबोर्ड','लॉग आउट'],
+    id: ['Beranda','Ringkasan','Produk','Tagihan','Kode / Hadiah','Referal','Unduhan','Bantuan','Dasbor FIMA','Keluar'],
+    ja: ['ホーム','概要','製品','請求','コード / ギフト','紹介','ダウンロード','サポート','FIMA ダッシュボード','ログアウト'],
+    ko: ['홈','개요','제품','결제','코드 / 선물','추천','다운로드','지원','FIMA 대시보드','로그아웃'],
+    zh: ['首页','概览','产品','账单','兑换 / 礼物','推荐','下载','支持','FIMA 控制台','退出'],
+    ro: ['Acasă','Prezentare','Produse','Facturare','Cod / Cadou','Recomandări','Descărcări','Asistență','Panou FIMA','Deconectare'],
+    sr: ['Početna','Pregled','Proizvodi','Plaćanja','Kod / Poklon','Preporuke','Preuzimanja','Podrška','FIMA panel','Odjava']
   };
   const selected = labels[language] || labels.en;
   document.querySelectorAll('.account-dashboard-nav a span').forEach((node,index) => { node.textContent = selected[index]; });

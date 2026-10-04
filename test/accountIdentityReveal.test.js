@@ -56,8 +56,10 @@ test("production wiring keeps authentication and reversible reveal behavior", ()
   const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(server, /app\.post\("\/api\/me\/identity\/reveal", authLimiter, requireUser, revealAccountIdentity\)/);
   const script = readFileSync(new URL("../public/assets/js/account.js", import.meta.url), "utf8");
-  assert.match(script, /const username = user\.username \|\| t\("usernameNotSet"\)/);
-  assert.match(script, /post\("\/api\/me\/identity\/reveal"/);
-  assert.match(script, /getAttribute\("aria-pressed"\) === "true"/);
-  assert.match(script, /finally \{\s*revealButton\.disabled = false/);
+  assert.match(script, /const username = user\.username \? "••••••" : accountIdentityCopy\(\)\.unset/);
+  const reveal = readFileSync(new URL("../public/assets/js/account-identity.js", import.meta.url), "utf8");
+  assert.match(script, /identityReveal\.toggle\(revealButton\)/);
+  assert.match(reveal, /post\("\/api\/me\/identity\/reveal"/);
+  assert.match(reveal, /getAttribute\("aria-pressed"\) === "true"/);
+  assert.match(reveal, /finally \{[\s\S]*button\.disabled = false/);
 });

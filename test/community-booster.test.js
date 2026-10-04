@@ -323,20 +323,20 @@ test("unboosting prevents future-month rewards and December rolls into January",
   assert.equal(state.boosterStates[0].active, false);
 });
 
-test("booster mutations are rejected outside the isolated test guild", async () => {
+test("production booster mutations require the production runtime and feature flag", async () => {
   const { db } = boosterDb();
   await assert.rejects(
     reconcileCommunityBoosterMember(null, {
       ...member(),
       guild: { id: "1419335632324657306" }
     }, { db, source: enabledSource }),
-    { code: "test_guild_only" }
+    { code: "production_rewards_require_production_runtime" }
   );
   await assert.rejects(
     observeCommunityBoostMessage({
       ...boostMessage("production-boost-message"),
       guildId: "1419335632324657306"
     }, { db, source: enabledSource }),
-    { code: "test_guild_only" }
+    { code: "production_rewards_require_production_runtime" }
   );
 });

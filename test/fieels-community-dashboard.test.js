@@ -42,8 +42,8 @@ test("Community dashboard exposes every safe planning control", () => {
 });
 
 test("Community planning routes stay owner-only, test-guild-bound and mutation-free", () => {
-  const start = serverSource.indexOf('app.get("/api/paradise/community-structure"');
-  const end = serverSource.indexOf('app.get("/api/paradise/config/history"', start);
+  const start = serverSource.indexOf('app.get("/api/fima-bot/community-structure"');
+  const end = serverSource.indexOf('app.get("/api/fima-bot/config/history"', start);
   assert.ok(start >= 0, "Community route block should exist");
   assert.ok(end > start, "Community route block should end before config history");
   const block = serverSource.slice(start, end);

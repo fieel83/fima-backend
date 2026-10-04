@@ -20,15 +20,17 @@ test("community profile API exposes separate language, region, nationality and t
 
 test("Turkish community access is derived only from preferred language", () => {
   const profileBuilder = serverSource.match(
-    /async function buildCommunityProfile\([\s\S]*?(?=\nasync function requireParadiseOwner\()/
+    /async function buildCommunityProfile\([\s\S]*?\r?\n}\r?\n/
   )?.[0] || "";
   assert.match(profileBuilder, /communityAccessForLanguage\(user\?\.preferredLanguage\)/);
   assert.doesNotMatch(profileBuilder, /communityAccessForLanguage\([^)]*(?:country|nationality)/i);
   assert.doesNotMatch(profileBuilder, /turkishCategoryAccess\s*:\s*Boolean\([^)]*(?:country|nationality)/i);
 });
 
-test("dashboard renders Discord-first identity and exact language choices", () => {
-  assert.match(dashboardSource, /Discord is the primary identity connection/i);
+test("dashboard renders unified account identity and exact language choices", () => {
+  assert.match(dashboardSource, /Manage your recovery options and community preferences/i);
+  assert.match(dashboardSource, /Roblox and either Discord or Google/i);
+  assert.doesNotMatch(dashboardSource, /Discord is the primary identity connection/i);
   assert.match(dashboardSource, /id="communityProfileSettings"/);
   assert.match(accountSource, /name="preferredLanguage"/);
   assert.match(accountSource, />Türkçe<\/option>/);

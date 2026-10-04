@@ -66,12 +66,19 @@ import {
   normalizeCommunityProfilePreferences
 } from "./accountProfilePreferences.js";
 import {
+  PARADISE_CUSTOMER_WORKSPACE_ROUTES,
   applyParadiseCustomerWorkspacePatch,
   buildParadiseCustomerWorkspaceView,
+  normalizeParadiseCustomerWorkspaceExpectedVersion,
+  paradiseCustomerWorkspaceVersion,
   normalizeParadiseCustomerWorkspacePatch
 } from "./paradiseDashboardWorkspace.js";
 import { normalizeParadiseFeatureFlags } from "./paradiseFeatureFlags.js";
-import { PARADISE_TEST_GUILD_ID } from "./paradise3a59.js";
+import {
+  FIMA_COMMUNITY_REBUILD_CONFIRMATION,
+  FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+  PARADISE_TEST_GUILD_ID
+} from "./paradise3a59.js";
 import { buildParadiseReconciliation, summarizeParadiseReconciliation } from "./paradiseReconciliation.js";
 import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
@@ -90,20 +97,32 @@ import { runOwnerLifetimeGrantJobOnce } from "./ownerGrantJob.js";
 import { runSecurityE2EJobOnce } from "./securityE2EJob.js";
 import { isLegacyTrialPlan, LEGACY_TRIAL_PROGRAM_STATUS } from "./trialPromo.js";
 import {
+  applyFtCommunityProfileFromDashboard,
+  buildFtCommunityDeploymentReadiness,
   createMissingParadiseTemplateFromDashboard,
+  applyFimaBotProfileFromDashboard,
   discordBotHealth,
+  fimaGuildDiscordGateway,
+  fimaBotProfileSyncStatus,
+  ftCommunityProfileSyncStatus,
   fimaAiSupportHealth,
   giveDiscordRole,
   paradiseDiscordAuditJobStatus,
   paradiseDiscordDeepAudit,
   paradiseDiscordContentMessage,
   paradiseDiscordGuildsSnapshot,
+  paradiseProductionOwnerBinding,
   paradiseDiscordRuntimeSnapshot,
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
+  recoverParadiseTestRollbackFromDashboard,
+  rebuildFimaCommunityProductionFromDashboard,
+  runFtCommunityProductionOrchestrator,
+  inspectFimaCommunityProductionRebuildPreflightFromDashboard,
+  rehearseParadiseTestTemplateFromDashboard,
   rebuildParadiseTestTemplateFromDashboard,
   runParadiseTestSmokeSuiteFromDashboard,
   repostParadiseGuides,
@@ -113,7 +132,9 @@ import {
   sendPaymentSubmissionLog,
   submitParadiseWebsiteApplicationForm,
   syncDiscordLanguageRole,
-  startDiscordBot
+  startDiscordBot,
+  createFimaFeedbackDiscordAdapter,
+  configureFimaAiSupportQueue
 } from "./discordBot.js";
 import { assertStripeSecretKeyAllowed, stripeConfigSummary, stripeKeyMode, stripePriceEnvState, stripeSessionPrefix } from "./stripeSafety.js";
 import {
@@ -137,6 +158,58 @@ import {
 import { paradiseApplicationHttpError, requireParadisePrivateReviewQueued } from "./paradiseApplicationHttp.js";
 import { isStrictAccountOnlyEntitlementPayload } from "./desktopLogin.js";
 import { createDesktopLoginHandlers } from "./desktopLoginRoutes.js";
+import { activateDesktopAuthSession, createDesktopLogoutHandler } from "./desktopAuthSessions.js";
+import { registerAccountDeviceRoutes } from "./accountDeviceRoutes.js";
+import { createRobloxAccountHandlers } from "./robloxAccountSecurity.js";
+import { createFimaGuildOperationsRouter } from "./fimaGuildOperationsRouter.js";
+import { paradiseWorkspaceReadModel } from "./paradiseWorkspaceReadModel.js";
+import {
+  paradiseApplicationRedirectPath,
+  paradiseFrontendRedirectUrl
+} from "./paradiseDashboardRoute.js";
+import { resolveFimaBotApplicationRoute } from "./fimaBotApplicationRoute.js";
+import {
+  renderFimaBotApplicationCatalogHtml,
+  renderFimaBotApplicationDetailHtml
+} from "./fimaBotApplicationPageHtml.js";
+import {
+  importParadiseContentArchiveMessage,
+  listParadiseContentArchive
+} from "./paradiseContentArchive.js";
+import {
+  normalizeWebsiteApplicationScope,
+  verifyParadiseApplicationOAuthAccess
+} from "./paradiseApplicationAccess.js";
+import { sanitizeParadiseApplicationSettings } from "./paradiseApplicationSettings.js";
+import {
+  consumeParadiseProductionRebuildPlan,
+  createParadiseProductionRebuildPlan,
+  finishParadiseProductionRebuildPlan,
+  paradiseProductionRebuildPlanStatus
+} from "./paradiseProductionRebuildPlan.js";
+import {
+  paradisePersistentMutationLockStatus,
+  updateParadiseMutationLease,
+  withParadiseGuildMutationLease
+} from "./paradiseMutationLease.js";
+import {
+  createOwnerFreshProof,
+  verifyOwnerFreshProof
+} from "./ownerFreshProof.js";
+import {
+  parseParadiseTestGuildArgs,
+  persistParadiseTestGuildRehearsalEvidence
+} from "./paradiseTestGuildRunner.js";
+import {
+  buildParadiseApplicationDraftRecord,
+  normalizeParadiseApplicationDraftRecord,
+  normalizeParadiseApplicationDraftScope,
+  paradiseApplicationDraftSettingKey
+} from "./paradiseApplicationDraft.js";
+import {
+  fimaBotApiCompatibility,
+  publicFimaBotIdentity
+} from "./fimaBotIdentity.js";
 
 const app = express();
 const port = Number(env("PORT", "8080"));
@@ -192,6 +265,7 @@ const giftRedeemLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 12, stand
 const adminGiftLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 80, standardHeaders: true, legacyHeaders: false });
 const adminRuntimeLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const referralLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 35, standardHeaders: true, legacyHeaders: false });
+const paradiseApplicationDraftLimiter = rateLimit({windowMs: 600000, limit: 180, standardHeaders: true, legacyHeaders: false});
 const paradiseApplicationLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 12, standardHeaders: true, legacyHeaders: false });
 const videoAssetLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
@@ -202,6 +276,8 @@ const videoAssetLimiter = rateLimit({
 });
 const adminFailedLoginState = new Map();
 const USER_SESSION_COOKIE = "fima_user_session";
+const OWNER_FRESH_PROOF_COOKIE = "fima_owner_fresh_proof";
+const accountMutationCsrf = requireCsrfForCookieMutations({adminCookieName: ADMIN_COOKIE_NAME, userCookieName: USER_SESSION_COOKIE});
 const PARADISE_OWNER_DISCORD_ID = "762858334440521739";
 const FIMA_OWNER_ACCOUNT_EMAIL = "oyuncukaande@gmail.com";
 const OAUTH_STATE_COOKIE = "fima_oauth_state";
@@ -594,7 +670,6 @@ app.use(requireCsrfForCookieMutations({
   userCookieName: USER_SESSION_COOKIE
 }));
 
-import { activateDesktopAuthSession, createDesktopLogoutHandler } from "./desktopAuthSessions.js";
 
 const desktopLoginHandlers = createDesktopLoginHandlers({
   prisma,
@@ -639,7 +714,6 @@ app.post("/api/desktop-login/logout", entitlementRefreshLimiter, createDesktopLo
   logError: (error) => console.error("Desktop logout failed", publicError(error))
 }));
 
-import { registerAccountDeviceRoutes } from "./accountDeviceRoutes.js";
 registerAccountDeviceRoutes(app, {
   prisma, requireUser, authLimiter, isOwnerManagedLicense, createAuditLog,
   logError: error => console.error("Device management failed", publicError(error))
@@ -780,20 +854,6 @@ app.patch("/api/me/username", authLimiter, requireUser, usernameHandler({
   serialize: publicUser
 }));
 
-app.get(["/paradise", "/dashboard/paradise"], (req, res) => {
-  if (req.path === "/dashboard/paradise") return res.redirect(302, `${frontendUrl()}/paradise`);
-  if (isParadiseApiHost(req.hostname)) return res.redirect(302, `${frontendUrl()}/paradise`);
-  res.set("Cache-Control", "no-store");
-  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-  return res.type("html").send(paradiseDashboardHtml({
-    clientId: env("DISCORD_CLIENT_ID", ""),
-    apiBaseUrl: apiBaseUrl(),
-    frontendUrl: frontendUrl()
-  }));
-});
-
-app.get("/paradise/dashboard", (_req, res) => res.redirect(302, "/paradise"));
-
 function protectOwnerContentStudioPages(req, res, next) {
   let pathname;
   try {
@@ -814,36 +874,202 @@ function protectOwnerContentStudioPages(req, res, next) {
 
 app.use(protectOwnerContentStudioPages);
 
-app.get("/paradise/content-studio", (_req, res) => {
+app.use(fimaBotApiCompatibility);
+
+app.get("/api/fima-bot/identity", (_req, res) => {
+  res.set("Cache-Control", "public, max-age=300");
+  return res.json(publicFimaBotIdentity());
+});
+
+function renderFimaBotOwnerDashboard(req, res) {
+  const frontendRedirect = paradiseFrontendRedirectUrl({
+    requestHostname: req.hostname,
+    requestHost: req.get("host"),
+    frontendBaseUrl: frontendUrl(),
+    apiBaseUrl: apiBaseUrl(),
+    dashboardPath: req.path
+  });
+  if (frontendRedirect) return res.redirect(302, frontendRedirect);
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.type("html").send(paradiseDashboardHtml({
+    clientId: env("DISCORD_CLIENT_ID", ""),
+    apiBaseUrl: apiBaseUrl(),
+    frontendUrl: frontendUrl()
+  }));
+}
+
+const FIMA_BOT_CUSTOMER_DASHBOARD_MODULES = new Set(
+  PARADISE_CUSTOMER_WORKSPACE_ROUTES.map(route => route.id)
+);
+
+function sendFimaBotCustomerDashboard(req, res) {
+  const guildId = String(req.params.guildId || "");
+  const moduleId = String(req.params.module || "").trim().toLowerCase();
+  if (guildId && !/^\d{16,22}$/.test(guildId)) return res.status(404).send("Not found");
+  if (moduleId && !FIMA_BOT_CUSTOMER_DASHBOARD_MODULES.has(moduleId)) return res.status(404).send("Not found");
+
+  const dashboardPath = guildId
+    ? `/fima-bot/dashboard/servers/${guildId}/${moduleId || "overview"}`
+    : "/fima-bot/dashboard";
+  const frontendRedirect = paradiseFrontendRedirectUrl({
+    requestHostname: req.hostname,
+    requestHost: req.get("host"),
+    frontendBaseUrl: frontendUrl(),
+    apiBaseUrl: apiBaseUrl(),
+    dashboardPath
+  });
+  if (frontendRedirect) return res.redirect(302, frontendRedirect);
+  if (guildId && !req.path.includes('/dashboard/servers/')) return redirectLegacyFimaBotRoute(req, res, dashboardPath);
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.sendFile(path.join(publicDir, "fima-bot-dashboard.html"));
+}
+
+function redirectLegacyFimaBotRoute(req, res, canonicalPath) {
+  const originalUrl = String(req.originalUrl || req.url || "");
+  const queryIndex = originalUrl.indexOf("?");
+  const query = queryIndex >= 0 ? originalUrl.slice(queryIndex) : "";
+  return res.redirect(301, `${canonicalPath}${query}`);
+}
+
+// FIMA Bot is the canonical public product.  Keep the historical Paradise
+// paths as explicit, query-preserving 301 aliases so bookmarks and Discord
+// embeds converge on one stable URL without duplicating public surfaces.
+app.get(["/paradise", "/dashboard/paradise"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/dashboard"));
+app.get("/fima-bot", (_req, res) => res.sendFile(path.join(publicDir, "paradise-bot.html")));
+app.get("/fima-bot/dashboard", sendFimaBotCustomerDashboard);
+app.get("/fima-bot/dashboard/servers/:guildId/:module", sendFimaBotCustomerDashboard);
+app.get("/fima-bot/dashboard/:guildId", sendFimaBotCustomerDashboard);
+app.get("/fima-bot/dashboard/:guildId/:module", sendFimaBotCustomerDashboard);
+app.get(["/fima-bot/owner", "/fima-bot/owner/dashboard"], requireUser, requireParadiseOwner, renderFimaBotOwnerDashboard);
+app.get("/dashboard/fima-bot", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/dashboard"));
+app.get(["/paradise-bot", "/paradise-bot.html"], (_req, res) => res.redirect(301, "/fima-bot"));
+
+app.get("/paradise/dashboard", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/dashboard"));
+
+
+
+function sendFimaBotContentStudio(_req, res) {
   res.set("Cache-Control", "no-store");
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   return res.sendFile(path.join(publicDir, "paradise-content-studio.html"));
-});
+}
 
-app.get(["/paradise/invite", "/bot/invite"], (_req, res) => {
+app.get(["/fima-bot/content-studio", "/paradise-content-studio", "/paradise-content-studio.html"], requireUser, requireParadiseOwner, sendFimaBotContentStudio);
+app.get("/fima-bot/embed-builder", requireUser, requireParadiseOwner, sendFimaBotContentStudio);
+app.get("/paradise/content-studio", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/content-studio"));
+
+function sendFimaBotInvitePage(_req, res) {
+  res.set("Cache-Control", "public, max-age=300");
+  return res.sendFile(path.join(publicDir, "fima-bot-invite.html"));
+}
+
+function redirectFimaBotInvite(req, res) {
   const clientId = env("DISCORD_CLIENT_ID", "");
-  if (!/^\d{16,22}$/.test(clientId)) return res.redirect(302, "/paradise-bot#invite-unavailable");
+  if (!/^\d{16,22}$/.test(clientId)) return res.redirect(302, "/fima-bot/invite?status=unavailable");
   const url = new URL("https://discord.com/oauth2/authorize");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("permissions", "8");
   url.searchParams.set("scope", "bot applications.commands");
+  const guildId = String(req.query?.guild || "");
+  if (/^\d{16,22}$/.test(guildId)) url.searchParams.set("guild_id", guildId);
   return res.redirect(302, url.toString());
+}
+
+app.get("/fima-bot/invite", sendFimaBotInvitePage);
+app.get("/fima-bot/invite/authorize", redirectFimaBotInvite);
+app.get(["/paradise/invite", "/bot/invite"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/invite"));
+
+app.get("/fima-bot/commands", (_req, res) => res.sendFile(path.join(publicDir, "fima-bot-commands.html")));
+app.get("/fima-bot/premium", (_req, res) => res.sendFile(path.join(publicDir, "fima-bot-premium.html")));
+app.get("/fima-bot/feedback", (_req, res) => res.sendFile(path.join(publicDir, "fima-bot-feedback.html")));
+app.get(["/paradise/commands", "/bot/commands"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/commands"));
+app.get(["/paradise/premium", "/bot/premium"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/premium"));
+app.get(["/paradise/feedback", "/bot/feedback"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/feedback"));
+function sendFimaBotApplicationCatalog(_req, res) {
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.type("html").send(renderFimaBotApplicationCatalogHtml());
+}
+app.get("/fima-bot/apply", sendFimaBotApplicationCatalog);
+app.get("/fima-bot/apply/:slug", (req, res) => {
+  const html = renderFimaBotApplicationDetailHtml(req.params.slug);
+  if (!html) return res.status(404).send("Not found");
+  res.set("Cache-Control", "no-store");
+  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return res.type("html").send(html);
+});
+app.get("/paradise-apply", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/apply"));
+app.get(["/paradise/apply", "/bot/apply"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/apply"));
+app.get(["/paradise/reseller", "/bot/reseller"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/reseller"));
+app.get("/fima-bot/reseller", (_req, res) => res.redirect(302, "/fima-bot/apply?workflow=business&type=reseller"));
+
+app.get("/api/fima-bot/applications/draft", paradiseApplicationDraftLimiter, requireUser, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const access = await paradiseApplicationDraftAccess(req.user, req.query || {});
+    const key = paradiseApplicationDraftSettingKey(access.scope);
+    const row = await prisma.setting.findUnique({ where: { key } });
+    const draft = normalizeParadiseApplicationDraftRecord(row?.value, access);
+    if (row && !draft) await prisma.setting.deleteMany({ where: { key } }).catch(() => {});
+    return res.json({ success: true, draft });
+  } catch (error) {
+    return sendParadiseApplicationDraftError(res, error, "read");
+  }
 });
 
-app.get(["/paradise/commands", "/bot/commands"], (_req, res) => res.redirect(302, "/paradise-bot#commands"));
-app.get(["/paradise/premium", "/bot/premium"], (_req, res) => res.redirect(302, "/paradise-bot#premium"));
-app.get(["/paradise/feedback", "/bot/feedback"], (_req, res) => res.redirect(302, "/paradise-bot#feedback"));
-app.get(["/paradise/apply", "/bot/apply"], (_req, res) => res.redirect(302, "/paradise-apply"));
-app.get(["/paradise/reseller", "/bot/reseller"], (_req, res) => res.redirect(302, "/paradise-apply"));
-
-app.get("/api/paradise/applications/context", paradiseApplicationLimiter, requireUser, async (req, res) => {
+app.put("/api/fima-bot/applications/draft", paradiseApplicationDraftLimiter, requireUser, async (req, res) => {
+  res.set("Cache-Control", "no-store");
   try {
-    const access = await paradiseLinkedDiscordAccess(req.user);
-    if (!access.discordLinked) return res.status(409).json({ error: "discord_link_required" });
+    const access = await paradiseApplicationDraftAccess(req.user, req.body || {});
+    const key = paradiseApplicationDraftSettingKey(access.scope);
+    const draft = await prisma.$transaction(async tx => {
+      await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
+      const row = await tx.setting.findUnique({ where: { key } });
+      const current = normalizeParadiseApplicationDraftRecord(row?.value, access);
+      const next = buildParadiseApplicationDraftRecord({
+        ...access,
+        answers: req.body?.answers,
+        current,
+        expectedRevision: req.body?.expectedRevision ?? 0
+      });
+      await tx.setting.upsert({
+        where: { key },
+        update: { value: next },
+        create: { key, value: next }
+      });
+      return next;
+    });
+    return res.json({ success: true, draft });
+  } catch (error) {
+    return sendParadiseApplicationDraftError(res, error, "write");
+  }
+});
+
+app.delete("/api/fima-bot/applications/draft", paradiseApplicationDraftLimiter, requireUser, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const access = await paradiseApplicationDraftAccess(req.user, req.body || {});
+    const key = paradiseApplicationDraftSettingKey(access.scope);
+    await prisma.setting.deleteMany({ where: { key } });
+    return res.json({ success: true, deleted: true });
+  } catch (error) {
+    return sendParadiseApplicationDraftError(res, error, "delete");
+  }
+});
+
+app.get("/api/fima-bot/applications/context", paradiseApplicationLimiter, requireUser, async (req, res) => {
+  try {
     const requestedGuildId = String(req.query?.guildId || "").trim();
-    const workflow = req.query?.workflow === "business" ? "business" : "staff";
+    const { workflow } = normalizeWebsiteApplicationScope({
+      workflow: req.query?.workflow,
+      type: req.query?.type
+    }, { requireType: false });
+    const access = await paradiseWebsiteApplicationOAuthAccess(req.user, requestedGuildId || null);
     const guilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
-    const candidates = requestedGuildId ? guilds.filter(guild => guild.id === requestedGuildId) : guilds;
+    const candidates = (requestedGuildId ? guilds.filter(guild => guild.id === requestedGuildId) : guilds)
+      .filter(guild => access.guildIds.has(guild.id));
     if (requestedGuildId && candidates.length === 0) return res.status(404).json({ error: "guild_not_managed" });
     const contexts = [];
     for (const guild of candidates.slice(0, 20)) {
@@ -861,18 +1087,17 @@ app.get("/api/paradise/applications/context", paradiseApplicationLimiter, requir
       contexts
     });
   } catch (error) {
-    console.error("Paradise application context failed", publicError(error));
-    return res.status(500).json({ error: "application_context_failed" });
+    const response = paradiseApplicationHttpError(error);
+    if (response.status >= 500) console.error("FIMA Bot application context failed", publicError(error));
+    return res.status(response.status).json(response.body);
   }
 });
 
-app.post("/api/paradise/applications/submit", paradiseApplicationLimiter, requireUser, async (req, res) => {
+app.post("/api/fima-bot/applications/submit", paradiseApplicationLimiter, requireUser, async (req, res) => {
   try {
-    const access = await paradiseLinkedDiscordAccess(req.user);
-    if (!access.discordLinked) return res.status(409).json({ error: "discord_link_required" });
     const guildId = String(req.body?.guildId || "").trim();
-    const type = String(req.body?.type || "").trim();
-    const workflow = req.body?.workflow === "business" ? "business" : "staff";
+    const { workflow, type } = normalizeWebsiteApplicationScope(req.body);
+    const access = await paradiseWebsiteApplicationOAuthAccess(req.user, guildId);
     const answers = req.body?.answers && typeof req.body.answers === "object" ? req.body.answers : {};
     const evidence = Array.isArray(req.body?.evidence) ? req.body.evidence : [];
     const guilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
@@ -885,6 +1110,10 @@ app.post("/api/paradise/applications/submit", paradiseApplicationLimiter, requir
       evidence,
       siteUserId: req.user.id
     }));
+    const draftKey = paradiseApplicationDraftSettingKey({ userId: req.user.id, guildId, workflow, type });
+    await prisma.setting.deleteMany({ where: { key: draftKey } }).catch(error => {
+      console.error("FIMA Bot submitted application draft cleanup failed", publicError(error));
+    });
     await createAuditLog("paradise_website_application_submitted", "discord_guild", guildId, {
       userId: req.user.id,
       discordIdMasked: maskExternalId(access.discordUserId),
@@ -896,12 +1125,12 @@ app.post("/api/paradise/applications/submit", paradiseApplicationLimiter, requir
     return res.status(201).json({ success: true, application: result });
   } catch (error) {
     const response = paradiseApplicationHttpError(error);
-    if (response.status >= 500) console.error("Paradise website application failed", publicError(error));
+    if (response.status >= 500) console.error("FIMA Bot website application failed", publicError(error));
     return res.status(response.status).json(response.body);
   }
 });
 
-app.get("/api/paradise/session-status", async (req, res) => {
+app.get("/api/fima-bot/session-status", async (req, res) => {
   res.set("Cache-Control", "no-store");
   try {
     const user = await getOptionalUser(req, res);
@@ -912,7 +1141,7 @@ app.get("/api/paradise/session-status", async (req, res) => {
         ownerAuthorized: false,
         csrfReady: false,
         reasonCode: "login_required",
-        dashboardUrl: `${frontendUrl()}/paradise`
+        dashboardUrl: `${frontendUrl()}/fima-bot/dashboard`
       });
     }
     const access = await paradiseOwnerAccess(user);
@@ -928,22 +1157,35 @@ app.get("/api/paradise/session-status", async (req, res) => {
       ownerAuthorized: access.ownerAuthorized,
       csrfReady: Boolean(req.cookies?.[USER_SESSION_COOKIE]),
       reasonCode: access.reasonCode,
-      dashboardUrl: `${frontendUrl()}/paradise`
+      dashboardUrl: `${frontendUrl()}/fima-bot/dashboard`
     });
   } catch (error) {
-    console.error("Paradise session status failed", publicError(error));
+    console.error("FIMA Bot session status failed", publicError(error));
     return res.status(500).json({
       authenticated: false,
       discordLinked: false,
       ownerAuthorized: false,
       csrfReady: false,
       reasonCode: "session_check_failed",
-      dashboardUrl: `${frontendUrl()}/paradise`
+      dashboardUrl: `${frontendUrl()}/fima-bot/dashboard`
     });
   }
 });
 
-app.get("/api/paradise/customer/workspaces", requireUser, async (req, res) => {
+app.use("/api/fima-bot/customer/workspaces/:guildId/operations", createFimaGuildOperationsRouter({
+  prisma, authenticate: requireUser, csrf: accountMutationCsrf, gateway: fimaGuildDiscordGateway,
+  trustedOrigin: isTrustedParadiseOrigin,
+  authorize: async (user, guildId) => {
+    const access = await paradiseCustomerWorkspaceAccess(user);
+    if (!access.ready) {
+      const error = new Error(access.code);
+      error.code = access.code; error.statusCode = 409; throw error;
+    }
+    return { card: access.cards.find(card => card.guildId === guildId), discordUserId: access.discordUserId };
+  }
+}));
+
+app.get("/api/fima-bot/customer/workspaces", requireUser, async (req, res) => {
   try {
     const workspaceAccess = await paradiseCustomerWorkspaceAccess(req.user);
     if (!workspaceAccess.ready) {
@@ -959,7 +1201,7 @@ app.get("/api/paradise/customer/workspaces", requireUser, async (req, res) => {
     });
     return res.json({ success: true, workspaces: workspaceAccess.cards });
   } catch (error) {
-    console.error("Paradise customer workspace lookup failed", publicError(error));
+    console.error("FIMA Bot customer workspace lookup failed", publicError(error));
     return res.status(503).json({ success: false, error: error.code || "paradise_workspace_unavailable" });
   }
 });
@@ -967,7 +1209,7 @@ app.get("/api/paradise/customer/workspaces", requireUser, async (req, res) => {
 // Customer workspaces intentionally remain separate from the Fieel owner
 // console.  A Discord OAuth membership with Manage Guild/Admin is required on
 // every request; a guessed guild ID cannot reveal another guild's config.
-app.get("/api/paradise/customer/workspaces/:guildId", requireUser, async (req, res) => {
+app.get("/api/fima-bot/customer/workspaces/:guildId", requireUser, async (req, res) => {
   try {
     const guildId = String(req.params.guildId || "");
     const workspaceAccess = await paradiseCustomerWorkspaceAccess(req.user);
@@ -987,7 +1229,7 @@ app.get("/api/paradise/customer/workspaces/:guildId", requireUser, async (req, r
     });
     return res.json({ success: true, ...workspace });
   } catch (error) {
-    console.error("Paradise customer workspace read failed", publicError(error));
+    console.error("FIMA Bot customer workspace read failed", publicError(error));
     return res.status(503).json({ success: false, error: error.code || "paradise_workspace_unavailable" });
   }
 });
@@ -995,7 +1237,7 @@ app.get("/api/paradise/customer/workspaces/:guildId", requireUser, async (req, r
 // Customer writes use the same state/version/audit transaction as the owner
 // console, but only after Discord OAuth proves the current user can manage the
 // selected guild. The normalizer rejects owner-only, billing and provider data.
-app.patch("/api/paradise/customer/workspaces/:guildId/config", requireUser, async (req, res) => {
+app.patch("/api/fima-bot/customer/workspaces/:guildId/config", requireUser, async (req, res) => {
   try {
     const origin = String(req.get("origin") || "");
     if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ success: false, error: "origin_mismatch" });
@@ -1007,22 +1249,46 @@ app.patch("/api/paradise/customer/workspaces/:guildId/config", requireUser, asyn
     if (!card.botInstalled) return res.status(409).json({ success: false, error: "bot_invite_required" });
 
     const normalized = normalizeParadiseCustomerWorkspacePatch({ route: req.body?.route, value: req.body?.value });
-    const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
-    const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
-    state.guildConfigs = state.guildConfigs && typeof state.guildConfigs === "object" ? state.guildConfigs : {};
-    const previous = structuredClone(state.guildConfigs[guildId] || {});
-    const next = applyParadiseCustomerWorkspacePatch(previous, normalized);
-    state.guildConfigs[guildId] = next;
+    const expectedVersion = normalizeParadiseCustomerWorkspaceExpectedVersion(req.body?.expectedVersion);
+    // Mapping edits require live guild membership and IDs from this guild.
+    if (['channels', 'roles'].includes(normalized.route)) {
+      const inventory = await fimaGuildDiscordGateway.inspect(guildId, workspaceAccess.discordUserId);
+      const resources = normalized.route === 'channels' ? inventory.channels : inventory.roles;
+      const mappings = normalized.patch?.channelMappings || normalized.patch?.roleMappings || normalized.value?.channelMappings || normalized.value?.roleMappings || {};
+      if (Object.values(mappings).some(id => id && !resources.some(row => row.id === id))) {
+        return res.status(400).json({ success: false, error: 'binding_not_in_guild' });
+      }
+      if (normalized.route === 'roles' && Object.values(mappings).some(id => id && resources.some(row => row.id === id && (row.managed || row.id === guildId)))) {
+        return res.status(400).json({ success: false, error: 'role_binding_not_assignable' });
+      }
+    }
     const correlationId = crypto.randomUUID();
-    const configVersion = createParadiseConfigVersion({
-      guildId,
-      previous,
-      next,
-      actorId: req.user.id,
-      source: "paradise_customer_dashboard"
-    });
 
-    await prisma.$transaction(async tx => {
+    const committed = await prisma.$transaction(async tx => {
+      // The shared legacy state row must be read inside the serializable
+      // transaction. Reading before it would allow two editors to silently
+      // overwrite one another with stale full-state snapshots.
+      const row = await tx.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+      const state = row?.value && typeof row.value === "object" ? structuredClone(row.value) : {};
+      state.guildConfigs = state.guildConfigs && typeof state.guildConfigs === "object" ? state.guildConfigs : {};
+      const previous = structuredClone(state.guildConfigs[guildId] || {});
+      const currentVersion = paradiseCustomerWorkspaceVersion(previous);
+      if (currentVersion !== expectedVersion) {
+        throw Object.assign(new Error("workspace_version_conflict"), {
+          code: "workspace_version_conflict",
+          statusCode: 409,
+          currentVersion
+        });
+      }
+      const next = applyParadiseCustomerWorkspacePatch(previous, normalized);
+      state.guildConfigs[guildId] = next;
+      const configVersion = createParadiseConfigVersion({
+        guildId,
+        previous,
+        next,
+        actorId: req.user.id,
+        source: "paradise_customer_dashboard"
+      });
       await tx.setting.upsert({
         where: { key: "paradise_3a59_state_v1" },
         update: { value: state },
@@ -1046,23 +1312,46 @@ app.patch("/api/paradise/customer/workspaces/:guildId/config", requireUser, asyn
           }
         }
       });
-    });
+      return {
+        configVersion,
+        committedVersion: paradiseCustomerWorkspaceVersion(next)
+      };
+    }, { isolationLevel: "Serializable" });
 
-    const workspace = buildParadiseCustomerWorkspaceView({ card, config: next, route: normalized.route });
+    // Read the canonical state again after commit instead of echoing the
+    // in-memory candidate. This response therefore reflects persisted data,
+    // including a newer authorized write that may have committed immediately
+    // after this one.
+    const readbackRow = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
+    const readbackState = readbackRow?.value && typeof readbackRow.value === "object" ? readbackRow.value : {};
+    const readbackConfig = readbackState.guildConfigs?.[guildId] || {};
+    const workspace = buildParadiseCustomerWorkspaceView({ card, config: readbackConfig, route: normalized.route });
+    if (workspace.version < committed.committedVersion) {
+      throw Object.assign(new Error("workspace_readback_failed"), { code: "workspace_readback_failed" });
+    }
     return res.json({
       success: true,
       correlationId,
       workspace,
-      configVersion: summarizeParadiseConfigVersion(configVersion)
+      committedVersion: committed.committedVersion,
+      readbackVersion: workspace.version,
+      configVersion: summarizeParadiseConfigVersion(committed.configVersion)
     });
   } catch (error) {
-    const status = error.code?.startsWith("invalid_") || error.code === "workspace_route_read_only" ? 400 : 503;
-    if (status >= 500) console.error("Paradise customer workspace write failed", publicError(error));
-    return res.status(status).json({ success: false, error: error.code || "paradise_workspace_save_failed" });
+    const serializationConflict = error.code === "P2034";
+    const status = serializationConflict || error.code === "workspace_version_conflict" || error.code === "module_dependency_or_compatibility_conflict"
+      ? 409
+      : error.code?.startsWith("invalid_") || error.code === "workspace_route_read_only" ? 400 : 503;
+    if (status >= 500) console.error("FIMA Bot customer workspace write failed", publicError(error));
+    return res.status(status).json({
+      success: false,
+      error: serializationConflict ? "workspace_version_conflict" : error.code || "paradise_workspace_save_failed",
+      ...(Number.isSafeInteger(error.currentVersion) ? { currentVersion: error.currentVersion } : {})
+    });
   }
 });
 
-app.get("/api/paradise/public-status", async (_req, res) => {
+app.get("/api/fima-bot/public-status", async (_req, res) => {
   const [health, guilds, testLab, testRuntime] = await Promise.all([
     discordBotHealth().catch(() => null),
     paradiseDiscordGuildsSnapshot().catch(() => []),
@@ -1074,7 +1363,7 @@ app.get("/api/paradise/public-status", async (_req, res) => {
   return res.json({
     status: health?.botReady ? "ready" : "unavailable",
     botReady: health?.botReady === true,
-    intendedName: "Paradise",
+    intendedName: "FIMA Bot",
     managedGuildCount: guilds.length,
     commandSync: {
       count: Number(primary?.commandSync?.count || 0),
@@ -1096,7 +1385,7 @@ app.get("/api/paradise/public-status", async (_req, res) => {
   });
 });
 
-app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/config", requireUser, requireParadiseOwner, async (req, res) => {
   const row = await prisma.setting.findUnique({ where: { key: "paradise_3a59_state_v1" } });
   const state = row?.value && typeof row.value === "object" ? row.value : {};
   const servers = await paradiseDiscordGuildsSnapshot().catch(() => []);
@@ -1107,6 +1396,14 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
     || null;
   const selectedGuildId = selectedGuild?.id || env("DISCORD_GUILD_ID", "");
   const runtime = await paradiseDiscordRuntimeSnapshot(selectedGuildId).catch(error => ({ status: "error", error: error.message }));
+  const mutationLock = await paradisePersistentMutationLockStatus(selectedGuildId).catch(error => ({
+    guildId: selectedGuildId,
+    locked: true,
+    waiting: 0,
+    recoverable: false,
+    status: "status_unavailable",
+    error: String(error?.code || "mutation_lock_status_unavailable")
+  }));
   const config = state.guildConfigs?.[selectedGuildId] || state.config || {};
   const relations = state.relations?.[selectedGuildId] || (state.relations?.allies || state.relations?.enemies ? state.relations : {});
   const belongsToSelectedGuild = item => item?.guildId ? item.guildId === selectedGuildId : selectedGuildId === env("DISCORD_GUILD_ID");
@@ -1116,6 +1413,8 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
     servers,
     config,
     runtime,
+    mutationLock,
+    workspace: paradiseWorkspaceReadModel(state, selectedGuildId),
     summary: {
       verifiedProfiles: Object.keys(state.profiles || {}).length,
       pendingTryouts: Object.values(state.pendingTryouts || {}).filter(item => belongsToSelectedGuild(item) && item.status !== "approved").length,
@@ -1130,7 +1429,7 @@ app.get("/api/paradise/config", requireUser, requireParadiseOwner, async (req, r
   });
 });
 
-app.get("/api/paradise/fima-ai/health", requireUser, requireParadiseOwner, async (_req, res) => {
+app.get("/api/fima-bot/fima-ai/health", requireUser, requireParadiseOwner, async (_req, res) => {
   const health = await fimaAiSupportHealth().catch(() => ({
     status: "offline",
     configured: Boolean(env("FIMA_AI_ADAPTER_URL")),
@@ -1141,6 +1440,20 @@ app.get("/api/paradise/fima-ai/health", requireUser, requireParadiseOwner, async
 
 function paradiseContentStudioStateKey(guildId) {
   return `paradise_content_studio_v1_${guildId}`;
+}
+
+function paradiseContentArchiveBackupKey(guildId) {
+  return `paradise_3a61_backup_${guildId}`;
+}
+
+async function readParadiseContentArchiveBackup(guildId) {
+  const row = await prisma.setting.findUnique({ where: { key: paradiseContentArchiveBackupKey(guildId) } });
+  if (!row?.value) {
+    const error = new Error("content_archive_backup_missing");
+    error.code = "content_archive_backup_missing";
+    throw error;
+  }
+  return row.value;
 }
 
 function paradiseContentStudioOwnerMutationAllowed(req, res) {
@@ -1226,7 +1539,11 @@ function requireParadiseContentStudioRevision(body, state) {
 function paradiseContentStudioStatus(error) {
   const code = String(error?.code || "");
   if (["test_guild_only", "production_guild_mutation_blocked", "non_test_guild_mutation_blocked"].includes(code)) return 403;
-  if (["document_not_found", "version_not_found", "preset_not_found", "guild_not_managed", "content_message_not_found", "content_channel_not_found"].includes(code)) return 404;
+  if ([
+    "document_not_found", "version_not_found", "preset_not_found", "guild_not_managed",
+    "content_message_not_found", "content_channel_not_found", "content_archive_backup_missing",
+    "content_archive_missing", "content_archive_record_not_found"
+  ].includes(code)) return 404;
   if ([
     "overwrite_confirmation_required", "state_changed", "state_revision_required",
     "content_stage_transition_invalid", "imported_stage_requires_original_payload"
@@ -1238,11 +1555,11 @@ function paradiseContentStudioStatus(error) {
 
 function paradiseContentStudioFailure(res, error, fallback) {
   const status = paradiseContentStudioStatus(error);
-  if (status >= 500) console.error("Paradise Content Studio failed", publicError(error));
+  if (status >= 500) console.error("FIMA Content Studio failed", publicError(error));
   return res.status(status).json({ success: false, error: error?.code || fallback });
 }
 
-app.get("/api/paradise/content-studio", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/content-studio", requireUser, requireParadiseOwner, async (req, res) => {
   try {
     const { guild, servers } = await paradiseContentStudioGuild(req.query?.guildId);
     const state = await readParadiseContentStudioState(guild.id);
@@ -1260,7 +1577,7 @@ app.get("/api/paradise/content-studio", requireUser, requireParadiseOwner, async
   }
 });
 
-app.get("/api/paradise/content-studio/document/:documentId", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/content-studio/document/:documentId", requireUser, requireParadiseOwner, async (req, res) => {
   try {
     const { guild } = await paradiseContentStudioGuild(req.query?.guildId);
     const state = await readParadiseContentStudioState(guild.id);
@@ -1270,7 +1587,42 @@ app.get("/api/paradise/content-studio/document/:documentId", requireUser, requir
   }
 });
 
-app.get("/api/paradise/content-studio/preset/:preset", requireUser, requireParadiseOwner, (req, res) => {
+app.get("/api/fima-bot/content-studio/archive", requireUser, requireParadiseOwner, async (req, res) => {
+  try {
+    const { guild } = await paradiseContentStudioGuild(req.query?.guildId);
+    const backup = await readParadiseContentArchiveBackup(guild.id);
+    const records = listParadiseContentArchive(backup, { expectedGuildId: guild.id });
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      success: true,
+      guildId: guild.id,
+      capturedAt: backup.capturedAt || backup.integrity?.capturedAt || null,
+      digest: backup.integrity?.digest || null,
+      records
+    });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_archive_load_failed");
+  }
+});
+
+app.post("/api/fima-bot/content-studio/archive/import", requireUser, requireParadiseOwner, async (req, res) => {
+  try {
+    const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
+    const backup = await readParadiseContentArchiveBackup(guild.id);
+    const imported = importParadiseContentArchiveMessage(backup, {
+      expectedGuildId: guild.id,
+      channelId: req.body?.channelId,
+      messageId: req.body?.messageId,
+      importedByActorId: req.paradiseOwnerDiscord?.providerSubject || null
+    });
+    res.set("Cache-Control", "no-store");
+    return res.json({ success: true, imported });
+  } catch (error) {
+    return paradiseContentStudioFailure(res, error, "content_archive_import_failed");
+  }
+});
+
+app.get("/api/fima-bot/content-studio/preset/:preset", requireUser, requireParadiseOwner, (req, res) => {
   try {
     return res.json({ success: true, preset: paradiseContentPreset(req.params.preset) });
   } catch (error) {
@@ -1278,7 +1630,7 @@ app.get("/api/paradise/content-studio/preset/:preset", requireUser, requireParad
   }
 });
 
-app.post("/api/paradise/content-studio/preview", requireUser, requireParadiseOwner, (req, res) => {
+app.post("/api/fima-bot/content-studio/preview", requireUser, requireParadiseOwner, (req, res) => {
   if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
   try {
     return res.json({ success: true, preview: paradiseContentPreview(req.body?.payload, req.body?.mode) });
@@ -1287,56 +1639,72 @@ app.post("/api/paradise/content-studio/preview", requireUser, requireParadiseOwn
   }
 });
 
-app.post("/api/paradise/content-studio/save", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/content-studio/save", requireUser, requireParadiseOwner, async (req, res) => {
   if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
   try {
     const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
-    const state = await readParadiseContentStudioState(guild.id);
-    const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
-    const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
-    const saved = saveParadiseContentDocument(state, req.body?.document, { actorId });
-    await persistParadiseContentStudioState({
-      guildId: guild.id,
-      state: saved.state,
-      expectedStateUpdatedAt,
-      action: "paradise_content_document_saved",
-      targetId: saved.document.id,
-      actorId,
-      metadata: { versionId: saved.version.id, source: saved.document.source }
+    const result = await withParadiseGuildMutationLease(guild.id, "content_studio_save", async () => {
+      const state = await readParadiseContentStudioState(guild.id);
+      const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
+      const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
+      const saved = saveParadiseContentDocument(state, req.body?.document, { actorId });
+      await persistParadiseContentStudioState({
+        guildId: guild.id,
+        state: saved.state,
+        expectedStateUpdatedAt,
+        action: "paradise_content_document_saved",
+        targetId: saved.document.id,
+        actorId,
+        metadata: { versionId: saved.version.id, source: saved.document.source }
+      });
+      return { stateUpdatedAt: saved.state.updatedAt, document: saved.document, version: saved.version };
+    }, {
+      purposeKey: "content_studio_state_mutation",
+      idempotencyKey: `${guild.id}:content-studio-save:${String(req.body?.document?.id || "new")}:${String(req.body?.expectedStateUpdatedAt ?? "missing")}`,
+      phase: "content_studio_state_pending",
+      expectedGuildId: guild.id
     });
-    return res.json({ success: true, stateUpdatedAt: saved.state.updatedAt, document: saved.document, version: saved.version });
+    return res.json({ success: true, ...result });
   } catch (error) {
     return paradiseContentStudioFailure(res, error, "content_document_save_failed");
   }
 });
 
-app.post("/api/paradise/content-studio/rollback", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/content-studio/rollback", requireUser, requireParadiseOwner, async (req, res) => {
   if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
   try {
     const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
-    const state = await readParadiseContentStudioState(guild.id);
-    const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
-    const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
-    const saved = rollbackParadiseContentDocument(state, {
-      documentId: req.body?.documentId,
-      versionId: req.body?.versionId
-    }, { actorId });
-    await persistParadiseContentStudioState({
-      guildId: guild.id,
-      state: saved.state,
-      expectedStateUpdatedAt,
-      action: "paradise_content_document_rolled_back",
-      targetId: saved.document.id,
-      actorId,
-      metadata: { restoredFromVersionId: req.body?.versionId, versionId: saved.version.id }
+    const result = await withParadiseGuildMutationLease(guild.id, "content_studio_rollback", async () => {
+      const state = await readParadiseContentStudioState(guild.id);
+      const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
+      const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
+      const saved = rollbackParadiseContentDocument(state, {
+        documentId: req.body?.documentId,
+        versionId: req.body?.versionId
+      }, { actorId });
+      await persistParadiseContentStudioState({
+        guildId: guild.id,
+        state: saved.state,
+        expectedStateUpdatedAt,
+        action: "paradise_content_document_rolled_back",
+        targetId: saved.document.id,
+        actorId,
+        metadata: { restoredFromVersionId: req.body?.versionId, versionId: saved.version.id }
+      });
+      return { stateUpdatedAt: saved.state.updatedAt, document: saved.document, version: saved.version };
+    }, {
+      purposeKey: "content_studio_state_mutation",
+      idempotencyKey: `${guild.id}:content-studio-rollback:${String(req.body?.documentId || "missing")}:${String(req.body?.versionId || "missing")}:${String(req.body?.expectedStateUpdatedAt ?? "missing")}`,
+      phase: "content_studio_state_pending",
+      expectedGuildId: guild.id
     });
-    return res.json({ success: true, stateUpdatedAt: saved.state.updatedAt, document: saved.document, version: saved.version });
+    return res.json({ success: true, ...result });
   } catch (error) {
     return paradiseContentStudioFailure(res, error, "content_document_rollback_failed");
   }
 });
 
-app.post("/api/paradise/content-studio/import", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/content-studio/import", requireUser, requireParadiseOwner, async (req, res) => {
   if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
   try {
     const { guild } = await paradiseContentStudioGuild(req.body?.guildId);
@@ -1349,7 +1717,7 @@ app.post("/api/paradise/content-studio/import", requireUser, requireParadiseOwne
   }
 });
 
-app.post("/api/paradise/content-studio/publish", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/content-studio/publish", requireUser, requireParadiseOwner, async (req, res) => {
   if (!paradiseContentStudioOwnerMutationAllowed(req, res)) return;
   try {
     if (req.body?.confirmation !== "PUBLISH TEST CONTENT") {
@@ -1363,74 +1731,117 @@ app.post("/api/paradise/content-studio/publish", requireUser, requireParadiseOwn
       error.code = "test_guild_only";
       throw error;
     }
-    const state = await readParadiseContentStudioState(guild.id);
-    const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
-    const document = loadParadiseContentDocument(state, req.body?.documentId);
-    if (document.importStatus === "pending_source_export") {
-      const error = new Error("content_source_export_required");
-      error.code = "content_source_export_required";
-      throw error;
-    }
-    if (!["improved_draft", "production_version"].includes(document.stage)) {
-      const error = new Error("content_stage_not_publishable");
-      error.code = "content_stage_not_publishable";
-      throw error;
-    }
-    const channelId = String(req.body?.channelId || document.targetChannelId || "");
-    const messageId = Object.hasOwn(req.body || {}, "messageId") ? req.body.messageId : document.targetMessageId;
-    const published = await publishParadiseContentMessage({
-      guildId: guild.id,
-      channelId,
-      messageId,
-      payload: document.current,
-      deliveryMode: document.deliveryMode,
-      webhookUrl: req.body?.webhookUrl
-    });
-
-    const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
-    try {
-      const saved = saveParadiseContentDocument(state, {
-        id: document.id,
-        overwrite: true,
-        name: document.name,
-        payload: document.current,
-        stage: "production_version",
-        importStatus: document.importStatus,
-        metadata: document.metadata,
-        originalSnapshot: document.originalSnapshot,
-        deliveryMode: document.deliveryMode,
-        targetChannelId: published.channelId,
-        targetMessageId: published.messageId,
-        canonicalGuildId: published.guildId,
-        canonicalChannelId: published.channelId,
-        canonicalMessageId: published.messageId,
-        source: document.source
-      }, { actorId });
-      await persistParadiseContentStudioState({
+    const result = await withParadiseGuildMutationLease(guild.id, "content_studio_publish", async () => {
+      const state = await readParadiseContentStudioState(guild.id);
+      const expectedStateUpdatedAt = requireParadiseContentStudioRevision(req.body, state);
+      const document = loadParadiseContentDocument(state, req.body?.documentId);
+      if (document.importStatus === "pending_source_export") {
+        const error = new Error("content_source_export_required");
+        error.code = "content_source_export_required";
+        throw error;
+      }
+      if (!["improved_draft", "production_version"].includes(document.stage)) {
+        const error = new Error("content_stage_not_publishable");
+        error.code = "content_stage_not_publishable";
+        throw error;
+      }
+      const channelId = String(req.body?.channelId || document.targetChannelId || "");
+      const messageId = Object.hasOwn(req.body || {}, "messageId") ? req.body.messageId : document.targetMessageId;
+      const published = await publishParadiseContentMessage({
         guildId: guild.id,
-        state: saved.state,
-        expectedStateUpdatedAt,
-        action: "paradise_content_document_published",
-        targetId: document.id,
-        actorId,
-        metadata: {
-          messageId: published.messageId,
-          channelId: published.channelId,
-          operation: published.operation,
-          deliveryMode: published.deliveryMode,
-          versionId: saved.version.id
-        }
+        channelId,
+        messageId,
+        payload: document.current,
+        deliveryMode: document.deliveryMode
       });
-      return res.json({ success: true, published, document: saved.document, stateUpdatedAt: saved.state.updatedAt });
-    } catch (persistenceError) {
-      console.error("Paradise Content Studio publish state persistence failed", publicError(persistenceError));
-      return res.json({
-        success: true,
-        published,
-        persistenceWarning: "published_but_state_not_persisted",
-        recovery: { channelId: published.channelId, messageId: published.messageId }
+      const reconciliation = {
+        reason: "content_studio_state_persistence_pending",
+        guildId: guild.id,
+        channelId: published.channelId,
+        messageId: published.messageId,
+        documentId: document.id,
+        operation: published.operation,
+        deliveryMode: published.deliveryMode
+      };
+      await updateParadiseMutationLease({
+        phase: "discord_published_state_pending",
+        status: "running",
+        reconciliation: { required: true, ...reconciliation }
       });
-    }
+
+      const actorId = req.paradiseOwnerDiscord?.providerSubject || null;
+      try {
+        const saved = saveParadiseContentDocument(state, {
+          id: document.id,
+          overwrite: true,
+          name: document.name,
+          payload: document.current,
+          stage: "production_version",
+          importStatus: document.importStatus,
+          metadata: document.metadata,
+          originalSnapshot: document.originalSnapshot,
+          deliveryMode: document.deliveryMode,
+          targetChannelId: published.channelId,
+          targetMessageId: published.messageId,
+          canonicalGuildId: published.guildId,
+          canonicalChannelId: published.channelId,
+          canonicalMessageId: published.messageId,
+          source: document.source
+        }, { actorId });
+        await persistParadiseContentStudioState({
+          guildId: guild.id,
+          state: saved.state,
+          expectedStateUpdatedAt,
+          action: "paradise_content_document_published",
+          targetId: document.id,
+          actorId,
+          metadata: {
+            messageId: published.messageId,
+            channelId: published.channelId,
+            operation: published.operation,
+            deliveryMode: published.deliveryMode,
+            versionId: saved.version.id
+          }
+        });
+        const reconciled = { ...reconciliation, required: false, reason: "content_studio_state_persisted" };
+        await updateParadiseMutationLease({
+          phase: "content_studio_state_persisted",
+          status: "running",
+          reconciliation: reconciled
+        });
+        return {
+          response: { success: true, published, document: saved.document, stateUpdatedAt: saved.state.updatedAt },
+          reconciliation: reconciled
+        };
+      } catch (persistenceError) {
+        console.error("FIMA Content Studio publish state persistence failed", publicError(persistenceError));
+        const recovery = {
+          ...reconciliation,
+          required: true,
+          failureCode: String(persistenceError?.code || "content_studio_state_persistence_failed")
+        };
+        await updateParadiseMutationLease({
+          phase: "discord_published_state_pending",
+          status: "reconciliation_required",
+          reconciliation: recovery
+        });
+        return {
+          response: {
+            success: true,
+            published,
+            persistenceWarning: "published_but_state_not_persisted",
+            recovery: { channelId: published.channelId, messageId: published.messageId }
+          },
+          reconciliation: recovery
+        };
+      }
+    }, {
+      purposeKey: "content_studio_discord_publish",
+      idempotencyKey: `${guild.id}:content-studio-publish:${String(req.body?.documentId || "missing")}:${String(req.body?.expectedStateUpdatedAt ?? "missing")}`,
+      phase: "content_studio_publish_pending",
+      expectedGuildId: PARADISE_TEST_GUILD_ID
+    });
+    return res.json(result.response);
   } catch (error) {
     return paradiseContentStudioFailure(res, error, "content_publish_failed");
   }
@@ -1444,10 +1855,13 @@ const FIEELS_COMMUNITY_CHANNEL_KEYS = new Set([
   "turkish_chat", "turkish_media", "turkish_announcements", "turkish_voice",
   "support", "support_faq",
   "staff_hub", "staff_guides", "reviews", "transcripts", "security_logs",
+  "video_hub", "video_ideas", "video_scripts", "video_assets", "video_review", "video_upload_schedule", "video_voice",
   "community_voice", "focus_voice"
 ]);
 const FIEELS_COMMUNITY_ROLE_KEYS = new Set([
-  "owner", "administrator", "moderator", "junior_moderator", "helper", "member", "turkish", "english"
+  "owner", "administrator", "moderator", "junior_moderator", "helper",
+  "video_team", "video_editor", "thumbnail_designer",
+  "member", "turkish", "english"
 ]);
 const FIEELS_COMMUNITY_CHANNEL_ALIASES = Object.freeze({
   welcome_channel: "start_here",
@@ -1604,7 +2018,7 @@ function communityStructurePlan(draft, inventory, operation, isTestGuild) {
   };
 }
 
-app.get("/api/paradise/community-structure", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/community-structure", requireUser, requireParadiseOwner, async (req, res) => {
   const guildId = String(req.query?.guildId || "");
   const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
   if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
@@ -1615,7 +2029,7 @@ app.get("/api/paradise/community-structure", requireUser, requireParadiseOwner, 
   return res.json({ success: true, guildId, ...buildCommunityStructureResponse(config, runtime, guildId) });
 });
 
-app.patch("/api/paradise/community-structure/draft", requireUser, requireParadiseOwner, async (req, res) => {
+app.patch("/api/fima-bot/community-structure/draft", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -1697,7 +2111,7 @@ app.patch("/api/paradise/community-structure/draft", requireUser, requireParadis
   });
 });
 
-app.post("/api/paradise/community-structure/plan", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/community-structure/plan", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -1726,7 +2140,7 @@ app.post("/api/paradise/community-structure/plan", requireUser, requireParadiseO
   return res.json({ success: true, guildId, draft: response.draft, validation: response.validation, plan });
 });
 
-app.get("/api/paradise/config/history", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/config/history", requireUser, requireParadiseOwner, async (req, res) => {
   const guildId = String(req.query?.guildId || "");
   const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
   if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
@@ -1739,7 +2153,7 @@ app.get("/api/paradise/config/history", requireUser, requireParadiseOwner, async
   return res.json({ success: true, guildId, versions });
 });
 
-app.get("/api/paradise/reconciliation", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/reconciliation", requireUser, requireParadiseOwner, async (req, res) => {
   const guildId = String(req.query?.guildId || "");
   const managedGuilds = await paradiseDiscordGuildsSnapshot().catch(() => []);
   if (!managedGuilds.some(guild => guild.id === guildId)) return res.status(400).json({ error: "invalid_or_unmanaged_guild" });
@@ -1755,7 +2169,7 @@ app.get("/api/paradise/reconciliation", requireUser, requireParadiseOwner, async
   return res.json({ success: true, guildId, reconciliation });
 });
 
-app.post("/api/paradise/config/rollback-preview", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/config/rollback-preview", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -1779,14 +2193,14 @@ app.post("/api/paradise/config/rollback-preview", requireUser, requireParadiseOw
   }
 });
 
-app.get("/api/paradise/real-audit", requireUser, requireParadiseOwner, async (req, res) => {
+app.get("/api/fima-bot/real-audit", requireUser, requireParadiseOwner, async (req, res) => {
   const guildId = String(req.query?.guildId || "");
   if (!guildId) return res.status(400).json({ error: "guild_id_required" });
   const row = await prisma.setting.findUnique({ where: { key: `paradise_3a61_audit_${guildId}` } });
   return res.json({ success: true, guildId, audit: row?.value || null });
 });
 
-app.post("/api/paradise/actions/audit", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/actions/audit", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -1806,12 +2220,12 @@ app.post("/api/paradise/actions/audit", requireUser, requireParadiseOwner, async
     });
     return res.json({ success: true, guildId, audit });
   } catch (error) {
-    console.error("Paradise real audit failed", publicError(error));
+    console.error("FIMA Bot real audit failed", publicError(error));
     return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "real_audit_failed" });
   }
 });
 
-app.post("/api/paradise/actions/backup", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/actions/backup", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -1831,12 +2245,12 @@ app.post("/api/paradise/actions/backup", requireUser, requireParadiseOwner, asyn
     });
     return res.json({ success: true, guildId, backup });
   } catch (error) {
-    console.error("Paradise structure backup failed", publicError(error));
+    console.error("FIMA Bot structure backup failed", publicError(error));
     return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "backup_failed" });
   }
 });
 
-app.post("/api/paradise/actions/preview", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/actions/preview", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -1860,12 +2274,12 @@ app.post("/api/paradise/actions/preview", requireUser, requireParadiseOwner, asy
     });
     return res.json({ success: true, guildId, preview });
   } catch (error) {
-    console.error("Paradise setup preview failed", publicError(error));
+    console.error("FIMA Bot setup preview failed", publicError(error));
     return res.status(500).json({ error: error.code || "preview_failed" });
   }
 });
 
-app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req, res) => {
+app.patch("/api/fima-bot/config", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -2060,38 +2474,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
     };
   } else if (kind === "applications") {
     const value = req.body?.value || {};
-    const extraQuestions = value.extraQuestions && typeof value.extraQuestions === "object" && !Array.isArray(value.extraQuestions)
-      ? Object.fromEntries(Object.entries(value.extraQuestions).slice(0, 20).map(([key, question]) => [
-        String(key).replace(/[^a-z0-9_]/gi, "").slice(0, 32),
-        String(question).trim().slice(0, 180)
-      ]).filter(([key, question]) => key && question))
-      : {};
-    const evidenceRequirements = value.evidenceRequirements
-      && typeof value.evidenceRequirements === "object"
-      && !Array.isArray(value.evidenceRequirements)
-      ? Object.fromEntries(Object.entries(value.evidenceRequirements).slice(0, 20).map(([type, requirements]) => {
-        const safeType = String(type).replace(/[^a-z0-9_]/gi, "").slice(0, 32);
-        const safeRequirements = requirements && typeof requirements === "object" && !Array.isArray(requirements)
-          ? Object.fromEntries(Object.entries(requirements).slice(0, 40).map(([questionKey, requirement]) => [
-            String(questionKey).replace(/[^a-z0-9_]/gi, "").slice(0, 32),
-            requirement === "required" ? "required" : "optional"
-          ]).filter(([questionKey]) => questionKey))
-          : {};
-        return [safeType, safeRequirements];
-      }).filter(([type, requirements]) => type && Object.keys(requirements).length))
-      : {};
-    config.applicationSettings = {
-      ...(config.applicationSettings || {}),
-      enabled: value.enabled !== false,
-      cooldownDays: Math.min(365, Math.max(0, Number(value.cooldownDays) || 0)),
-      autoGrantRole: value.autoGrantRole === true,
-      blockBlacklisted: value.blockBlacklisted !== false,
-      panelTitle: String(value.panelTitle || "").trim().slice(0, 80),
-      panelDescription: String(value.panelDescription || "").trim().slice(0, 1200),
-      panelButtonLabel: String(value.panelButtonLabel || "").trim().slice(0, 40),
-      extraQuestions,
-      evidenceRequirements
-    };
+    config.applicationSettings = sanitizeParadiseApplicationSettings(value, config.applicationSettings);
   } else if (kind === "moderation") {
     const value = req.body?.value || {};
     config.moderationSettings = {
@@ -2197,7 +2580,7 @@ app.patch("/api/paradise/config", requireUser, requireParadiseOwner, async (req,
   });
 });
 
-app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/actions/repost-guides", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -2215,12 +2598,12 @@ app.post("/api/paradise/actions/repost-guides", requireUser, requireParadiseOwne
     });
     return res.json({ success: true, mode, posted: result.posted });
   } catch (error) {
-    console.error("Paradise guide repost failed", publicError(error));
+    console.error("FIMA Bot guide repost failed", publicError(error));
     return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "guide_repost_failed" });
   }
 });
 
-app.post("/api/paradise/actions/create-missing", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/actions/create-missing", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -2241,13 +2624,16 @@ app.post("/api/paradise/actions/create-missing", requireUser, requireParadiseOwn
     });
     return res.json({ success: true, result });
   } catch (error) {
-    console.error("Paradise create-missing setup failed", publicError(error));
-    const status = error.code === "test_guild_only" ? 403 : error.code === "paradise_bot_not_ready" ? 503 : 500;
+    console.error("FIMA Bot create-missing setup failed", publicError(error));
+    const status = error.code === "test_guild_only" ? 403
+      : error.code === "guild_mutation_wait_timeout" ? 409
+      : error.code === "guild_mutation_locked" ? 423
+      : error.code === "paradise_bot_not_ready" ? 503 : 500;
     return res.status(status).json({ error: error.code || "create_missing_failed" });
   }
 });
 
-app.post("/api/paradise/actions/rebuild-test-template", requireUser, requireParadiseOwner, async (req, res) => {
+app.post("/api/fima-bot/actions/rebuild-test-template", requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -2267,31 +2653,519 @@ app.post("/api/paradise/actions/rebuild-test-template", requireUser, requirePara
     });
     return res.json({ success: true, result });
   } catch (error) {
-    console.error("Paradise test template rebuild failed", publicError(error));
+    console.error("FIMA Bot test template rebuild failed", publicError(error));
     const status = ["test_guild_only", "typed_confirmation_mismatch"].includes(error.code) ? 403
+      : error.code === "guild_mutation_wait_timeout" ? 409
+      : error.code === "guild_mutation_locked" ? 423
       : error.code === "paradise_bot_not_ready" ? 503 : 500;
     return res.status(status).json({ error: error.code || "test_template_rebuild_failed" });
   }
 });
 
-app.post("/api/paradise/actions/run-test-smoke", requireUser, requireParadiseOwner, async (req, res) => {
-  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
-  const origin = String(req.get("origin") || "");
-  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+app.get("/api/fima-bot/actions/rebuild-fima-community/status", requireUser, requireParadiseOwner, async (req, res) => {
+  const requestedGuildId = String(req.query?.guildId || FIMA_COMMUNITY_PRODUCTION_GUILD_ID);
+  if (requestedGuildId !== FIMA_COMMUNITY_PRODUCTION_GUILD_ID || requestedGuildId === PARADISE_TEST_GUILD_ID) {
+    return res.status(403).json({ error: "production_guild_only" });
+  }
+  if (!hasFreshOwnerActionProof(req)) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  const planId = String(req.query?.planId || "").trim();
+  if (!planId) return res.status(400).json({ error: "production_rebuild_plan_id_required" });
   try {
-    const guildId = String(req.body?.guildId || "");
-    const result = await runParadiseTestSmokeSuiteFromDashboard(guildId);
-    await createAuditLog("paradise_test_live_smoke", "discord_guild", guildId, {
-      trainingMessageId: result.training?.messageId,
-      tryoutMessageId: result.tryout?.messageId,
+    const plan = await paradiseProductionRebuildPlanStatus({
+      planId,
+      secret: productionRebuildPlanSecret()
+    });
+    return res.json({
+      success: true,
+      target: { guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, mode: "community" },
+      plan,
+      safeguards: {
+        ownerOnly: true,
+        freshOwnerProofRequired: true,
+        signedTestGuildRehearsalRequired: true,
+        sealedBackupRequired: true,
+        singleUseExecutionPlanRequired: true
+      },
+      mutationExecuted: false
+    });
+  } catch (error) {
+    console.error("FT Community production plan status failed", publicError(error));
+    const status = error.code === "production_rebuild_plan_secret_unavailable" ? 503
+      : error.code === "production_rebuild_plan_unavailable" ? 404 : 403;
+    return res.status(status).json({ error: error.code || "production_rebuild_plan_status_failed" });
+  }
+});
+
+app.get("/api/fima-bot/actions/fima-bot-profile", requireUser, requireParadiseOwner, async (_req, res) => {
+  try {
+    return res.json({ success: true, profile: await fimaBotProfileSyncStatus(), mutationExecuted: false });
+  } catch (error) {
+    console.error("FIMA Bot profile status failed", publicError(error));
+    return res.status(500).json({ error: error.code || "fima_bot_profile_status_failed" });
+  }
+});
+
+app.post("/api/fima-bot/actions/fima-bot-profile", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") {
+    return res.status(403).json({ error: "owner_action_header_required" });
+  }
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) {
+    return res.status(403).json({ error: "origin_mismatch" });
+  }
+  const ownerDiscordId = resolvedParadiseOwnerDiscordId();
+  const freshProofValid = ownerGateRequirementsConfigured() && verifyOwnerFreshProof({
+    token: req.cookies?.[OWNER_FRESH_PROOF_COOKIE],
+    secret: ownerFreshProofSecret(),
+    userId: req.user.id,
+    sessionTokenHash: hashToken(req.cookies?.[USER_SESSION_COOKIE]),
+    discordUserId: ownerDiscordId
+  });
+  if (!freshProofValid) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  try {
+    const dryRun = req.body?.apply !== true;
+    const result = await applyFimaBotProfileFromDashboard({
+      ownerDiscordId: req.paradiseOwnerDiscord?.providerSubject,
+      confirmation: String(req.body?.confirmation || ""),
+      dryRun
+    });
+    if (!dryRun) {
+      await createAuditLog("fima_bot_profile_sync", "discord_application", String(process.env.FIMA_BOT_EXPECTED_APPLICATION_ID || ""), {
+        changes: result.changes || [],
+        actorUserId: req.user.id
+      });
+    }
+    return res.json({ success: true, result, mutationExecuted: !dryRun && result.applied === true });
+  } catch (error) {
+    console.error("FIMA Bot profile sync failed", publicError(error));
+    const status = [
+      "owner_verification_required",
+      "profile_sync_confirmation_required",
+      "profile_sync_disabled",
+      "profile_sync_scope_not_ready"
+    ].includes(error.message) ? 403 : error.code === "paradise_bot_not_ready" ? 503 : 500;
+    return res.status(status).json({ error: error.code || error.message || "fima_bot_profile_sync_failed" });
+  }
+});
+
+app.get("/api/fima-bot/actions/ft-community-profile", requireUser, requireParadiseOwner, async (_req, res) => {
+  try {
+    return res.json({ success: true, profile: await ftCommunityProfileSyncStatus(), mutationExecuted: false });
+  } catch (error) {
+    console.error("FT Community profile status failed", publicError(error));
+    return res.status(500).json({ error: error.code || "ft_community_profile_status_failed" });
+  }
+});
+
+app.post("/api/fima-bot/actions/ft-community-profile", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") {
+    return res.status(403).json({ error: "owner_action_header_required" });
+  }
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) {
+    return res.status(403).json({ error: "origin_mismatch" });
+  }
+  const ownerDiscordId = resolvedParadiseOwnerDiscordId();
+  const freshProofValid = ownerGateRequirementsConfigured() && verifyOwnerFreshProof({
+    token: req.cookies?.[OWNER_FRESH_PROOF_COOKIE],
+    secret: ownerFreshProofSecret(),
+    userId: req.user.id,
+    sessionTokenHash: hashToken(req.cookies?.[USER_SESSION_COOKIE]),
+    discordUserId: ownerDiscordId
+  });
+  if (!freshProofValid) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  try {
+    const dryRun = req.body?.apply !== true;
+    const result = await applyFtCommunityProfileFromDashboard({
+      ownerDiscordId: req.paradiseOwnerDiscord?.providerSubject,
+      confirmation: String(req.body?.confirmation || ""),
+      dryRun
+    });
+    if (!dryRun) {
+      await createAuditLog("ft_community_profile_sync", "discord_guild", String(result.targetGuildId || ""), {
+        changes: result.changes || [],
+        actorUserId: req.user.id
+      });
+    }
+    return res.json({ success: true, result, mutationExecuted: !dryRun && result.applied === true });
+  } catch (error) {
+    console.error("FT Community profile sync failed", publicError(error));
+    const errorCode = error.code || error.message;
+    const status = [
+      "owner_verification_required",
+      "guild_profile_confirmation_required",
+      "guild_profile_sync_disabled",
+      "guild_profile_sync_scope_not_ready"
+    ].includes(errorCode) ? 403 : errorCode === "paradise_bot_not_ready" ? 503 : 500;
+    return res.status(status).json({ error: errorCode || "ft_community_profile_sync_failed" });
+  }
+});
+
+app.get("/api/fima-bot/actions/ft-community-production/readiness", requireUser, requireParadiseOwner, async (req, res) => {
+  if (!hasFreshOwnerActionProof(req)) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  try {
+    const readiness = buildFtCommunityDeploymentReadiness();
+    return res.json({
+      success: true,
+      readiness,
+      mutationExecuted: false
+    });
+  } catch (error) {
+    console.error("FT Community deployment readiness failed", publicError(error));
+    return res.status(503).json({ error: "production_readiness_unavailable" });
+  }
+});
+
+app.post("/api/fima-bot/actions/ft-community-production", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") {
+    return res.status(403).json({ error: "owner_action_header_required" });
+  }
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) {
+    return res.status(403).json({ error: "origin_mismatch" });
+  }
+  if (!hasFreshOwnerActionProof(req)) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  if (req.body?.apply !== true) {
+    return res.status(400).json({ error: "production_apply_required" });
+  }
+  const guildId = String(req.body?.guildId || "");
+  if (guildId !== FIMA_COMMUNITY_PRODUCTION_GUILD_ID || guildId === PARADISE_TEST_GUILD_ID) {
+    return res.status(403).json({ error: "production_guild_only" });
+  }
+  if (String(req.body?.confirmation || "") !== FIMA_COMMUNITY_REBUILD_CONFIRMATION) {
+    return res.status(403).json({ error: "production_confirmation_required" });
+  }
+  try {
+    const result = await runFtCommunityProductionOrchestrator();
+    if (result?.ok !== true) {
+      const dependencyUnavailable = [
+        "deployment_readiness",
+        "release_attestation",
+        "target_validation",
+        "canonical_text_encoding",
+        "visual_assets",
+        "preflight"
+      ].includes(result?.phase);
+      return res.status(dependencyUnavailable ? 503 : 409).json({
+        success: false,
+        result,
+        mutationStatus: [
+          "post_audit",
+          "community_profile_inspect",
+          "community_profile_apply",
+          "bot_profile_inspect",
+          "bot_profile_apply",
+          "plan_finish"
+        ].includes(result?.phase) ? "executed" : result?.phase === "rebuild" ? "possible" : "not_started"
+      });
+    }
+    await createAuditLog("ft_community_production_orchestrator_completed", "discord_guild", guildId, {
+      liveDiscordVerified: result.liveDiscordVerified === true,
+      structureVerified: result.structureVerified === true,
+      reconciliationVerified: result.reconciliationVerified === true,
+      postAuditVerified: result.postAuditVerified === true,
+      communityProfileChanges: Number(result.communityProfileChanges || 0),
+      botProfileChanges: Number(result.botProfileChanges || 0),
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result, mutationExecuted: true });
+  } catch (error) {
+    console.error("FT Community production orchestration failed", publicError(error));
+    return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({
+      error: error.code === "paradise_bot_not_ready"
+        ? "paradise_bot_not_ready"
+        : "production_orchestration_failed"
+    });
+  }
+});
+
+app.post("/api/fima-bot/actions/rebuild-fima-community/preflight", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") {
+    return res.status(403).json({ error: "owner_action_header_required" });
+  }
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) {
+    return res.status(403).json({ error: "origin_mismatch" });
+  }
+  if (!hasFreshOwnerActionProof(req)) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  const guildId = String(req.body?.guildId || "");
+  if (guildId !== FIMA_COMMUNITY_PRODUCTION_GUILD_ID || guildId === PARADISE_TEST_GUILD_ID) {
+    return res.status(403).json({ error: "production_guild_only" });
+  }
+  try {
+    const preflight = await inspectFimaCommunityProductionRebuildPreflightFromDashboard(guildId, {
+      includeBackupEnvelope: true,
+      testGuildRehearsalEvidenceSecret: env("PARADISE_REHEARSAL_EVIDENCE_SECRET", "")
+    });
+    const plan = await createParadiseProductionRebuildPlan({
+      guildId,
+      mode: "community",
+      backup: preflight.backupEnvelope,
+      ownerUserId: req.user.id,
+      secret: productionRebuildPlanSecret(),
+      preflight,
+      expectedGuildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID
+    });
+    const { backupEnvelope: _sealedBackup, ...publicPreflight } = preflight;
+    return res.json({
+      success: true,
+      guildId,
+      preflight: publicPreflight,
+      plan,
+      mutationExecuted: false
+    });
+  } catch (error) {
+    console.error("FT Community production preflight failed", publicError(error));
+    const status = error.code === "production_guild_only" ? 403
+      : error.code === "guild_mutation_wait_timeout" ? 409
+      : error.code === "guild_mutation_locked" ? 423
+      : error.code === "paradise_bot_not_ready" ? 503 : 500;
+    return res.status(status).json({ error: error.code || "production_community_preflight_failed" });
+  }
+});
+
+app.post("/api/fima-bot/actions/rebuild-fima-community", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") {
+    return res.status(403).json({ error: "owner_action_header_required" });
+  }
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) {
+    return res.status(403).json({ error: "origin_mismatch" });
+  }
+  const mode = String(req.body?.mode || "");
+  const guildId = String(req.body?.guildId || "");
+  const confirmation = String(req.body?.confirmation || "");
+  const backupDigest = String(req.body?.backupDigest || "").trim().toLowerCase();
+  const planId = String(req.body?.planId || "").trim();
+  if (mode !== "community") return res.status(400).json({ error: "production_community_only" });
+  if (guildId !== FIMA_COMMUNITY_PRODUCTION_GUILD_ID || guildId === PARADISE_TEST_GUILD_ID) {
+    return res.status(403).json({ error: "production_guild_only" });
+  }
+  if (!hasFreshOwnerActionProof(req)) {
+    return res.status(403).json({ error: "fresh_owner_proof_required" });
+  }
+  if (!planId) return res.status(400).json({ error: "production_rebuild_plan_id_required" });
+  let planConsumed = false;
+  let planOutcome = "failed";
+  try {
+    const executionProof = await consumeParadiseProductionRebuildPlan({
+      planId,
+      guildId,
+      mode,
+      backupDigest,
+      ownerUserId: req.user.id,
+      confirmation,
+      secret: productionRebuildPlanSecret()
+    });
+    planConsumed = true;
+    const result = await rebuildFimaCommunityProductionFromDashboard(mode, guildId, confirmation, {
+      expectedBackupDigest: backupDigest,
+      executionProof,
+      planId,
+      executionProofSecret: productionRebuildPlanSecret(),
+      testGuildRehearsalEvidenceSecret: env("PARADISE_REHEARSAL_EVIDENCE_SECRET", "")
+    });
+    planOutcome = "completed";
+    await createAuditLog("fima_community_production_full_rebuild", "discord_guild", guildId, {
+      mode,
+      planId,
+      backupDigest,
+      deletedChannels: result.deleted?.channels || 0,
+      deletedRoles: result.deleted?.roles || 0,
+      createdChannels: result.createdChannels || 0,
+      createdRoles: result.createdRoles || 0,
       actorUserId: req.user.id
     });
     return res.json({ success: true, result });
   } catch (error) {
-    console.error("Paradise live smoke suite failed", publicError(error));
-    const status = error.code === "test_guild_only" ? 403
-      : ["paradise_bot_not_ready", "guild_not_found", "test_channels_missing"].includes(error.code) ? 503 : 500;
+    console.error("FT Community production rebuild failed", publicError(error));
+    const status = [
+      "production_guild_only",
+      "production_community_only",
+      "production_preflight_backup_digest_required",
+      "production_rebuild_plan_confirmation_mismatch",
+      "production_rebuild_plan_owner_mismatch",
+      "production_rebuild_plan_target_mismatch",
+      "production_rebuild_plan_mode_mismatch",
+      "production_rebuild_execution_proof_schema_invalid",
+      "production_rebuild_execution_proof_authenticity_invalid",
+      "production_rebuild_execution_proof_scope_mismatch",
+      "production_rebuild_execution_proof_expired"
+    ].includes(error.code) ? 403
+      : [
+        "guild_mutation_wait_timeout",
+        "production_preflight_backup_digest_mismatch",
+        "production_rebuild_plan_digest_mismatch",
+        "production_rebuild_plan_expired",
+        "production_rebuild_plan_already_used",
+        "production_rebuild_plan_backup_changed",
+        "production_rebuild_plan_backup_state_changed"
+      ].includes(error.code) ? 409
+      : error.code === "guild_mutation_locked" ? 423
+      : ["paradise_bot_not_ready", "production_rebuild_plan_secret_unavailable"].includes(error.code) ? 503 : 500;
+    return res.status(status).json({ error: error.code || "production_community_rebuild_failed" });
+  } finally {
+    if (planConsumed) {
+      await finishParadiseProductionRebuildPlan({
+        planId,
+        outcome: planOutcome,
+        secret: productionRebuildPlanSecret()
+      }).catch(error => {
+        console.error("FT Community production plan finalization failed", publicError(error));
+      });
+    }
+  }
+});
+
+app.post("/api/fima-bot/actions/run-test-smoke", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  if (!hasFreshOwnerActionProof(req)) return res.status(403).json({ error: "fresh_owner_proof_required" });
+  try {
+    const guildId = String(req.body?.guildId || "");
+    const options = parseParadiseTestGuildArgs([
+      "smoke",
+      "--confirm",
+      String(req.body?.confirmation || "")
+    ]);
+    if (guildId !== options.guildId) {
+      const scopeError = new Error("test_guild_only");
+      scopeError.code = "test_guild_only";
+      throw scopeError;
+    }
+    const result = await runParadiseTestSmokeSuiteFromDashboard(guildId);
+    await createAuditLog("paradise_test_live_smoke", "discord_guild", guildId, {
+      status: result.status || null,
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result, evidenceRecorded: false });
+  } catch (error) {
+    console.error("FIMA Bot live smoke suite failed", publicError(error));
+    const status = ["test_guild_only", "typed_confirmation_mismatch"].includes(error.code) ? 403
+      : error.code === "guild_mutation_wait_timeout" ? 409
+      : error.code === "guild_mutation_locked" ? 423
+      : [
+        "paradise_bot_not_ready",
+        "guild_not_found",
+        "test_channels_missing"
+      ].includes(error.code) ? 503 : 500;
     return res.status(status).json({ error: error.code || "test_smoke_failed" });
+  }
+});
+
+app.post("/api/fima-bot/actions/recover-test-rollback", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  if (!hasFreshOwnerActionProof(req)) return res.status(403).json({ error: "fresh_owner_proof_required" });
+  try {
+    const guildId = String(req.body?.guildId || "");
+    const options = parseParadiseTestGuildArgs([
+      "recover-rollback",
+      "--confirm",
+      String(req.body?.confirmation || "")
+    ]);
+    if (guildId !== options.guildId || guildId !== PARADISE_TEST_GUILD_ID) {
+      const scopeError = new Error("test_guild_only");
+      scopeError.code = "test_guild_only";
+      throw scopeError;
+    }
+    const result = await recoverParadiseTestRollbackFromDashboard(guildId, options.confirmation);
+    await createAuditLog("paradise_test_rollback_recovered", "discord_guild", guildId, {
+      status: result.status || null,
+      rollbackRecovered: result.rollbackRecovered === true,
+      reconciliationCanRestore: result.reconciliationCanRestore === true,
+      reconciliationMutationsPlanned: Number(result.reconciliationMutationsPlanned || 0),
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result });
+  } catch (error) {
+    console.error("FIMA Bot test-guild rollback recovery failed", publicError(error));
+    const status = [
+      "test_guild_only",
+      "typed_confirmation_mismatch",
+      "rollback_marker_schema_invalid",
+      "rollback_marker_not_recoverable",
+      "rollback_marker_backup_invalid",
+      "rollback_recovery_backup_path_invalid",
+      "rollback_recovery_backup_path_escape",
+      "rollback_recovery_backup_guild_mismatch",
+      "rollback_recovery_backup_digest_mismatch",
+      "rollback_recovery_backup_state_digest_mismatch",
+      "rollback_recovery_marker_changed"
+    ].includes(error.code) ? 403
+      : [
+        "guild_mutation_wait_timeout",
+        "rollback_recovery_reconciliation_not_zero",
+        "rollback_recovery_post_restore_reconciliation_not_zero"
+      ].includes(error.code) ? 409
+      : error.code === "guild_mutation_locked" ? 423
+      : [
+        "paradise_bot_not_ready",
+        "rollback_marker_missing",
+        "rollback_recovery_backup_artifact_invalid",
+        "rollback_recovery_backup_invalid"
+      ].includes(error.code) ? 503 : 500;
+    return res.status(status).json({ error: error.code || "test_rollback_recovery_failed" });
+  }
+});
+
+app.post("/api/fima-bot/actions/run-test-rehearsal", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  if (!hasFreshOwnerActionProof(req)) return res.status(403).json({ error: "fresh_owner_proof_required" });
+  try {
+    const guildId = String(req.body?.guildId || "");
+    const options = parseParadiseTestGuildArgs([
+      "rehearsal",
+      "--confirm",
+      String(req.body?.confirmation || "")
+    ]);
+    if (guildId !== options.guildId || guildId !== PARADISE_TEST_GUILD_ID) {
+      const scopeError = new Error("test_guild_only");
+      scopeError.code = "test_guild_only";
+      throw scopeError;
+    }
+    const result = await rehearseParadiseTestTemplateFromDashboard(guildId, options.confirmation);
+    const rehearsal = await persistParadiseTestGuildRehearsalEvidence({ guildId, result }, {
+      rehearsalEvidenceSecret: env("PARADISE_REHEARSAL_EVIDENCE_SECRET", "")
+    });
+    await createAuditLog("paradise_test_full_rehearsal", "discord_guild", guildId, {
+      smokeRunsCompleted: Number(result.smokeRunsCompleted || 0),
+      fullSmokeRunsVerified: result.fullSmokeRunsVerified === true,
+      restoredOriginalState: result.restoredOriginalState === true,
+      originalStateMutationsPlanned: Number(result.originalStateMutationsPlanned || 0),
+      evidenceRecorded: rehearsal.recorded === true,
+      rehearsalVerifiedAt: rehearsal.verifiedAt,
+      actorUserId: req.user.id
+    });
+    return res.json({ success: true, result, rehearsal });
+  } catch (error) {
+    console.error("FIMA Bot full test rehearsal failed", publicError(error));
+    const status = ["test_guild_only", "typed_confirmation_mismatch", "test_rehearsal_community_only"].includes(error.code) ? 403
+      : error.code === "guild_mutation_wait_timeout" || String(error.code || "").startsWith("test_rehearsal_") ? 409
+      : error.code === "guild_mutation_locked" ? 423
+      : [
+        "paradise_bot_not_ready",
+        "guild_not_found",
+        "test_channels_missing",
+        "test_guild_rehearsal_secret_unavailable"
+      ].includes(error.code) ? 503 : 500;
+    return res.status(status).json({ error: error.code || "test_rehearsal_failed" });
   }
 });
 
@@ -2422,7 +3296,12 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
     await evaluateReferralForUser(linked.user.id).catch((error) => {
       console.warn("Referral evaluation after Discord link failed", { userId: linked.user.id, ...publicError(error) });
     });
-    await issueUserSession(res, linked.user.id, initiatingSession, { provider: "discord", subject: String(profile.id) });
+    const sessionReceipt = await issueUserSession(res, linked.user.id, initiatingSession, { provider: "discord", subject: String(profile.id) });
+    const ownerDiscordId = resolvedParadiseOwnerDiscordId();
+    if (ownerDiscordId && String(profile.id) === ownerDiscordId && ownerGateRequirementsConfigured() && normalizeEmail(linked.user.email) === FIMA_OWNER_ACCOUNT_EMAIL) {
+      setOwnerFreshProofCookie(res, createOwnerFreshProof({secret: ownerFreshProofSecret(), userId: linked.user.id,
+        sessionTokenHash: sessionReceipt.tokenHash, discordUserId: ownerDiscordId}));
+    }
     await createAuditLog(state.userId ? "discord_account_linked" : "discord_login_success", "user", linked.user.id, {
       discordUserId: profile.id,
       created: linked.created
@@ -2953,7 +3832,6 @@ app.patch("/api/me/profile/preferences", requireUser, async (req, res) => {
   }
 });
 
-import { createRobloxAccountHandlers } from "./robloxAccountSecurity.js";
 
 const robloxAccountHandlers = createRobloxAccountHandlers({
   db: prisma,
@@ -9456,6 +10334,7 @@ async function sendFimaEmail({ to, subject, text, html }) {
 }
 
 async function issueUserSession(res, userId, initiatingSession = null, providerIdentity = null) {
+  clearOwnerFreshProofCookie(res);
   const token = randomToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const data = { userId, tokenHash: hashToken(token), expiresAt };
@@ -9489,6 +10368,7 @@ async function issueUserSession(res, userId, initiatingSession = null, providerI
     path: "/",
     maxAge: 30 * 24 * 60 * 60 * 1000
   });
+  return { tokenHash: data.tokenHash };
 }
 
 function clearUserCookie(res) {
@@ -9629,18 +10509,23 @@ async function requireParadiseOwner(req, res, next) {
     req.paradiseOwnerDiscord = access.link;
     return next();
   } catch (error) {
-    console.error("Paradise owner authorization failed", publicError(error));
+    console.error("FIMA Bot owner authorization failed", publicError(error));
     return res.status(500).json({ error: "paradise_owner_auth_failed" });
   }
 }
 
 async function paradiseOwnerAccess(user) {
   const access = await paradiseLinkedDiscordAccess(user);
-  const ownerAuthorized = access.discordUserId === PARADISE_OWNER_DISCORD_ID;
+  const ownerDiscordId = resolvedParadiseOwnerDiscordId();
+  const ownerAuthorized = Boolean(ownerDiscordId) && access.discordUserId === ownerDiscordId;
   return {
     ...access,
     ownerAuthorized,
-    reasonCode: ownerAuthorized ? "ok" : access.discordLinked ? "not_owner" : "discord_link_required"
+    reasonCode: ownerAuthorized
+      ? "ok"
+      : !ownerDiscordId
+        ? "owner_runtime_binding_unavailable"
+        : access.discordLinked ? "not_owner" : "discord_link_required"
   };
 }
 
@@ -11841,4 +12726,115 @@ function timingSafeTextEqual(left, right) {
   const a = crypto.createHash("sha256").update(left).digest();
   const b = crypto.createHash("sha256").update(right).digest();
   return crypto.timingSafeEqual(a, b);
+}
+
+function productionRebuildPlanSecret() {
+  return String(env("PARADISE_PRODUCTION_REBUILD_PLAN_SECRET", "") || "");
+}
+
+function resolvedParadiseOwnerDiscordId() {
+  const binding = paradiseProductionOwnerBinding();
+  return binding?.ready === true ? String(binding.ownerDiscordId || "").trim() : "";
+}
+
+function ownerGateRequirementsConfigured() {
+  return Boolean(
+    normalizeEmail(FIMA_OWNER_ACCOUNT_EMAIL)
+    && resolvedParadiseOwnerDiscordId()
+    && ownerFreshProofSecret().length >= 32
+  );
+}
+
+function setOwnerFreshProofCookie(res, proof) {
+  res.cookie(OWNER_FRESH_PROOF_COOKIE, proof, ownerFreshProofCookieOptions());
+}
+
+function clearOwnerFreshProofCookie(res) {
+  res.clearCookie(OWNER_FRESH_PROOF_COOKIE, {
+    httpOnly: true,
+    secure: apiBaseUrl().startsWith("https"),
+    sameSite: "lax",
+    path: "/"
+  });
+}
+
+function sendParadiseApplicationDraftError(res, error, operation) {
+  const requestedStatus = Number(error?.statusCode);
+  const status = Number.isInteger(requestedStatus) && requestedStatus >= 400 && requestedStatus <= 599
+    ? requestedStatus
+    : 500;
+  if (status >= 500) {
+    console.error(`FIMA Bot application draft ${operation} failed`, publicError(error));
+  }
+  return res.status(status).json({
+    error: error?.code || "application_draft_failed",
+    question: error?.question || null,
+    draft: error?.currentDraft || null
+  });
+}
+
+function ownerFreshProofSecret() {
+  return String(env("FIMA_OWNER_PROOF_SECRET", "") || "");
+}
+
+function hasFreshOwnerActionProof(req) {
+  const ownerDiscordId = resolvedParadiseOwnerDiscordId();
+  return ownerGateRequirementsConfigured() && verifyOwnerFreshProof({
+    token: req.cookies?.[OWNER_FRESH_PROOF_COOKIE],
+    secret: ownerFreshProofSecret(),
+    userId: req.user?.id,
+    sessionTokenHash: hashToken(req.cookies?.[USER_SESSION_COOKIE]),
+    discordUserId: ownerDiscordId
+  });
+}
+
+function ownerFreshProofCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: apiBaseUrl().startsWith("https"),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 10 * 60 * 1000
+  };
+}
+
+async function paradiseApplicationDraftAccess(user, input) {
+  const applicationScope = normalizeWebsiteApplicationScope(input);
+  const scope = normalizeParadiseApplicationDraftScope({
+    userId: user?.id,
+    guildId: input?.guildId,
+    ...applicationScope
+  });
+  const linked = await paradiseWebsiteApplicationOAuthAccess(user, scope.guildId);
+  const guilds = await paradiseDiscordGuildsSnapshot();
+  if (!guilds.some(guild => guild.id === scope.guildId)) {
+    throw Object.assign(new Error("guild_not_managed"), { code: "guild_not_managed", statusCode: 404 });
+  }
+  const context = await paradiseWebsiteApplicationFormContext(scope.guildId, linked.discordUserId, { workflow: scope.workflow });
+  if (!context?.member) {
+    throw Object.assign(new Error("discord_membership_required"), { code: "discord_membership_required", statusCode: 403 });
+  }
+  const selected = context.types?.find(item => item.type === scope.type);
+  if (!selected) {
+    throw Object.assign(new Error("application_type_unavailable"), { code: "application_type_unavailable", statusCode: 400 });
+  }
+  return { scope, questions: selected.questions || [] };
+}
+
+async function paradiseWebsiteApplicationOAuthAccess(user, requestedGuildId = null) {
+  const link = await prisma.oAuthLink.findFirst({
+    where: { userId: user.id, provider: "discord" },
+    select: {
+      providerSubject: true,
+      accessTokenCipher: true,
+      tokenExpiresAt: true,
+      scopes: true
+    }
+  });
+  return verifyParadiseApplicationOAuthAccess({
+    link,
+    requestedGuildId,
+    decryptAccessToken: decryptToken,
+    fetchGuildMemberships: fetchDiscordGuildMemberships
+  });
 }

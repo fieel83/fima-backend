@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "assetVersion": "v3",
+  "brand": "FIMA",
+  "generatedAt": "2026-08-02",
+  "liveMutationApproved": false,
+  "assets": [
+    {
+      "id": "ft-community-server-icon",
+      "usage": "FT Community Discord server icon",
+      "path": "/assets/images/discord/v3/ft-community-server-icon-v3.png",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 2173936,
+      "sha256": "ce98650d99436a067f87a0e02ebce47074797354534369d75e0dc4fcba4da9b0",
+      "semantic": "FT monogram centered between the Kaneki-inspired left and Luffy-inspired right character anchors.",
+      "cropSafe": "Primary FT mark and both character silhouettes remain inside the circular safe area."
+    },
+    {
+      "id": "ft-community-server-banner",
+      "usage": "FT Community Discord server banner",
+      "path": "/assets/images/discord/v3/ft-community-server-banner-v3.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2310349,
+      "sha256": "3172fc99d2c5c016b0862665abce25daae9fc5aecb28f2d0acc3bf7f759bf37a",
+      "semantic": "FT Community identity scene with Kaneki and Fieel on the left, Luffy and Tatu on the right, over an obsidian violet backdrop.",
+      "cropSafe": "The central area is intentionally quiet; the Fieel and Tatu character anchors remain at opposite sides."
+    },
+    {
+      "id": "fima-bot-avatar",
+      "usage": "FIMA Bot Discord application avatar",
+      "path": "/assets/images/discord/v3/fima-bot-avatar-v3.png",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 1252662,
+      "sha256": "35c4770a0ba934ae5f93f2382aed560ac991a76425900c7abd27584253b4e240",
+      "semantic": "Angular FIMA F mark with violet and cyan energy on obsidian glass.",
+      "cropSafe": "The angular FIMA mark remains legible in Discord's circular small-avatar crop."
+    },
+    {
+      "id": "fima-bot-profile-banner",
+      "usage": "FIMA Bot Discord application profile banner",
+      "path": "/assets/images/discord/v3/fima-bot-profile-banner-v3.png",
+      "width": 1500,
+      "height": 600,
+      "bytes": 1571098,
+      "sha256": "bce10ec81f2e13f0d518b9e5b1af4e4c7cabef3920bfe22ac561aaf1c589a107",
+      "semantic": "Wide FIMA Bot profile identity with a central F mark, violet cyan energy and dark glass depth.",
+      "cropSafe": "Cropped to a 5:2 Discord profile-banner ratio with the FIMA mark inside the central safe area."
+    },
+    {
+      "id": "ft-community-welcome",
+      "usage": "FT Community welcome webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-welcome-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2816406,
+      "sha256": "77554b8ad43b6a7b0c82c121ecbf329ce5318639b88ee74e620ddafb539b2675",
+      "semantic": "Bright arrival portal and welcoming energy distinguish a new member joining FT Community.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-leave",
+      "usage": "FT Community leave webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-leave-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2644889,
+      "sha256": "6842dc98bbdaa292dfbc129fa9f8b7e58f03029d18210a15e14a1abf10554a32",
+      "semantic": "Fading departure trail and subdued energy distinguish a member leaving FT Community.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-rules",
+      "usage": "FT Community rules webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-rules-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2684945,
+      "sha256": "336bed1cb49b626153c698309c89ecab81c01e2ed93f074c5c3e1e7f657c16fa",
+      "semantic": "Shield and structured document motifs communicate community rules and safety.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-staff",
+      "usage": "FT Community staff webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-staff-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2310431,
+      "sha256": "58c6ec1562a6172e1c0126cdde7def67b9ed9ec89430e94426b4c904d13dc26b",
+      "semantic": "Command crest and coordinated team silhouettes identify staff operations.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-video-team",
+      "usage": "FT Community video-team webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-video-team-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2562589,
+      "sha256": "57c15fe7425c41ce14f53f6f77b019473f1e1ed3c9f8274a411469d88b03c35e",
+      "semantic": "Camera, timeline and production-light motifs identify the FT video team.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-announcement",
+      "usage": "FT Community announcement webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-announcement-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2537402,
+      "sha256": "8bc221c5c46488fc12e2d1ca296829a37d1c60f27c144c7179096191d9cb9337",
+      "semantic": "Broadcast pulse and signal motifs distinguish official announcements.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-leaderboard",
+      "usage": "FT Community leaderboard webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-leaderboard-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 2911163,
+      "sha256": "b369da69dda490a9bf10d4456bc8046d24f4a5242f8d74b852c1d329ceed636a",
+      "semantic": "Podium, rank lines and competitive glow distinguish monthly leaderboard results.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    },
+    {
+      "id": "ft-community-booster",
+      "usage": "FT Community booster webhook embed banner",
+      "path": "/assets/images/paradise/banners/fima-community-booster-v4.png",
+      "width": 1983,
+      "height": 793,
+      "bytes": 3080982,
+      "sha256": "5dbde43e5a1b7cc2803632c6d99e986d53b1c1bd67ee1bfa2b4d567e8e57a9aa",
+      "semantic": "Gem and celebration energy distinguish booster recognition and reward moments.",
+      "cropSafe": "5:2 embed banner with centered title-safe composition."
+    }
+  ]
+}

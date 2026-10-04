@@ -1,7 +1,8 @@
 import { prisma } from "./db.js";
 import { generateUniqueLicenseKey } from "./license.js";
 import { communityActivitySeasonWindow } from "./communityActivity.js";
-import { PARADISE_TEST_GUILD_ID, assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
+import { PARADISE_TEST_GUILD_ID } from "./runtimeEnvironment.js";
+import { assertCommunityRewardGuild, communityRewardGuildIds } from "./communityGuildPolicy.js";
 
 export const COMMUNITY_BOOSTER_DAYS_PER_BOOST = 3;
 export const DISCORD_GUILD_BOOST_MESSAGE_TYPE = 8;
@@ -38,7 +39,7 @@ function asDate(value) {
 }
 
 function assertBoosterMutation(guildId, source) {
-  return assertParadiseTestGuildMutation({ guildId, operation: "community_booster_mutation", source });
+  return assertCommunityRewardGuild({ guildId, source });
 }
 
 function boosterMemberId(oldMember, newMember) {
@@ -312,34 +313,42 @@ export async function ensureMonthlyCommunityBoosterRewards({ guildId = PARADISE_
 export async function runCommunityBoosterWorker(client, { db = prisma, source = process.env, now = new Date() } = {}) {
   const config = communityBoosterConfig(source);
   if (!config.enabled) return { ran: false, reason: "booster_rewards_disabled" };
-  const guild = client?.guilds?.cache?.get?.(PARADISE_TEST_GUILD_ID) || null;
-  if (!guild) return { ran: false, reason: "test_guild_unavailable" };
-  assertBoosterMutation(guild.id, source);
-
-  let members = guild.members?.cache || new Map();
-  let authoritativeMemberSnapshot = false;
-  if (typeof guild.members?.fetch === "function") {
-    try {
-      members = await guild.members.fetch();
-      authoritativeMemberSnapshot = true;
-    } catch (error) {
-      console.warn("FIMA booster member refresh failed; preserving prior active state", { message: error.message });
+  const guildResults = [];
+  for (const guildId of communityRewardGuildIds(source)) {
+    const guild = client?.guilds?.cache?.get?.(guildId) || null;
+    if (!guild) {
+      guildResults.push({ guildId, ran: false, reason: "guild_unavailable" });
+      continue;
     }
+    assertBoosterMutation(guild.id, source);
+    let members = guild.members?.cache || new Map();
+    let authoritativeMemberSnapshot = false;
+    if (typeof guild.members?.fetch === "function") {
+      try {
+        members = await guild.members.fetch();
+        authoritativeMemberSnapshot = true;
+      } catch (error) {
+        console.warn("FIMA booster member refresh failed; preserving prior active state", { message: error.message, guildId });
+      }
+    }
+    const activeDiscordUserIds = [];
+    for (const member of members?.values?.() || []) {
+      if (member?.user?.bot || !asDate(member?.premiumSince || member?.premiumSinceTimestamp)) continue;
+      activeDiscordUserIds.push(String(member.id));
+      await reconcileCommunityBoosterMember(null, member, { db, source, now });
+    }
+    if (authoritativeMemberSnapshot) {
+      await db.communityBoosterState.updateMany({
+        where: { guildId: guild.id, active: true, discordUserId: { notIn: activeDiscordUserIds } },
+        data: { active: false, verifiedBoostCount: 0, countProvenance: "authoritative_member_snapshot_inactive", lastObservedAt: now, endedAt: now }
+      });
+    }
+    const rewards = await ensureMonthlyCommunityBoosterRewards({ guildId: guild.id, db, source, now });
+    guildResults.push({ guildId, ran: true, authoritativeMemberSnapshot, activeMembers: activeDiscordUserIds.length, rewards });
   }
-  const activeDiscordUserIds = [];
-  for (const member of members?.values?.() || []) {
-    if (member?.user?.bot || !asDate(member?.premiumSince || member?.premiumSinceTimestamp)) continue;
-    activeDiscordUserIds.push(String(member.id));
-    await reconcileCommunityBoosterMember(null, member, { db, source, now });
-  }
-  if (authoritativeMemberSnapshot) {
-    await db.communityBoosterState.updateMany({
-      where: { guildId: guild.id, active: true, discordUserId: { notIn: activeDiscordUserIds } },
-      data: { active: false, verifiedBoostCount: 0, countProvenance: "authoritative_member_snapshot_inactive", lastObservedAt: now, endedAt: now }
-    });
-  }
-  const rewards = await ensureMonthlyCommunityBoosterRewards({ guildId: guild.id, db, source, now });
-  return { ran: true, authoritativeMemberSnapshot, activeMembers: activeDiscordUserIds.length, rewards };
+  const completed = guildResults.filter(result => result.ran);
+  if (!completed.length) return { ran: false, reason: "community_guilds_unavailable", guilds: guildResults };
+  return { ran: true, guilds: guildResults };
 }
 
 export function startCommunityBoosterWorker(client, { db = prisma, source = process.env } = {}) {

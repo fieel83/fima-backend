@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer"><title>Complete your account | FIMA</title>
+<link rel="stylesheet" href="/assets/css/account.css?v=20260621-3a50">
+<link rel="stylesheet" href="/assets/css/fima-design-system.css?v=20260928-2"></head>
+<body data-account-page="account-setup" data-fima-product="hub">
+<header class="account-header"><div class="nav"><a class="brand" href="/"><strong>FIMA</strong></a><button class="button secondary" data-logout data-setup-tr="Çıkış yap">Sign out</button></div></header>
+<main class="shell auth-shell"><section class="auth-intro panel panel-pad"><div>
+<p class="eyebrow">FIMA Account</p><h1 data-setup-tr="Hesabını tamamla.">Complete your account.</h1>
+<p data-setup-tr="Bağlı hesapların ve FIMA kullanıcı adın aynı hesaba giriş sağlar. Bir kullanıcı adı ve şifre belirle.">Your linked identities and FIMA username sign in to the same account. Choose your username and password.</p>
+</div></section><section class="auth-card panel panel-pad"><form data-auth-form>
+<label><span data-setup-tr="Kullanıcı adı">Username</span><input name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" required></label>
+<p class="field-note" data-setup-tr="3–24 karakter: harf, rakam ve alt çizgi. Büyük/küçük harf fark etmez.">3–24 characters: letters, numbers and underscores. Names are case-insensitive.</p>
+<label><span data-setup-tr="Şifre">Password</span><input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+<label><span data-setup-tr="Şifreyi tekrar gir">Confirm password</span><input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="200" required></label>
+<button class="button" type="submit" data-setup-tr="Kaydet ve devam et">Save and continue</button>
+<p class="message" id="message" role="status" aria-live="polite"></p></form></section></main>
+<script src="/assets/js/config.js"></script><script src="/assets/js/account.js?v=20261004-ft-1" defer></script></body></html>

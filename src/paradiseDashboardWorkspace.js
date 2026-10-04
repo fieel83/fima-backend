@@ -1,3 +1,4 @@
+import { FIMA_MODULE_CATALOG, assertFimaModuleSelection, fimaModuleStates, fimaPublicConfig, fimaSetupType, fimaWorkspaceRoutes } from './fimaGuildArchitecture.js';
 const ROUTES = Object.freeze([
   ["overview", "Overview"], ["modules", "Modules"], ["setup", "Setup Wizard"],
   ["channels", "Channels"], ["roles", "Roles & Permissions"], ["welcome", "Welcome & Roles"],
@@ -6,7 +7,8 @@ const ROUTES = Object.freeze([
   ["tickets", "Tickets"], ["moderation", "Moderation"], ["security", "Security / AutoMod"],
   ["levels", "XP / Levels"], ["voice", "Join-to-Create"], ["events", "Events / Daily Question"],
   ["social", "Social Notifications"], ["ai", "AI Assistant"], ["commands", "Custom Commands / Auto Responder"],
-  ["branding", "Branding"], ["logs", "Logs / Transcripts"], ["premium", "Premium / Billing"], ["audit", "Audit History"]
+  ["branding", "Branding"], ["logs", "Logs / Transcripts"], ["premium", "Premium / Billing"], ["audit", "Audit History"],
+  ["content", "Content"], ["polls", "Native Polls"], ["integrations", "Integrations"]
 ].map(([id, title]) => Object.freeze({ id, title })));
 
 export const PARADISE_CUSTOMER_WORKSPACE_ROUTES = ROUTES;
@@ -45,10 +47,7 @@ const DISCORD_ID = /^\d{16,22}$/;
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const SAFE_SETTING_KEY = /^[a-z][a-z0-9_]{0,48}$/;
 const BLOCKED_SETTING_KEY = /(secret|token|password|cookie|license.?key|hwid|webhook|authorization|owner|billing|stripe)/i;
-const CUSTOMER_MODULES = new Set([
-  "welcome", "roles", "tickets", "applications", "levels", "voice", "security",
-  "sessions", "profiles", "leaderboards", "challenge", "availability", "social", "ai"
-]);
+const CUSTOMER_MODULES = new Set(FIMA_MODULE_CATALOG.map(module => module.id));
 
 function plainObject(value) {
   return value && typeof value === "object" && !Array.isArray(value);
@@ -130,7 +129,6 @@ export function normalizeParadiseCustomerWorkspacePatch({ route, value } = {}) {
     return {
       route: selectedRoute,
       patch: safeOptions(value, {
-        activeSetupMode: { type: "enum", values: ["community", "clan", "tsbtr"] },
         language: { type: "enum", values: ["tr", "en"] },
         dashboardTheme: { type: "enum", values: ["paradise", "charcoal", "midnight"] }
       }, "invalid_workspace_overview")
@@ -190,7 +188,11 @@ export function applyParadiseCustomerWorkspacePatch(config = {}, normalizedPatch
   if (!plainObject(config) || !plainObject(normalizedPatch?.patch)) throw workspaceError("invalid_workspace_patch");
   const next = structuredClone(config);
   for (const [key, value] of Object.entries(normalizedPatch.patch)) {
-    if (key === "channelMappings" || key === "roleMappings" || key === "modules") {
+    if (key === "channelMappings" || key === "roleMappings") {
+      // These route-scoped PATCH payloads are complete editor snapshots so a
+      // customer can remove a stale mapping as well as add or change one.
+      next[key] = { ...value };
+    } else if (key === "modules") {
       next[key] = { ...(next[key] || {}), ...value };
     } else if (plainObject(value)) {
       next[key] = { ...(next[key] || {}), ...value };
@@ -199,7 +201,19 @@ export function applyParadiseCustomerWorkspacePatch(config = {}, normalizedPatch
     }
   }
   next.customerWorkspaceVersion = Math.max(0, Number(next.customerWorkspaceVersion) || 0) + 1;
+  assertFimaModuleSelection(next);
   return next;
+}
+
+export function paradiseCustomerWorkspaceVersion(config = {}) {
+  const version = Number(config?.customerWorkspaceVersion);
+  return Number.isSafeInteger(version) && version >= 0 ? version : 0;
+}
+
+export function normalizeParadiseCustomerWorkspaceExpectedVersion(value) {
+  const version = typeof value === "number" ? value : Number.NaN;
+  if (!Number.isSafeInteger(version) || version < 0) throw workspaceError("invalid_workspace_version");
+  return version;
 }
 
 export function normalizeParadiseWorkspaceRoute(route = "overview") {
@@ -212,7 +226,7 @@ export function customerWorkspaceConfigView(config = {}, route = "overview") {
   const keys = CONFIG_KEYS_BY_ROUTE[selectedRoute] || [];
   return Object.fromEntries(keys
     .filter(key => Object.prototype.hasOwnProperty.call(config || {}, key))
-    .map(key => [key, cloneSafe(config[key])]));
+    .map(key => [key, fimaPublicConfig(cloneSafe(config[key]))]));
 }
 
 export function buildParadiseCustomerWorkspaceView({ card, config = {}, route = "overview" } = {}) {
@@ -221,7 +235,9 @@ export function buildParadiseCustomerWorkspaceView({ card, config = {}, route = 
     error.code = "workspace_card_required";
     throw error;
   }
-  const selectedRoute = normalizeParadiseWorkspaceRoute(route);
+  const availableRoutes = fimaWorkspaceRoutes(ROUTES, config, card);
+  const requestedRoute = normalizeParadiseWorkspaceRoute(route);
+  const selectedRoute = availableRoutes.some(item => item.id === requestedRoute) ? requestedRoute : 'overview';
   return Object.freeze({
     workspace: {
       guildId: String(card.guildId),
@@ -234,8 +250,14 @@ export function buildParadiseCustomerWorkspaceView({ card, config = {}, route = 
       lastSuccessfulSyncAt: card.lastSuccessfulSyncAt || null
     },
     route: selectedRoute,
-    routes: ROUTES,
-    config: card.botInstalled ? customerWorkspaceConfigView(config, selectedRoute) : {},
+    routes: availableRoutes,
+    setupType: fimaSetupType(config, card),
+    moduleStates: fimaModuleStates(config, card),
+    version: paradiseCustomerWorkspaceVersion(config),
+    config: card.botInstalled ? {
+      ...customerWorkspaceConfigView(config, selectedRoute),
+      ...(selectedRoute === 'modules' ? { modules: Object.fromEntries(fimaModuleStates(config, card).map(item => [item.id, item.enabled])) } : {})
+    } : {},
     inviteRequired: card.botInstalled !== true
   });
 }

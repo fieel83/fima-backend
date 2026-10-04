@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
+import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings } from './fimaGuildArchitecture.js';
 import path from "node:path";
 import crypto from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -27,19 +29,124 @@ import {
   summarizeParadiseReconciliation
 } from "./paradiseReconciliation.js";
 import { buildParadiseComponentId, outdatedParadiseComponentMessage, parseParadiseComponentId } from "./paradiseComponentProtocol.js";
-import { buildParadiseRestoreDryRun, createParadiseBackupEnvelope } from "./paradiseBackupIntegrity.js";
+import {
+  buildParadiseRestoreDryRun,
+  createParadiseBackupEnvelope,
+  paradiseBackupStateDigest,
+  validateParadiseBackupArtifactCopies,
+  validateParadiseBackupEnvelope
+} from "./paradiseBackupIntegrity.js";
+import {
+  captureParadiseGuildBackupSnapshot,
+  paradiseProductionRestoreConfirmation,
+  paradiseRestoreConfirmation,
+  restoreParadiseGuildBackup
+} from "./paradiseGuildRestore.js";
+import {
+  armParadiseRollbackMarker,
+  assertNoUnresolvedParadiseRollback,
+  readParadiseRollbackMarker,
+  resolveParadiseRollbackMarker,
+  updateParadiseRollbackMarker
+} from "./paradiseRollbackMarker.js";
+import { inspectCommunityActivityReadiness } from "./communityActivity.js";
+import {
+  paradiseGuildMutationLockStatus as mutationLockStatus,
+  paradiseCurrentMutationLease,
+  paradisePersistentMutationLockStatus,
+  sanitizeParadiseMutationFailure,
+  updateParadiseMutationLease,
+  withParadiseGuildMutationLease
+} from "./paradiseMutationLease.js";
+import { inspectParadiseRebuildPreflight } from "./paradiseRebuildPreflight.js";
+import {
+  readParadiseProductionFinalizationReceipt,
+  resolveParadiseProductionFinalizationReceipt,
+  verifyParadiseProductionRebuildExecutionProof
+} from "./paradiseProductionRebuildPlan.js";
+import {
+  FT_COMMUNITY_VISUAL_MANIFEST,
+  assertFtCommunityVisualMutationApproved,
+  createFtCommunityVisualSurfacePlan,
+  loadVerifiedFtCommunityVisualAsset
+} from "./ftCommunityVisualAssets.js";
 
 export const PARADISE_TEST_GUILD_ID = "1520519015661961257";
+export const FIMA_COMMUNITY_PRODUCTION_GUILD_ID = "1419335632324657306";
+export const FIMA_COMMUNITY_REBUILD_CONFIRMATION = "REBUILD FIEELS COMMUNITY";
+export const PARADISE_TEST_REHEARSAL_CONFIRMATION = "REHEARSE TEST COMMUNITY";
+export const PARADISE_TEST_ROLLBACK_RECOVERY_CONFIRMATION = "RECOVER TEST COMMUNITY ROLLBACK";
+const PARADISE_ARTIFACT_ROOT = path.resolve(process.cwd(), "artifacts", "post-security-backlog");
+const PARADISE_TEST_REBUILD_POLICY = Object.freeze({
+  allowedGuildId: PARADISE_TEST_GUILD_ID,
+  expectedConfirmation: null,
+  artifactPrefix: "3a65-test-server",
+  restoreArtifactPrefix: "3a73-test-server",
+  auditReason: "FIMA owner-confirmed test-guild",
+  operationLabel: "full_test_server_rebuild",
+  failurePrefix: "test_rebuild",
+  isProduction: false,
+  isTest: true
+});
+const FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY = Object.freeze({
+  allowedGuildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+  expectedConfirmation: FIMA_COMMUNITY_REBUILD_CONFIRMATION,
+  artifactPrefix: "production-ft-community",
+  restoreArtifactPrefix: "production-ft-community",
+  auditReason: "FIMA owner-confirmed production FT Community",
+  operationLabel: "full_production_ft_community_rebuild",
+  failurePrefix: "production_rebuild",
+  requireTestGuildRehearsal: true,
+  expectedTestGuildId: PARADISE_TEST_GUILD_ID,
+  testGuildRehearsalMaxAgeMs: 24 * 60 * 60 * 1000,
+  isProduction: true,
+  isTest: false
+});
+const PARADISE_BACKUP_DIGEST_PATTERN = /^[a-f0-9]{64}$/i;
+const DISCORD_UNKNOWN_CHANNEL_CODES = new Set([10003, "10003"]);
+const PARADISE_ROLLBACK_CACHE_REFRESH_TIMEOUT_MS = 15_000;
 export const DEFAULT_PARADISE_BRAND_COLOR = "#000000";
+
+export function isParadiseUnknownChannelError(error) {
+  return DISCORD_UNKNOWN_CHANNEL_CODES.has(error?.code)
+    || DISCORD_UNKNOWN_CHANNEL_CODES.has(error?.rawError?.code)
+    || DISCORD_UNKNOWN_CHANNEL_CODES.has(error?.cause?.code);
+}
+
 // Changing this revision reruns the guarded smoke suite only in the fixed
-// Paradise test guild. It never targets a production guild.
-const PARADISE_AUTO_SMOKE_REVISION = "3a71-compact-turkish-template-smoke-v10";
+// Fixed FIMA Bot test guild. It never targets a production guild.
+const PARADISE_AUTO_SMOKE_REVISION = "3a80-ft-community-activity-smoke-v11";
 // This revision is intentionally limited to the fixed lab guild. It is the
 // owner-authorized compact test layout, never a production-guild rebuild.
-const PARADISE_TEST_LAB_LAYOUT_REVISION = "3a71-compact-tsbtr-lab-v1";
-const DEFAULT_PARADISE_FOOTER_BRAND = "Made By Fieel";
-const PARADISE_PUBLIC_ASSET_BASE = String(process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com").replace(/\/+$/, "");
-const PARADISE_LEADERBOARD_SEPARATOR_ASSET = `${PARADISE_PUBLIC_ASSET_BASE}/assets/images/paradise/line-gifs/fixedbulletlines.gif`;
+const PARADISE_TEST_LAB_LAYOUT_REVISION = "3a80-template-aware-canonical-lab-v3";
+const DEFAULT_FIMA_FOOTER_BRAND = "Made By Fieel";
+export function sanitizeParadisePublicAssetBase(value) {
+  const safe = sanitizeParadiseHttpsUrl(value);
+  if (!safe) return "https://fimamacro.com";
+  const parsed = new URL(safe);
+  parsed.search = "";
+  parsed.hash = "";
+  return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
+}
+
+const PARADISE_PUBLIC_ASSET_BASE = sanitizeParadisePublicAssetBase(
+  process.env.FRONTEND_URL || process.env.PUBLIC_BASE_URL || "https://fimamacro.com"
+);
+export const PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN = createFtCommunityVisualSurfacePlan(
+  PARADISE_PUBLIC_ASSET_BASE,
+  FT_COMMUNITY_VISUAL_MANIFEST
+);
+export const PARADISE_COMMUNITY_ASSETS = PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN.surfaces.webhookBanners;
+const PARADISE_LEADERBOARD_SEPARATOR_ASSET = PARADISE_COMMUNITY_ASSETS.leaderboard;
+
+export function paradiseCommunityGuideBannerUrl(definitionKey) {
+  const assetKey = {
+    rules: "rules",
+    announcement: "announcement",
+    booster: "booster"
+  }[definitionKey];
+  return assetKey ? PARADISE_COMMUNITY_ASSETS[assetKey] : null;
+}
 const LEVELS = ["Low", "Mid", "High"];
 const STRENGTHS = ["Weak", "Stable", "Strong"];
 const APPLICATION_TYPES = Object.freeze([
@@ -48,21 +155,39 @@ const APPLICATION_TYPES = Object.freeze([
   ["training_hoster", "Training Hoster"], ["tryout_hoster", "Tryout Hoster"],
   ["referee", "Referee"], ["event_staff", "Event Staff"],
   ["giveaway_staff", "Giveaway Staff"], ["content_creator", "Content Creator"],
+  ["video_team", "Video Team"], ["creative_team", "Creative Team"], ["developer", "Developer"],
   ["partnership", "Partnership / Ally"], ["clan_mainer", "Clan Member / Mainer"],
   ["fima_support", "Fima Support Helper"], ["macro_staff", "Macro Staff"],
   ["fflag_staff", "FFlag Staff"], ["war_hoster", "War Hoster"],
+  ["creator", "Creator / Media Partner"],
   ["reseller", "Reseller / Affiliate"]
 ]);
 export const FIEELS_COMMUNITY_STAFF_PROGRESSION = Object.freeze([
   "Helper", "Junior Moderator", "Moderator", "Senior Moderator", "Administrator", "Owner"
 ]);
-const COMMUNITY_PUBLIC_STAFF_APPLICATION_TYPES = new Set(["helper"]);
-const BUSINESS_APPLICATION_TYPES = new Set(["partnership", "reseller"]);
+const COMMUNITY_PUBLIC_STAFF_APPLICATION_TYPES = new Set([
+  "helper",
+  "staff",
+  "moderator",
+  "support",
+  "training_hoster",
+  "event_staff",
+  "giveaway_staff",
+  "content_creator",
+  "video_team",
+  "creative_team",
+  "developer",
+  "fima_support",
+  "macro_staff",
+  "fflag_staff"
+]);
+const BUSINESS_APPLICATION_TYPES = new Set(["partnership", "creator", "reseller"]);
 const COMMUNITY_BLOCKED_APPLICATION_TYPES = new Set(["clan_mainer", "tryout_hoster", "referee", "war_hoster"]);
 const CLAN_ONLY_APPLICATION_TYPES = new Set(["clan_mainer", "war_hoster"]);
 const COMMUNITY_ONLY_APPLICATION_TYPES = new Set(["fima_support", "macro_staff", "fflag_staff", "reseller"]);
 const TSBTR_BLOCKED_APPLICATION_TYPES = new Set(["clan_mainer", "fima_support", "macro_staff", "fflag_staff", "war_hoster", "reseller"]);
 const DISCORD_APPLICATION_MODAL_LIMIT = 5;
+const APPLICATION_EXTRA_QUESTION_LIMIT = 20;
 const APPLICATION_DRAFT_TTL_MS = 30 * 60_000;
 const APPLICATION_EVIDENCE_MAX_PER_QUESTION = 2;
 const APPLICATION_EVIDENCE_MAX_FILES = 4;
@@ -144,7 +269,7 @@ const APPLICATION_QUESTION_BANK = Object.freeze({
     ["anti_scam", "Dolandırıcılık önlemi", "Chargeback/dolandırıcılık riskini nasıl azaltırsın?", TextInputStyle.Paragraph, 20, 700],
     ["terms", "Şartlar", "Teslimat, iade ve komisyon şartlarını nasıl takip edersin?", TextInputStyle.Paragraph, 20, 700],
     ["experience", "Deneyim", "Daha önce reseller/affiliate deneyimin var mı?", TextInputStyle.Paragraph, 5, 700],
-    ["why", "Neden sen?", "Neden Paradise/Fima reseller olmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
+    ["why", "Neden sen?", "Neden FIMA Bot/FIMA reseller olmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
   ],
   default: [
     ["motivation", "Motivasyon", "Bu pozisyonu neden istiyorsun?", TextInputStyle.Paragraph, 20, 700],
@@ -156,7 +281,7 @@ const APPLICATION_QUESTION_BANK = Object.freeze({
 });
 const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
   helper: [
-    ["motivation", "Motivasyon", "Fieel's Community Helper ekibine neden katılmak istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["motivation", "Motivasyon", "FIMA Helper ekibine neden katılmak istiyorsun?", TextInputStyle.Paragraph, 20, 700],
     ["availability", "Aktiflik planı", "Saat dilimin nedir; haftada hangi gün ve saatlerde aktif olabilirsin?", TextInputStyle.Short, 3, 180],
     ["first_response", "İlk müdahale", "Bir üye yardım istediğinde sorunu nasıl anlayıp ilk yanıtını nasıl verirsin?", TextInputStyle.Paragraph, 20, 700],
     ["conflict", "Tartışma yönetimi", "İki üye tartışırken ortamı sakinleştirmek için hangi adımları izlersin?", TextInputStyle.Paragraph, 20, 700],
@@ -331,14 +456,14 @@ const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
     ["pricing", "Fiyat/komisyon", "Karlı ama güvenli bir reseller ilişkisi için komisyon nasıl olmalı?", TextInputStyle.Paragraph, 20, 700],
     ["reporting", "Raporlama", "Haftalık satış raporunu nasıl hazırlarsın?", TextInputStyle.Paragraph, 20, 700],
     ["experience", "Deneyim", "Daha önce reseller/affiliate deneyimin var mı?", TextInputStyle.Paragraph, 5, 700],
-    ["why", "Neden sen?", "Neden Paradise/Fima reseller olmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
+    ["why", "Neden sen?", "Neden FIMA Bot/FIMA reseller olmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
   ],
   content_creator: [
     ["platforms", "Platformlar", "Hangi platformlarda içerik üretiyorsun?", TextInputStyle.Short, 3, 180],
     ["portfolio", "Örnek iş", "Örnek video/link veya portfolyo açıklaması yaz.", TextInputStyle.Paragraph, 20, 700],
     ["schedule", "Plan", "Haftada kaç içerik çıkarabilirsin?", TextInputStyle.Short, 3, 180],
     ["style", "Stil", "İçerik tarzın nasıl?", TextInputStyle.Paragraph, 20, 700],
-    ["brand", "Marka", "Paradise/Fima markasını nasıl doğru temsil edersin?", TextInputStyle.Paragraph, 20, 700],
+    ["brand", "Marka", "FIMA Bot/FIMA markasını nasıl doğru temsil edersin?", TextInputStyle.Paragraph, 20, 700],
     ["rules", "Kural", "Yanıltıcı başlık veya sahte vaat kullanmamak için ne yaparsın?", TextInputStyle.Paragraph, 20, 700],
     ["community", "Topluluk", "Yorumlarda toxiclik çıkarsa nasıl yönetirsin?", TextInputStyle.Paragraph, 20, 700],
     ["collab", "İşbirliği", "Diğer içerik üreticileriyle nasıl çalışırsın?", TextInputStyle.Paragraph, 20, 700],
@@ -346,6 +471,56 @@ const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
     ["assets", "Görsel", "Banner/thumbnail hazırlama deneyimin var mı?", TextInputStyle.Paragraph, 5, 700],
     ["availability", "Aktiflik", "Haftalık aktifliğin nedir?", TextInputStyle.Short, 3, 180],
     ["why", "Neden sen?", "Content Creator rolü için neden uygunsun?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  video_team: [
+    ["portfolio", "Video portfolyosu", "Kurgu, motion veya prodüksiyon çalışmalarından doğrulanabilir örneklerini paylaş.", TextInputStyle.Paragraph, 20, 700],
+    ["editing_stack", "Kurgu araçları", "Hangi kurgu, ses, motion ve görsel araçlarını hangi seviyede kullanıyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["weekly_capacity", "Haftalık kapasite", "Bir haftada gerçekçi olarak kaç kısa ve uzun video teslim edebilirsin?", TextInputStyle.Short, 3, 180],
+    ["source_rights", "Kaynak ve kullanım hakları", "Müzik, font, görüntü ve diğer kaynakların kullanım haklarını nasıl doğrularsın?", TextInputStyle.Paragraph, 20, 700],
+    ["privacy", "Gizlilik", "Kayıtlarda görünen kullanıcı adları, mesajlar ve kişisel verileri nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["delivery_workflow", "Teslim akışı", "Brief'ten dışa aktarma, dosya adlandırma ve arşivlemeye kadar teslim sürecini açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["feedback", "Revizyon", "Çelişen veya yoğun geri bildirim geldiğinde revizyonları nasıl önceliklendirirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["brand_safety", "Marka güvenliği", "Yanıltıcı başlık, izinsiz içerik ve uygunsuz görselleri nasıl engellersin?", TextInputStyle.Paragraph, 20, 700],
+    ["availability", "Uygunluk", "Saat dilimin, müsait günlerin ve acil teslimlere yaklaşımın nedir?", TextInputStyle.Short, 3, 180],
+    ["why", "Neden sen?", "FIMA Video Team'e hangi özgün katkıyı sağlayabilirsin?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  creative_team: [
+    ["portfolio", "Tasarım portfolyosu", "Grafik, illüstrasyon, marka veya arayüz çalışmalarından doğrulanabilir örneklerini paylaş.", TextInputStyle.Paragraph, 20, 700],
+    ["disciplines", "Yaratıcı alanlar", "En güçlü olduğun tasarım alanlarını, araçlarını ve seviyeni açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["brief_process", "Brief süreci", "Belirsiz bir brief'i uygulanabilir yaratıcı hedeflere nasıl dönüştürürsün?", TextInputStyle.Paragraph, 20, 700],
+    ["brand_consistency", "Marka tutarlılığı", "FIMA'nın görsel dilini farklı ürün ve yüzeylerde nasıl tutarlı tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["collaboration", "Ekip çalışması", "Video, içerik ve geliştirme ekipleriyle dosya ve karar akışını nasıl yönetirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["delivery", "Teslim akışı", "Kaynak dosya, dışa aktarma, adlandırma ve arşivleme düzenini açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["feedback", "Geri bildirim", "Çelişen yaratıcı geri bildirimleri nasıl netleştirir ve revizyona dönüştürürsün?", TextInputStyle.Paragraph, 20, 700],
+    ["rights", "Kaynak hakları", "Font, görsel, karakter ve diğer kaynakların lisans ve kullanım haklarını nasıl doğrularsın?", TextInputStyle.Paragraph, 20, 700],
+    ["availability", "Uygunluk", "Saat dilimin, haftalık kapasiten ve acil teslimlere yaklaşımın nedir?", TextInputStyle.Short, 3, 180],
+    ["why", "Neden sen?", "FIMA Creative Team'e hangi özgün katkıyı sağlayabilirsin?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  developer: [
+    ["languages", "Teknik yetkinlik", "Kullandığın dilleri, frameworkleri ve en güçlü olduğun alanları yaz.", TextInputStyle.Paragraph, 20, 700],
+    ["projects", "Projeler", "Rolünle ilgili doğrulanabilir projelerini ve bu projelerdeki kişisel katkını açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["debugging", "Hata ayıklama", "Tekrarlanamayan bir production hatasını nasıl araştırır ve kanıtlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["review_workflow", "Kod inceleme", "Küçük, incelenebilir değişiklikler ve anlaşılır review notları için nasıl çalışırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["testing", "Test yaklaşımı", "Değişikliğin doğruluğunu ve geriye dönük uyumluluğunu hangi testlerle kanıtlarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["least_privilege", "En az yetki", "Araç, servis ve kullanıcı verisi erişimlerini en az yetkiyle nasıl sınırlandırırsın?", TextInputStyle.Paragraph, 20, 700],
+    ["secrets", "Sır yönetimi", "API anahtarı, token ve kullanıcı sırlarını koddan, loglardan ve istemciden nasıl uzak tutarsın?", TextInputStyle.Paragraph, 20, 700],
+    ["rollback", "Geri alma", "Riskli bir değişiklik için yayın, gözlem ve geri alma planını açıkla.", TextInputStyle.Paragraph, 20, 700],
+    ["availability", "Uygunluk", "Saat dilimin, haftalık kapasiten ve bakım görevlerine ayırabileceğin zaman nedir?", TextInputStyle.Short, 3, 180],
+    ["why", "Neden sen?", "FIMA geliştirme ekibine hangi özgün katkıyı sağlayabilirsin?", TextInputStyle.Paragraph, 20, 700]
+  ],
+  creator: [
+    ["platforms", "Platformlar", "Hangi platformlarda ve hangi adla içerik üretiyorsun?", TextInputStyle.Short, 3, 180],
+    ["portfolio", "Portfolyo", "Örnek içeriklerini veya doğrulanabilir portfolyo açıklamanı paylaş.", TextInputStyle.Paragraph, 20, 700],
+    ["audience", "Kitle", "Kitlenin konusu, dili ve yaklaşık erişimi nedir?", TextInputStyle.Paragraph, 20, 700],
+    ["proposal", "İşbirliği fikri", "FIMA ile nasıl bir creator işbirliği yapmak istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["deliverables", "Teslimler", "Hangi içerikleri, hangi sıklıkta üretebilirsin?", TextInputStyle.Paragraph, 20, 700],
+    ["brand_safety", "Marka güvenliği", "Reklam, sponsorluk ve yanıltıcı vaat sınırlarını nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["rights", "Kullanım hakları", "İçerik kullanım ve yeniden paylaşım beklentin nedir?", TextInputStyle.Paragraph, 10, 700],
+    ["privacy", "Gizlilik", "Topluluk üyelerinin kişisel verilerini içerikte nasıl korursun?", TextInputStyle.Paragraph, 20, 700],
+    ["measurement", "Başarı ölçümü", "İşbirliğinin başarısını hangi sinyallerle ölçersin?", TextInputStyle.Paragraph, 20, 700],
+    ["compensation", "Koşullar", "Ücret, ürün erişimi veya karşılıklı tanıtım beklentin nedir?", TextInputStyle.Paragraph, 10, 700],
+    ["contact", "İletişim", "İletişim planın ve uygun olduğun zamanlar nedir?", TextInputStyle.Paragraph, 10, 700],
+    ["why", "Neden FIMA?", "Neden FIMA ile çalışmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
   ],
   partnership: [
     ["clan", "Klan/topluluk", "Hangi klan/topluluk adına başvuruyorsun?", TextInputStyle.Short, 3, 180],
@@ -359,7 +534,7 @@ const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
     ["contact", "İletişim", "İletişim ve anlaşmazlık durumunda kim yetkili olacak?", TextInputStyle.Paragraph, 20, 700],
     ["duration", "Süre", "Bu ilişki sürekli mi, dönemsel mi?", TextInputStyle.Short, 3, 180],
     ["notes", "Not", "Eklemek istediğin bir detay var mı?", TextInputStyle.Paragraph, 0, 700],
-    ["why", "Neden biz?", "Neden Paradise/Fima ile çalışmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
+    ["why", "Neden biz?", "Neden FIMA Bot/FIMA ile çalışmak istiyorsun?", TextInputStyle.Paragraph, 20, 700]
   ],
   clan_mainer: [
     ["roblox", "Roblox", "Roblox kullanıcı adın nedir?", TextInputStyle.Short, 3, 80],
@@ -371,12 +546,12 @@ const APPLICATION_QUESTION_BANK_V2 = Object.freeze({
     ["wars", "War", "War/roster etkinliklerine katılabilir misin?", TextInputStyle.Paragraph, 20, 700],
     ["training", "Training", "Training/tryoutlara katılma durumun nedir?", TextInputStyle.Paragraph, 20, 700],
     ["toxicity", "Davranış", "Toxiclik veya tartışma olursa nasıl davranırsın?", TextInputStyle.Paragraph, 20, 700],
-    ["loyalty", "Bağlılık", "Neden Paradise mainlemek istiyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["loyalty", "Bağlılık", "Neden FIMA Bot topluluğunu mainlemek istiyorsun?", TextInputStyle.Paragraph, 20, 700],
     ["proof", "Kanıt", "Mainer proof atmayı kabul ediyor musun?", TextInputStyle.Short, 2, 80],
     ["why", "Neden sen?", "Klanda seni öne çıkaran özellik nedir?", TextInputStyle.Paragraph, 20, 700]
   ],
   fima_support: [
-    ["product", "Ürün bilgisi", "Fima/Paradise ürünleri hakkında neleri biliyorsun?", TextInputStyle.Paragraph, 20, 700],
+    ["product", "Ürün bilgisi", "FIMA/FIMA Bot ürünleri hakkında neleri biliyorsun?", TextInputStyle.Paragraph, 20, 700],
     ["support", "Destek", "Bir kullanıcı lisans veya giriş sorunu yaşarsa nasıl yönlendirirsin?", TextInputStyle.Paragraph, 20, 700],
     ["privacy", "Gizlilik", "Kullanıcıdan hangi bilgileri asla istemezsin?", TextInputStyle.Paragraph, 20, 700],
     ["trial", "Trial", "Ücretsiz deneme/Roblox verify akışını nasıl anlatırsın?", TextInputStyle.Paragraph, 20, 700],
@@ -414,9 +589,16 @@ const activeTournaments = new Map();
 const staffTeamRefreshTimers = new Map();
 const levelMessageCooldowns = new Map();
 const paradiseGuildContext = new AsyncLocalStorage();
+const paradiseRoleCreatesInFlight = new Map();
+const paradiseChannelCreatesInFlight = new Map();
 const PROFILE_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-verified-roblox-profiles.json");
 const STATE_FALLBACK_STORE = path.resolve(process.cwd(), "artifacts", "post-security-backlog", "3a59-paradise-state-fallback.json");
+const STATE_FALLBACK_LOCK_STORE = `${STATE_FALLBACK_STORE}.lock`;
 const STATE_KEY = "paradise_3a59_state_v1";
+const STATE_FALLBACK_LOCK_WAIT_MS = 7_500;
+const STATE_FALLBACK_LOCK_STALE_MS = 30_000;
+const STATE_FALLBACK_RENAME_RETRY_LIMIT = 5;
+const STATE_FALLBACK_RENAME_RETRY_DELAY_MS = 35;
 const EMPTY_STATE = Object.freeze({
   profiles: {}, verificationChallenges: {}, pendingTryouts: {}, pendingChallenges: {}, trainings: {},
   tournaments: {}, leaderboard: {}, leaderboards: {}, leaderboardHistory: {}, staffActivity: {}, activityChecks: {},
@@ -427,7 +609,34 @@ const EMPTY_STATE = Object.freeze({
   temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
   applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}, paradiseLogs: {}, challengeAudits: {}
 });
-let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_PARADISE_FOOTER_BRAND } });
+let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_FIMA_FOOTER_BRAND } });
+
+function normalizedMutationResourceName(value) {
+  return String(value || "").normalize("NFKC").trim().toLocaleLowerCase("en-US");
+}
+
+function mutationResourceNameMatches(actual, desired) {
+  return normalizedMutationResourceName(actual) === normalizedMutationResourceName(desired);
+}
+
+function exactMutationResourceNameMatches(actual, desired) {
+  return String(actual || "") === String(desired || "");
+}
+
+/**
+ * Serializes every Discord structure mutation per guild in this process and
+ * acquires a persistent atomic lease before the callback starts. Nested calls
+ * are re-entrant and keep the outer correlation/idempotency record.
+ */
+export async function withParadiseGuildMutationLock(guildOrId, operation, callback, options = {}) {
+  return withParadiseGuildMutationLease(guildOrId, operation, callback, options);
+}
+
+export function paradiseGuildMutationLockStatus(guildId) {
+  return mutationLockStatus(guildId);
+}
+
+export { paradisePersistentMutationLockStatus, updateParadiseMutationLease };
 
 function normalizeState(value) {
   const input = value && typeof value === "object" ? value : {};
@@ -485,6 +694,93 @@ export function recordParadiseLeaderboardAudit(state, {
   return state;
 }
 
+async function readFallbackState() {
+  try {
+    return normalizeState(JSON.parse(await fs.readFile(STATE_FALLBACK_STORE, "utf8")));
+  } catch {}
+  try {
+    return normalizeState(JSON.parse(await fs.readFile(PROFILE_STORE, "utf8")));
+  } catch {
+    return normalizeState({});
+  }
+}
+
+function waitForFallbackStateLock(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function acquireFallbackStateLock() {
+  const startedAt = Date.now();
+  await fs.mkdir(path.dirname(STATE_FALLBACK_STORE), { recursive: true });
+  while (Date.now() - startedAt < STATE_FALLBACK_LOCK_WAIT_MS) {
+    try {
+      const handle = await fs.open(STATE_FALLBACK_LOCK_STORE, "wx", 0o600);
+      await handle.writeFile(JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }), "utf8");
+      return handle;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      try {
+        const lockStats = await fs.stat(STATE_FALLBACK_LOCK_STORE);
+        if (Date.now() - lockStats.mtimeMs > STATE_FALLBACK_LOCK_STALE_MS) {
+          await fs.unlink(STATE_FALLBACK_LOCK_STORE).catch(() => {});
+          continue;
+        }
+      } catch {}
+      await waitForFallbackStateLock(20 + Math.floor(Math.random() * 30));
+    }
+  }
+  const error = new Error("paradise_state_fallback_lock_timeout");
+  error.code = "paradise_state_fallback_lock_timeout";
+  throw error;
+}
+
+async function withFallbackStateLock(callback) {
+  let handle = null;
+  try {
+    handle = await acquireFallbackStateLock();
+    return await callback();
+  } finally {
+    await handle?.close().catch(() => {});
+    if (handle) await fs.unlink(STATE_FALLBACK_LOCK_STORE).catch(() => {});
+  }
+}
+
+function isTransientFallbackRenameError(error) {
+  // Windows can briefly keep either the destination or the just-written
+  // temporary file open (for example through Defender or an indexed handle).
+  // Only retry lock-like failures; all other write failures must remain visible
+  // to the caller so a state transition never appears to have succeeded.
+  return ["EACCES", "EBUSY", "ENOTEMPTY", "EPERM"].includes(error?.code);
+}
+
+async function renameFallbackStateWithRetry(temporaryPath) {
+  let lastError;
+  for (let attempt = 0; attempt <= STATE_FALLBACK_RENAME_RETRY_LIMIT; attempt += 1) {
+    try {
+      await fs.rename(temporaryPath, STATE_FALLBACK_STORE);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientFallbackRenameError(error) || attempt === STATE_FALLBACK_RENAME_RETRY_LIMIT) {
+        throw error;
+      }
+      await waitForFallbackStateLock(STATE_FALLBACK_RENAME_RETRY_DELAY_MS * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
+async function writeFallbackStateAtomically(state) {
+  const directory = path.dirname(STATE_FALLBACK_STORE);
+  const temporaryPath = path.join(directory, `${path.basename(STATE_FALLBACK_STORE)}.${process.pid}.${crypto.randomUUID()}.tmp`);
+  try {
+    await fs.writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    await renameFallbackStateWithRetry(temporaryPath);
+  } finally {
+    await fs.unlink(temporaryPath).catch(() => {});
+  }
+}
+
 async function loadState() {
   try {
     const { prisma } = await import("./db.js");
@@ -494,30 +790,40 @@ async function loadState() {
       return lastKnownStateSnapshot;
     }
   } catch {}
-  try {
-    lastKnownStateSnapshot = normalizeState(JSON.parse(await fs.readFile(STATE_FALLBACK_STORE, "utf8")));
-    return lastKnownStateSnapshot;
-  } catch {}
-  try {
-    lastKnownStateSnapshot = normalizeState(JSON.parse(await fs.readFile(PROFILE_STORE, "utf8")));
-    return lastKnownStateSnapshot;
-  } catch {
-    lastKnownStateSnapshot = normalizeState({});
-    return lastKnownStateSnapshot;
-  }
+  lastKnownStateSnapshot = await readFallbackState();
+  return lastKnownStateSnapshot;
 }
 
 async function saveState(mutator) {
-  const current = await loadState();
-  const next = normalizeState(await mutator(current) || current);
+  let prisma;
+  let row;
   try {
-    const { prisma } = await import("./db.js");
-    await prisma.setting.upsert({ where: { key: STATE_KEY }, update: { value: next }, create: { key: STATE_KEY, value: next } });
+    ({ prisma } = await import("./db.js"));
+    row = await prisma.setting.findUnique({ where: { key: STATE_KEY } });
   } catch {
-    await writeArtifact("3a59-paradise-state-fallback.json", next);
+    return withFallbackStateLock(async () => {
+      // Always re-read after the cross-process lock is held.  A stale snapshot
+      // here would silently discard another worker's application or ticket.
+      const current = await readFallbackState();
+      const next = normalizeState(await mutator(current) || current);
+      await writeFallbackStateAtomically(next);
+      lastKnownStateSnapshot = next;
+      return next;
+    });
   }
-  lastKnownStateSnapshot = next;
-  return next;
+
+  const committed = await prisma.$transaction(async tx => {
+  row = await tx.setting.findUnique({ where: { key: STATE_KEY } });
+  const current = row?.value ? normalizeState(row.value) : await readFallbackState();
+  // Keep the state transition outside the database error boundary.  A mutator
+  // can close over an interaction or deliberately throw; treating that as a
+  // storage outage would run it twice in the fallback path.
+  const next = normalizeState(await mutator(current) || current);
+    await tx.setting.upsert({ where: { key: STATE_KEY }, update: { value: next }, create: { key: STATE_KEY, value: next } });
+    return next;
+  }, { isolationLevel: "Serializable" });
+  lastKnownStateSnapshot = committed;
+  return committed;
 }
 
 export function normalizeParadiseBrandColor(value, fallback = DEFAULT_PARADISE_BRAND_COLOR) {
@@ -529,14 +835,56 @@ export function paradiseBrandColorInteger(value) {
   return Number.parseInt(normalizeParadiseBrandColor(value).slice(1), 16);
 }
 
+export function sanitizeParadiseHttpsUrl(value) {
+  const candidate = String(value || "").trim();
+  if (!candidate) return null;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+export function isFimaCommunityManagedGuild(guildId) {
+  const normalized = String(guildId || "");
+  return normalized === PARADISE_TEST_GUILD_ID
+    || normalized === FIMA_COMMUNITY_PRODUCTION_GUILD_ID;
+}
+
+export function mergeParadiseCommunityAssetDefaults(config, { guildId, mode } = {}) {
+  const source = config && typeof config === "object" ? config : {};
+  const next = structuredClone(source);
+  if (!isFimaCommunityManagedGuild(guildId) || mode !== "community") return next;
+
+  next.welcomeSettings = next.welcomeSettings && typeof next.welcomeSettings === "object"
+    ? next.welcomeSettings
+    : {};
+  next.banners = next.banners && typeof next.banners === "object" ? next.banners : {};
+  next.welcomeSettings.bannerUrl = sanitizeParadiseHttpsUrl(next.welcomeSettings.bannerUrl)
+    || PARADISE_COMMUNITY_ASSETS.welcome;
+  next.welcomeSettings.leaveBannerUrl = sanitizeParadiseHttpsUrl(next.welcomeSettings.leaveBannerUrl)
+    || PARADISE_COMMUNITY_ASSETS.leave;
+  next.staffTeamBannerUrl = sanitizeParadiseHttpsUrl(next.staffTeamBannerUrl)
+    || PARADISE_COMMUNITY_ASSETS.staffTeam;
+  next.banners.staffTeam = sanitizeParadiseHttpsUrl(next.banners.staffTeam)
+    || PARADISE_COMMUNITY_ASSETS.staffTeam;
+  next.videoTeamBannerUrl = sanitizeParadiseHttpsUrl(next.videoTeamBannerUrl)
+    || PARADISE_COMMUNITY_ASSETS.videoTeam;
+  next.banners.videoTeam = sanitizeParadiseHttpsUrl(next.banners.videoTeam)
+    || PARADISE_COMMUNITY_ASSETS.videoTeam;
+  return next;
+}
+
 async function paradiseBrandColor() {
   const state = await loadState();
   return paradiseBrandColorInteger(configForGuild(state, paradiseGuildContext.getStore()).brandColor);
 }
 
 function paradiseFooter(context = "", guildId = paradiseGuildContext.getStore()) {
-  const footerBrand = String(configForGuild(lastKnownStateSnapshot, guildId).footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim()
-    || DEFAULT_PARADISE_FOOTER_BRAND;
+  const footerBrand = String(configForGuild(lastKnownStateSnapshot, guildId).footerBrand || DEFAULT_FIMA_FOOTER_BRAND).trim()
+    || DEFAULT_FIMA_FOOTER_BRAND;
   return { text: `${context ? `${context} • ` : ""}${footerBrand}` };
 }
 
@@ -751,24 +1099,243 @@ export const PARADISE_CLAN_ROLES = [
 ];
 
 export const PARADISE_COMMUNITY_ROLES = [
-  "✦・OWNER RANK",
-  "Owner",
-  "━━━━━ STAFF ━━━━━", "Admin", "Manager", "Moderator", "Support Staff", "Trial Support",
-  "Bot Manager", "Developer", "Security Staff", "Macro Staff", "FFlag Staff",
-  "━━━━━ PRODUCT ACCESS ━━━━━", "Buyer", "Trial User", "Lifetime Buyer",
-  "━━━━━ COMMUNITY ━━━━━", "Creator", "Partner / Reseller", "Reseller", "Media Trusted", "Link Trusted", "Media Approved", "Links Approved", "Invite Approved", "Verified",
-  "━━━━━ PING ROLES ━━━━━",
-  "Update Ping", "Training Ping", "Tournament Ping", "Giveaway Ping",
-  "Event Ping", "Game Night Ping", "Security Alert Ping", "Robux Payment Ping",
-  "━━━━━ LANGUAGE ━━━━━",
-  "Turkish", "English", "LOA", "BLACKLISTED", "Muted / Quarantined",
-  "━━━━━ REGION ROLES ━━━━━",
-  "Europe", "Asia", "North America", "South America", "Oceania"
+  "━━━━━ OWNERSHIP ━━━━━", "Owner",
+  "━━━━━ STAFF ━━━━━", "Administrator", "Senior Moderator", "Moderator", "Junior Moderator", "Helper",
+  "━━━━━ CREATIVE TEAM ━━━━━", "Content Creator", "Outfit Designer", "Cape Designer",
+  "━━━━━ VIDEO TEAM ━━━━━", "Video Team", "Video Editor", "Thumbnail Designer",
+  "━━━━━ PRODUCT SUPPORT ━━━━━", "FIMA Support", "Macro Specialist", "FFlag Specialist",
+  "━━━━━ COMMUNITY ━━━━━", "Member", "Verified", "Media Trusted", "Link Trusted",
+  "━━━━━ SAFETY ━━━━━", "BLACKLISTED", "Muted / Quarantined",
+  "━━━━━ LANGUAGE ━━━━━", "Turkish", "English",
+  "━━━━━ REGIONS ━━━━━", "Europe", "Asia", "North America", "South America", "Oceania",
+  "━━━━━ PRODUCT ACCESS ━━━━━", "FIMA Customer", "FIMA Macro Customer", "FIMA AI Customer", "Lifetime Customer",
+  "━━━━━ NOTIFICATIONS ━━━━━", "Product Notifications", "FIMA Updates", "FIMA Macro Updates", "FIMA AI Updates",
+  "Fieel Content Notifications", "Tatu Content Notifications", "Event Notifications", "Security Alerts",
+  "━━━━━ TEXT ACTIVITY ━━━━━", "Text Level 5", "Text Level 10", "Text Level 20", "Text Level 35", "Text Level 50",
+  "━━━━━ VOICE ACTIVITY ━━━━━", "Voice Level 5", "Voice Level 10", "Voice Level 20", "Voice Level 35", "Voice Level 50",
+  "━━━━━ BOOSTERS ━━━━━", "Booster"
+];
+
+export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
+  Owner: Object.freeze({ unicodeEmoji: "👑" }),
+  Administrator: Object.freeze({ unicodeEmoji: "🛡️" }),
+  "Senior Moderator": Object.freeze({ unicodeEmoji: "🛡️" }),
+  Moderator: Object.freeze({ unicodeEmoji: "🔨" }),
+  "Junior Moderator": Object.freeze({ unicodeEmoji: "🤝" }),
+  Helper: Object.freeze({ unicodeEmoji: "🤝" }),
+  "Content Creator": Object.freeze({ unicodeEmoji: "🎬" }),
+  "Outfit Designer": Object.freeze({ unicodeEmoji: "👕" }),
+  "Cape Designer": Object.freeze({ unicodeEmoji: "🦸" }),
+  "Video Team": Object.freeze({ unicodeEmoji: "🎥" }),
+  "Video Editor": Object.freeze({ unicodeEmoji: "✂️" }),
+  "Thumbnail Designer": Object.freeze({ unicodeEmoji: "🎨" }),
+  "FIMA Support": Object.freeze({ unicodeEmoji: "🎧" }),
+  "Macro Specialist": Object.freeze({ unicodeEmoji: "⌨️" }),
+  "FFlag Specialist": Object.freeze({ unicodeEmoji: "⚙️" }),
+  Member: Object.freeze({ unicodeEmoji: "👤" }),
+  Verified: Object.freeze({ unicodeEmoji: "✅" }),
+  "Media Trusted": Object.freeze({ unicodeEmoji: "🖼️" }),
+  "Link Trusted": Object.freeze({ unicodeEmoji: "🔗" }),
+  BLACKLISTED: Object.freeze({ unicodeEmoji: "⛔" }),
+  "Muted / Quarantined": Object.freeze({ unicodeEmoji: "🔇" }),
+  Turkish: Object.freeze({ unicodeEmoji: "🇹🇷" }),
+  English: Object.freeze({ unicodeEmoji: "🇬🇧" }),
+  Europe: Object.freeze({ unicodeEmoji: "🌍" }),
+  Asia: Object.freeze({ unicodeEmoji: "🌏" }),
+  "North America": Object.freeze({ unicodeEmoji: "🌎" }),
+  "South America": Object.freeze({ unicodeEmoji: "🌎" }),
+  Oceania: Object.freeze({ unicodeEmoji: "🌏" }),
+  "FIMA Customer": Object.freeze({ unicodeEmoji: "◆" }),
+  "FIMA Macro Customer": Object.freeze({ unicodeEmoji: "⌨️" }),
+  "FIMA AI Customer": Object.freeze({ unicodeEmoji: "🧠" }),
+  "Lifetime Customer": Object.freeze({ unicodeEmoji: "♾️" }),
+  "Product Notifications": Object.freeze({ unicodeEmoji: "🔔" }),
+  "FIMA Updates": Object.freeze({ unicodeEmoji: "◆" }),
+  "FIMA Macro Updates": Object.freeze({ unicodeEmoji: "⌨️" }),
+  "FIMA AI Updates": Object.freeze({ unicodeEmoji: "🧠" }),
+  "Fieel Content Notifications": Object.freeze({ unicodeEmoji: "🎬" }),
+  "Tatu Content Notifications": Object.freeze({ unicodeEmoji: "🎬" }),
+  "Event Notifications": Object.freeze({ unicodeEmoji: "📅" }),
+  "Security Alerts": Object.freeze({ unicodeEmoji: "🚨" }),
+  "Text Level 5": Object.freeze({ unicodeEmoji: "💬" }),
+  "Text Level 10": Object.freeze({ unicodeEmoji: "💬" }),
+  "Text Level 20": Object.freeze({ unicodeEmoji: "💬" }),
+  "Text Level 35": Object.freeze({ unicodeEmoji: "💬" }),
+  "Text Level 50": Object.freeze({ unicodeEmoji: "💬" }),
+  "Voice Level 5": Object.freeze({ unicodeEmoji: "🎙️" }),
+  "Voice Level 10": Object.freeze({ unicodeEmoji: "🎙️" }),
+  "Voice Level 20": Object.freeze({ unicodeEmoji: "🎙️" }),
+  "Voice Level 35": Object.freeze({ unicodeEmoji: "🎙️" }),
+  "Voice Level 50": Object.freeze({ unicodeEmoji: "🎙️" }),
+  Booster: Object.freeze({ unicodeEmoji: "💎" })
+});
+
+const PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS = Object.freeze({
+  Owner: "owner",
+  Administrator: "administrator",
+  "Senior Moderator": "moderator",
+  Moderator: "moderator",
+  "Junior Moderator": "helper",
+  Helper: "helper",
+  "Content Creator": "creative",
+  "Outfit Designer": "creative",
+  "Cape Designer": "creative",
+  "Video Team": "video-team",
+  "Video Editor": "video-team",
+  "Thumbnail Designer": "video-team",
+  "FIMA Support": "support",
+  "Macro Specialist": "macro-specialist",
+  "FFlag Specialist": "support",
+  Member: "member",
+  Verified: "verified",
+  "Media Trusted": "verified",
+  "Link Trusted": "verified",
+  BLACKLISTED: "safety",
+  "Muted / Quarantined": "safety",
+  Turkish: "language",
+  English: "language",
+  Europe: "region",
+  Asia: "region",
+  "North America": "region",
+  "South America": "region",
+  Oceania: "region",
+  "FIMA Customer": "member",
+  "FIMA Macro Customer": "macro-specialist",
+  "FIMA AI Customer": "fima-ai",
+  "Lifetime Customer": "verified",
+  "Product Notifications": "notifications",
+  "FIMA Updates": "notifications",
+  "FIMA Macro Updates": "macro-specialist",
+  "FIMA AI Updates": "fima-ai",
+  "Fieel Content Notifications": "creative",
+  "Tatu Content Notifications": "creative",
+  "Event Notifications": "notifications",
+  "Security Alerts": "safety",
+  "Text Level 5": "member",
+  "Text Level 10": "member",
+  "Text Level 20": "member",
+  "Text Level 35": "member",
+  "Text Level 50": "member",
+  "Voice Level 5": "member",
+  "Voice Level 10": "member",
+  "Voice Level 20": "member",
+  "Voice Level 35": "member",
+  "Voice Level 50": "member",
+  Booster: "booster"
+});
+
+export const PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS = Object.freeze(Object.fromEntries(
+  Object.entries(PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS).map(([roleName, assetKey]) => [
+    roleName,
+    PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN.assetBindings.roleIcons[assetKey]
+  ])
+));
+
+export const PARADISE_GUIDE_CATEGORY_ASSET_KEYS = Object.freeze({
+  rules: "start",
+  role_guide: "community",
+  faq_trust: "start",
+  application_guide: "personnel",
+  ticket_guide: "support",
+  staff_command_guide: "personnel",
+  training_hoster_guide: "personnel",
+  tryout_hoster_guide: "personnel",
+  giveaway_event_guide: "community",
+  dashboard_guide: "fima",
+  fieel_style_guide: "fieel-style",
+  turkish_community_guide: "turkish-community",
+  voice_guide: "voice",
+  moderation_policy: "support",
+  report_guide: "support",
+  video_team: "video-team"
+});
+
+export function paradiseCommunityGuideThumbnailUrl(
+  definitionKey,
+  visualPlan = PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN
+) {
+  if (visualPlan?.liveMutationApproved !== true) return null;
+  const assetKey = PARADISE_GUIDE_CATEGORY_ASSET_KEYS[definitionKey];
+  return assetKey ? visualPlan.surfaces?.categoryThumbnails?.[assetKey] || null : null;
+}
+
+export function paradiseCommunityGuideThumbnailAttachment(
+  definitionKey,
+  visualPlan = PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN
+) {
+  if (visualPlan?.liveMutationApproved !== true) return null;
+  const assetKey = PARADISE_GUIDE_CATEGORY_ASSET_KEYS[definitionKey];
+  const binding = assetKey
+    ? visualPlan.assetBindings?.categoryThumbnails?.[assetKey]
+    : null;
+  if (!binding?.assetId || !binding?.sha256) return null;
+  try {
+    const asset = loadVerifiedFtCommunityVisualAsset(binding.assetId, {
+      expectedUsage: "category-thumbnail"
+    });
+    if (asset.sha256 !== binding.sha256) return null;
+    return Object.freeze({
+      assetId: asset.id,
+      sha256: asset.sha256,
+      url: asset.attachmentUrl,
+      file: Object.freeze({ attachment: asset.buffer, name: asset.filename })
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function sanitizeParadiseCommunityRoleIconDescriptor(descriptor) {
+  if (!descriptor || typeof descriptor !== "object" || Array.isArray(descriptor)) return null;
+  const hasUnicodeEmoji = Object.hasOwn(descriptor, "unicodeEmoji");
+  const hasAssetId = Object.hasOwn(descriptor, "assetId");
+  if (hasUnicodeEmoji === hasAssetId) return null;
+
+  if (hasUnicodeEmoji) {
+    const unicodeEmoji = String(descriptor.unicodeEmoji || "").trim();
+    const allowedUnicodeEmoji = new Set(Object.values(PARADISE_COMMUNITY_ROLE_ICONS)
+      .map(item => item.unicodeEmoji)
+      .filter(Boolean));
+    if (!allowedUnicodeEmoji.has(unicodeEmoji)) return null;
+    return Object.freeze({ kind: "unicode", unicodeEmoji });
+  }
+
+  try {
+    const sha256 = String(descriptor.sha256 || "").trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(sha256)) return null;
+    const asset = loadVerifiedFtCommunityVisualAsset(descriptor.assetId, { expectedUsage: "role-icon" });
+    if (sha256 !== asset.sha256) return null;
+    return Object.freeze({
+      kind: "icon",
+      assetId: asset.id,
+      sha256: asset.sha256,
+      discordContentHash: asset.discordContentHash
+    });
+  } catch {
+    return null;
+  }
+}
+
+export const COMMUNITY_STAFF_ACCESS_ROLES = [
+  "Owner", "Administrator", "Senior Moderator", "Moderator", "Junior Moderator", "Helper"
+];
+
+export const COMMUNITY_TURKISH_ACCESS_ROLES = [
+  "Turkish",
+  ...COMMUNITY_STAFF_ACCESS_ROLES
+];
+
+export const COMMUNITY_VIDEO_TEAM_ACCESS_ROLES = [
+  "Video Team",
+  ...COMMUNITY_STAFF_ACCESS_ROLES
 ];
 
 export const PARADISE_DEFAULT_XP_ROLE_REWARDS = Object.freeze({
-  "5": "Media Trusted",
-  "10": "Link Trusted"
+  "5": "Text Level 5",
+  "10": "Text Level 10",
+  "20": "Text Level 20",
+  "35": "Text Level 35",
+  "50": "Text Level 50"
 });
 
 export function paradiseXpPolicy(config = {}) {
@@ -784,6 +1351,11 @@ export function paradiseXpPolicy(config = {}) {
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
 
 export const PARADISE_VOICE_CHANNEL_NAMES = Object.freeze([
+  "⌁・join-to-create",
+  "⌁・community-voice",
+  "⌁・afk",
+  "〆・turkish-voice",
+  "〆・video-voice",
   "◜・oda-oluştur",
   "◜・topluluk-sesi",
   "◜・savaş-odası",
@@ -814,23 +1386,25 @@ export function paradiseSetupChannelTypeMismatch(channel, categoryName, channelN
 function paradiseVoiceSetupIds(guild) {
   const find = names => guild.channels.cache.find(channel => names.includes(channel.name) && channel.type === ChannelType.GuildVoice)?.id || null;
   return {
-    joinToCreateChannelId: find(["◜・oda-oluştur", "Join to Create"]),
-    communityVoiceChannelId: find(["◜・topluluk-sesi", "Community Voice"]),
+    joinToCreateChannelId: find(["⌁・join-to-create", "◜・oda-oluştur", "Join to Create"]),
+    communityVoiceChannelId: find(["⌁・community-voice", "◜・topluluk-sesi", "Community Voice"]),
     warVoiceChannelId: find(["◜・savaş-odası", "War VC"]),
-    afkChannelId: find(["◞・afk", "AFK"]),
-    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name))?.id || null
+    afkChannelId: find(["⌁・afk", "◞・afk", "AFK"]),
+    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name))?.id || null
   };
 }
 
 async function configureParadiseAfkChannel(guild, voiceIds) {
   if (!voiceIds?.afkChannelId || typeof guild?.setAFKChannel !== "function") return false;
-  await guild.setAFKChannel(voiceIds.afkChannelId, "Paradise configured AFK voice channel").catch(() => null);
+  await guild.setAFKChannel(voiceIds.afkChannelId, "FIMA Bot configured AFK voice channel").catch(() => null);
   return true;
 }
 
 export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
   ["start_here_channel", "Public getting-started handbook"],
   ["rules_channel", "Public rules handbook"],
+  ["announcement_channel", "Public announcements handbook"],
+  ["activity_rewards_channel", "Public activity and booster rewards handbook"],
   ["roles_channel", "Public language and ping role panel"],
   ["member_help_channel", "Public member-safe bot help"],
   ["staff_command_guide_channel", "Private role-aware staff command guide"],
@@ -884,12 +1458,17 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
 // defaults.  Extra modules use existing mapped channels or are enabled later;
 // they never produce an empty channel by default.
 export const PARADISE_COMMUNITY_SCHEMA = [
-  ["━━ BAŞLANGIÇ ━━", ["⌁・başlangıç", "⌁・kurallar", "⌁・hoş-geldin", "⌁・roller"], false],
-  ["━━ TOPLULUK ━━", ["┆・duyurular", "┆・genel", "┆・medya", "┆・etkinlikler", "┆・seviyeler"], false],
-  ["━━ DESTEK ━━", ["◇・destek"], false],
-  ["━━ PERSONEL ━━", ["〢・personel-merkezi", "〢・personel-komutları", "〢・personel-rehberleri", "〢・incelemeler", "〢・transcriptler", "〢・personel-logları"], true],
-  ["━━ SESLER ━━", ["◜・oda-oluştur", "◜・topluluk-sesi", "◞・afk"], false],
-  ["━━ ÖZEL SESLER ━━", [], false]
+  ["⟐・START", ["⟐・overview", "⟐・rules", "⟐・announcements", "⌁・get-roles", "⌁・faq-help"], false],
+  ["⌁・COMMUNITY", ["⌁・general", "⌁・media", "⌁・events", "⌁・commands"], false],
+  ["⌁・FIEEL-AND-TATU", ["⌁・content-feed", "⌁・fieel-content", "⌁・tatu-content", "⌁・collaborations"], false],
+  ["⟐・FIMA", ["⟐・fima-overview", "⌁・fima-macro", "⌁・fima-ai", "⌁・fima-updates", "⌁・vouches", "⌁・support"], false],
+  ["⟐・ACTIVITY", ["⌁・text-activity", "⌁・voice-activity", "⌁・activity-rewards"], false],
+  ["⌁・STYLE", ["⌁・outfits", "⌁・capes"], false],
+  ["⟐・APPLICATIONS", ["⌁・applications", "⌁・application-status"], false],
+  ["⌁・VOICE", ["⌁・join-to-create", "⌁・community-voice", "⌁・afk"], false],
+  ["〆・PRIVATE TURKISH", ["〆・turkish-chat", "〆・turkish-media", "〆・turkish-announcements", "〆・turkish-voice"], true, COMMUNITY_TURKISH_ACCESS_ROLES],
+  ["〆・PRIVATE VIDEO TEAM", ["〆・video-hub", "〆・video-ideas", "〆・video-scripts", "〆・video-assets", "〆・video-review", "〆・video-upload-schedule", "〆・video-voice"], true, COMMUNITY_VIDEO_TEAM_ACCESS_ROLES],
+  ["〆・PRIVATE STAFF", ["〆・staff-hub", "〆・staff-guides", "〆・staff-application-reviews", "〆・staff-logs", "〆・staff-security-logs", "〆・staff-transcripts"], true, COMMUNITY_STAFF_ACCESS_ROLES]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
@@ -916,12 +1495,13 @@ export const PARADISE_TSBTR_SCHEMA = [
 
 const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
   community: {
-    start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
-    member_help_channel: "┆・genel", level_channel: "┆・seviyeler", faq_channel: "⌁・başlangıç", role_guide_channel: "⌁・roller",
-    support_ticket_channel: "◇・destek", application_ticket_channel: "◇・destek", blacklist_appeal_channel: "◇・destek", staff_command_guide_channel: "〢・personel-komutları", staff_guides_channel: "〢・personel-rehberleri",
-    application_review_channel: "〢・incelemeler", moderation_requests_channel: "〢・incelemeler", quarantine_review_channel: "〢・incelemeler",
-    support_transcripts_channel: "〢・transcriptler", challenge_transcripts_channel: "〢・transcriptler",
-    support_logs_channel: "〢・personel-logları", application_logs_channel: "〢・personel-logları", moderation_logs_channel: "〢・personel-logları", voice_logs_channel: "〢・personel-logları", level_logs_channel: "〢・personel-logları", blacklist_logs_channel: "〢・personel-logları"
+    start_here_channel: "⟐・overview", rules_channel: "⟐・rules", welcome_channel: "⟐・overview", leave_channel: "⟐・overview", roles_channel: "⌁・get-roles",
+    announcement_channel: "⟐・announcements", activity_rewards_channel: "⌁・activity-rewards",
+    member_help_channel: "⌁・faq-help", level_channel: "⌁・text-activity", faq_channel: "⌁・faq-help", role_guide_channel: "⌁・get-roles",
+    support_ticket_channel: "⌁・support", application_ticket_channel: "⌁・applications", blacklist_appeal_channel: "⌁・support", staff_command_guide_channel: "〆・staff-hub", staff_guides_channel: "〆・staff-guides",
+    application_review_channel: "〆・staff-application-reviews", moderation_requests_channel: "〆・staff-security-logs", quarantine_review_channel: "〆・staff-security-logs",
+    support_transcripts_channel: "〆・staff-transcripts", challenge_transcripts_channel: "〆・staff-transcripts",
+    support_logs_channel: "〆・staff-logs", application_logs_channel: "〆・staff-logs", moderation_logs_channel: "〆・staff-security-logs", activity_logs_channel: "〆・staff-logs", voice_logs_channel: "〆・staff-logs", level_logs_channel: "〆・staff-logs", blacklist_logs_channel: "〆・staff-security-logs", payout_queue_channel: "〆・staff-logs"
   },
   clan: {
     start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
@@ -947,14 +1527,104 @@ const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
 });
 
 export const PARADISE_SETUP_SCHEMAS = Object.freeze({
-  community: { label: "Fieel's Community", schema: PARADISE_COMMUNITY_SCHEMA, roles: PARADISE_COMMUNITY_ROLES },
-  clan: { label: "Paradise Clan", schema: PARADISE_CLAN_SCHEMA, roles: PARADISE_CLAN_ROLES },
+  community: { label: "FT Community", schema: PARADISE_COMMUNITY_SCHEMA, roles: PARADISE_COMMUNITY_ROLES },
+  clan: { label: "FIMA Bot Clan", schema: PARADISE_CLAN_SCHEMA, roles: PARADISE_CLAN_ROLES },
   tsbtr: { label: "TSBTR-style Community", schema: PARADISE_TSBTR_SCHEMA, roles: PARADISE_CLAN_ROLES }
 });
 
+// Typical UTF-8 bytes decoded as Windows-1252/Latin-1. Discord accepts these
+// strings, so catch them before a rebuild can persist visibly corrupted names.
+const PARADISE_MOJIBAKE_PATTERN = /[\u00c2-\u00c5\u00e2\ufffd]/u;
+
+export function inspectParadiseCanonicalTextEncoding(mode = "community") {
+  const selected = PARADISE_SETUP_SCHEMAS[String(mode || "")];
+  if (!selected) {
+    return Object.freeze({ ready: false, code: "canonical_template_unknown", affected: Object.freeze([]) });
+  }
+  const affected = [];
+  const check = (value, path) => {
+    if (PARADISE_MOJIBAKE_PATTERN.test(String(value || ""))) affected.push(path);
+  };
+  check(selected.label, "label");
+  selected.schema.forEach(([category, channels], categoryIndex) => {
+    check(category, `categories[${categoryIndex}]`);
+    channels.forEach((channel, channelIndex) => {
+      check(channel, `categories[${categoryIndex}].channels[${channelIndex}]`);
+    });
+  });
+  selected.roles.forEach((role, roleIndex) => check(role, `roles[${roleIndex}]`));
+  return Object.freeze({
+    ready: affected.length === 0,
+    code: affected.length === 0 ? "canonical_text_encoding_verified" : "canonical_text_encoding_invalid",
+    // Paths identify the broken template slot without echoing its text.
+    affected: Object.freeze(affected)
+  });
+}
+
+export function buildParadiseCommunityOperationalSemantics() {
+  const typeFor = (categoryName, channelName) =>
+    paradiseSetupChannelType(categoryName, channelName) === ChannelType.GuildVoice ? "voice" : "text";
+  const categoryPurpose = (name) => {
+    if (name === "〆・PRIVATE TURKISH") return "turkish";
+    if (name === "〆・PRIVATE VIDEO TEAM") return "video_team";
+    if (name === "〆・PRIVATE STAFF") return "staff";
+    return null;
+  };
+  const channelPurpose = new Map([
+    ["〆・turkish-chat", "turkish_chat"], ["〆・turkish-media", "turkish_media"],
+    ["〆・turkish-announcements", "turkish_announcements"], ["〆・turkish-voice", "turkish_voice"],
+    ["〆・video-hub", "video_hub"], ["〆・video-ideas", "video_ideas"],
+    ["〆・video-scripts", "video_scripts"], ["〆・video-assets", "video_assets"],
+    ["〆・video-review", "video_review"], ["〆・video-upload-schedule", "video_upload_schedule"],
+    ["〆・video-voice", "video_voice"], ["〆・staff-hub", "staff_hub"],
+    ["〆・staff-guides", "staff_guides"], ["〆・staff-application-reviews", "application_reviews"],
+    ["〆・staff-logs", "staff_logs"], ["〆・staff-security-logs", "security_logs"],
+    ["〆・staff-transcripts", "transcripts"]
+  ]);
+  const accessClasses = (roles = []) => [
+    ...(roles.some(role => COMMUNITY_TURKISH_ACCESS_ROLES.includes(role) && role === "Turkish") ? ["turkish"] : []),
+    ...(roles.some(role => COMMUNITY_VIDEO_TEAM_ACCESS_ROLES.includes(role) && role === "Video Team") ? ["video_team"] : []),
+    ...(roles.some(role => COMMUNITY_STAFF_ACCESS_ROLES.includes(role)) ? ["staff"] : [])
+  ];
+  const privateCategories = PARADISE_COMMUNITY_SCHEMA
+    .filter(([name]) => categoryPurpose(name))
+    .map(([name, channels, privateCategory, accessRoles]) => ({
+      purpose: categoryPurpose(name),
+      private: privateCategory === true,
+      accessClasses: accessClasses(accessRoles),
+      channels: channels.map(channel => ({
+        purpose: channelPurpose.get(channel),
+        name: channel,
+        type: typeFor(name, channel)
+      }))
+    }));
+  const channelNames = PARADISE_COMMUNITY_SCHEMA.flatMap(([, channels]) => channels);
+  const defaults = PARADISE_TEMPLATE_CHANNEL_DEFAULTS.community;
+  return {
+    identity: PARADISE_SETUP_SCHEMAS.community.label,
+    publicLanguage: "en",
+    privateCategories,
+    channelNames,
+    roleClasses: {
+      staff: [...COMMUNITY_STAFF_ACCESS_ROLES],
+      turkish: ["Turkish"],
+      video_team: ["Video Team"]
+    },
+    mappings: {
+      welcome: defaults.welcome_channel,
+      leave: defaults.leave_channel,
+      rules: defaults.rules_channel,
+      announcements: defaults.announcement_channel,
+      activityRewards: defaults.activity_rewards_channel,
+      support: defaults.support_ticket_channel,
+      applications: defaults.application_ticket_channel
+    }
+  };
+}
+
 const COMMUNITY_HIDDEN_COMMANDS = new Set([
   "challenge", "referee", "lineup", "roster", "mainer", "findfcw", "relation",
-  "war", "spar",
+  "war", "spar", "training", "fighter", "profile", "leaderboard", "ranked", "autowin",
   "blacklist", "appeal", "bail", "availability", "tryout", "paradisetraining",
   "whitelist", "handbook", "qotd", "answer"
 ]);
@@ -1120,9 +1790,9 @@ export function paradiseCommands() {
     new SlashCommandBuilder().setName("setupfieelstsbtr").setDescription("Preview, repair or repost the TSBTR-style setup.")
       .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addStringOption(setupAction),
-    new SlashCommandBuilder().setName("help").setDescription("Open or search the complete Paradise command manual.")
+    new SlashCommandBuilder().setName("help").setDescription("Open or search the complete FIMA Bot command manual.")
       .addStringOption(option => option.setName("query").setDescription("Optional command or system to search for").setRequired(false)),
-    new SlashCommandBuilder().setName("ticket").setDescription("Paradise support ticket lifecycle")
+    new SlashCommandBuilder().setName("ticket").setDescription("FIMA Bot support ticket lifecycle")
       .addSubcommand(s => s.setName("open").setDescription("Open your private support ticket")
         .addStringOption(o => o.setName("category").setDescription("Support category for this server")
           .addChoices(...[...new Set(Object.values(PARADISE_TICKET_CATEGORY_DEFAULTS).flat().map(([id, label]) => ({ name: label, value: id })))])))
@@ -1146,12 +1816,12 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("repair").setDescription("Admin: repair this ticket header in place"))
       .addSubcommand(s => s.setName("logs").setDescription("Staff: show safe lifecycle metadata")),
     new SlashCommandBuilder().setName("sendlanguagequestion").setDescription("Post English/Turkish language buttons."),
-    new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post Paradise notification-role selector."),
-    new SlashCommandBuilder().setName("sendregionroleselector").setDescription("Post Paradise region-role selector."),
-    new SlashCommandBuilder().setName("welcome").setDescription("Preview the configured Paradise welcome message.")
+    new SlashCommandBuilder().setName("sendpingroleselector").setDescription("Post FIMA Bot notification-role selector."),
+    new SlashCommandBuilder().setName("sendregionroleselector").setDescription("Post FIMA Bot region-role selector."),
+    new SlashCommandBuilder().setName("welcome").setDescription("Preview the configured FIMA Bot welcome message.")
       .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
       .addSubcommand(s => s.setName("preview").setDescription("Post a safe welcome preview in this channel")),
-    new SlashCommandBuilder().setName("leave").setDescription("Preview the configured Paradise leave message.")
+    new SlashCommandBuilder().setName("leave").setDescription("Preview the configured FIMA Bot leave message.")
       .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
       .addSubcommand(s => s.setName("preview").setDescription("Post a safe leave preview in this channel")),
     new SlashCommandBuilder().setName("backupserverstructure").setDescription("Back up channels, roles and permission overwrites.")
@@ -1160,13 +1830,13 @@ export function paradiseCommands() {
       .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     new SlashCommandBuilder().setName("verifyroblox").setDescription("Verify Roblox ownership with a profile About code.")
       .addStringOption(o => o.setName("username").setDescription("Roblox username").setRequired(true)),
-    new SlashCommandBuilder().setName("verifyrobloxcheck").setDescription("Check the short Paradise code in your Roblox About."),
-    new SlashCommandBuilder().setName("profile").setDescription("Create or view a verified Paradise fighter profile")
-      .setDescriptionLocalizations({ tr: "Doğrulanmış Paradise oyuncu profili oluştur, düzenle veya görüntüle" })
+    new SlashCommandBuilder().setName("verifyrobloxcheck").setDescription("Check the short FIMA Bot code in your Roblox About."),
+    new SlashCommandBuilder().setName("profile").setDescription("Create or view a verified FIMA Bot fighter profile")
+      .setDescriptionLocalizations({ tr: "Doğrulanmış FIMA Bot oyuncu profili oluştur, düzenle veya görüntüle" })
       .addSubcommand(s => s.setName("create").setDescription("Verify Roblox and create your fighter profile"))
-      .addSubcommand(s => s.setName("view").setDescription("View a Paradise fighter profile")
+      .addSubcommand(s => s.setName("view").setDescription("View a FIMA Bot fighter profile")
         .addUserOption(o => o.setName("user").setDescription("Discord profile owner"))
-        .addIntegerOption(o => o.setName("profile_id").setDescription("Paradise profile ID").setMinValue(1))
+        .addIntegerOption(o => o.setName("profile_id").setDescription("FIMA Bot profile ID").setMinValue(1))
         .addStringOption(o => o.setName("user_id").setDescription("Discord user ID"))
         .addStringOption(o => o.setName("roblox_name").setDescription("Exact Roblox username"))
         .addStringOption(o => o.setName("query").setDescription("Display name, nickname or Roblox name")))
@@ -1175,14 +1845,14 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("visibility").setDescription("Profile visibility").setRequired(true)
           .addChoices({ name: "Public", value: "public" }, { name: "Private", value: "private" })))
       .addSubcommand(s => s.setName("verify-status").setDescription("Show your Roblox verification and profile-completion status")),
-    new SlashCommandBuilder().setName("tryout").setNameLocalizations({ tr: "deneme" }).setDescription("Paradise tryout system").setDescriptionLocalizations({ tr: "Paradise deneme ve sonuç sistemi" })
+    new SlashCommandBuilder().setName("tryout").setNameLocalizations({ tr: "deneme" }).setDescription("FIMA Bot tryout system").setDescriptionLocalizations({ tr: "FIMA Bot deneme ve sonuç sistemi" })
       .addSubcommand(s => s.setName("start").setDescription("Start a tryout")
         .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
         .addBooleanOption(o => o.setName("ping").setDescription("Ping tryout/training members").setRequired(false)))
       .addSubcommand(s => rankOptions(s.setName("result").setDescription("Submit a structured tryout result")
         .addUserOption(o => o.setName("user").setDescription("Verified fighter").setRequired(true)))
         .addStringOption(o => o.setName("note").setDescription("Optional note").setRequired(false))),
-    new SlashCommandBuilder().setName("challenge").setNameLocalizations({ tr: "meydan-okuma" }).setDescription("Verified Paradise challenge system").setDescriptionLocalizations({ tr: "Doğrulanmış Paradise meydan okuma sistemi" })
+    new SlashCommandBuilder().setName("challenge").setNameLocalizations({ tr: "meydan-okuma" }).setDescription("Verified FIMA Bot challenge system").setDescriptionLocalizations({ tr: "Doğrulanmış FIMA Bot meydan okuma sistemi" })
       .addSubcommand(s => s.setName("create").setDescription("Create a verified challenge ticket")
         .addUserOption(o => o.setName("opponent").setDescription("Verified opponent; omit to choose from eligible ranks"))
         .addStringOption(o => o.setName("region").setDescription("Match region").setRequired(false)
@@ -1215,15 +1885,8 @@ export function paradiseCommands() {
         .addUserOption(o => o.setName("co_ref").setDescription("Optional co-referee")))
       .addSubcommand(s => s.setName("close").setDescription("Close this challenge and remove player access")
         .addStringOption(o => o.setName("reason").setDescription("Closure reason").setRequired(true))),
-    new SlashCommandBuilder().setName("paradisetraining").setNameLocalizations({ tr: "antrenman" }).setDescription("Paradise training lifecycle").setDescriptionLocalizations({ tr: "Paradise antrenman başlatma ve bitirme sistemi" })
-      .addSubcommand(s => s.setName("start").setDescription("Start training")
-        .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
-        .addStringOption(o => o.setName("rules").setDescription("Extra rules").setRequired(false)))
-      .addSubcommand(s => s.setName("end").setDescription("End training")
-        .addStringOption(o => o.setName("score").setDescription("Score, e.g. 3-1").setRequired(true))
-        .addStringOption(o => o.setName("winner").setDescription("Red, Blue or team name").setRequired(true))),
-    new SlashCommandBuilder().setName("training").setDescription("Paradise training setup, start and result")
-      .setDescriptionLocalizations({ tr: "Paradise eğitim kurulum, başlatma ve sonuç sistemi" })
+    new SlashCommandBuilder().setName("training").setDescription("FIMA Bot training setup, start and result")
+      .setDescriptionLocalizations({ tr: "FIMA Bot eğitim kurulum, başlatma ve sonuç sistemi" })
       .addSubcommand(s => s.setName("setup").setDescription("Post the training help and announcement panel"))
       .addSubcommand(s => s.setName("create").setDescription("Create a training session with a plain Markdown announcement")
         .addStringOption(o => o.setName("link").setDescription("Roblox private server link").setRequired(true))
@@ -1241,7 +1904,7 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("mvps").setDescription("Mention MVPs or list names"))
         .addStringOption(o => o.setName("note").setDescription("Result note"))
         .addStringOption(o => o.setName("proof").setDescription("Proof image or message URL"))),
-    new SlashCommandBuilder().setName("tournament").setNameLocalizations({ tr: "turnuva" }).setDescription("Paradise tournament system").setDescriptionLocalizations({ tr: "Paradise turnuva sistemi" })
+    new SlashCommandBuilder().setName("tournament").setNameLocalizations({ tr: "turnuva" }).setDescription("FIMA Bot tournament system").setDescriptionLocalizations({ tr: "FIMA Bot turnuva sistemi" })
       .addSubcommand(s => s.setName("start-simple").setDescription("Start a simple tournament")
         .addStringOption(o => o.setName("title").setDescription("Tournament title").setRequired(true))
         .addStringOption(o => o.setName("link").setDescription("Roblox server link").setRequired(true))
@@ -1258,7 +1921,7 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("tournament_id").setDescription("Tournament ID").setRequired(true))
         .addIntegerOption(o => o.setName("match").setDescription("Match number").setRequired(true).setMinValue(1))
         .addUserOption(o => o.setName("winner").setDescription("Match winner").setRequired(true))),
-    new SlashCommandBuilder().setName("giveaway").setNameLocalizations({ tr: "cekilis" }).setDescription("Paradise giveaway operations").setDescriptionLocalizations({ tr: "Paradise çekiliş işlemleri" })
+    new SlashCommandBuilder().setName("giveaway").setNameLocalizations({ tr: "cekilis" }).setDescription("FIMA Bot giveaway operations").setDescriptionLocalizations({ tr: "FIMA Bot çekiliş işlemleri" })
       .addSubcommand(s => s.setName("create").setDescription("Create a giveaway")
         .addStringOption(o => o.setName("prize").setDescription("Prize").setRequired(true))
         .addIntegerOption(o => o.setName("minutes").setDescription("Duration in minutes").setRequired(true).setMinValue(1).setMaxValue(43200))
@@ -1272,20 +1935,20 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("id").setDescription("Giveaway ID").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Cancellation reason").setRequired(true).setMaxLength(500)))
       .addSubcommand(s => s.setName("list").setDescription("List safe recent giveaway lifecycle metadata")),
-    new SlashCommandBuilder().setName("gamenight").setNameLocalizations({ tr: "oyun-gecesi" }).setDescription("Paradise game night operations").setDescriptionLocalizations({ tr: "Paradise oyun gecesi işlemleri" })
+    new SlashCommandBuilder().setName("gamenight").setNameLocalizations({ tr: "oyun-gecesi" }).setDescription("FIMA Bot game night operations").setDescriptionLocalizations({ tr: "FIMA Bot oyun gecesi işlemleri" })
       .addSubcommand(s => s.setName("start").setDescription("Start a game night")
         .addStringOption(o => o.setName("game").setDescription("Game name").setRequired(true))
         .addStringOption(o => o.setName("link").setDescription("Game/server link").setRequired(true))
         .addAttachmentOption(o => o.setName("image").setDescription("Game image").setRequired(true))
         .addStringOption(o => o.setName("notes").setDescription("Rules or notes"))),
-    new SlashCommandBuilder().setName("event").setNameLocalizations({ tr: "etkinlik" }).setDescription("Paradise event operations").setDescriptionLocalizations({ tr: "Paradise etkinlik işlemleri" })
+    new SlashCommandBuilder().setName("event").setNameLocalizations({ tr: "etkinlik" }).setDescription("FIMA Bot event operations").setDescriptionLocalizations({ tr: "FIMA Bot etkinlik işlemleri" })
       .addSubcommand(s => s.setName("create").setDescription("Create an event")
         .addStringOption(o => o.setName("title").setDescription("Event title").setRequired(true))
         .addStringOption(o => o.setName("time").setDescription("Time or Discord timestamp").setRequired(true))
         .addAttachmentOption(o => o.setName("image").setDescription("Event image").setRequired(true))
         .addStringOption(o => o.setName("link").setDescription("Optional link"))
         .addStringOption(o => o.setName("rules").setDescription("Rules or details"))),
-    new SlashCommandBuilder().setName("referee").setNameLocalizations({ tr: "hakem" }).setDescription("Paradise referee operations").setDescriptionLocalizations({ tr: "Paradise hakem işlemleri" })
+    new SlashCommandBuilder().setName("referee").setNameLocalizations({ tr: "hakem" }).setDescription("FIMA Bot referee operations").setDescriptionLocalizations({ tr: "FIMA Bot hakem işlemleri" })
       .addSubcommand(s => s.setName("guide").setDescription("Show the referee command and rules guide"))
       .addSubcommand(s => s.setName("works").setDescription("Show your weekly referee activity")),
     new SlashCommandBuilder().setName("activity").setNameLocalizations({ tr: "aktivite" }).setDescription("Staff activity and attendance").setDescriptionLocalizations({ tr: "Personel aktivite ve yoklama sistemi" })
@@ -1301,7 +1964,7 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("remove").setDescription("Remove a whitelist")
         .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true)))
       .addSubcommand(s => s.setName("list").setDescription("List active whitelists")),
-    new SlashCommandBuilder().setName("mainer").setDescription("Paradise clan mainer code and guide")
+    new SlashCommandBuilder().setName("mainer").setDescription("FIMA Bot clan mainer code and guide")
       .addSubcommand(s => s.setName("set").setDescription("Set the official clan mainer code")
         .addStringOption(o => o.setName("code").setDescription("TSBCC clan mainer code").setRequired(true))
         .addStringOption(o => o.setName("region").setDescription("Official mainer region").addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))
@@ -1313,7 +1976,7 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("opponent").setDescription("Opponent clan or contact").setRequired(true).setMaxLength(80))
         .addStringOption(o => o.setName("format").setDescription("Requested format, e.g. 5v5 FT3").setRequired(true).setMaxLength(80))
         .addStringOption(o => o.setName("region").setDescription("Preferred region").addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))),
-    new SlashCommandBuilder().setName("war").setDescription("Manage Paradise war state and results")
+    new SlashCommandBuilder().setName("war").setDescription("Manage FIMA Bot war state and results")
       .addSubcommand(s => s.setName("create").setDescription("Create an auditable war record")
         .addStringOption(o => o.setName("opponent").setDescription("Opponent clan").setRequired(true).setMaxLength(80))
         .addStringOption(o => o.setName("format").setDescription("War format").setRequired(true).setMaxLength(80))
@@ -1326,7 +1989,7 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("score").setDescription("Score, e.g. 3-1").setRequired(true)))
       .addSubcommand(s => s.setName("result").setDescription("Close a war with evidence")
         .addStringOption(o => o.setName("id").setDescription("War ID").setRequired(true))
-        .addStringOption(o => o.setName("winner").setDescription("Winning side").setRequired(true).addChoices({ name: "Paradise", value: "paradise" }, { name: "Opponent", value: "opponent" }))
+        .addStringOption(o => o.setName("winner").setDescription("Winning side").setRequired(true).addChoices({ name: "FIMA Bot", value: "paradise" }, { name: "Opponent", value: "opponent" }))
         .addStringOption(o => o.setName("proof").setDescription("Evidence message or image URL").setRequired(true).setMaxLength(500)))
       .addSubcommand(s => s.setName("cancel").setDescription("Cancel an open war with an audit reason")
         .addStringOption(o => o.setName("id").setDescription("War ID").setRequired(true))
@@ -1340,7 +2003,7 @@ export function paradiseCommands() {
     new SlashCommandBuilder().setName("findfcw").setNameLocalizations({ tr: "fcw-bul" }).setDescription("Find an opt-in clan war opponent.").setDescriptionLocalizations({ tr: "İzinli havuzdan FCW rakibi bul" })
       .addStringOption(o => o.setName("region").setDescription("EU, NA, AS, SA or OCE").setRequired(true))
       .addStringOption(o => o.setName("format").setDescription("Requested format, e.g. 5v5 FT3")),
-    new SlashCommandBuilder().setName("commandchannel").setDescription("Configure where Paradise commands can run")
+    new SlashCommandBuilder().setName("commandchannel").setDescription("Configure where FIMA Bot commands can run")
       .addSubcommand(s => s.setName("add").setDescription("Allow a command in this channel")
         .addStringOption(o => o.setName("command").setDescription("Command name without /").setRequired(true)))
       .addSubcommand(s => s.setName("remove").setDescription("Remove this channel from a command")
@@ -1351,12 +2014,12 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("text").setDescription("Sticky text").setRequired(true).setMaxLength(1800)))
       .addSubcommand(s => s.setName("remove").setDescription("Remove this channel's sticky message"))
       .addSubcommand(s => s.setName("list").setDescription("List configured sticky channels")),
-    new SlashCommandBuilder().setName("branding").setDescription("Configure Paradise embed appearance")
+    new SlashCommandBuilder().setName("branding").setDescription("Configure FIMA Bot embed appearance")
       .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addSubcommand(s => s.setName("color").setDescription("Set the embed side-accent color")
         .addStringOption(o => o.setName("hex").setDescription("Six-digit HEX color, e.g. #000000").setRequired(true)))
-      .addSubcommand(s => s.setName("preview").setDescription("Preview Paradise typography and symbols")),
-    new SlashCommandBuilder().setName("relation").setDescription("Manage the Paradise ally and enemy clan board")
+      .addSubcommand(s => s.setName("preview").setDescription("Preview FIMA Bot typography and symbols")),
+    new SlashCommandBuilder().setName("relation").setDescription("Manage the FIMA Bot ally and enemy clan board")
       .addSubcommand(s => s.setName("add").setDescription("Add an ally or enemy clan")
         .addStringOption(o => o.setName("type").setDescription("Relationship type").setRequired(true)
           .addChoices({ name: "Ally", value: "ally" }, { name: "Enemy", value: "enemy" }))
@@ -1412,7 +2075,7 @@ export function paradiseCommands() {
         .addUserOption(o => o.setName("user").setDescription("Staff member").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Removal reason")))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the active LOA board")),
-    new SlashCommandBuilder().setName("lineup").setDescription("Manage Paradise main and war lineup boards")
+    new SlashCommandBuilder().setName("lineup").setDescription("Manage FIMA Bot main and war lineup boards")
       .addSubcommand(s => s.setName("add").setDescription("Add a member to a lineup")
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
@@ -1438,7 +2101,7 @@ export function paradiseCommands() {
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" })))
       .addSubcommand(s => s.setName("repost").setDescription("Update the existing lineup board in place")
         .addStringOption(o => o.setName("board").setDescription("Lineup board").setRequired(true).addChoices({ name: "Main lineup", value: "main" }, { name: "War lineup", value: "war" }))),
-    new SlashCommandBuilder().setName("roster").setDescription("Manage the Paradise competitive roster")
+    new SlashCommandBuilder().setName("roster").setDescription("Manage the FIMA Bot competitive roster")
       .addSubcommand(s => s.setName("add").setDescription("Add or update a roster member")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
         .addStringOption(o => o.setName("region").setDescription("Region").setRequired(true).addChoices({ name: "EU", value: "EU" }, { name: "NA", value: "NA" }, { name: "AS", value: "AS" }, { name: "SA", value: "SA" }, { name: "OCE", value: "OCE" }))
@@ -1467,7 +2130,7 @@ export function paradiseCommands() {
         .addUserOption(o => o.setName("user").setDescription("User; defaults to you")))
       .addSubcommand(s => s.setName("appeal-panel").setDescription("Post or refresh the appeal information panel"))
       .addSubcommand(s => s.setName("panel").setDescription("Refresh the public blacklist board")),
-    new SlashCommandBuilder().setName("appeal").setDescription("Open or review a private Paradise blacklist appeal")
+    new SlashCommandBuilder().setName("appeal").setDescription("Open or review a private FIMA Bot blacklist appeal")
       .addSubcommand(s => s.setName("open").setDescription("Open your private blacklist appeal")
         .addStringOption(o => o.setName("reason").setDescription("Why the record should be reviewed").setRequired(true).setMaxLength(700))
         .addStringOption(o => o.setName("evidence").setDescription("Optional evidence URL").setMaxLength(500)))
@@ -1493,16 +2156,16 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("post").setDescription("Post today's question now for testing"))
       .addSubcommand(s => s.setName("status").setDescription("Show today's question status privately"))
       .addSubcommand(s => s.setName("cancel").setDescription("Cancel today's unanswered question")),
-    new SlashCommandBuilder().setName("answer").setDescription("Answer today's Paradise clan question")
+    new SlashCommandBuilder().setName("answer").setDescription("Answer today's FIMA Bot clan question")
       .addStringOption(o => o.setName("answer").setDescription("Your answer").setRequired(true).setMaxLength(120)),
-    new SlashCommandBuilder().setName("application").setDescription("Paradise application forms and review queue")
+    new SlashCommandBuilder().setName("application").setDescription("FIMA Bot application forms and review queue")
       .addSubcommand(s => s.setName("panel").setDescription("Post the application launcher panel"))
       .addSubcommand(s => s.setName("apply").setDescription("Open an application form")
         .addStringOption(o => o.setName("type").setDescription("Application type").setRequired(true)
           .addChoices(...APPLICATION_TYPES.map(([value, name]) => ({ name, value })))))
       .addSubcommand(s => s.setName("status").setDescription("View your latest application status"))
       .addSubcommand(s => s.setName("continue").setDescription("Reply to a staff request for more information")),
-    new SlashCommandBuilder().setName("mod").setDescription("Paradise moderation cases and approval queue")
+    new SlashCommandBuilder().setName("mod").setDescription("FIMA Bot moderation cases and approval queue")
       .addSubcommand(s => s.setName("warn").setDescription("Record a staff warning")
         .addUserOption(o => o.setName("user").setDescription("Member").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Reason").setRequired(true).setMaxLength(500)))
@@ -1559,26 +2222,26 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("case-revoke").setDescription("Senior: revoke a case without deleting its audit history")
         .addStringOption(o => o.setName("id").setDescription("Case ID").setRequired(true))
         .addStringOption(o => o.setName("reason").setDescription("Review reason").setRequired(true).setMaxLength(500))),
-    new SlashCommandBuilder().setName("channel").setDescription("Paradise safe channel operations")
+    new SlashCommandBuilder().setName("channel").setDescription("FIMA Bot safe channel operations")
       .addSubcommand(s => s.setName("lock").setDescription("Lock this channel for @everyone"))
       .addSubcommand(s => s.setName("unlock").setDescription("Unlock this channel for @everyone"))
       .addSubcommand(s => s.setName("hide").setDescription("Hide this channel from @everyone"))
       .addSubcommand(s => s.setName("unhide").setDescription("Show this channel to @everyone")),
-    new SlashCommandBuilder().setName("modcase").setDescription("Review Paradise moderation case history")
+    new SlashCommandBuilder().setName("modcase").setDescription("Review FIMA Bot moderation case history")
       .addSubcommand(s => s.setName("user").setDescription("Show recent cases for a member")
         .addUserOption(o => o.setName("user").setDescription("Moderated member").setRequired(true)))
       .addSubcommand(s => s.setName("staff").setDescription("Show recent cases created by a staff member")
         .addUserOption(o => o.setName("staff").setDescription("Staff member").setRequired(true)))
       .addSubcommand(s => s.setName("weekly").setDescription("Show this server's seven-day moderation summary")),
-    new SlashCommandBuilder().setName("moderation").setDescription("Paradise moderation statistics")
+    new SlashCommandBuilder().setName("moderation").setDescription("FIMA Bot moderation statistics")
       .addSubcommand(s => s.setName("stats").setDescription("Show seven-day and all-time moderation counts")),
-    new SlashCommandBuilder().setName("security").setDescription("Paradise security and quarantine controls")
+    new SlashCommandBuilder().setName("security").setDescription("FIMA Bot security and quarantine controls")
       .addSubcommand(s => s.setName("panel").setDescription("Post the security status panel"))
       .addSubcommand(s => s.setName("quarantine").setDescription("Show quarantine status"))
       .addSubcommand(s => s.setName("automod").setDescription("Show active AutoMod policy")),
-    new SlashCommandBuilder().setName("rank").setDescription("Show Paradise chat and voice XP")
+    new SlashCommandBuilder().setName("rank").setDescription("Show FIMA Bot chat and voice XP")
       .addUserOption(o => o.setName("user").setDescription("Member; defaults to you")),
-    new SlashCommandBuilder().setName("leaderboard").setDescription("Paradise XP and ranked leaderboard operations")
+    new SlashCommandBuilder().setName("leaderboard").setDescription("FIMA Bot XP and ranked leaderboard operations")
       .addSubcommand(s => s.setName("show").setDescription("Show an XP leaderboard")
         .addStringOption(o => o.setName("type").setDescription("Leaderboard type")
           .addChoices(
@@ -1609,8 +2272,8 @@ export function paradiseCommands() {
       .addSubcommand(s => s.setName("import").setDescription("Import ranked leaderboard JSON")
         .addStringOption(o => o.setName("json").setDescription("Array of {userId,rank}").setRequired(true).setMaxLength(4000))),
     (() => {
-      const command = new SlashCommandBuilder().setName("set").setDescription("Map Paradise systems to Discord channels")
-        .setDescriptionLocalizations({ tr: "Paradise sistemlerini Discord kanallarına eşle" });
+      const command = new SlashCommandBuilder().setName("set").setDescription("Map FIMA Bot systems to Discord channels")
+        .setDescriptionLocalizations({ tr: "FIMA Bot sistemlerini Discord kanallarına eşle" });
       command.setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator);
       for (const [name, description] of PARADISE_CHANNEL_MAPPINGS.slice(0, 25)) {
         command.addSubcommand(subcommand => subcommand.setName(name).setDescription(description)
@@ -1619,26 +2282,35 @@ export function paradiseCommands() {
       return command;
     })(),
     (() => {
-      const command = new SlashCommandBuilder().setName("setlogchannel").setDescription("Map Paradise appeal, bail and private log channels")
-        .setDescriptionLocalizations({ tr: "Paradise itiraz, bail ve özel log kanallarını eşle" });
+      const command = new SlashCommandBuilder().setName("setlogchannel").setDescription("Map FIMA Bot appeal, bail and private log channels")
+        .setDescriptionLocalizations({ tr: "FIMA Bot itiraz, bail ve özel log kanallarını eşle" });
       command.setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator);
-      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS.slice(25)) {
+      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS.slice(25, 50)) {
         command.addSubcommand(subcommand => subcommand.setName(name).setDescription(description)
           .addChannelOption(option => option.setName("channel").setDescription(description).addChannelTypes(ChannelType.GuildText).setRequired(true)));
       }
       return command;
     })(),
-    new SlashCommandBuilder().setName("handbook").setDescription("Post or regenerate Paradise guide panels")
-      .setDescriptionLocalizations({ tr: "Paradise rehber panellerini gönder veya yenile" })
+    (() => {
+      const command = new SlashCommandBuilder().setName("setcommunitychannel").setDescription("Map additional FIMA Bot Community channels")
+        .setDescriptionLocalizations({ tr: "Ek FIMA Bot Community kanallarini esle" });
+      command.setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator);
+      for (const [name, description] of PARADISE_CHANNEL_MAPPINGS.slice(50, 75)) {
+        command.addSubcommand(subcommand => subcommand.setName(name).setDescription(description)
+          .addChannelOption(option => option.setName("channel").setDescription(description).addChannelTypes(ChannelType.GuildText).setRequired(true)));
+      }
+      return command;
+    })(),
+    new SlashCommandBuilder().setName("handbook").setDescription("Post or regenerate FIMA Bot guide panels")
+      .setDescriptionLocalizations({ tr: "FIMA Bot rehber panellerini gönder veya yenile" })
       .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
       .addSubcommand(s => s.setName("post").setDescription("Post all guides for a setup template")
         .addStringOption(o => o.setName("template").setDescription("Guide family").setRequired(true)
           .addChoices(
-            { name: "Fieel's Community", value: "community" },
-            { name: "Paradise Clan", value: "clan" },
+            { name: "FIMA", value: "community" },
+            { name: "FIMA Bot Clan", value: "clan" },
             { name: "TSBTR-style", value: "tsbtr" }
-          ))),
-    new SlashCommandBuilder().setName("paradisehelp").setDescription("Show private English/Turkish command guidance.")
+          )))
   ];
 }
 
@@ -1649,27 +2321,32 @@ export async function initializeParadise(client) {
       state.config.blackThemeVersion = 1;
       state.config.blackThemeAppliedAt = new Date().toISOString();
     }
-    state.config.footerBrand = String(state.config.footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim() || DEFAULT_PARADISE_FOOTER_BRAND;
+    state.config.footerBrand = String(state.config.footerBrand || DEFAULT_FIMA_FOOTER_BRAND).trim() || DEFAULT_FIMA_FOOTER_BRAND;
     return state;
   });
-  const globalUsernameSyncEnabled = String(process.env.FIMA_GLOBAL_USERNAME_SYNC_ENABLED || "").trim().toLowerCase() === "true";
-  if (globalUsernameSyncEnabled && client.user?.username !== "FIMA") {
-    await client.user.setUsername("FIMA").catch(error => {
-      console.warn("FIMA bot username update failed", { message: error.message });
-    });
-  }
+  // Discord profile changes are intentionally excluded from startup. They are
+  // available only through the fresh-owner-proof profile sync routes.
+  const automaticMaintenanceEnabled = String(process.env.FIMA_BOT_AUTOMATIC_MAINTENANCE_ENABLED || "")
+    .trim()
+    .toLowerCase() === "true";
   for (const guild of client.guilds.cache.values()) {
     await saveState(state => {
       state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
-      state.guildConfigs[guild.id].footerBrand = String(state.guildConfigs[guild.id].footerBrand || DEFAULT_PARADISE_FOOTER_BRAND).trim() || DEFAULT_PARADISE_FOOTER_BRAND;
+      let guildConfig = state.guildConfigs[guild.id];
+      guildConfig.footerBrand = String(guildConfig.footerBrand || DEFAULT_FIMA_FOOTER_BRAND).trim() || DEFAULT_FIMA_FOOTER_BRAND;
+      if (isFimaCommunityManagedGuild(guild.id) && guildConfig.activeSetupMode === "community") {
+        guildConfig = mergeParadiseCommunityAssetDefaults(guildConfig, { guildId: guild.id, mode: "community" });
+        state.guildConfigs[guild.id] = guildConfig;
+        if (guild.id === PARADISE_TEST_GUILD_ID) state.config = structuredClone(guildConfig);
+      }
       return state;
     });
-    if (guild.id !== PARADISE_TEST_GUILD_ID) continue;
-    assertParadiseTestGuildMutation({ guildId: guild.id, operation: "initialize_identity_and_maintenance" });
-    const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
-    if (me && me.nickname !== "FIMA") await me.setNickname("FIMA", "FIMA test-guild managed identity").catch(() => {});
-    await paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild)).catch(() => {});
-    const timer = setInterval(() => paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild)).catch(() => {}), 15 * 60_000);
+    if (!isFimaCommunityManagedGuild(guild.id)) continue;
+    if (!automaticMaintenanceEnabled) continue;
+    await withParadiseGuildMutationLock(guild, "startup_maintenance", () =>
+      paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild))).catch(() => {});
+    const timer = setInterval(() => withParadiseGuildMutationLock(guild, "scheduled_maintenance", () =>
+      paradiseGuildContext.run(guild.id, () => runParadiseMaintenance(guild))).catch(() => {}), 15 * 60_000);
     timer.unref?.();
   }
 }
@@ -1681,7 +2358,9 @@ function isOwner(interaction) {
 async function writeArtifact(name, data) {
   const dir = path.resolve(process.cwd(), "artifacts", "post-security-backlog");
   await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, name), `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  const artifactPath = path.resolve(dir, name);
+  await fs.writeFile(artifactPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  return artifactPath;
 }
 
 async function loadProfileStore() {
@@ -1712,6 +2391,7 @@ async function saveVerifiedProfile(discordId, profile) {
       updatedAt: new Date().toISOString()
     };
     state.profiles[discordId] = saved;
+    ensureFimaGlobalProfileId(state, discordId);
     return state;
   });
   const profileCount = Object.keys((await loadState()).profiles || {}).length;
@@ -1742,13 +2422,13 @@ async function snapshotGuild(guild) {
 async function setupChooser(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("paradise_setup_select:community").setLabel("Fieel's Community").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("paradise_setup_select:clan").setLabel("Paradise Clan").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("paradise_setup_select:community").setLabel("FIMA").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("paradise_setup_select:clan").setLabel("FIMA Bot Clan").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId("paradise_setup_select:tsbtr").setLabel("TSBTR-style").setStyle(ButtonStyle.Secondary)
   );
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ CHOOSE A SERVER SETUP")
-      .setDescription("## ◆ Fieel's Community\nFima product, support, buyer and community server.\n\n## ◆ Paradise Clan\nFocused clan, training, challenge, relations and event server.\n\n## ◆ TSBTR-style\nLarge community/leaderboard structure kept as an optional future template.\n\n-# Every choice creates a backup and a second confirmation screen before destructive work.")
+      .setDescription("## ◆ FIMA\nFima product, support, buyer and community server.\n\n## ◆ FIMA Bot Clan\nFocused clan, training, challenge, relations and event server.\n\n## ◆ TSBTR-style\nLarge community/leaderboard structure kept as an optional future template.\n\n-# Every choice creates a backup and a second confirmation screen before destructive work.")
       .setFooter(paradiseFooter("Three independent setup templates"))],
     components: [row],
     ephemeral: true
@@ -1791,8 +2471,8 @@ async function showSetupFinalConfirmation(interaction, mode) {
   const modal = new ModalBuilder().setCustomId(`paradise_setup_final:${mode}`).setTitle("Final destructive confirmation");
   const confirmation = new TextInputBuilder()
     .setCustomId("confirmation")
-    .setLabel(`Type REBUILD ${mode.toUpperCase()}`)
-    .setPlaceholder(`REBUILD ${mode.toUpperCase()}`)
+    .setLabel(`Type REBUILD TEST ${mode.toUpperCase()}`)
+    .setPlaceholder(`REBUILD TEST ${mode.toUpperCase()}`)
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
   modal.addComponents(new ActionRowBuilder().addComponents(confirmation));
@@ -1800,7 +2480,7 @@ async function showSetupFinalConfirmation(interaction, mode) {
 }
 
 async function handleSetupFinalConfirmation(interaction, mode) {
-  const expected = `REBUILD ${mode.toUpperCase()}`;
+  const expected = `REBUILD TEST ${mode.toUpperCase()}`;
   const supplied = interaction.fields.getTextInputValue("confirmation").trim().toUpperCase();
   if (supplied !== expected) {
     return interaction.reply({ content: `Confirmation did not match \`${expected}\`. Nothing was changed.`, ephemeral: true });
@@ -1814,8 +2494,9 @@ async function handleSetupAction(interaction, mode) {
   if (action === "guides") {
     if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
     await interaction.deferReply({ ephemeral: true });
-    const result = await publishAllGuides(interaction.guild, mode);
-    return interaction.editReply(`Paradise handbooks regenerated: **${result.posted}** posts updated or created.`);
+    const result = await publishParadiseGuidesFromDashboard(interaction.guild, mode);
+    const brand = mode === "community" ? "FIMA" : "FIMA Bot";
+    return interaction.editReply(`${brand} handbooks regenerated: **${result.posted}** posts updated or created.`);
   }
   return setupPreview(interaction, mode);
 }
@@ -1823,16 +2504,18 @@ async function handleSetupAction(interaction, mode) {
 const ROLE_PERMISSION_NAMES = Object.freeze({
   Owner: ["Administrator"],
   Admin: ["Administrator"],
+  Administrator: ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "BanMembers", "ViewAuditLog"],
   Overseer: ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "BanMembers", "ViewAuditLog"],
   "Administration Manager": ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Head Admin": ["ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Senior Admin": ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Moderator Manager": ["ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Head Moderator": ["ManageMessages", "ModerateMembers", "KickMembers"],
-  "Senior Moderator": ["ManageMessages", "ModerateMembers"],
+  "Senior Moderator": ["ManageMessages", "ModerateMembers", "KickMembers"],
   Manager: ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Community Manager": ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
-  Moderator: ["ManageMessages", "ModerateMembers", "KickMembers"],
+  Moderator: ["ManageMessages", "ModerateMembers"],
+  "Junior Moderator": ["ManageMessages"],
   "Support Staff": ["ManageMessages", "ModerateMembers"],
   "Bot Manager": ["ManageGuild", "ManageChannels", "ManageMessages"],
   "Training Manager": ["ManageChannels", "ManageMessages", "ModerateMembers"],
@@ -1847,7 +2530,7 @@ const ROLE_PERMISSION_NAMES = Object.freeze({
 });
 
 const PRIVATE_ACCESS_ROLES = new Set([
-  "Owner", "Admin", "Overseer", "Manager", "Community Manager", "Moderator",
+  "Owner", "Admin", "Administrator", "Overseer", "Manager", "Community Manager", "Moderator", "Junior Moderator", "Helper",
   "Administration Manager", "Head Admin", "Senior Admin", "Moderator Manager", "Head Moderator", "Senior Moderator",
   "Support Staff", "Bot Manager", "Security Staff", "Training Manager", "Tryout Manager",
   "Tournament Manager", "Event Manager", "Giveaway Manager", "Game Night Manager",
@@ -1863,15 +2546,626 @@ function rolePermissions(name) {
     .filter(Boolean);
 }
 
-async function ensureRole(guild, name, applyPermissions = false) {
-  let role = guild.roles.cache.find(item => item.name === name);
+function permissionBitfieldValue(value) {
+  const raw = value?.bitfield ?? value;
+  try {
+    return raw === undefined || raw === null ? null : BigInt(raw);
+  } catch {
+    return null;
+  }
+}
+
+function expectedRolePermissionBitfield(name) {
+  return new PermissionsBitField(rolePermissions(name)).bitfield;
+}
+
+function paradisePermissionRepairError(code, context, cause = null) {
+  const error = new Error(code);
+  error.code = code;
+  Object.assign(error, context);
+  if (cause) error.cause = cause;
+  return error;
+}
+
+export async function ensureRole(guild, name, applyPermissions = false) {
+  const cachedRoles = () => [...guild.roles.cache.values()].filter(item => !item.managed);
+  const findCachedRole = () => cachedRoles().find(item => exactMutationResourceNameMatches(item.name, name))
+    || cachedRoles().find(item => mutationResourceNameMatches(item.name, name));
+  let role = findCachedRole();
   const permissions = rolePermissions(name);
   if (!role) {
-    role = await guild.roles.create({ name, permissions, reason: "3A59 Paradise setup" });
-  } else if (applyPermissions && role.editable && !role.managed) {
-    await role.setPermissions(permissions, "3A59 Paradise permission template").catch(() => {});
+    const key = `${guild.id}:role:${normalizedMutationResourceName(name)}`;
+    let creation = paradiseRoleCreatesInFlight.get(key);
+    if (!creation) {
+      creation = (async () => {
+        const cached = findCachedRole();
+        if (cached) return cached;
+        return guild.roles.create({ name, permissions, reason: "3A59 FIMA Bot setup" });
+      })();
+      paradiseRoleCreatesInFlight.set(key, creation);
+      void creation.then(
+        () => { if (paradiseRoleCreatesInFlight.get(key) === creation) paradiseRoleCreatesInFlight.delete(key); },
+        () => { if (paradiseRoleCreatesInFlight.get(key) === creation) paradiseRoleCreatesInFlight.delete(key); }
+      );
+    }
+    role = await creation;
+  }
+  if (applyPermissions) {
+    const expected = expectedRolePermissionBitfield(name);
+    const actual = permissionBitfieldValue(role.permissions);
+    if (actual !== expected) {
+      if (role.managed || !role.editable || typeof role.setPermissions !== "function") {
+        throw paradisePermissionRepairError("role_permission_repair_unavailable", {
+          roleId: role.id,
+          roleName: name,
+          expectedPermissions: expected.toString(),
+          actualPermissions: actual?.toString() ?? null
+        });
+      }
+      try {
+        await role.setPermissions(permissions, "3A59 FIMA Bot permission template");
+      } catch (cause) {
+        throw paradisePermissionRepairError("role_permission_repair_failed", {
+          roleId: role.id,
+          roleName: name,
+          expectedPermissions: expected.toString(),
+          actualPermissions: actual?.toString() ?? null,
+          discordCode: String(cause?.code || "unknown")
+        }, cause);
+      }
+    }
   }
   return role;
+}
+
+function paradiseRoleIconError(code, context = {}, cause = null) {
+  const error = new Error(code);
+  error.code = code;
+  Object.assign(error, context);
+  if (cause) error.cause = cause;
+  return error;
+}
+
+function paradiseGuildPremiumTier(guild) {
+  const direct = Number(guild?.premiumTier);
+  if (Number.isFinite(direct)) return direct;
+  const match = String(guild?.premiumTier || "").match(/[0-3]/);
+  return match ? Number(match[0]) : 0;
+}
+
+function paradiseCurrentRoleIcon(role) {
+  let iconUrl = null;
+  try {
+    iconUrl = role?.iconURL?.({ extension: "png", size: 256 }) || null;
+  } catch {
+    iconUrl = null;
+  }
+  return Object.freeze({
+    iconHash: role?.icon || null,
+    iconUrl,
+    unicodeEmoji: role?.unicodeEmoji || null
+  });
+}
+
+function sanitizeParadiseRoleIconEvidence(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return Object.freeze({});
+  const entries = [];
+  for (const [roleId, record] of Object.entries(value)) {
+    const safeRoleId = String(roleId || "").trim();
+    const assetId = String(record?.assetId || "").trim();
+    const sha256 = String(record?.sha256 || "").trim().toLowerCase();
+    const iconHash = String(record?.iconHash || "").trim().toLowerCase();
+    if (!/^[-_a-zA-Z0-9]{1,64}$/.test(safeRoleId)
+      || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(assetId)
+      || !/^[a-f0-9]{64}$/.test(sha256)
+      || !/^(?:a_)?[a-f0-9]{32}$/.test(iconHash)) continue;
+    entries.push([safeRoleId, Object.freeze({ assetId, sha256, iconHash })]);
+  }
+  return Object.freeze(Object.fromEntries(entries));
+}
+
+function paradiseRoleIconMatches(current, expected, roleId, roleIconEvidence) {
+  if (!expected) return !current.iconHash && !current.unicodeEmoji;
+  if (expected.kind === "unicode") {
+    return !current.iconHash && current.unicodeEmoji === expected.unicodeEmoji;
+  }
+  const evidence = roleIconEvidence[roleId];
+  return !current.unicodeEmoji
+    && Boolean(current.iconHash)
+    && evidence?.assetId === expected.assetId
+    && evidence?.sha256 === expected.sha256
+    && evidence?.iconHash === current.iconHash;
+}
+
+function paradiseRoleIconMutationAvailable(role, expected, current) {
+  if (!expected) return typeof role?.edit === "function";
+  if (expected.kind === "unicode") {
+    return current.iconHash
+      ? typeof role?.edit === "function"
+      : typeof role?.setUnicodeEmoji === "function" || typeof role?.edit === "function";
+  }
+  return current.unicodeEmoji
+    ? typeof role?.edit === "function"
+    : typeof role?.setIcon === "function" || typeof role?.edit === "function";
+}
+
+export function inspectParadiseRoleIconReadiness(guild, {
+  roleIcons = PARADISE_COMMUNITY_ROLE_ICONS,
+  visualPlan = null,
+  roleIconEvidence = configForGuild(lastKnownStateSnapshot, guild?.id).roleIconEvidence
+} = {}) {
+  const guildId = String(guild?.id || "");
+  const features = [...(guild?.features || [])].map(value => String(value));
+  const premiumTier = paradiseGuildPremiumTier(guild);
+  const roleIconsFeature = features.some(value => value.toUpperCase() === "ROLE_ICONS");
+  const roleIconsAvailable = roleIconsFeature || premiumTier >= 2;
+  const me = guild?.members?.me || null;
+  let canManageRoles = false;
+  try {
+    canManageRoles = Boolean(me?.permissions?.has?.(PermissionsBitField.Flags.ManageRoles));
+  } catch {
+    canManageRoles = false;
+  }
+  const highestBotRolePosition = Number.isFinite(Number(me?.roles?.highest?.position))
+    ? Number(me.roles.highest.position)
+    : null;
+  const blockers = [];
+  const mismatches = [];
+  const targets = [];
+  const safeRoleIconEvidence = sanitizeParadiseRoleIconEvidence(roleIconEvidence);
+
+  if (!isFimaCommunityManagedGuild(guildId)) {
+    blockers.push({
+      code: "managed_community_guild_only",
+      guildId,
+      expectedGuildIds: [PARADISE_TEST_GUILD_ID, FIMA_COMMUNITY_PRODUCTION_GUILD_ID]
+    });
+  }
+  if (!roleIconsAvailable) {
+    blockers.push({
+      code: "role_icons_feature_unavailable",
+      features,
+      premiumTier,
+      requiredFeature: "ROLE_ICONS",
+      requiredPremiumTier: 2
+    });
+  }
+  if (visualPlan && visualPlan.liveMutationApproved !== true) {
+    blockers.push({
+      code: "ft_community_visual_live_mutation_not_approved",
+      theme: visualPlan.theme || null
+    });
+  }
+  if (!me) blockers.push({ code: "bot_member_unavailable" });
+  if (me && !canManageRoles) blockers.push({ code: "manage_roles_missing", botMemberId: me.id || null });
+  if (me && highestBotRolePosition === null) blockers.push({ code: "bot_role_hierarchy_unknown", botMemberId: me.id || null });
+
+  for (const roleName of PARADISE_COMMUNITY_ROLES) {
+    const configured = roleIcons[roleName] || null;
+    const expected = configured ? sanitizeParadiseCommunityRoleIconDescriptor(configured) : null;
+    const matches = [...(guild?.roles?.cache?.values?.() || [])]
+      .filter(role => mutationResourceNameMatches(role.name, roleName) && !role.managed);
+    if (matches.length === 0) {
+      blockers.push({ code: "role_icon_target_missing", roleName });
+      continue;
+    }
+    if (matches.length > 1) {
+      blockers.push({ code: "role_icon_target_ambiguous", roleName, count: matches.length });
+      continue;
+    }
+
+    const role = matches[0];
+    const current = paradiseCurrentRoleIcon(role);
+    const matchesExpected = paradiseRoleIconMatches(current, expected, role.id, safeRoleIconEvidence);
+    targets.push({
+      roleId: role.id,
+      roleName,
+      expected,
+      current,
+      matches: matchesExpected
+    });
+    if (matchesExpected) continue;
+
+    mismatches.push({
+      roleId: role.id,
+      roleName,
+      expected,
+      current,
+      reason: expected ? "icon_mismatch" : "divider_icon_must_be_empty"
+    });
+    if (role.editable !== true) {
+      blockers.push({ code: "role_icon_target_not_editable", roleId: role.id, roleName });
+    }
+    const rolePosition = Number(role.position);
+    if (!Number.isFinite(rolePosition)) {
+      blockers.push({ code: "role_icon_target_hierarchy_unknown", roleId: role.id, roleName });
+    } else if (highestBotRolePosition !== null && rolePosition >= highestBotRolePosition) {
+      blockers.push({
+        code: "role_icon_target_above_bot",
+        roleId: role.id,
+        roleName,
+        rolePosition,
+        highestBotRolePosition
+      });
+    }
+    if (!paradiseRoleIconMutationAvailable(role, expected, current)) {
+      blockers.push({ code: "role_icon_mutation_unavailable", roleId: role.id, roleName });
+    }
+  }
+
+  return Object.freeze({
+    guildId,
+    scope: "managed_fima_community_guilds",
+    ready: blockers.length === 0 && mismatches.length === 0,
+    canReconcile: blockers.length === 0,
+    capability: Object.freeze({
+      roleIconsFeature,
+      roleIconsAvailable,
+      premiumTier,
+      canManageRoles,
+      botMemberId: me?.id || null,
+      highestBotRolePosition,
+      visualTheme: visualPlan?.theme || null,
+      visualMutationApproved: visualPlan ? visualPlan.liveMutationApproved === true : null
+    }),
+    targets: Object.freeze(targets),
+    mismatches: Object.freeze(mismatches),
+    blockers: Object.freeze(blockers),
+    roleIconEvidence: safeRoleIconEvidence
+  });
+}
+
+async function applyParadiseRoleIconMutation(role, expected) {
+  const reason = "FIMA Community canonical role icon";
+  const current = paradiseCurrentRoleIcon(role);
+  if (!expected) {
+    return role.edit({ icon: null, unicodeEmoji: null, reason });
+  }
+  if (expected.kind === "unicode") {
+    if (current.iconHash || typeof role.setUnicodeEmoji !== "function") {
+      return role.edit({ icon: null, unicodeEmoji: expected.unicodeEmoji, reason });
+    }
+    return role.setUnicodeEmoji(expected.unicodeEmoji, reason);
+  }
+  const asset = loadVerifiedFtCommunityVisualAsset(expected.assetId, { expectedUsage: "role-icon" });
+  if (asset.sha256 !== expected.sha256 || asset.discordContentHash !== expected.discordContentHash) {
+    throw paradiseRoleIconError("role_icon_asset_binding_changed", { assetId: expected.assetId });
+  }
+  if (current.unicodeEmoji || typeof role.setIcon !== "function") {
+    return role.edit({ icon: asset.buffer, unicodeEmoji: null, reason });
+  }
+  return role.setIcon(asset.buffer, reason);
+}
+
+function canonicalParadiseRoleIconEvidence(guild, targets, priorEvidence, changedRoleIds = new Set()) {
+  const records = {};
+  for (const target of targets) {
+    if (target.expected?.kind !== "icon") continue;
+    const role = guild?.roles?.cache?.get?.(target.roleId);
+    const current = paradiseCurrentRoleIcon(role);
+    if (!current.iconHash || current.unicodeEmoji) continue;
+    const priorMatches = paradiseRoleIconMatches(
+      current,
+      target.expected,
+      target.roleId,
+      priorEvidence
+    );
+    if (!priorMatches && !changedRoleIds.has(target.roleId)) continue;
+    records[target.roleId] = {
+      assetId: target.expected.assetId,
+      sha256: target.expected.sha256,
+      iconHash: current.iconHash
+    };
+  }
+  return sanitizeParadiseRoleIconEvidence(records);
+}
+
+async function persistParadiseRoleIconEvidence(guildId, roleIconEvidence) {
+  await saveState(next => {
+    next.guildConfigs[guildId] = next.guildConfigs[guildId] || structuredClone(next.config || {});
+    next.guildConfigs[guildId].roleIconEvidence = structuredClone(roleIconEvidence);
+    return next;
+  });
+}
+
+export async function reconcileParadiseCommunityRoleIcons(guild, options = {}) {
+  const configuredRoleIcons = options.roleIcons || PARADISE_COMMUNITY_ROLE_ICONS;
+  const requiresAssetEvidence = Object.values(configuredRoleIcons)
+    .some(descriptor => Boolean(descriptor?.assetId));
+  const evidenceWasProvided = Object.hasOwn(options, "roleIconEvidence");
+  const state = requiresAssetEvidence && !evidenceWasProvided ? await loadState() : null;
+  const roleIconEvidence = sanitizeParadiseRoleIconEvidence(evidenceWasProvided
+    ? options.roleIconEvidence
+    : configForGuild(state || lastKnownStateSnapshot, guild?.id).roleIconEvidence);
+  const scopedOptions = { ...options, roleIconEvidence };
+  const before = inspectParadiseRoleIconReadiness(guild, scopedOptions);
+  if (!before.canReconcile) {
+    return Object.freeze({
+      status: "blocked",
+      changed: 0,
+      unchanged: before.targets.filter(target => target.matches).length,
+      readiness: before,
+      blockers: before.blockers,
+      roleIconEvidence
+    });
+  }
+  if (before.mismatches.length === 0) {
+    const canonicalEvidence = canonicalParadiseRoleIconEvidence(
+      guild,
+      before.targets,
+      roleIconEvidence
+    );
+    if (requiresAssetEvidence && !evidenceWasProvided
+      && JSON.stringify(canonicalEvidence) !== JSON.stringify(roleIconEvidence)) {
+      await persistParadiseRoleIconEvidence(guild.id, canonicalEvidence);
+    }
+    return Object.freeze({
+      status: "verified",
+      changed: 0,
+      unchanged: before.targets.length,
+      readiness: before,
+      blockers: Object.freeze([]),
+      roleIconEvidence: canonicalEvidence
+    });
+  }
+
+  if (options.visualPlan) assertFtCommunityVisualMutationApproved(options.visualPlan);
+
+  const changed = [];
+  const changedRoleIds = new Set();
+  for (const mismatch of before.mismatches) {
+    const role = guild.roles.cache.get(mismatch.roleId);
+    if (!role) {
+      throw paradiseRoleIconError("role_icon_target_disappeared", {
+        guildId: guild.id,
+        roleId: mismatch.roleId,
+        roleName: mismatch.roleName
+      });
+    }
+    try {
+      await applyParadiseRoleIconMutation(role, mismatch.expected);
+      changed.push({
+        roleId: mismatch.roleId,
+        roleName: mismatch.roleName,
+        expected: mismatch.expected
+      });
+      changedRoleIds.add(mismatch.roleId);
+    } catch (cause) {
+      throw paradiseRoleIconError("role_icon_reconcile_failed", {
+        guildId: guild.id,
+        roleId: mismatch.roleId,
+        roleName: mismatch.roleName,
+        expected: mismatch.expected,
+        discordCode: String(cause?.code || "unknown"),
+        changed
+      }, cause);
+    }
+  }
+
+  if (typeof guild.roles.fetch === "function") {
+    try {
+      await guild.roles.fetch();
+    } catch (cause) {
+      throw paradiseRoleIconError("role_icon_refresh_failed", {
+        guildId: guild.id,
+        discordCode: String(cause?.code || "unknown"),
+        changed
+      }, cause);
+    }
+  }
+  const nextRoleIconEvidence = canonicalParadiseRoleIconEvidence(
+    guild,
+    before.targets,
+    roleIconEvidence,
+    changedRoleIds
+  );
+  const after = inspectParadiseRoleIconReadiness(guild, {
+    ...scopedOptions,
+    roleIconEvidence: nextRoleIconEvidence
+  });
+  if (!after.ready) {
+    throw paradiseRoleIconError("role_icon_verification_failed", {
+      guildId: guild.id,
+      changed,
+      readiness: after
+    });
+  }
+  if (requiresAssetEvidence && !evidenceWasProvided) {
+    try {
+      await persistParadiseRoleIconEvidence(guild.id, nextRoleIconEvidence);
+    } catch (cause) {
+      throw paradiseRoleIconError("role_icon_evidence_persist_failed", {
+        guildId: guild.id,
+        changed
+      }, cause);
+    }
+  }
+  return Object.freeze({
+    status: "verified",
+    changed: changed.length,
+    unchanged: after.targets.length - changed.length,
+    changes: Object.freeze(changed),
+    readiness: after,
+    blockers: Object.freeze([]),
+    roleIconEvidence: nextRoleIconEvidence
+  });
+}
+
+export function inspectParadiseCommunityExtendedRoleIconReadiness(
+  guild,
+  options = {}
+) {
+  const visualPlan = options.visualPlan || PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN;
+  return inspectParadiseRoleIconReadiness(guild, {
+    ...options,
+    roleIcons: PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS,
+    visualPlan
+  });
+}
+
+export async function reconcileParadiseCommunityExtendedRoleIcons(
+  guild,
+  options = {}
+) {
+  const visualPlan = options.visualPlan || PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN;
+  return reconcileParadiseCommunityRoleIcons(guild, {
+    ...options,
+    roleIcons: PARADISE_COMMUNITY_EXTENDED_ROLE_ICONS,
+    visualPlan
+  });
+}
+
+async function ensureSetupChannel(guild, { name, type, parent = null, reason }) {
+  const cachedChannels = () => [...guild.channels.cache.values()].filter(item => item.type === type);
+  const findCachedChannel = () => cachedChannels().find(item => exactMutationResourceNameMatches(item.name, name))
+    || cachedChannels().find(item => mutationResourceNameMatches(item.name, name));
+  let channel = findCachedChannel();
+  if (channel) return channel;
+  const key = `${guild.id}:channel:${type}:${normalizedMutationResourceName(name)}`;
+  let creation = paradiseChannelCreatesInFlight.get(key);
+  if (!creation) {
+    creation = (async () => {
+      const cached = findCachedChannel();
+      if (cached) return cached;
+      return guild.channels.create({ name, type, parent, reason });
+    })();
+    paradiseChannelCreatesInFlight.set(key, creation);
+    void creation.then(
+      () => { if (paradiseChannelCreatesInFlight.get(key) === creation) paradiseChannelCreatesInFlight.delete(key); },
+      () => { if (paradiseChannelCreatesInFlight.get(key) === creation) paradiseChannelCreatesInFlight.delete(key); }
+    );
+  }
+  channel = await creation;
+  return channel;
+}
+
+async function editParadiseCategoryOverwrite(category, target, permissions, context) {
+  if (!category?.permissionOverwrites?.edit) {
+    throw paradisePermissionRepairError("category_permission_repair_unavailable", context);
+  }
+  try {
+    await category.permissionOverwrites.edit(target, permissions, {
+      reason: "FIMA canonical category visibility template"
+    });
+  } catch (cause) {
+    throw paradisePermissionRepairError("category_permission_repair_failed", {
+      ...context,
+      discordCode: String(cause?.code || "unknown")
+    }, cause);
+  }
+}
+
+async function editParadiseChannelOverwrite(channel, target, permissions, context) {
+  if (!channel?.permissionOverwrites?.edit) {
+    throw paradisePermissionRepairError("channel_permission_repair_unavailable", context);
+  }
+  try {
+    await channel.permissionOverwrites.edit(target, permissions, {
+      reason: "FIMA canonical private channel permissions"
+    });
+  } catch (cause) {
+    throw paradisePermissionRepairError("channel_permission_repair_failed", {
+      ...context,
+      discordCode: String(cause?.code || "unknown")
+    }, cause);
+  }
+}
+
+export async function repairParadiseCommunityChannelPermissions(
+  guild,
+  channel,
+  channelName,
+  categoryName
+) {
+  const normalizedChannel = normalizedMutationResourceName(channelName || channel?.name);
+  const normalizedCategory = normalizedMutationResourceName(categoryName);
+  const isTurkish = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE TURKISH");
+  const isVideo = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE VIDEO TEAM");
+  const isAnnouncements = isTurkish
+    && normalizedChannel === normalizedMutationResourceName("〆・turkish-announcements");
+  const isPrivateVoice = channel?.type === ChannelType.GuildVoice && (isTurkish || isVideo);
+  if (!isAnnouncements && !isPrivateVoice) return;
+
+  const accessRoleNames = isTurkish
+    ? COMMUNITY_TURKISH_ACCESS_ROLES
+    : COMMUNITY_VIDEO_TEAM_ACCESS_ROLES;
+  const everyonePermissions = {
+    ViewChannel: false,
+    ...(isAnnouncements ? { SendMessages: false } : {}),
+    ...(isPrivateVoice ? { Connect: false } : {})
+  };
+  await editParadiseChannelOverwrite(channel, guild.roles.everyone, everyonePermissions, {
+    channelId: channel?.id,
+    channelName,
+    targetId: guild.roles.everyone?.id,
+    targetName: "@everyone"
+  });
+
+  for (const roleName of accessRoleNames) {
+    const role = guild.roles.cache.find(item => item.name === roleName && !item.managed);
+    if (!role) continue;
+    const staff = COMMUNITY_STAFF_ACCESS_ROLES.includes(roleName);
+    const permissions = {
+      ViewChannel: true,
+      ...(isAnnouncements ? { SendMessages: staff } : {}),
+      ...(isPrivateVoice ? { Connect: true } : {})
+    };
+    await editParadiseChannelOverwrite(channel, role, permissions, {
+      channelId: channel.id,
+      channelName,
+      targetId: role.id,
+      targetName: roleName
+    });
+  }
+}
+
+export async function repairParadiseCategoryVisibilityPermissions(
+  guild,
+  category,
+  roleNames,
+  privateCategory,
+  accessRoleNames = null
+) {
+  await editParadiseCategoryOverwrite(
+    category,
+    guild.roles.everyone,
+    { ViewChannel: privateCategory ? false : null },
+    {
+      categoryId: category?.id,
+      categoryName: category?.name,
+      targetId: guild.roles.everyone?.id,
+      targetName: "@everyone",
+      expectedView: privateCategory ? "deny" : "inherit"
+    }
+  );
+  if (!privateCategory) return;
+  const explicitAccess = Array.isArray(accessRoleNames);
+  const allowedRoleNames = explicitAccess
+    ? new Set(accessRoleNames)
+    : PRIVATE_ACCESS_ROLES;
+  for (const roleName of roleNames.filter(name => allowedRoleNames.has(name))) {
+    const role = guild.roles.cache.find(item => item.name === roleName && !item.managed);
+    if (!role) continue;
+    await editParadiseCategoryOverwrite(category, role, { ViewChannel: true }, {
+      categoryId: category.id,
+      categoryName: category.name,
+      targetId: role.id,
+      targetName: roleName,
+      expectedView: "allow"
+    });
+  }
+  if (!explicitAccess) return;
+  for (const roleName of roleNames.filter(name => !allowedRoleNames.has(name))) {
+    const role = guild.roles.cache.find(item => item.name === roleName && !item.managed);
+    if (!role) continue;
+    await editParadiseCategoryOverwrite(category, role, { ViewChannel: null }, {
+      categoryId: category.id,
+      categoryName: category.name,
+      targetId: role.id,
+      targetName: roleName,
+      expectedView: "inherit"
+    });
+  }
 }
 
 async function ensureBlacklistVisibility(guild, channel, channelName, roleNames = []) {
@@ -1892,20 +3186,20 @@ async function ensureBlacklistVisibility(guild, channel, channelName, roleNames 
       ViewChannel: false,
       SendMessages: false,
       AddReactions: false
-    }, { reason: "Paradise blacklist appeal visibility" }).catch(() => {});
+    }, { reason: "FIMA Bot blacklist appeal visibility" }).catch(() => {});
     await channel.permissionOverwrites.edit(blacklisted, {
       ViewChannel: true,
       SendMessages: false,
       AddReactions: false,
       ReadMessageHistory: true
-    }, { reason: "Paradise blacklist appeal visibility" }).catch(() => {});
+    }, { reason: "FIMA Bot blacklist appeal visibility" }).catch(() => {});
     for (const roleName of staffRoles) {
       const role = guild.roles.cache.find(item => item.name === roleName);
       if (role) await channel.permissionOverwrites.edit(role, {
         ViewChannel: true,
         SendMessages: true,
         ReadMessageHistory: true
-      }, { reason: "Paradise blacklist staff review visibility" }).catch(() => {});
+      }, { reason: "FIMA Bot blacklist staff review visibility" }).catch(() => {});
     }
     return;
   }
@@ -1915,14 +3209,14 @@ async function ensureBlacklistVisibility(guild, channel, channelName, roleNames 
       ViewChannel: false,
       SendMessages: false,
       AddReactions: false
-    }, { reason: "Paradise staff-only blacklist review visibility" }).catch(() => {});
+    }, { reason: "FIMA Bot staff-only blacklist review visibility" }).catch(() => {});
     for (const roleName of staffRoles) {
       const role = guild.roles.cache.find(item => item.name === roleName);
       if (role) await channel.permissionOverwrites.edit(role, {
         ViewChannel: true,
         SendMessages: true,
         ReadMessageHistory: true
-      }, { reason: "Paradise staff-only blacklist review visibility" }).catch(() => {});
+      }, { reason: "FIMA Bot staff-only blacklist review visibility" }).catch(() => {});
     }
     return;
   }
@@ -1933,7 +3227,7 @@ async function ensureBlacklistVisibility(guild, channel, channelName, roleNames 
       SendMessages: false,
       AddReactions: false,
       ReadMessageHistory: true
-    }, { reason: "Paradise public blacklist board read-only" }).catch(() => {});
+    }, { reason: "FIMA Bot public blacklist board read-only" }).catch(() => {});
   }
 }
 
@@ -1950,12 +3244,12 @@ async function ensureCommunityProgressionPermissions(guild, channel, channelName
   // Members may share media only in the dedicated media channel until their
   // level/manual trust role opens it elsewhere. Links remain protected by the
   // runtime scam/invite guard even once Link Trusted is granted.
-  await channel.permissionOverwrites.edit(everyone, { AttachFiles: mediaChannel ? true : false, EmbedLinks: false }, { reason: "Paradise level-based media/link baseline" }).catch(() => {});
+  await channel.permissionOverwrites.edit(everyone, { AttachFiles: mediaChannel ? true : false, EmbedLinks: false }, { reason: "FIMA Bot level-based media/link baseline" }).catch(() => {});
   for (const role of [mediaTrusted, mediaApproved, legacyApproved].filter(Boolean)) {
-    await channel.permissionOverwrites.edit(role, { AttachFiles: true }, { reason: "Paradise Media Trusted progression" }).catch(() => {});
+    await channel.permissionOverwrites.edit(role, { AttachFiles: true }, { reason: "FIMA Bot Media Trusted progression" }).catch(() => {});
   }
   for (const role of [linkTrusted, linksApproved, legacyApproved].filter(Boolean)) {
-    await channel.permissionOverwrites.edit(role, { EmbedLinks: true }, { reason: "Paradise Link Trusted progression" }).catch(() => {});
+    await channel.permissionOverwrites.edit(role, { EmbedLinks: true }, { reason: "FIMA Bot Link Trusted progression" }).catch(() => {});
   }
 }
 
@@ -1971,55 +3265,149 @@ async function organizeRoleHierarchy(guild, roleNames) {
   if (positions.length) await guild.roles.setPositions(positions).catch(() => {});
 }
 
+const PARADISE_AUTOMOD_RULE_SUFFIXES = Object.freeze({
+  link: "Invite & Scam Link Guard",
+  mention: "Mention Spam Guard"
+});
+
+export function paradiseAutoModRuleNamesForTemplate(template = "clan") {
+  const brand = template === "community" ? "FIMA" : "FIMA Bot";
+  const desired = Object.fromEntries(Object.entries(PARADISE_AUTOMOD_RULE_SUFFIXES)
+    .map(([key, suffix]) => [key, `${brand} ${suffix}`]));
+  const managed = [...new Set(Object.values(PARADISE_AUTOMOD_RULE_SUFFIXES)
+    .flatMap(suffix => [`FIMA ${suffix}`, `FIMA Bot ${suffix}`, `Paradise ${suffix}`]))];
+  return Object.freeze({ brand, ...desired, managed: Object.freeze(managed) });
+}
+
+export function planParadiseAutoModRuleReconciliation(ruleNames = [], template = "clan") {
+  const policy = paradiseAutoModRuleNamesForTemplate(template);
+  const existing = [...new Set(ruleNames.map(name => String(name || "").trim()).filter(Boolean))];
+  const rules = Object.entries(PARADISE_AUTOMOD_RULE_SUFFIXES).map(([key, suffix]) => {
+    const desiredName = policy[key];
+    const managedForRule = [`FIMA ${suffix}`, `FIMA Bot ${suffix}`, `Paradise ${suffix}`];
+    const matches = managedForRule.filter(name => existing.includes(name));
+    const primary = matches.includes(desiredName) ? desiredName : (matches[0] || null);
+    return Object.freeze({
+      key,
+      desiredName,
+      existingName: primary,
+      action: !primary ? "create" : (primary === desiredName ? "keep" : "rename"),
+      duplicateNames: Object.freeze(matches.filter(name => name !== primary))
+    });
+  });
+  return Object.freeze({ brand: policy.brand, managedNames: policy.managed, rules: Object.freeze(rules) });
+}
+
 async function ensureParadiseAutoMod(guild) {
   const rules = await guild.autoModerationRules.fetch().catch(() => null);
   if (!rules) return { status: "unavailable" };
   const state = await loadState();
-  const config = configForGuild(state, guild.id).automod || {};
+  const guildConfig = configForGuild(state, guild.id);
+  const config = guildConfig.automod || {};
+  const template = guildConfig.activeSetupMode || "clan";
+  const policy = paradiseAutoModRuleNamesForTemplate(template);
+  const reconciliation = planParadiseAutoModRuleReconciliation([...rules.values()].map(rule => rule.name), template);
+  const managedNames = new Set(reconciliation.managedNames);
+  const reasonBrand = policy.brand;
   if (config.enabled === false) {
     for (const rule of rules.values()) {
-      if (rule.name.startsWith("Paradise ")) await rule.edit({ enabled: false, reason: "Paradise dashboard AutoMod disabled" }).catch(() => {});
+      if (managedNames.has(rule.name)) await rule.edit({ enabled: false, reason: `${reasonBrand} dashboard AutoMod disabled` }).catch(() => {});
     }
     return { status: "disabled" };
   }
   // Approval/trusted roles may unlock ordinary media/link posting, but they do
   // not bypass the server-wide invite and scam guard.
-  const exemptRoleIds = ["Owner", "Admin", "Overseer"]
+  const exemptRoleIds = (template === "community"
+    ? ["Owner", "Administrator", "Senior Moderator"]
+    : ["Owner", "Admin", "Overseer"])
     .map(name => guild.roles.cache.find(role => role.name === name)?.id).filter(Boolean);
-  const logChannel = guild.channels.cache.find(channel => channel.name === "mod-logs");
+  const logChannel = guild.channels.cache.find(channel => ["mod-logs", "〆・staff-security-logs"].includes(channel.name));
   const actions = [{ type: AutoModerationActionType.BlockMessage, metadata: { customMessage: "That link is not allowed here. Use an approved media/ticket channel or ask staff." } }];
   if (logChannel) actions.push({ type: AutoModerationActionType.SendAlertMessage, metadata: { channel: logChannel.id } });
   const keywords = [];
   if (config.blockInvites !== false) keywords.push("*discord.gg/*", "*discord.com/invite/*", "*discordapp.com/invite/*");
   if (config.blockScamKeywords !== false) keywords.push("*free nitro*", "*steam gift*", "*claim reward*", "*verify account here*", "*limited gift*");
-  if (keywords.length && ![...rules.values()].some(rule => rule.name === "Paradise Invite & Scam Link Guard")) {
-    await guild.autoModerationRules.create({
-      name: "Paradise Invite & Scam Link Guard",
-      eventType: AutoModerationRuleEventType.MessageSend,
-      triggerType: AutoModerationRuleTriggerType.Keyword,
-      triggerMetadata: {
-        keywordFilter: keywords
-      },
-      actions, enabled: true, exemptRoles: exemptRoleIds,
-      reason: "3A59 anti-scam and invite-link protection"
-    });
-  }
-  if (![...rules.values()].some(rule => rule.name === "Paradise Mention Spam Guard")) {
-    await guild.autoModerationRules.create({
-      name: "Paradise Mention Spam Guard",
-      eventType: AutoModerationRuleEventType.MessageSend,
-      triggerType: AutoModerationRuleTriggerType.MentionSpam,
-      triggerMetadata: { mentionTotalLimit: Math.min(50, Math.max(3, Number(config.mentionSpamLimit) || 8)), mentionRaidProtectionEnabled: true },
-      actions,
-      enabled: true,
-      exemptRoles: exemptRoleIds,
-      reason: "Paradise mention-spam protection"
-    });
-  }
-  return { status: "configured", rules: [...rules.values()].length + 2 };
+  const rulesByName = new Map([...rules.values()].map(rule => [rule.name, rule]));
+  const errors = [];
+  let created = 0;
+  let migrated = 0;
+  let duplicatesDisabled = 0;
+
+  const reconcileRule = async (key, createOptions, shouldEnable = true) => {
+    const planned = reconciliation.rules.find(item => item.key === key);
+    if (!planned) return;
+    const primary = planned.existingName ? rulesByName.get(planned.existingName) : null;
+    if (!shouldEnable) {
+      for (const name of [planned.existingName, ...planned.duplicateNames].filter(Boolean)) {
+        const rule = rulesByName.get(name);
+        if (rule?.enabled !== false) await rule.edit({ enabled: false, reason: `${reasonBrand} AutoMod policy disabled this guard` })
+          .catch(error => errors.push({ key, action: "disable", code: error.code || error.message }));
+      }
+      return;
+    }
+    if (planned.action === "create") {
+      await guild.autoModerationRules.create({ ...createOptions, name: planned.desiredName, enabled: true })
+        .then(() => { created += 1; })
+        .catch(error => errors.push({ key, action: "create", code: error.code || error.message }));
+    } else if (planned.action === "rename" && primary) {
+      await primary.edit({ name: planned.desiredName, enabled: true, reason: `${reasonBrand} template AutoMod brand migration` })
+        .then(() => { migrated += 1; })
+        .catch(error => errors.push({ key, action: "rename", code: error.code || error.message }));
+    } else if (primary?.enabled === false) {
+      await primary.edit({ enabled: true, reason: `${reasonBrand} dashboard AutoMod enabled` })
+        .catch(error => errors.push({ key, action: "enable", code: error.code || error.message }));
+    }
+    for (const name of planned.duplicateNames) {
+      const duplicate = rulesByName.get(name);
+      if (duplicate?.enabled !== false) await duplicate.edit({ enabled: false, reason: `${reasonBrand} AutoMod duplicate disabled after safe migration` })
+        .then(() => { duplicatesDisabled += 1; })
+        .catch(error => errors.push({ key, action: "disable_duplicate", code: error.code || error.message }));
+    }
+  };
+
+  await reconcileRule("link", {
+    eventType: AutoModerationRuleEventType.MessageSend,
+    triggerType: AutoModerationRuleTriggerType.Keyword,
+    triggerMetadata: { keywordFilter: keywords },
+    actions,
+    exemptRoles: exemptRoleIds,
+    reason: `${reasonBrand} anti-scam and invite-link protection`
+  }, keywords.length > 0);
+  await reconcileRule("mention", {
+    eventType: AutoModerationRuleEventType.MessageSend,
+    triggerType: AutoModerationRuleTriggerType.MentionSpam,
+    triggerMetadata: { mentionTotalLimit: Math.min(50, Math.max(3, Number(config.mentionSpamLimit) || 8)), mentionRaidProtectionEnabled: true },
+    actions,
+    exemptRoles: exemptRoleIds,
+    reason: `${reasonBrand} mention-spam protection`
+  });
+  return {
+    status: errors.length ? "partial" : "configured",
+    rules: [...rules.values()].length + created,
+    created,
+    migrated,
+    duplicatesDisabled,
+    errors
+  };
 }
 
 async function applyServerSetup(interaction, mode, destructive = true) {
+  return withParadiseGuildMutationLock(
+    interaction.guild,
+    destructive ? "interactive_rebuild" : "interactive_repair",
+    async () => {
+      await updateParadiseMutationLease({ phase: destructive ? "interactive_rebuild" : "interactive_repair" });
+      return applyServerSetupUnlocked(interaction, mode, destructive);
+    },
+    {
+      purposeKey: destructive ? "discord_template_rebuild" : "discord_template_repair",
+      idempotencyKey: `${interaction.guildId}:${mode}:${destructive ? "rebuild" : "repair"}:${interaction.id || crypto.randomUUID()}`,
+      phase: "request_validated"
+    }
+  );
+}
+
+async function applyServerSetupUnlocked(interaction, mode, destructive = true) {
   if (!isOwner(interaction) || interaction.guildId !== PARADISE_TEST_GUILD_ID) {
     return interaction.reply({ content: "Blocked: wrong guild or non-owner.", ephemeral: true });
   }
@@ -2027,24 +3415,35 @@ async function applyServerSetup(interaction, mode, destructive = true) {
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) return interaction.reply({ content: "Blocked: unknown setup template.", ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
+  if (destructive) {
+    const result = await rebuildParadiseTemplateUnlocked(
+      interaction.guild,
+      mode,
+      `REBUILD TEST ${mode.toUpperCase()}`,
+      PARADISE_TEST_REBUILD_POLICY
+    );
+    return interaction.editReply(result.status === "LIVE DISCORD VERIFIED"
+      ? `${selected.label} rebuild verified against the live test-guild structure.`
+      : `${selected.label} rebuild finished but live verification failed. Review the rebuild artifact before retrying.`);
+  }
   const snapshot = await snapshotGuild(interaction.guild);
   await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
   for (const name of selected.roles) await ensureRole(interaction.guild, name, true);
   const desiredNames = new Set(selected.schema.flatMap(([category, channels]) => [category, ...channels]));
   const wrongTypeChannelIds = new Set();
   const wrongTypeChannels = [];
-  for (const [categoryName, channelNames, privateCategory] of selected.schema) {
+  for (const [categoryName, channelNames, privateCategory, accessRoleNames] of selected.schema) {
     let category = interaction.guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && c.name === categoryName);
-    if (!category) category = await interaction.guild.channels.create({ name: categoryName, type: ChannelType.GuildCategory, reason: "3A59 Paradise setup" });
-    if (privateCategory) {
-      await category.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: false });
-      for (const roleName of selected.roles.filter(name => PRIVATE_ACCESS_ROLES.has(name))) {
-        const role = interaction.guild.roles.cache.find(item => item.name === roleName);
-        if (role) await category.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
-      }
-    } else {
-      await category.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: null }).catch(() => {});
-    }
+    if (!category) category = await ensureSetupChannel(interaction.guild, {
+      name: categoryName, type: ChannelType.GuildCategory, reason: "3A59 FIMA Bot setup"
+    });
+    await repairParadiseCategoryVisibilityPermissions(
+      interaction.guild,
+      category,
+      selected.roles,
+      privateCategory,
+      accessRoleNames
+    );
     const mutedRole = interaction.guild.roles.cache.find(item => item.name === "Muted / Quarantined");
     if (mutedRole) {
       await category.permissionOverwrites.edit(mutedRole, {
@@ -2062,13 +3461,16 @@ async function applyServerSetup(interaction, mode, destructive = true) {
         wrongTypeChannels.push({ name: channelName, actualType: wrongType.type, expectedType });
       }
       if (!channel) {
-        channel = await interaction.guild.channels.create({
+        channel = await ensureSetupChannel(interaction.guild, {
           name: channelName, type: expectedType,
-          parent: category.id, reason: "3A59 Paradise setup"
+          parent: category.id, reason: "3A59 FIMA Bot setup"
         });
       } else if (channel.parentId !== category.id) await channel.setParent(category.id, { lockPermissions: privateCategory });
       await ensureBlacklistVisibility(interaction.guild, channel, channelName, selected.roles).catch(() => {});
       await ensureCommunityProgressionPermissions(interaction.guild, channel, channelName, { mode, privateCategory });
+      if (mode === "community") {
+        await repairParadiseCommunityChannelPermissions(interaction.guild, channel, channelName, categoryName);
+      }
     }
   }
   const removableChannels = [...interaction.guild.channels.cache.values()]
@@ -2080,17 +3482,32 @@ async function applyServerSetup(interaction, mode, destructive = true) {
     for (const role of removableRoles) await role.delete("3A59 owner-confirmed test-server rebuild").catch(() => {});
   }
   await organizeRoleHierarchy(interaction.guild, selected.roles);
+  const roleIcons = mode === "community"
+    ? await reconcileParadiseCommunityExtendedRoleIcons(interaction.guild)
+    : { status: "not_applicable", changed: 0, blockers: [] };
   await applyParadiseTemplateChannelMappings(interaction.guild, mode);
   const autoMod = await ensureParadiseAutoMod(interaction.guild).catch(error => ({ status: "failed", error: error.message }));
-  await publishAllGuides(interaction.guild, mode).catch(() => {});
+  const guideResult = await publishAllGuides(interaction.guild, mode).catch(() => ({
+    posted: 0,
+    verified: 0,
+    required: 1,
+    ready: false,
+    mode,
+    details: [sanitizeParadiseMessageReadback(failedParadiseMessageReadback({ reason: "publisher_failed" }), "guides")]
+  }));
   if (mode !== "community") {
     await updateRelationsPanel(interaction.guild).catch(() => {});
     await updateAvailabilityPanel(interaction.guild).catch(() => {});
     await updateLoaPanel(interaction.guild).catch(() => {});
   }
-  await updateStaffTeamEmbed(interaction.guild).catch(() => {});
+  const staffResult = await updateStaffTeamEmbed(interaction.guild, mode)
+    .catch(() => failedParadiseMessageReadback({ reason: "publisher_failed" }));
   const voiceIds = paradiseVoiceSetupIds(interaction.guild);
   await configureParadiseAfkChannel(interaction.guild, voiceIds);
+  await interaction.guild.channels.fetch?.();
+  await interaction.guild.roles.fetch?.();
+  const structureVerification = verifyParadiseTemplateStructure(interaction.guild, selected);
+  const liveReady = structureVerification.ready && guideResult.ready && staffResult.ready;
   await saveState(state => {
     state.guildConfigs[interaction.guildId] = state.guildConfigs[interaction.guildId] || structuredClone(state.config || {});
     const config = state.guildConfigs[interaction.guildId];
@@ -2102,7 +3519,9 @@ async function applyServerSetup(interaction, mode, destructive = true) {
       createdOrRepairedChannels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0),
       preservedExtraChannels: destructive ? 0 : removableChannels.length,
       preservedExtraRoles: destructive ? 0 : removableRoles.length,
-      wrongChannelTypes: wrongTypeChannels
+      wrongChannelTypes: wrongTypeChannels,
+      roleIconStatus: roleIcons.status,
+      roleIconBlockers: roleIcons.blockers || []
     };
     config.autoActivityChecks = true;
     config.autoActivityRoleRemoval = true;
@@ -2112,19 +3531,44 @@ async function applyServerSetup(interaction, mode, destructive = true) {
     return state;
   });
   await writeArtifact(`3a59-discord-${mode}-setup-live.json`, {
-    status: "LIVE VERIFIED", completedAt: new Date().toISOString(), operation: destructive ? "rebuild" : "repair",
+    status: liveReady ? "LIVE DISCORD VERIFIED" : "LIVE DISCORD FAILED",
+    completedAt: new Date().toISOString(), operation: destructive ? "rebuild" : "repair",
     guildId: interaction.guildId, template: selected.label, categories: selected.schema.length,
     channels: selected.schema.reduce((n, [, rows]) => n + rows.length, 0), roles: selected.roles.length,
     wrongChannelTypes: wrongTypeChannels.map(item => ({ name: item.name, actualType: item.actualType, expectedType: item.expectedType })),
-    autoMod
+    roleIcons,
+    autoMod,
+    guideReadback: {
+      posted: guideResult.posted,
+      verified: guideResult.verified,
+      required: guideResult.required,
+      ready: guideResult.ready,
+      details: guideResult.details
+    },
+    staffReadback: sanitizeParadiseMessageReadback(staffResult),
+    structureVerification
   });
-  return interaction.editReply(destructive
-    ? `${selected.label} rebuild completed. Backup and final typed confirmation were recorded.`
-    : `${selected.label} repair completed. No extra channel or role was deleted.`);
+  return interaction.editReply(liveReady
+    ? `${selected.label} repair is live-verified. No extra channel or role was deleted.`
+    : `${selected.label} repair ran, but live permission/structure verification failed. No extra channel or role was deleted.`);
 }
 
-export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPermissions = true } = {}) {
-  assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "create_missing" });
+export async function applyParadiseTemplateMissingOnly(guild, mode, options = {}) {
+  return withParadiseGuildMutationLock(guild, "create_missing", async () => {
+    await updateParadiseMutationLease({ phase: options.repairPermissions ? "repairing_permissions" : "creating_missing_resources" });
+    return applyParadiseTemplateMissingOnlyUnlocked(guild, mode, options);
+  }, {
+    purposeKey: options.repairPermissions ? "discord_template_repair" : "discord_create_missing",
+    idempotencyKey: `${guild?.id}:${mode}:create-missing:${options.repairPermissions === true}`,
+    phase: "request_validated"
+  });
+}
+
+async function applyParadiseTemplateMissingOnlyUnlocked(guild, mode, {
+  repairPermissions = true,
+  mutationPolicy = PARADISE_TEST_REBUILD_POLICY
+} = {}) {
+  assertParadiseMutationPolicy(guild, mode, null, mutationPolicy, { confirmationRequired: false });
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) {
     const error = new Error("invalid_template");
@@ -2133,30 +3577,53 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
   }
 
   const snapshot = await snapshotGuild(guild);
-  await writeArtifact("3a59-discord-test-server-backup.json", snapshot);
+  await writeArtifact(`${mutationPolicy.artifactPrefix}-create-missing-backup.json`, snapshot);
   const beforeChannelIds = new Set(guild.channels.cache.keys());
   const beforeRoleIds = new Set(guild.roles.cache.keys());
   const wrongTypeChannels = [];
 
-  for (const [categoryName, channelNames, privateCategory] of selected.schema) {
+  const roleNamesToEnsure = repairPermissions
+    ? selected.roles
+    : selected.roles.filter(name => !guild.roles.cache.some(role => role.name === name));
+  const roleCreationFailures = [];
+  for (const name of roleNamesToEnsure) {
+    try {
+      await ensureRole(guild, name, repairPermissions);
+    } catch (error) {
+      roleCreationFailures.push({
+        name,
+        code: String(error?.code || "role_create_failed"),
+        roleId: error?.roleId || null,
+        expectedPermissions: error?.expectedPermissions ?? null,
+        actualPermissions: error?.actualPermissions ?? null,
+        discordCode: error?.discordCode || null
+      });
+    }
+  }
+  if (roleCreationFailures.length) {
+    const error = new Error("template_role_creation_failed");
+    error.code = "template_role_creation_failed";
+    error.failures = roleCreationFailures;
+    throw error;
+  }
+
+  for (const [categoryName, channelNames, privateCategory, accessRoleNames] of selected.schema) {
     let category = guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && channel.name === categoryName);
     if (!category) {
-      category = await guild.channels.create({
+      category = await ensureSetupChannel(guild, {
         name: categoryName,
         type: ChannelType.GuildCategory,
-        reason: "Paradise dashboard create-missing test"
+        reason: `${mutationPolicy.auditReason} create-missing`
       });
     }
     if (repairPermissions) {
-      await category.permissionOverwrites.edit(guild.roles.everyone, {
-        ViewChannel: privateCategory ? false : null
-      }).catch(() => {});
-      if (privateCategory) {
-        for (const roleName of selected.roles.filter(name => PRIVATE_ACCESS_ROLES.has(name))) {
-          const role = guild.roles.cache.find(item => item.name === roleName);
-          if (role) await category.permissionOverwrites.edit(role, { ViewChannel: true }).catch(() => {});
-        }
-      }
+      await repairParadiseCategoryVisibilityPermissions(
+        guild,
+        category,
+        selected.roles,
+        privateCategory,
+        accessRoleNames
+      );
     }
     for (const channelName of channelNames) {
       const expectedType = paradiseSetupChannelType(categoryName, channelName);
@@ -2164,51 +3631,60 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
       const wrongType = guild.channels.cache.find(item => item.name === channelName && paradiseSetupChannelTypeMismatch(item, categoryName, channelName));
       if (wrongType) wrongTypeChannels.push({ name: channelName, actualType: wrongType.type, expectedType });
       if (!channel) {
-        channel = await guild.channels.create({
+        channel = await ensureSetupChannel(guild, {
           name: channelName,
           type: expectedType,
           parent: category.id,
-          reason: "Paradise dashboard create-missing test"
+          reason: `${mutationPolicy.auditReason} create-missing`
         });
       } else if (channel.parentId !== category.id) {
         await channel.setParent(category.id, { lockPermissions: privateCategory }).catch(() => {});
       }
       await ensureBlacklistVisibility(guild, channel, channelName, selected.roles).catch(() => {});
       if (repairPermissions) await ensureCommunityProgressionPermissions(guild, channel, channelName, { mode, privateCategory });
+      if (mode === "community" && repairPermissions) {
+        await repairParadiseCommunityChannelPermissions(guild, channel, channelName, categoryName);
+      }
     }
   }
 
-  const missingRoleNames = selected.roles.filter(name => !guild.roles.cache.some(role => role.name === name));
-  const roleCreationResults = await Promise.allSettled(missingRoleNames.map(name => Promise.race([
-    ensureRole(guild, name, repairPermissions),
-    new Promise(resolve => setTimeout(() => resolve(null), 20_000))
-  ])));
-  const pendingRoleCreates = roleCreationResults.filter(result => result.status === "fulfilled" && !result.value).length;
   if (repairPermissions) {
-    await Promise.race([
-      organizeRoleHierarchy(guild, selected.roles),
-      new Promise(resolve => setTimeout(resolve, 20_000))
-    ]).catch(() => {});
+    await organizeRoleHierarchy(guild, selected.roles);
   }
+  const roleIcons = mode === "community" && repairPermissions
+    ? await reconcileParadiseCommunityExtendedRoleIcons(guild)
+    : { status: "not_requested", changed: 0, blockers: [] };
   const autoMod = repairPermissions
     ? await ensureParadiseAutoMod(guild).catch(error => ({ status: "failed", error: error.message }))
     : { status: "not_requested" };
   const mappedChannels = await applyParadiseTemplateChannelMappings(guild, mode);
-  const guideResult = await publishAllGuides(guild, mode).catch(error => ({ posted: 0, error: error.message }));
+  const guideResult = await publishAllGuides(guild, mode).catch(() => ({
+    posted: 0,
+    verified: 0,
+    required: 1,
+    ready: false,
+    mode,
+    details: [sanitizeParadiseMessageReadback(failedParadiseMessageReadback({ reason: "publisher_failed" }), "guides")]
+  }));
   if (mode !== "community") {
     await updateRelationsPanel(guild).catch(() => {});
     await updateAvailabilityPanel(guild).catch(() => {});
     await updateLoaPanel(guild).catch(() => {});
     await updateRankedLeaderboardBoards(guild).catch(() => {});
   }
-  await updateStaffTeamEmbed(guild).catch(() => {});
+  const staffResult = await updateStaffTeamEmbed(guild, mode)
+    .catch(() => failedParadiseMessageReadback({ reason: "publisher_failed" }));
   const voiceIds = paradiseVoiceSetupIds(guild);
   await configureParadiseAfkChannel(guild, voiceIds);
+  await guild.channels.fetch?.();
+  await guild.roles.fetch?.();
+  const structureVerification = verifyParadiseTemplateStructure(guild, selected);
+  const liveReady = structureVerification.ready && guideResult.ready && staffResult.ready;
 
   const createdChannels = [...guild.channels.cache.keys()].filter(id => !beforeChannelIds.has(id)).length;
   const createdRoles = [...guild.roles.cache.keys()].filter(id => !beforeRoleIds.has(id)).length;
   const result = {
-    status: "LIVE DISCORD VERIFIED",
+    status: liveReady ? "LIVE DISCORD VERIFIED" : "LIVE DISCORD FAILED",
     completedAt: new Date().toISOString(),
     guildId: guild.id,
     mode,
@@ -2216,11 +3692,21 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     operation: repairPermissions ? "create_missing_and_repair_permissions" : "create_missing_only",
     createdChannels,
     createdRoles,
-    pendingRoleCreates,
+    pendingRoleCreates: 0,
     mappedChannelCount: Object.keys(mappedChannels).length,
     guidePosts: Number(guideResult.posted || 0),
+    guideReadback: {
+      posted: guideResult.posted,
+      verified: guideResult.verified,
+      required: guideResult.required,
+      ready: guideResult.ready,
+      details: guideResult.details
+    },
+    staffReadback: sanitizeParadiseMessageReadback(staffResult),
     wrongChannelTypes: wrongTypeChannels,
-    autoMod
+    roleIcons,
+    autoMod,
+    structureVerification
   };
   await saveState(state => {
     state.guildConfigs[guild.id] = state.guildConfigs[guild.id] || structuredClone(state.config || {});
@@ -2231,80 +3717,2018 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, { repairPerm
     if (guild.id === PARADISE_TEST_GUILD_ID) state.config = structuredClone(config);
     return state;
   });
-  await writeArtifact(`3a63-${mode}-test-create-missing-live.json`, result);
+  await writeArtifact(`${mutationPolicy.artifactPrefix}-${mode}-create-missing-live.json`, result);
   return result;
 }
 
-export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
-  assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "rebuild" });
+function assertParadiseMutationPolicy(guild, mode, confirmation, policy, { confirmationRequired = true } = {}) {
+  if (!policy || !policy.allowedGuildId) {
+    const error = new Error("invalid_mutation_policy");
+    error.code = "invalid_mutation_policy";
+    throw error;
+  }
+  const guildId = String(guild?.id || "");
+  if (guildId !== String(policy.allowedGuildId)
+      || (policy.isProduction && guildId === PARADISE_TEST_GUILD_ID)) {
+    const error = new Error(policy.isProduction ? "production_guild_only" : "test_guild_only");
+    error.code = policy.isProduction ? "production_guild_only" : "test_guild_only";
+    throw error;
+  }
+  if (policy.isProduction && mode !== "community") {
+    const error = new Error("production_community_only");
+    error.code = "production_community_only";
+    throw error;
+  }
   const selected = PARADISE_SETUP_SCHEMAS[mode];
   if (!selected) {
     const error = new Error("invalid_template");
     error.code = "invalid_template";
     throw error;
   }
-  const expected = `REBUILD TEST ${mode.toUpperCase()}`;
-  if (String(confirmation || "").trim().toUpperCase() !== expected) {
+  const expected = policy.expectedConfirmation || `REBUILD TEST ${mode.toUpperCase()}`;
+  if (confirmationRequired && String(confirmation || "").trim().toUpperCase() !== expected.toUpperCase()) {
     const error = new Error("typed_confirmation_mismatch");
     error.code = "typed_confirmation_mismatch";
     throw error;
   }
+  return { selected, expected };
+}
 
-  const snapshot = await snapshotGuild(guild);
-  const backup = createParadiseBackupEnvelope(snapshot);
-  const restoreDryRun = buildParadiseRestoreDryRun({ backup, currentSnapshot: snapshot });
-  if (restoreDryRun.code !== "restore_dry_run_valid") {
-    const error = new Error("backup_restore_dry_run_failed");
-    error.code = "backup_restore_dry_run_failed";
+async function requireParadiseRebuildPreflight(guild, allowedCorrelationId = null, policy = PARADISE_TEST_REBUILD_POLICY) {
+  const state = await loadState();
+  const preflight = await inspectParadiseRebuildPreflight(guild, {
+    state,
+    allowedCorrelationId,
+    allowedGuildId: policy.allowedGuildId,
+    requireTestGuildRehearsal: policy.requireTestGuildRehearsal === true,
+    requireProductionDeploymentReadiness: policy.isProduction === true,
+    deploymentEnvironment: policy.deploymentEnvironment,
+    expectedTestGuildId: policy.expectedTestGuildId,
+    testGuildRehearsalMaxAgeMs: policy.testGuildRehearsalMaxAgeMs,
+    testGuildRehearsalEvidenceSecret: policy.testGuildRehearsalEvidenceSecret
+  });
+  if (!preflight.ready) {
+    const error = new Error(preflight.code || "paradise_rebuild_preflight_blocked");
+    error.code = preflight.code || "paradise_rebuild_preflight_blocked";
+    error.preflight = preflight;
     throw error;
   }
+  if (policy.isProduction) {
+    const expectedBackupDigest = String(policy.expectedBackupDigest || "").trim().toLowerCase();
+    if (!PARADISE_BACKUP_DIGEST_PATTERN.test(expectedBackupDigest)) {
+      const error = new Error("production_preflight_backup_digest_required");
+      error.code = "production_preflight_backup_digest_required";
+      error.preflight = preflight;
+      throw error;
+    }
+    if (String(preflight.backup?.guildId || "") !== String(policy.allowedGuildId)
+        || String(preflight.backup?.digest || "").toLowerCase() !== expectedBackupDigest) {
+      const error = new Error("production_preflight_backup_digest_mismatch");
+      error.code = "production_preflight_backup_digest_mismatch";
+      error.preflight = preflight;
+      throw error;
+    }
+  }
+  return preflight;
+}
+
+export async function inspectParadiseTestTemplateRebuildPreflight(guild) {
+  const state = await loadState();
+  return inspectParadiseRebuildPreflight(guild, { state });
+}
+
+export async function inspectFimaCommunityProductionRebuildPreflight(guild, options = {}) {
+  const state = await loadState();
+  return inspectParadiseRebuildPreflight(guild, {
+    state,
+    allowedGuildId: FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY.allowedGuildId,
+    requireTestGuildRehearsal: true,
+    requireProductionDeploymentReadiness: true,
+    deploymentEnvironment: options.deploymentEnvironment,
+    expectedTestGuildId: FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY.expectedTestGuildId,
+    testGuildRehearsalMaxAgeMs: FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY.testGuildRehearsalMaxAgeMs,
+    testGuildRehearsalEvidenceSecret: options.testGuildRehearsalEvidenceSecret,
+    includeBackupEnvelope: options.includeBackupEnvelope === true
+  });
+}
+
+export async function rebuildParadiseTestTemplate(guild, mode, confirmation) {
+  return rebuildParadiseTemplateWithPolicy(guild, mode, confirmation, PARADISE_TEST_REBUILD_POLICY);
+}
+
+async function persistParadiseRestoredState({ guildId, tickets, legacyTranscripts, guildConfig }) {
+  await saveState(next => {
+    next.guildConfigs = next.guildConfigs || {};
+    next.guildConfigs[guildId] = structuredClone(guildConfig || {});
+    if (guildId === PARADISE_TEST_GUILD_ID) next.config = structuredClone(next.guildConfigs[guildId]);
+
+    next.supportTickets = next.supportTickets || {};
+    next.supportTickets[guildId] = Object.fromEntries((tickets || []).map((ticket, index) => [
+      String(ticket?.id || ticket?.ticketId || ticket?.channelId || `restored-${index + 1}`),
+      structuredClone(ticket)
+    ]));
+
+    next.transcripts = Object.fromEntries(Object.entries(next.transcripts || {}).filter(([key, transcript]) =>
+      String(transcript?.guildId || "") !== guildId && !String(key).includes(`:${guildId}:`)
+    ));
+    Object.assign(next.transcripts, structuredClone(legacyTranscripts || {}));
+    return next;
+  });
+}
+
+function paradiseRehearsalError(code, details = {}) {
+  return Object.assign(new Error(code), { code, ...details });
+}
+
+async function refreshParadiseRollbackCaches(guild, timeoutMs = PARADISE_ROLLBACK_CACHE_REFRESH_TIMEOUT_MS) {
+  const boundedTimeoutMs = Number.isFinite(Number(timeoutMs))
+    ? Math.max(1, Math.min(60_000, Number(timeoutMs)))
+    : PARADISE_ROLLBACK_CACHE_REFRESH_TIMEOUT_MS;
+  let timer = null;
+  const refresh = Promise.all([
+    Promise.resolve().then(() => guild.channels?.fetch?.()),
+    Promise.resolve().then(() => guild.roles?.fetch?.())
+  ]);
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(paradiseRehearsalError("rollback_recovery_cache_refresh_timeout", {
+        timeoutMs: boundedTimeoutMs
+      }));
+    }, boundedTimeoutMs);
+    timer.unref?.();
+  });
+
+  try {
+    await Promise.race([refresh, timeout]);
+  } catch (cause) {
+    if (cause?.code === "rollback_recovery_cache_refresh_timeout") throw cause;
+    throw paradiseRehearsalError("rollback_recovery_cache_refresh_failed", { cause });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function assertParadiseRollbackRecoveryArtifactPath(artifactPath, artifactRoot = PARADISE_ARTIFACT_ROOT) {
+  const root = path.resolve(artifactRoot);
+  const candidate = path.resolve(String(artifactPath || ""));
+  const relative = path.relative(root, candidate);
+  if (!artifactPath
+      || path.extname(candidate).toLowerCase() !== ".json"
+      || relative === ""
+      || relative.startsWith(`..${path.sep}`)
+      || relative === ".."
+      || path.isAbsolute(relative)) {
+    throw paradiseRehearsalError("rollback_recovery_backup_path_invalid");
+  }
+  return { root, candidate };
+}
+
+async function assertParadiseRollbackRecoveryRealPath(root, candidate, realpath) {
+  if (typeof realpath !== "function") return candidate;
+  let realRoot;
+  let realCandidate;
+  try {
+    [realRoot, realCandidate] = await Promise.all([realpath(root), realpath(candidate)]);
+  } catch (cause) {
+    throw paradiseRehearsalError("rollback_recovery_backup_artifact_unavailable", { cause });
+  }
+  const relative = path.relative(path.resolve(realRoot), path.resolve(realCandidate));
+  if (relative === ""
+      || relative.startsWith(`..${path.sep}`)
+      || relative === ".."
+      || path.isAbsolute(relative)
+      || path.extname(realCandidate).toLowerCase() !== ".json") {
+    throw paradiseRehearsalError("rollback_recovery_backup_path_invalid");
+  }
+  return realCandidate;
+}
+
+/**
+ * Recovers a stranded test-guild rollback marker from its authenticated backup.
+ * An already matching guild is resolved without mutation; otherwise the backup
+ * is restored under the persistent mutation lease and reconciled again before
+ * the marker can be resolved.
+ */
+async function recoverParadiseRollback(guild, confirmation, dependencies, recoveryPolicy) {
+  const targetGuildId = recoveryPolicy.guildId;
+  const isProduction = recoveryPolicy.isProduction === true;
+  if (String(guild?.id || "") !== targetGuildId) {
+    throw paradiseRehearsalError(isProduction ? "production_guild_only" : "test_guild_only");
+  }
+  if (!isProduction
+      && String(confirmation || "").trim() !== PARADISE_TEST_ROLLBACK_RECOVERY_CONFIRMATION) {
+    throw paradiseRehearsalError("typed_confirmation_mismatch");
+  }
+
+  const withMutationLock = dependencies.withMutationLock || withParadiseGuildMutationLock;
+  const readRollback = dependencies.readRollback || readParadiseRollbackMarker;
+  const resolveRollback = dependencies.resolveRollback || resolveParadiseRollbackMarker;
+  const updateRollback = dependencies.updateRollback || updateParadiseRollbackMarker;
+  const loadCurrentState = dependencies.loadState || loadState;
+  const captureSnapshot = dependencies.captureSnapshot || captureParadiseGuildBackupSnapshot;
+  const validateBackup = dependencies.validateBackup || validateParadiseBackupEnvelope;
+  const backupStateDigest = dependencies.backupStateDigest || paradiseBackupStateDigest;
+  const createRestoreDryRun = dependencies.createRestoreDryRun || buildParadiseRestoreDryRun;
+  const restoreBackup = dependencies.restoreBackup || restoreParadiseGuildBackup;
+  const persistRestoredState = dependencies.persistRestoredState || persistParadiseRestoredState;
+  const persistArtifact = dependencies.persistArtifact || writeArtifact;
+  const updateLease = dependencies.updateLease || updateParadiseMutationLease;
+  const refreshRollbackCaches = dependencies.refreshRollbackCaches || refreshParadiseRollbackCaches;
+  const rollbackCacheRefreshTimeoutMs = dependencies.rollbackCacheRefreshTimeoutMs
+    ?? PARADISE_ROLLBACK_CACHE_REFRESH_TIMEOUT_MS;
+  const artifactRoot = path.resolve(dependencies.artifactRoot || PARADISE_ARTIFACT_ROOT);
+  const readBackupArtifact = dependencies.readBackupArtifact || (async artifactPath => {
+    try {
+      return JSON.parse(await fs.readFile(artifactPath, "utf8"));
+    } catch (cause) {
+      throw paradiseRehearsalError("rollback_recovery_backup_artifact_invalid", { cause });
+    }
+  });
+  const realpath = dependencies.realpath
+    || (dependencies.readBackupArtifact ? null : fs.realpath.bind(fs));
+
+  return withMutationLock(guild, "recover_rollback", async () => {
+    await updateLease({ phase: "rollback_recovery_validating_marker", status: "active" });
+    const marker = await readRollback(targetGuildId);
+    if (!marker) throw paradiseRehearsalError("rollback_marker_missing");
+    if (Number(marker.schemaVersion) !== 1
+        || String(marker.guildId || "") !== targetGuildId
+        || !String(marker.markerId || "")) {
+      throw paradiseRehearsalError("rollback_marker_schema_invalid");
+    }
+    const markerStatus = String(marker.status || "");
+    if (!["rollback_required", "rollback_in_progress"].includes(markerStatus)) {
+      throw paradiseRehearsalError("rollback_marker_not_recoverable");
+    }
+    const markerId = String(marker.markerId);
+    const markerDigest = String(marker.backupDigest || "").toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(markerDigest)) {
+      throw paradiseRehearsalError("rollback_marker_backup_invalid");
+    }
+    if (String(marker.mode || "") !== recoveryPolicy.markerMode) {
+      throw paradiseRehearsalError("rollback_recovery_marker_mode_mismatch");
+    }
+
+    const checkedPath = assertParadiseRollbackRecoveryArtifactPath(marker.backupArtifact, artifactRoot);
+    const backupPath = await assertParadiseRollbackRecoveryRealPath(
+      checkedPath.root,
+      checkedPath.candidate,
+      realpath
+    );
+    let backup;
+    try {
+      backup = await readBackupArtifact(backupPath);
+    } catch (cause) {
+      if (cause?.code === "rollback_recovery_backup_artifact_invalid") throw cause;
+      throw paradiseRehearsalError("rollback_recovery_backup_artifact_invalid", { cause });
+    }
+    const validation = validateBackup(backup);
+    if (!validation?.valid) {
+      throw paradiseRehearsalError("rollback_recovery_backup_invalid", {
+        validation: { code: String(validation?.code || "backup_invalid") }
+      });
+    }
+    const canonicalDigest = String(backup?.integrity?.digest || "").toLowerCase();
+    const calculatedStateDigest = String(backupStateDigest(backup) || "").toLowerCase();
+    const recordedStateDigest = String(backup?.integrity?.stateDigest || calculatedStateDigest).toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(calculatedStateDigest)
+        || calculatedStateDigest !== recordedStateDigest) {
+      throw paradiseRehearsalError("rollback_recovery_backup_state_digest_mismatch");
+    }
+    if (canonicalDigest !== markerDigest) {
+      throw paradiseRehearsalError("rollback_recovery_backup_digest_mismatch");
+    }
+    if (String(backup?.guildId || backup?.guild?.id || "") !== targetGuildId) {
+      throw paradiseRehearsalError("rollback_recovery_backup_guild_mismatch");
+    }
+    if (isProduction) {
+      const authorization = confirmation || {};
+      let proof;
+      try {
+        proof = verifyParadiseProductionRebuildExecutionProof(authorization.executionProof, {
+          secret: authorization.executionProofSecret,
+          guildId: targetGuildId,
+          mode: "community",
+          backupDigest: calculatedStateDigest,
+          planId: authorization.planId,
+          nowMs: authorization.nowMs ?? Date.now()
+        });
+      } catch {
+        throw paradiseRehearsalError("production_rebuild_execution_proof_invalid");
+      }
+      if (!proof?.ok) throw paradiseRehearsalError(proof?.code || "production_rebuild_execution_proof_invalid");
+      if (String(marker.confirmation || "") !== paradiseProductionRestoreConfirmation(backup)) {
+        throw paradiseRehearsalError("rollback_recovery_marker_confirmation_mismatch");
+      }
+    }
+
+    const assertMarkerUnchanged = (currentMarker, expectedStatus = "rollback_required") => {
+      if (!currentMarker
+          || Number(currentMarker.schemaVersion) !== 1
+          || String(currentMarker.guildId || "") !== targetGuildId
+          || String(currentMarker.markerId || "") !== markerId
+          || String(currentMarker.status || "") !== expectedStatus
+          || String(currentMarker.backupDigest || "").toLowerCase() !== markerDigest
+          || String(currentMarker.backupArtifact || "") !== String(marker.backupArtifact || "")) {
+        throw paradiseRehearsalError("rollback_recovery_marker_changed");
+      }
+      return currentMarker;
+    };
+
+    const persistReconciliation = async (reconciliation, source, resolutionEligible) => {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      return persistArtifact(`${recoveryPolicy.artifactPrefix}-rollback-recovery-reconciliation-${stamp}.json`, {
+        schemaVersion: 1,
+        guildId: targetGuildId,
+        markerId,
+        backupDigest: markerDigest,
+        capturedAt: new Date().toISOString(),
+        source,
+        reconciliation,
+        resolutionEligible
+      });
+    };
+
+    await updateLease({ phase: "rollback_recovery_fresh_snapshot" });
+    const state = await loadCurrentState();
+    const snapshot = await captureSnapshot(guild, { state });
+    const reconciliation = createRestoreDryRun({
+      backup,
+      currentSnapshot: snapshot,
+      expectedGuildId: targetGuildId,
+      allowedGuildId: targetGuildId
+    });
+    const safeReconciliation = {
+      canRestore: reconciliation?.canRestore === true,
+      mutationsPlanned: Number(reconciliation?.mutationsPlanned || 0),
+      source: `fresh_${recoveryPolicy.sourceLabel}_rollback_recovery_snapshot`
+    };
+    await persistReconciliation(
+      reconciliation,
+      safeReconciliation.source,
+      safeReconciliation.canRestore && safeReconciliation.mutationsPlanned === 0
+    );
+    if (!safeReconciliation.canRestore) {
+      throw paradiseRehearsalError("rollback_recovery_reconciliation_not_zero", {
+        reconciliation: safeReconciliation
+      });
+    }
+
+    assertMarkerUnchanged(await readRollback(targetGuildId), markerStatus);
+
+    let resolutionReconciliation = safeReconciliation;
+    if (safeReconciliation.mutationsPlanned !== 0) {
+      let restore = null;
+      let rollbackInProgress = markerStatus === "rollback_in_progress";
+      try {
+        await updateLease({ phase: "rollback_recovery_restoring_backup", status: "rolling_back" });
+        if (rollbackInProgress) {
+          assertMarkerUnchanged(
+            await readRollback(targetGuildId),
+            "rollback_in_progress"
+          );
+        } else {
+          const inProgressMarker = await updateRollback(targetGuildId, markerId, {
+            status: "rollback_in_progress",
+            reconciliation: safeReconciliation
+          });
+          rollbackInProgress = true;
+          if (String(inProgressMarker?.markerId || "") !== markerId
+              || String(inProgressMarker?.status || "") !== "rollback_in_progress") {
+            throw paradiseRehearsalError("rollback_recovery_marker_update_failed");
+          }
+        }
+        restore = await restoreBackup({
+          guild,
+          backup,
+          confirmation: isProduction
+            ? paradiseProductionRestoreConfirmation(backup)
+            : paradiseRestoreConfirmation(backup),
+          allowedGuildId: targetGuildId,
+          productionAuthorization: isProduction ? {
+            executionProof: confirmation.executionProof,
+            executionProofSecret: confirmation.executionProofSecret,
+            planId: confirmation.planId,
+            mode: "community",
+            nowMs: confirmation.nowMs ?? Date.now()
+          } : null,
+          currentState: await loadCurrentState(),
+          persistRestoredState,
+          reason: recoveryPolicy.reason
+        });
+
+        await refreshRollbackCaches(guild, rollbackCacheRefreshTimeoutMs);
+        await updateLease({ phase: "rollback_recovery_post_restore_snapshot", status: "rolling_back" });
+        const restoredState = await loadCurrentState();
+        const restoredSnapshot = await captureSnapshot(guild, { state: restoredState });
+        const postRestoreReconciliation = createRestoreDryRun({
+          backup,
+          currentSnapshot: restoredSnapshot,
+          expectedGuildId: targetGuildId,
+          allowedGuildId: targetGuildId
+        });
+        resolutionReconciliation = {
+          canRestore: postRestoreReconciliation?.canRestore === true,
+          mutationsPlanned: Number(postRestoreReconciliation?.mutationsPlanned || 0),
+          source: `fresh_${recoveryPolicy.sourceLabel}_rollback_recovery_post_restore_snapshot`
+        };
+        const reconciliationArtifact = await persistReconciliation(
+          postRestoreReconciliation,
+          resolutionReconciliation.source,
+          resolutionReconciliation.canRestore && resolutionReconciliation.mutationsPlanned === 0
+        );
+        if (!resolutionReconciliation.canRestore || resolutionReconciliation.mutationsPlanned !== 0) {
+          throw paradiseRehearsalError("rollback_recovery_post_restore_reconciliation_not_zero", {
+            reconciliation: resolutionReconciliation,
+            reconciliationArtifact
+          });
+        }
+        assertMarkerUnchanged(await readRollback(targetGuildId), "rollback_in_progress");
+      } catch (error) {
+        if (rollbackInProgress) {
+          const currentMarker = await readRollback(targetGuildId).catch(() => null);
+          if (currentMarker
+              && String(currentMarker.markerId || "") === markerId
+              && String(currentMarker.status || "") === "rollback_in_progress"
+              && String(currentMarker.backupDigest || "").toLowerCase() === markerDigest
+              && String(currentMarker.backupArtifact || "") === String(marker.backupArtifact || "")) {
+            await updateRollback(targetGuildId, markerId, {
+              status: "rollback_required",
+              rollback: restore,
+              rollbackError: sanitizeParadiseMutationFailure(error, "rollback_recovery_restore_failed")
+            }).catch(() => null);
+          }
+          await updateLease({
+            phase: "rollback_recovery_failed_rollback_required",
+            status: "failed_rollback_required"
+          }).catch(() => null);
+        }
+        throw error;
+      }
+    }
+
+    let resolved;
+    try {
+      resolved = await resolveRollback(targetGuildId, markerId, resolutionReconciliation);
+      if (String(resolved?.markerId || "") !== markerId || String(resolved?.status || "") !== "resolved") {
+        throw paradiseRehearsalError("rollback_recovery_resolution_failed");
+      }
+    } catch (error) {
+      if (safeReconciliation.mutationsPlanned !== 0 || markerStatus === "rollback_in_progress") {
+        const currentMarker = await readRollback(targetGuildId).catch(() => null);
+        if (currentMarker
+            && String(currentMarker.markerId || "") === markerId
+            && String(currentMarker.status || "") === "rollback_in_progress"
+            && String(currentMarker.backupDigest || "").toLowerCase() === markerDigest
+            && String(currentMarker.backupArtifact || "") === String(marker.backupArtifact || "")) {
+          await updateRollback(targetGuildId, markerId, {
+            status: "rollback_required",
+            rollbackError: sanitizeParadiseMutationFailure(error, "rollback_recovery_resolution_failed")
+          }).catch(() => null);
+        }
+        await updateLease({
+          phase: "rollback_recovery_failed_rollback_required",
+          status: "failed_rollback_required"
+        }).catch(() => null);
+      }
+      throw error;
+    }
+    await updateLease({
+      phase: "rollback_recovery_reconciled",
+      status: "completed",
+      reconciliation: resolutionReconciliation
+    });
+    return Object.freeze({
+      action: "recover-rollback",
+      status: "ok",
+      completedAt: new Date().toISOString(),
+      mode: "community",
+      rollbackRecovered: true,
+      reconciliationCanRestore: true,
+      reconciliationMutationsPlanned: 0
+    });
+  }, {
+    failIfLocked: true,
+    purposeKey: recoveryPolicy.purposeKey,
+    idempotencyKey: `${targetGuildId}:community:${isProduction ? confirmation.planId : PARADISE_TEST_ROLLBACK_RECOVERY_CONFIRMATION}`,
+    phase: "request_validated",
+    expectedGuildId: targetGuildId
+  });
+}
+
+export async function recoverParadiseTestRollback(guild, confirmation, dependencies = {}) {
+  return recoverParadiseRollback(guild, confirmation, dependencies, {
+    guildId: PARADISE_TEST_GUILD_ID,
+    isProduction: false,
+    markerMode: "test_guild_rebuild:community",
+    artifactPrefix: "test-guild",
+    sourceLabel: "test_guild",
+    reason: "FIMA test-guild stranded rollback recovery",
+    purposeKey: "discord_test_guild_rollback_recovery"
+  });
+}
+
+export async function recoverFimaCommunityProductionRollback(guild, authorization, dependencies = {}) {
+  return recoverParadiseRollback(guild, authorization, dependencies, {
+    guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+    isProduction: true,
+    markerMode: "production_ft_community_rebuild:community",
+    artifactPrefix: "production-ft-community",
+    sourceLabel: "production_ft_community",
+    reason: "FIMA FT Community stranded production rollback recovery",
+    purposeKey: "discord_ft_community_production_rollback_recovery"
+  });
+}
+
+/**
+ * Resolves the production rollback marker only after the outer orchestrator
+ * has completed its fresh audit, profile readbacks and sealed the plan. The
+ * marker stays fail-closed for every earlier return path.
+ */
+export async function finalizeFimaCommunityProductionRollback(
+  guild,
+  authorization = {},
+  dependencies = {}
+) {
+  const targetGuildId = FIMA_COMMUNITY_PRODUCTION_GUILD_ID;
+  if (String(guild?.id || "") !== targetGuildId) {
+    throw paradiseRehearsalError("production_guild_only");
+  }
+
+  const markerId = String(authorization.markerId || "").trim();
+  const expectedBackupDigest = String(authorization.expectedBackupDigest || "").trim().toLowerCase();
+  const planId = String(authorization.planId || "").trim();
+  if (!/^[a-z0-9_-]{8,128}$/i.test(markerId)
+      || !PARADISE_BACKUP_DIGEST_PATTERN.test(expectedBackupDigest)
+      || !planId) {
+    throw paradiseRehearsalError("rollback_finalization_scope_invalid");
+  }
+
+  const withMutationLock = dependencies.withMutationLock || withParadiseGuildMutationLock;
+  const readRollback = dependencies.readRollback || readParadiseRollbackMarker;
+  const resolveRollback = dependencies.resolveRollback || resolveParadiseRollbackMarker;
+  const verifyExecutionProof = dependencies.verifyExecutionProof
+    || verifyParadiseProductionRebuildExecutionProof;
+  const validateBackup = dependencies.validateBackup || validateParadiseBackupEnvelope;
+  const backupStateDigest = dependencies.backupStateDigest || paradiseBackupStateDigest;
+  const artifactRoot = path.resolve(dependencies.artifactRoot || PARADISE_ARTIFACT_ROOT);
+  const readBackupArtifact = dependencies.readBackupArtifact || (async artifactPath => {
+    try {
+      return JSON.parse(await fs.readFile(artifactPath, "utf8"));
+    } catch (cause) {
+      throw paradiseRehearsalError("rollback_finalization_backup_artifact_invalid", { cause });
+    }
+  });
+  const realpath = dependencies.realpath
+    || (dependencies.readBackupArtifact ? null : fs.realpath.bind(fs));
+
+  return withMutationLock(guild, "finalize_production_rollback", async () => {
+    let proof;
+    try {
+      proof = verifyExecutionProof(authorization.executionProof, {
+        secret: authorization.executionProofSecret,
+        guildId: targetGuildId,
+        mode: "community",
+        backupDigest: expectedBackupDigest,
+        planId,
+        nowMs: authorization.nowMs ?? Date.now()
+      });
+    } catch {
+      throw paradiseRehearsalError("production_rebuild_execution_proof_invalid");
+    }
+    if (!proof?.ok) {
+      throw paradiseRehearsalError("production_rebuild_execution_proof_invalid");
+    }
+
+    const marker = await readRollback(targetGuildId);
+    const markerDigest = String(marker?.backupDigest || "").toLowerCase();
+    if (!marker
+        || Number(marker.schemaVersion) !== 1
+        || String(marker.guildId || "") !== targetGuildId
+        || String(marker.markerId || "") !== markerId
+        || String(marker.mode || "") !== "production_ft_community_rebuild:community"
+        || String(marker.status || "") !== "rollback_required"
+        || marker.pendingFinalization !== true
+        || String(marker.phase || "") !== "orchestrator_verification_pending"
+        || !PARADISE_BACKUP_DIGEST_PATTERN.test(markerDigest)) {
+      throw paradiseRehearsalError("rollback_finalization_marker_invalid");
+    }
+
+    const checkedPath = assertParadiseRollbackRecoveryArtifactPath(marker.backupArtifact, artifactRoot);
+    const backupPath = await assertParadiseRollbackRecoveryRealPath(
+      checkedPath.root,
+      checkedPath.candidate,
+      realpath
+    );
+    const backup = await readBackupArtifact(backupPath);
+    const validation = validateBackup(backup);
+    const calculatedStateDigest = String(backupStateDigest(backup) || "").toLowerCase();
+    if (!validation?.valid
+        || String(backup?.guildId || backup?.guild?.id || "") !== targetGuildId
+        || String(backup?.integrity?.digest || "").toLowerCase() !== markerDigest
+        || !PARADISE_BACKUP_DIGEST_PATTERN.test(calculatedStateDigest)
+        || calculatedStateDigest !== expectedBackupDigest
+        || String(marker.confirmation || "") !== paradiseProductionRestoreConfirmation(backup)) {
+      throw paradiseRehearsalError("rollback_finalization_backup_invalid");
+    }
+
+    const current = await readRollback(targetGuildId);
+    if (!current
+        || String(current.markerId || "") !== markerId
+        || String(current.status || "") !== "rollback_required"
+        || String(current.mode || "") !== "production_ft_community_rebuild:community"
+        || current.pendingFinalization !== true
+        || String(current.backupDigest || "").toLowerCase() !== markerDigest
+        || String(current.backupArtifact || "") !== String(marker.backupArtifact || "")) {
+      throw paradiseRehearsalError("rollback_finalization_marker_changed");
+    }
+
+    const resolved = await resolveRollback(targetGuildId, markerId, {
+      canRestore: true,
+      mutationsPlanned: 0,
+      source: "fresh_ft_community_orchestrator_verification"
+    });
+    if (String(resolved?.markerId || "") !== markerId
+        || String(resolved?.status || "") !== "resolved") {
+      throw paradiseRehearsalError("rollback_finalization_resolution_failed");
+    }
+    return Object.freeze({
+      status: "ok",
+      rollbackFinalized: true
+    });
+  }, {
+    failIfLocked: true,
+    purposeKey: "discord_ft_community_production_rollback_finalization",
+    idempotencyKey: `${targetGuildId}:community:${planId}:finalize`,
+    phase: "request_validated",
+    expectedGuildId: targetGuildId
+  });
+}
+
+/**
+ * Restart-safe finalization path. It deliberately accepts no Discord client
+ * or guild object and authorizes only an authenticated, persisted receipt
+ * bound to the completed plan and unresolved rollback marker.
+ */
+export async function finalizeFimaCommunityProductionRollbackFromReceipt(
+  authorization = {},
+  dependencies = {}
+) {
+  const targetGuildId = FIMA_COMMUNITY_PRODUCTION_GUILD_ID;
+  const secret = String(authorization.secret || "");
+  const withMutationLock = dependencies.withMutationLock || withParadiseGuildMutationLock;
+  const readReceipt = dependencies.readReceipt || readParadiseProductionFinalizationReceipt;
+  const readRollback = dependencies.readRollback || readParadiseRollbackMarker;
+  const resolveRollback = dependencies.resolveRollback || resolveParadiseRollbackMarker;
+  const resolveReceipt = dependencies.resolveReceipt
+    || resolveParadiseProductionFinalizationReceipt;
+  const validateBackup = dependencies.validateBackup || validateParadiseBackupEnvelope;
+  const backupStateDigest = dependencies.backupStateDigest || paradiseBackupStateDigest;
+  const artifactRoot = path.resolve(dependencies.artifactRoot || PARADISE_ARTIFACT_ROOT);
+  const readBackupArtifact = dependencies.readBackupArtifact || (async artifactPath => {
+    try {
+      return JSON.parse(await fs.readFile(artifactPath, "utf8"));
+    } catch (cause) {
+      throw paradiseRehearsalError("rollback_finalization_backup_artifact_invalid", { cause });
+    }
+  });
+  const realpath = dependencies.realpath
+    || (dependencies.readBackupArtifact ? null : fs.realpath.bind(fs));
+
+  let initialMarker;
+  let receipt;
+  try {
+    initialMarker = await readRollback(targetGuildId);
+    const initialMarkerId = String(initialMarker?.markerId || "").trim();
+    try {
+      receipt = await readReceipt({
+        guildId: targetGuildId,
+        markerId: initialMarkerId,
+        lifecycle: "pending",
+        planRoot: authorization.planRoot,
+        secret,
+        fileApi: dependencies.fileApi
+      });
+    } catch (error) {
+      if (error?.code !== "production_finalization_receipt_index_unavailable"
+          || String(initialMarker?.status || "") !== "resolved") {
+        throw error;
+      }
+      receipt = await readReceipt({
+        guildId: targetGuildId,
+        markerId: initialMarkerId,
+        lifecycle: "resolved",
+        planRoot: authorization.planRoot,
+        secret,
+        fileApi: dependencies.fileApi
+      });
+    }
+  } catch {
+    throw paradiseRehearsalError("production_finalization_receipt_invalid");
+  }
+  const markerId = String(receipt?.markerId || "").trim();
+  const planId = String(receipt?.planId || "").trim();
+  const stateDigest = String(receipt?.backupDigest || "").trim().toLowerCase();
+  const artifactDigest = String(receipt?.backupArtifactDigest || "").trim().toLowerCase();
+  if (String(receipt?.guildId || "") !== targetGuildId
+      || String(receipt?.mode || "") !== "community"
+      || receipt?.outcome !== "completed"
+      || !/^[0-9a-f-]{36}$/i.test(planId)
+      || !/^[a-z0-9_-]{8,128}$/i.test(markerId)
+      || String(initialMarker?.markerId || "") !== markerId
+      || !PARADISE_BACKUP_DIGEST_PATTERN.test(stateDigest)
+      || !PARADISE_BACKUP_DIGEST_PATTERN.test(artifactDigest)) {
+    throw paradiseRehearsalError("rollback_finalization_scope_invalid");
+  }
+
+  return withMutationLock(targetGuildId, "finalize_production_rollback_from_receipt", async () => {
+    const marker = await readRollback(targetGuildId);
+    if (!marker
+        || Number(marker.schemaVersion) !== 1
+        || String(marker.guildId || "") !== targetGuildId
+        || String(marker.markerId || "") !== markerId
+        || String(marker.mode || "") !== "production_ft_community_rebuild:community"
+        || String(marker.backupDigest || "").toLowerCase() !== artifactDigest) {
+      throw paradiseRehearsalError("rollback_finalization_marker_invalid");
+    }
+    if (String(marker.status || "") === "resolved") {
+      await resolveReceipt({
+        guildId: targetGuildId,
+        markerId,
+        planId,
+        planRoot: authorization.planRoot,
+        secret,
+        fileApi: dependencies.fileApi
+      });
+      return Object.freeze({
+        status: "ok",
+        rollbackFinalized: true,
+        alreadyFinalized: true
+      });
+    }
+    if (String(marker.status || "") !== "rollback_required"
+        || marker.pendingFinalization !== true
+        || String(marker.phase || "") !== "orchestrator_verification_pending") {
+      throw paradiseRehearsalError("rollback_finalization_marker_invalid");
+    }
+
+    const checkedPath = assertParadiseRollbackRecoveryArtifactPath(marker.backupArtifact, artifactRoot);
+    const backupPath = await assertParadiseRollbackRecoveryRealPath(
+      checkedPath.root,
+      checkedPath.candidate,
+      realpath
+    );
+    const backup = await readBackupArtifact(backupPath);
+    const validation = validateBackup(backup);
+    if (!validation?.valid
+        || String(backup?.guildId || backup?.guild?.id || "") !== targetGuildId
+        || String(backup?.integrity?.digest || "").toLowerCase() !== artifactDigest
+        || String(backupStateDigest(backup) || "").toLowerCase() !== stateDigest
+        || String(marker.confirmation || "") !== paradiseProductionRestoreConfirmation(backup)) {
+      throw paradiseRehearsalError("rollback_finalization_backup_invalid");
+    }
+
+    const current = await readRollback(targetGuildId);
+    if (!current
+        || String(current.markerId || "") !== markerId
+        || String(current.status || "") !== "rollback_required"
+        || String(current.mode || "") !== "production_ft_community_rebuild:community"
+        || current.pendingFinalization !== true
+        || String(current.backupDigest || "").toLowerCase() !== artifactDigest
+        || String(current.backupArtifact || "") !== String(marker.backupArtifact || "")) {
+      throw paradiseRehearsalError("rollback_finalization_marker_changed");
+    }
+    const resolved = await resolveRollback(targetGuildId, markerId, {
+      canRestore: true,
+      mutationsPlanned: 0,
+      source: "authenticated_ft_community_finalization_receipt"
+    });
+    if (String(resolved?.markerId || "") !== markerId
+        || String(resolved?.status || "") !== "resolved") {
+      throw paradiseRehearsalError("rollback_finalization_resolution_failed");
+    }
+    await resolveReceipt({
+      guildId: targetGuildId,
+      markerId,
+      planId,
+      planRoot: authorization.planRoot,
+      secret,
+      fileApi: dependencies.fileApi
+    });
+    return Object.freeze({ status: "ok", rollbackFinalized: true, alreadyFinalized: false });
+  }, {
+    failIfLocked: true,
+    purposeKey: "discord_ft_community_production_rollback_finalization",
+    idempotencyKey: `${targetGuildId}:community:${planId}:${markerId}:receipt-finalize`,
+    phase: "request_validated",
+    expectedGuildId: targetGuildId
+  });
+}
+
+export async function rehearseParadiseTestTemplate(
+  guild,
+  mode,
+  confirmation,
+  dependencies = {}
+) {
+  if (String(guild?.id || "") !== PARADISE_TEST_GUILD_ID) {
+    throw paradiseRehearsalError("test_guild_only");
+  }
+  if (mode !== "community") throw paradiseRehearsalError("test_rehearsal_community_only");
+  if (String(confirmation || "").trim() !== PARADISE_TEST_REHEARSAL_CONFIRMATION) {
+    throw paradiseRehearsalError("typed_confirmation_mismatch");
+  }
+
+  const loadCurrentState = dependencies.loadState || loadState;
+  const captureSnapshot = dependencies.captureSnapshot || captureParadiseGuildBackupSnapshot;
+  const createBackup = dependencies.createBackup || createParadiseBackupEnvelope;
+  const validateBackup = dependencies.validateBackup || validateParadiseBackupEnvelope;
+  const createRestoreDryRun = dependencies.createRestoreDryRun || buildParadiseRestoreDryRun;
+  const validateBackupCopies = dependencies.validateBackupCopies || validateParadiseBackupArtifactCopies;
+  const persistArtifact = dependencies.persistArtifact || writeArtifact;
+  const readArtifact = dependencies.readArtifact || (artifactPath => fs.readFile(artifactPath, "utf8").then(JSON.parse));
+  const rebuildTemplate = dependencies.rebuildTemplate || rebuildParadiseTemplateUnlocked;
+  const runSmoke = dependencies.runSmoke || runParadiseTestSmokeSuiteUnlocked;
+  const restoreBackup = dependencies.restoreBackup || restoreParadiseGuildBackup;
+  const persistRestoredState = dependencies.persistRestoredState || persistParadiseRestoredState;
+  const requirePreflight = dependencies.requirePreflight || requireParadiseRebuildPreflight;
+  const withMutationLock = dependencies.withMutationLock || withParadiseGuildMutationLock;
+  const currentLease = dependencies.currentLease || paradiseCurrentMutationLease;
+  const updateLease = dependencies.updateLease || updateParadiseMutationLease;
+  const updateRollback = dependencies.updateRollback || updateParadiseRollbackMarker;
+  const resolveRollback = dependencies.resolveRollback || resolveParadiseRollbackMarker;
+
+  await requirePreflight(guild, null, PARADISE_TEST_REBUILD_POLICY);
+  return withMutationLock(guild, "rehearsal", async () => {
+    const lease = currentLease();
+    await requirePreflight(guild, lease?.correlationId || null, PARADISE_TEST_REBUILD_POLICY);
+    await updateLease({ phase: "rehearsal_backup", status: "active" });
+
+    let initialBackup = null;
+    let initialBackupArtifact = null;
+    let rollbackMarker = null;
+    let mutationStarted = false;
+
+    const restoreOriginalAndVerify = async source => {
+      await updateLease({ phase: `${source}_restore_original`, status: "rolling_back" });
+      const restore = await restoreBackup({
+        guild,
+        backup: initialBackup,
+        confirmation: paradiseRestoreConfirmation(initialBackup),
+        allowedGuildId: PARADISE_TEST_GUILD_ID,
+        currentState: await loadCurrentState(),
+        persistRestoredState,
+        reason: "FIMA test-guild rehearsal original-state restoration"
+      });
+      await guild.channels?.fetch?.();
+      await guild.roles?.fetch?.();
+      const restoredState = await loadCurrentState();
+      const restoredSnapshot = await captureSnapshot(guild, { state: restoredState });
+      const reconciliation = createRestoreDryRun({
+        backup: initialBackup,
+        currentSnapshot: restoredSnapshot,
+        expectedGuildId: PARADISE_TEST_GUILD_ID,
+        allowedGuildId: PARADISE_TEST_GUILD_ID
+      });
+      if (!reconciliation.canRestore || reconciliation.mutationsPlanned !== 0) {
+        throw paradiseRehearsalError("test_rehearsal_original_state_mismatch", {
+          reconciliation: {
+            canRestore: reconciliation.canRestore === true,
+            mutationsPlanned: Number(reconciliation.mutationsPlanned || 0)
+          }
+        });
+      }
+      return { restore, reconciliation };
+    };
+
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const initialState = await loadCurrentState();
+      const initialSnapshot = await captureSnapshot(guild, { state: initialState });
+      initialBackup = createBackup(initialSnapshot);
+      const initialValidation = validateBackup(initialBackup);
+      if (!initialValidation.valid) throw paradiseRehearsalError("test_rehearsal_backup_invalid");
+
+      const initialDryRun = createRestoreDryRun({
+        backup: initialBackup,
+        currentSnapshot: initialSnapshot,
+        expectedGuildId: PARADISE_TEST_GUILD_ID,
+        allowedGuildId: PARADISE_TEST_GUILD_ID
+      });
+      if (!initialDryRun.canRestore || initialDryRun.mutationsPlanned !== 0) {
+        throw paradiseRehearsalError("test_rehearsal_initial_zero_diff_failed");
+      }
+
+      await updateLease({ phase: "rehearsal_persisting_backup" });
+      initialBackupArtifact = await persistArtifact(`test-guild-rehearsal-backup-${stamp}.json`, initialBackup);
+      const canonicalBackupArtifact = await persistArtifact("test-guild-rehearsal-pre-rebuild-backup.json", initialBackup);
+      const [diskBackup, canonicalDiskBackup] = await Promise.all([
+        readArtifact(initialBackupArtifact),
+        readArtifact(canonicalBackupArtifact)
+      ]);
+      const copiesValidation = validateBackupCopies({
+        timestampedBackup: diskBackup,
+        canonicalBackup: canonicalDiskBackup,
+        expectedBackup: initialBackup,
+        expectedGuildId: PARADISE_TEST_GUILD_ID
+      });
+      if (!copiesValidation.valid) throw paradiseRehearsalError("test_rehearsal_persisted_backup_invalid");
+      initialBackup = diskBackup;
+
+      mutationStarted = true;
+      await updateLease({ phase: "rehearsal_rebuild" });
+      const rehearsalRebuildPolicy = {
+        ...PARADISE_TEST_REBUILD_POLICY,
+        retainRollbackMarkerForRehearsal: true
+      };
+      const rebuild = await rebuildTemplate(
+        guild,
+        "community",
+        "REBUILD TEST COMMUNITY",
+        rehearsalRebuildPolicy
+      );
+      if (rebuild?.status !== "LIVE DISCORD VERIFIED") {
+        throw paradiseRehearsalError("test_rehearsal_rebuild_not_verified");
+      }
+      if (rebuild?.rollback?.required !== true
+          || rebuild?.rollback?.markerStatus !== "smoke_in_progress"
+          || !rebuild?.rollback?.markerId) {
+        throw paradiseRehearsalError("test_rehearsal_rollback_marker_not_retained");
+      }
+      rollbackMarker = {
+        markerId: String(rebuild.rollback.markerId),
+        status: String(rebuild.rollback.markerStatus)
+      };
+
+      const smokeRuns = [];
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        await updateLease({ phase: `rehearsal_full_smoke_${attempt}` });
+        const smoke = await runSmoke(guild, { fast: false });
+        if (smoke?.status !== "LIVE DISCORD VERIFIED") {
+          throw paradiseRehearsalError(`test_rehearsal_smoke_${attempt}_not_verified`);
+        }
+        smokeRuns.push(smoke);
+      }
+
+      rollbackMarker = await updateRollback(PARADISE_TEST_GUILD_ID, rollbackMarker.markerId, {
+        status: "restoring_original_state"
+      });
+      const { reconciliation } = await restoreOriginalAndVerify("rehearsal");
+      mutationStarted = false;
+      rollbackMarker = await resolveRollback(PARADISE_TEST_GUILD_ID, rollbackMarker.markerId, {
+        canRestore: true,
+        mutationsPlanned: 0,
+        source: "fresh_post_rehearsal_restore_snapshot"
+      });
+      await updateLease({
+        phase: "rehearsal_reconciled",
+        status: "completed",
+        rollback: { markerId: rollbackMarker.markerId, status: rollbackMarker.status },
+        reconciliation: { canRestore: true, mutationsPlanned: 0 }
+      });
+
+      const result = {
+        action: "rehearsal",
+        status: "LIVE DISCORD VERIFIED",
+        completedAt: new Date().toISOString(),
+        mode: "community",
+        smokeRunsCompleted: smokeRuns.length,
+        fullSmokeRunsVerified: smokeRuns.every(item => item.status === "LIVE DISCORD VERIFIED"),
+        initialBackupVerified: true,
+        persistedBackupVerified: true,
+        backupAlgorithm: String(diskBackup.integrity.algorithm || "").toLowerCase(),
+        backupArtifactDigest: String(diskBackup.integrity.digest || "").toLowerCase(),
+        backupStateDigest: String(
+          diskBackup.integrity.stateDigest || paradiseBackupStateDigest(diskBackup)
+        ).toLowerCase(),
+        persistedBackupArtifactDigest: String(canonicalDiskBackup.integrity.digest || "").toLowerCase(),
+        persistedBackupStateDigest: String(
+          canonicalDiskBackup.integrity.stateDigest || paradiseBackupStateDigest(canonicalDiskBackup)
+        ).toLowerCase(),
+        restoredOriginalState: true,
+        originalStateCanRestore: reconciliation.canRestore === true,
+        originalStateMutationsPlanned: Number(reconciliation.mutationsPlanned || 0)
+      };
+      await persistArtifact("test-guild-rehearsal-result.json", result);
+      return Object.freeze(result);
+    } catch (error) {
+      const nestedRollbackMarker = error?.rollbackMarker;
+      if (!rollbackMarker
+          && nestedRollbackMarker?.markerId
+          && String(nestedRollbackMarker.status || "") !== "resolved") {
+        rollbackMarker = {
+          markerId: String(nestedRollbackMarker.markerId),
+          status: String(nestedRollbackMarker.status || "rollback_required")
+        };
+      }
+      if (initialBackup && mutationStarted) {
+        let rollback = null;
+        let rollbackError = null;
+        try {
+          if (rollbackMarker) {
+            rollbackMarker = await updateRollback(PARADISE_TEST_GUILD_ID, rollbackMarker.markerId, {
+              status: "rollback_in_progress",
+              failure: sanitizeParadiseMutationFailure(error, "test_rehearsal_failed")
+            });
+          }
+          rollback = await restoreOriginalAndVerify("rehearsal_failure");
+          mutationStarted = false;
+          if (rollbackMarker) {
+            rollbackMarker = await resolveRollback(PARADISE_TEST_GUILD_ID, rollbackMarker.markerId, {
+              canRestore: true,
+              mutationsPlanned: 0,
+              source: "fresh_post_rehearsal_failure_rollback_snapshot"
+            });
+          }
+        } catch (restoreError) {
+          rollbackError = restoreError;
+          if (rollbackMarker) {
+            rollbackMarker = await updateRollback(PARADISE_TEST_GUILD_ID, rollbackMarker.markerId, {
+              status: "rollback_required",
+              rollbackError: sanitizeParadiseMutationFailure(restoreError, "test_rehearsal_rollback_failed")
+            }).catch(() => rollbackMarker);
+          }
+        }
+        error.rollback = rollback
+          ? { restoredOriginalState: true, originalStateMutationsPlanned: 0 }
+          : null;
+        error.rollbackError = rollbackError
+          ? paradiseRehearsalError(String(rollbackError?.code || "test_rehearsal_rollback_failed"))
+          : null;
+        error.rollbackMarker = rollbackMarker
+          ? { markerId: rollbackMarker.markerId, status: rollbackMarker.status }
+          : null;
+      }
+      await updateLease({
+        phase: mutationStarted ? "rehearsal_rollback_required" : "rehearsal_failed_rolled_back",
+        status: mutationStarted ? "failed" : "failed_rolled_back"
+      }).catch(() => {});
+      throw error;
+    }
+  }, {
+    purposeKey: "discord_test_guild_rehearsal",
+    idempotencyKey: `${PARADISE_TEST_GUILD_ID}:community:${PARADISE_TEST_REHEARSAL_CONFIRMATION}`,
+    phase: "request_validated",
+    expectedGuildId: PARADISE_TEST_GUILD_ID
+  });
+}
+
+export async function rebuildFimaCommunityProduction(guild, mode, confirmation, {
+  expectedBackupDigest,
+  executionProof,
+  planId,
+  executionProofSecret,
+  testGuildRehearsalEvidenceSecret
+} = {}) {
+  return rebuildParadiseTemplateWithPolicy(
+    guild,
+    mode,
+    confirmation,
+    Object.freeze({
+      ...FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY,
+      expectedBackupDigest: String(expectedBackupDigest || "").trim().toLowerCase(),
+      executionProof,
+      planId: String(planId || "").trim(),
+      executionProofSecret,
+      testGuildRehearsalEvidenceSecret
+    })
+  );
+}
+
+function assertParadiseProductionExecutionCapability(guild, mode, policy) {
+  if (!policy?.isProduction) return;
+  const verification = verifyParadiseProductionRebuildExecutionProof(policy.executionProof, {
+    secret: policy.executionProofSecret,
+    guildId: String(guild?.id || ""),
+    mode,
+    backupDigest: policy.expectedBackupDigest,
+    planId: policy.planId
+  });
+  if (!verification.ok) {
+    const error = new Error(verification.code);
+    error.code = verification.code;
+    throw error;
+  }
+}
+
+async function rebuildParadiseTemplateWithPolicy(guild, mode, confirmation, policy) {
+  assertParadiseMutationPolicy(guild, mode, confirmation, policy, {
+    confirmationRequired: policy?.isProduction !== true
+  });
+  const canonicalTextEncoding = inspectParadiseCanonicalTextEncoding(mode);
+  if (!canonicalTextEncoding.ready) {
+    const error = new Error(canonicalTextEncoding.code);
+    error.code = canonicalTextEncoding.code;
+    error.affected = canonicalTextEncoding.affected;
+    throw error;
+  }
+  assertParadiseProductionExecutionCapability(guild, mode, policy);
+  // The legacy template rebuild deletes objects and deduplicates roles/channels.
+  // A signed execution proof authorizes the target; it does not authorize loss
+  // of existing Discord IDs, messages, memberships, or external destinations.
+  // Production migrations must use the reviewed metadata-only executor instead.
+  if (policy?.isProduction) {
+    throw Object.assign(new Error("production_destructive_rebuild_disabled"), {
+      code: "production_destructive_rebuild_disabled"
+    });
+  }
+  const inheritedLease = paradiseCurrentMutationLease();
+  const inheritedCorrelationId = inheritedLease?.guildId === String(guild?.id || "")
+    ? inheritedLease.correlationId
+    : null;
+  await requireParadiseRebuildPreflight(guild, inheritedCorrelationId, policy);
+  return withParadiseGuildMutationLock(guild, "rebuild", async () => {
+    const ownedLease = paradiseCurrentMutationLease();
+    await requireParadiseRebuildPreflight(guild, ownedLease?.correlationId || null, policy);
+    await updateParadiseMutationLease({ phase: "backup_and_rebuild" });
+    return rebuildParadiseTemplateUnlocked(guild, mode, confirmation, policy);
+  }, {
+    purposeKey: "discord_template_rebuild",
+    idempotencyKey: `${guild?.id}:${mode}:${confirmation}`,
+    phase: "request_validated",
+    expectedGuildId: policy.allowedGuildId
+  });
+}
+
+function roleMemberCount(role) {
+  return Number(role?.members?.size || 0);
+}
+
+export function planParadiseDesiredRoleDeduplication(roles, {
+  everyoneRoleId,
+  botHighestPosition,
+  desiredName = null,
+  preferredRoleId = null
+} = {}) {
+  const available = [...(roles || [])];
+  const highestPosition = Number(botHighestPosition);
+  const hasBotHierarchy = Number.isFinite(highestPosition) && highestPosition > 0;
+  const candidates = available
+    .filter(role => role?.id !== everyoneRoleId
+      && !role?.managed
+      && (!hasBotHierarchy || Number(role?.position || 0) < highestPosition))
+    .sort((left, right) =>
+      Number(String(right?.id || "") === String(preferredRoleId || ""))
+      - Number(String(left?.id || "") === String(preferredRoleId || ""))
+      || Number(desiredName !== null && exactMutationResourceNameMatches(right?.name, desiredName))
+      - Number(desiredName !== null && exactMutationResourceNameMatches(left?.name, desiredName))
+      ||
+      roleMemberCount(right) - roleMemberCount(left)
+      || Number(right?.position || 0) - Number(left?.position || 0)
+      || String(left?.id || "").localeCompare(String(right?.id || "")));
+  const canonical = candidates[0] || null;
+  const duplicateActions = available
+    .filter(role => role?.id !== canonical?.id)
+    .map(role => {
+      let protection = null;
+      if (role?.id === everyoneRoleId) protection = "everyone_role";
+      else if (role?.managed) protection = "managed_role";
+      else if (hasBotHierarchy && Number(role?.position || 0) >= highestPosition) protection = "above_bot_hierarchy";
+      return { role, protection };
+    });
+  return { canonical, duplicateActions };
+}
+
+export async function cleanupParadiseDesiredRoleDuplicates(
+  guild,
+  desiredRoleNames,
+  me,
+  mutationPolicy = PARADISE_TEST_REBUILD_POLICY
+) {
+  assertParadiseMutationPolicy(guild, "community", null, mutationPolicy, { confirmationRequired: false });
+  const report = { deleted: [], protected: [], failed: [], memberMigrations: 0 };
+  for (const name of desiredRoleNames) {
+    const matching = [...guild.roles.cache.values()].filter(role => mutationResourceNameMatches(role.name, name));
+    if (matching.length <= 1) continue;
+    const plan = planParadiseDesiredRoleDeduplication(matching, {
+      everyoneRoleId: guild.id,
+      botHighestPosition: me.roles.highest.position,
+      desiredName: name
+    });
+    if (!plan.canonical) {
+      for (const { role, protection } of plan.duplicateActions) {
+        report.protected.push({ id: role.id, name, reason: protection || "no_canonical_role" });
+      }
+      continue;
+    }
+    for (const { role, protection } of plan.duplicateActions) {
+      if (protection) {
+        report.protected.push({ id: role.id, name, reason: protection });
+        continue;
+      }
+      const members = [...(role.members?.values?.() || [])];
+      let migrationFailed = false;
+      for (const member of members) {
+        if (member.roles?.cache?.has?.(plan.canonical.id)) continue;
+        if (!plan.canonical.editable || Number(plan.canonical.position || 0) >= me.roles.highest.position) {
+          migrationFailed = true;
+          report.protected.push({ id: role.id, name, reason: "member_migration_hierarchy_blocked", memberId: member.id });
+          break;
+        }
+        try {
+          await member.roles.add(plan.canonical, "FIMA duplicate-role member preservation");
+          report.memberMigrations += 1;
+        } catch (error) {
+          migrationFailed = true;
+          report.failed.push({ id: role.id, name, reason: "member_migration_failed", code: String(error?.code || "unknown") });
+          break;
+        }
+      }
+      if (migrationFailed) continue;
+      try {
+        await role.delete(`${mutationPolicy.auditReason} canonical duplicate-role cleanup`);
+        guild.roles.cache.delete(role.id);
+        report.deleted.push({ id: role.id, name, canonicalId: plan.canonical.id });
+      } catch (error) {
+        report.failed.push({ id: role.id, name, reason: "delete_failed", code: String(error?.code || "unknown") });
+      }
+    }
+  }
+  return report;
+}
+
+function canonicalParadiseChannel(channels, {
+  desiredName,
+  expectedType,
+  expectedParentId = null,
+  mappedChannelIds = new Set()
+} = {}) {
+  return [...channels]
+    .filter(channel => channel?.type === expectedType)
+    .sort((left, right) =>
+      Number(mappedChannelIds.has(String(right?.id || ""))) - Number(mappedChannelIds.has(String(left?.id || "")))
+      || Number(expectedParentId !== null && right?.parentId === expectedParentId)
+      - Number(expectedParentId !== null && left?.parentId === expectedParentId)
+      || Number(exactMutationResourceNameMatches(right?.name, desiredName))
+      - Number(exactMutationResourceNameMatches(left?.name, desiredName))
+      || Number(left?.rawPosition || 0) - Number(right?.rawPosition || 0)
+      || String(left?.id || "").localeCompare(String(right?.id || "")))[0] || null;
+}
+
+export async function cleanupParadiseDesiredChannelDuplicates(guild, selected, {
+  mappedChannelIds = new Set(),
+  mutationPolicy = PARADISE_TEST_REBUILD_POLICY
+} = {}) {
+  assertParadiseMutationPolicy(guild, "community", null, mutationPolicy, { confirmationRequired: false });
+  const preferredIds = new Set([...(mappedChannelIds || [])].map(String));
+  const report = { deleted: [], failed: [], reparented: [] };
+  for (const [categoryName, channelNames, privateCategory] of selected.schema) {
+    const categoryMatches = [...guild.channels.cache.values()]
+      .filter(channel => !channel.isThread?.() && mutationResourceNameMatches(channel.name, categoryName));
+    const category = canonicalParadiseChannel(categoryMatches, {
+      desiredName: categoryName,
+      expectedType: ChannelType.GuildCategory,
+      mappedChannelIds: preferredIds
+    });
+    for (const duplicate of categoryMatches.filter(channel => channel.id !== category?.id)) {
+      try {
+        await duplicate.delete(`${mutationPolicy.auditReason} canonical duplicate-category cleanup`);
+        guild.channels.cache.delete(duplicate.id);
+        report.deleted.push({ id: duplicate.id, name: categoryName, type: duplicate.type });
+      } catch (error) {
+        report.failed.push({ id: duplicate.id, name: categoryName, code: String(error?.code || "unknown") });
+      }
+    }
+    if (!category) continue;
+    for (const channelName of channelNames) {
+      const expectedType = paradiseSetupChannelType(categoryName, channelName);
+      const sameName = [...guild.channels.cache.values()]
+        .filter(channel => !channel.isThread?.() && mutationResourceNameMatches(channel.name, channelName));
+      const canonical = canonicalParadiseChannel(sameName, {
+        desiredName: channelName,
+        expectedType,
+        expectedParentId: category.id,
+        mappedChannelIds: preferredIds
+      });
+      if (canonical && canonical.parentId !== category.id) {
+        try {
+          await canonical.setParent(category.id, { lockPermissions: privateCategory });
+          report.reparented.push({ id: canonical.id, name: channelName, parentId: category.id });
+        } catch (error) {
+          report.failed.push({ id: canonical.id, name: channelName, code: String(error?.code || "parent_update_failed") });
+        }
+      }
+      for (const duplicate of sameName.filter(channel => channel.id !== canonical?.id)) {
+        try {
+          await duplicate.delete(`${mutationPolicy.auditReason} canonical duplicate-channel cleanup`);
+          guild.channels.cache.delete(duplicate.id);
+          report.deleted.push({ id: duplicate.id, name: channelName, type: duplicate.type });
+        } catch (error) {
+          report.failed.push({ id: duplicate.id, name: channelName, code: String(error?.code || "unknown") });
+        }
+      }
+    }
+  }
+  return report;
+}
+
+export function verifyParadiseTemplateStructure(guild, selected, roleIconOptions = {}) {
+  const missingDesiredRoles = [];
+  const duplicateDesiredRoles = [];
+  const rolePermissionMismatches = [];
+  for (const name of selected.roles) {
+    const matches = [...guild.roles.cache.values()]
+      .filter(role => mutationResourceNameMatches(role.name, name) && !role.managed);
+    const count = matches.length;
+    if (count === 0) missingDesiredRoles.push(name);
+    if (count > 1) duplicateDesiredRoles.push({ name, count });
+    for (const role of matches) {
+      const expected = expectedRolePermissionBitfield(name);
+      const actual = permissionBitfieldValue(role.permissions);
+      if (actual !== expected) {
+        rolePermissionMismatches.push({
+          id: role.id,
+          name,
+          expected: expected.toString(),
+          actual: actual?.toString() ?? null
+        });
+      }
+    }
+  }
+  const missingDesiredChannels = [];
+  const duplicateDesiredChannels = [];
+  const categoryPermissionMismatches = [];
+  const channelPermissionMismatches = [];
+  const desiredChannelKeys = new Set();
+  for (const [categoryName, channelNames, privateCategory, accessRoleNames] of selected.schema) {
+    desiredChannelKeys.add(`${ChannelType.GuildCategory}:${normalizedMutationResourceName(categoryName)}`);
+    const categories = [...guild.channels.cache.values()]
+      .filter(channel => mutationResourceNameMatches(channel.name, categoryName) && channel.type === ChannelType.GuildCategory);
+    if (categories.length === 0) missingDesiredChannels.push({ name: categoryName, type: ChannelType.GuildCategory });
+    if (categories.length > 1) duplicateDesiredChannels.push({ name: categoryName, type: ChannelType.GuildCategory, count: categories.length });
+    const category = categories[0];
+    if (category) {
+      const everyoneId = guild.roles.everyone?.id || guild.id;
+      const actualEveryoneView = overwriteViewDecision(permissionOverwriteFor(category, everyoneId)) || "inherit";
+      const expectedEveryoneView = privateCategory ? "deny" : "inherit";
+      if (actualEveryoneView !== expectedEveryoneView) {
+        categoryPermissionMismatches.push({
+          categoryId: category.id,
+          categoryName,
+          targetId: everyoneId,
+          targetName: "@everyone",
+          expected: expectedEveryoneView,
+          actual: actualEveryoneView
+        });
+      }
+      if (privateCategory) {
+        const explicitAccess = Array.isArray(accessRoleNames);
+        const allowedRoleNames = explicitAccess ? new Set(accessRoleNames) : PRIVATE_ACCESS_ROLES;
+        for (const roleName of selected.roles.filter(name => allowedRoleNames.has(name))) {
+          const role = guild.roles.cache.find(item => mutationResourceNameMatches(item.name, roleName) && !item.managed);
+          if (!role) continue;
+          const actual = overwriteViewDecision(permissionOverwriteFor(category, role.id)) || "inherit";
+          if (actual !== "allow") {
+            categoryPermissionMismatches.push({
+              categoryId: category.id,
+              categoryName,
+              targetId: role.id,
+              targetName: roleName,
+              expected: "allow",
+              actual
+            });
+          }
+        }
+        if (explicitAccess) {
+          for (const roleName of selected.roles.filter(name => !allowedRoleNames.has(name))) {
+            const role = guild.roles.cache.find(item => mutationResourceNameMatches(item.name, roleName) && !item.managed);
+            if (!role) continue;
+            const actual = overwriteViewDecision(permissionOverwriteFor(category, role.id)) || "inherit";
+            if (actual !== "inherit") {
+              categoryPermissionMismatches.push({
+                categoryId: category.id,
+                categoryName,
+                targetId: role.id,
+                targetName: roleName,
+                expected: "inherit",
+                actual
+              });
+            }
+          }
+        }
+      }
+    }
+    for (const channelName of channelNames) {
+      const expectedType = paradiseSetupChannelType(categoryName, channelName);
+      desiredChannelKeys.add(`${expectedType}:${normalizedMutationResourceName(channelName)}`);
+      const matches = [...guild.channels.cache.values()]
+        .filter(channel => mutationResourceNameMatches(channel.name, channelName) && channel.type === expectedType);
+      if (matches.length === 0 || (category && !matches.some(channel => channel.parentId === category.id))) {
+        missingDesiredChannels.push({ name: channelName, type: expectedType, parent: categoryName });
+      }
+      if (matches.length > 1) duplicateDesiredChannels.push({ name: channelName, type: expectedType, count: matches.length });
+      const canonical = category
+        ? matches.find(channel => channel.parentId === category.id)
+        : matches[0];
+      const normalizedCategory = normalizedMutationResourceName(categoryName);
+      const normalizedChannel = normalizedMutationResourceName(channelName);
+      const isTurkish = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE TURKISH");
+      const isVideo = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE VIDEO TEAM");
+      const isAnnouncements = isTurkish
+        && normalizedChannel === normalizedMutationResourceName("〆・turkish-announcements");
+      const isPrivateVoice = expectedType === ChannelType.GuildVoice && (isTurkish || isVideo);
+      if (canonical && (isAnnouncements || isPrivateVoice)) {
+        const expectedRoles = isTurkish
+          ? COMMUNITY_TURKISH_ACCESS_ROLES
+          : COMMUNITY_VIDEO_TEAM_ACCESS_ROLES;
+        const checks = [{
+          target: guild.roles.everyone,
+          targetName: "@everyone",
+          permissions: {
+            ViewChannel: "deny",
+            ...(isAnnouncements ? { SendMessages: "deny" } : {}),
+            ...(isPrivateVoice ? { Connect: "deny" } : {})
+          }
+        }];
+        for (const roleName of expectedRoles) {
+          const role = guild.roles.cache.find(item => mutationResourceNameMatches(item.name, roleName) && !item.managed);
+          if (!role) continue;
+          const staff = COMMUNITY_STAFF_ACCESS_ROLES.includes(roleName);
+          checks.push({
+            target: role,
+            targetName: roleName,
+            permissions: {
+              ViewChannel: "allow",
+              ...(isAnnouncements ? { SendMessages: staff ? "allow" : "deny" } : {}),
+              ...(isPrivateVoice ? { Connect: "allow" } : {})
+            }
+          });
+        }
+        for (const check of checks) {
+          const overwrite = permissionOverwriteFor(canonical, check.target?.id);
+          for (const [permission, expected] of Object.entries(check.permissions)) {
+            const flag = PermissionsBitField.Flags[permission];
+            const actual = overwrite?.allow?.has?.(flag)
+              ? "allow"
+              : overwrite?.deny?.has?.(flag) ? "deny" : "inherit";
+            if (actual !== expected) {
+              channelPermissionMismatches.push({
+                channelId: canonical.id,
+                channelName,
+                targetId: check.target?.id,
+                targetName: check.targetName,
+                permission,
+                expected,
+                actual
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  const extraChannels = [...guild.channels.cache.values()]
+    .filter(channel => !channel.isThread?.()
+      && !desiredChannelKeys.has(`${channel.type}:${normalizedMutationResourceName(channel.name)}`))
+    .map(channel => ({ id: channel.id, name: channel.name, type: channel.type }));
+  const desiredRoleNames = new Set(selected.roles.map(normalizedMutationResourceName));
+  const extraRoles = [...guild.roles.cache.values()]
+    .filter(role => role.id !== guild.id
+      && !role.managed
+      && !desiredRoleNames.has(normalizedMutationResourceName(role.name)))
+    .map(role => ({ id: role.id, name: role.name, position: role.position }));
+  const roleIconReadiness = selected?.roles === PARADISE_COMMUNITY_ROLES
+    ? inspectParadiseCommunityExtendedRoleIconReadiness(guild, roleIconOptions)
+    : null;
+  const roleIconMismatches = roleIconReadiness?.mismatches || [];
+  const roleIconBlockers = roleIconReadiness?.blockers || [];
+  return {
+    ready: missingDesiredRoles.length === 0
+      && duplicateDesiredRoles.length === 0
+      && rolePermissionMismatches.length === 0
+      && missingDesiredChannels.length === 0
+      && duplicateDesiredChannels.length === 0
+      && categoryPermissionMismatches.length === 0
+      && channelPermissionMismatches.length === 0
+      && extraChannels.length === 0
+      && extraRoles.length === 0
+      && (!roleIconReadiness || roleIconReadiness.ready),
+    missingDesiredRoles,
+    duplicateDesiredRoles,
+    rolePermissionMismatches,
+    missingDesiredChannels,
+    duplicateDesiredChannels,
+    categoryPermissionMismatches,
+    channelPermissionMismatches,
+    extraChannels,
+    extraRoles,
+    roleIconReadiness,
+    roleIconMismatches,
+    roleIconBlockers
+  };
+}
+
+async function rebuildParadiseTemplateUnlocked(
+  guild,
+  mode,
+  confirmation,
+  mutationPolicy = PARADISE_TEST_REBUILD_POLICY
+) {
+  const { selected, expected } = assertParadiseMutationPolicy(guild, mode, confirmation, mutationPolicy, {
+    confirmationRequired: mutationPolicy?.isProduction !== true
+  });
+  assertParadiseProductionExecutionCapability(guild, mode, mutationPolicy);
+  await assertNoUnresolvedParadiseRollback(guild.id);
+
+  const fail = (code, details = {}) => {
+    const error = new Error(code);
+    error.code = code;
+    Object.assign(error, details);
+    throw error;
+  };
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  await writeArtifact(`3a65-test-server-backup-${mode}-${stamp}.json`, backup);
-  await writeArtifact("3a65-test-server-pre-rebuild-backup.json", backup);
-  await writeArtifact("3a73-test-server-restore-dry-run.json", restoreDryRun);
+  await updateParadiseMutationLease({ phase: "capturing_complete_backup", status: "active" });
+  const state = await loadState();
+  const snapshot = await captureParadiseGuildBackupSnapshot(guild, { state });
+  const backup = createParadiseBackupEnvelope(snapshot);
+  const backupValidation = validateParadiseBackupEnvelope(backup);
+  if (!backupValidation.valid) fail("backup_envelope_validation_failed", { validation: backupValidation });
+  if (mutationPolicy.isProduction
+      && paradiseBackupStateDigest(backup).toLowerCase() !== String(mutationPolicy.expectedBackupDigest || "").toLowerCase()) {
+    fail("production_preflight_backup_digest_mismatch");
+  }
+  const restoreDryRun = buildParadiseRestoreDryRun({
+    backup,
+    currentSnapshot: snapshot,
+    expectedGuildId: guild.id,
+    allowedGuildId: mutationPolicy.allowedGuildId
+  });
+  if (!restoreDryRun.canRestore) fail("backup_restore_dry_run_failed", { restoreDryRun });
+
+  await updateParadiseMutationLease({ phase: "persisting_verified_backup" });
+  const timestampedBackupPath = await writeArtifact(`${mutationPolicy.artifactPrefix}-backup-${mode}-${stamp}.json`, backup);
+  const canonicalBackupPath = await writeArtifact(`${mutationPolicy.artifactPrefix}-pre-rebuild-backup.json`, backup);
+  const restoreDryRunPath = await writeArtifact(`${mutationPolicy.restoreArtifactPrefix}-restore-dry-run.json`, restoreDryRun);
+
+  await updateParadiseMutationLease({ phase: "validating_persisted_backup" });
+  const readPersistedBackup = async (artifact, artifactPath) => {
+    try {
+      return JSON.parse(await fs.readFile(artifactPath, "utf8"));
+    } catch (cause) {
+      fail("persisted_backup_read_failed", { artifact, artifactPath, cause });
+    }
+  };
+  const diskBackup = await readPersistedBackup("timestamped", timestampedBackupPath);
+  const canonicalDiskBackup = await readPersistedBackup("canonical", canonicalBackupPath);
+  const persistedBackupValidation = validateParadiseBackupArtifactCopies({
+    timestampedBackup: diskBackup,
+    canonicalBackup: canonicalDiskBackup,
+    expectedBackup: backup,
+    expectedGuildId: guild.id
+  });
+  if (!persistedBackupValidation.valid) {
+    fail("persisted_backup_validation_failed", { persistedBackupValidation });
+  }
+
+  const leaseStatus = await paradisePersistentMutationLockStatus(guild.id).catch(() => null);
+  let rollbackMarker = await armParadiseRollbackMarker({
+    guildId: guild.id,
+    backupArtifact: timestampedBackupPath,
+    backupDigest: diskBackup.integrity.digest,
+    mode: `${mutationPolicy.isProduction ? "production_ft_community_rebuild" : "test_guild_rebuild"}:${mode}`,
+    confirmation: mutationPolicy.isProduction
+      ? paradiseProductionRestoreConfirmation(diskBackup)
+      : paradiseRestoreConfirmation(diskBackup),
+    correlationId: leaseStatus?.correlationId || crypto.randomUUID()
+  });
 
   const deleted = { channels: 0, roles: 0 };
-  const channels = [...guild.channels.cache.values()]
-    .filter(channel => !channel.isThread?.())
-    .sort((a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId)));
-  for (const channel of channels) {
-    const removed = await channel.delete(`3A65 owner-confirmed test ${mode} rebuild`).then(() => true).catch(() => false);
-    if (removed) deleted.channels += 1;
+  const deletionFailures = { channels: [], roles: [] };
+  let roleDeduplication = { deleted: [], failed: [], protected: [], memberMigrations: 0 };
+  let channelDeduplication = { deleted: [], failed: [], reparented: [] };
+  try {
+    rollbackMarker = await updateParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+      status: "rebuild_in_progress"
+    });
+    await updateParadiseMutationLease({ phase: "deleting_existing_channels", status: "active" });
+    const channels = [...guild.channels.cache.values()]
+      .filter(channel => !channel.isThread?.())
+      .sort((a, b) => Number(Boolean(a.parentId)) - Number(Boolean(b.parentId)));
+    for (const channel of channels) {
+      try {
+        await channel.delete(`${mutationPolicy.auditReason} ${mode} rebuild`);
+        guild.channels.cache.delete(channel.id);
+        deleted.channels += 1;
+      } catch (error) {
+        if (isParadiseUnknownChannelError(error)) {
+          // A category deletion or a concurrent Discord cache refresh can make a
+          // cached child disappear before its turn. The desired end state has
+          // already been reached, so treat Discord's Unknown Channel as an
+          // idempotent success while keeping every other API/permission error
+          // fail-closed.
+          guild.channels.cache.delete(channel.id);
+          continue;
+        }
+        deletionFailures.channels.push({ id: channel.id, name: channel.name, code: String(error?.code || "unknown") });
+        fail(`${mutationPolicy.failurePrefix}_channel_delete_failed`, { deletionFailures });
+      }
+    }
+
+    await updateParadiseMutationLease({ phase: "deleting_existing_roles" });
+    const me = guild.members.me || await guild.members.fetchMe();
+    const desiredRoleNames = new Set(selected.roles.map(normalizedMutationResourceName));
+    const roles = [...guild.roles.cache.values()]
+      .filter(role => !role.managed
+        && role.id !== guild.id
+        && role.position < me.roles.highest.position
+        && !desiredRoleNames.has(normalizedMutationResourceName(role.name)))
+      .sort((a, b) => a.position - b.position);
+    for (const role of roles) {
+      try {
+        await role.delete(`${mutationPolicy.auditReason} ${mode} rebuild`);
+        guild.roles.cache.delete(role.id);
+        deleted.roles += 1;
+      } catch (error) {
+        deletionFailures.roles.push({ id: role.id, name: role.name, code: String(error?.code || "unknown") });
+        fail(`${mutationPolicy.failurePrefix}_role_delete_failed`, { deletionFailures });
+      }
+    }
+
+    await updateParadiseMutationLease({ phase: "deduplicating_roles" });
+    await guild.channels.fetch();
+    await guild.roles.fetch();
+    roleDeduplication = await cleanupParadiseDesiredRoleDuplicates(guild, selected.roles, me, mutationPolicy);
+    deleted.roles += roleDeduplication.deleted.length;
+    if (roleDeduplication.failed.length) fail(`${mutationPolicy.failurePrefix}_role_deduplication_failed`, { roleDeduplication });
+
+    await updateParadiseMutationLease({ phase: "installing_template" });
+    const installed = await applyParadiseTemplateMissingOnlyUnlocked(guild, mode, {
+      repairPermissions: true,
+      mutationPolicy
+    });
+    if (installed.status !== "LIVE DISCORD VERIFIED") {
+      fail(`${mutationPolicy.failurePrefix}_installation_not_verified`, { installed });
+    }
+
+    await updateParadiseMutationLease({ phase: "deduplicating_channels" });
+    const installedState = await loadState();
+    const mappedChannelIds = new Set(Object.values(configForGuild(installedState, guild.id).channelMappings || {})
+      .filter(Boolean)
+      .map(String));
+    channelDeduplication = await cleanupParadiseDesiredChannelDuplicates(guild, selected, {
+      mappedChannelIds,
+      mutationPolicy
+    });
+    deleted.channels += channelDeduplication.deleted.length;
+    if (channelDeduplication.failed.length) fail(`${mutationPolicy.failurePrefix}_channel_deduplication_failed`, { channelDeduplication });
+
+    await updateParadiseMutationLease({ phase: "verifying_rebuilt_structure" });
+    await guild.channels.fetch();
+    await guild.roles.fetch();
+    const structureVerification = verifyParadiseTemplateStructure(guild, selected);
+    if (!structureVerification.ready) {
+      fail(`${mutationPolicy.failurePrefix}_structure_not_verified`, { structureVerification });
+    }
+
+    const postRebuildState = await loadState();
+    const postRebuildSnapshot = await captureParadiseGuildBackupSnapshot(guild, { state: postRebuildState });
+    const postRebuildBackup = createParadiseBackupEnvelope(postRebuildSnapshot);
+    const postRebuildValidation = validateParadiseBackupEnvelope(postRebuildBackup);
+    if (!postRebuildValidation.valid) {
+      fail("post_rebuild_backup_validation_failed", { postRebuildValidation });
+    }
+    const reconciliation = buildParadiseRestoreDryRun({
+      backup: postRebuildBackup,
+      currentSnapshot: postRebuildSnapshot,
+      expectedGuildId: guild.id,
+      allowedGuildId: mutationPolicy.allowedGuildId
+    });
+    if (!reconciliation.canRestore || reconciliation.mutationsPlanned !== 0) {
+      fail("post_rebuild_reconciliation_failed", { reconciliation });
+    }
+    const postRebuildBackupPath = await writeArtifact(`${mutationPolicy.artifactPrefix}-post-rebuild-${mode}-${stamp}.json`, postRebuildBackup);
+    const reconciliationEvidence = {
+      ...reconciliation,
+      verifiedAt: new Date().toISOString(),
+      backupArtifact: postRebuildBackupPath,
+      source: "fresh_post_rebuild_snapshot"
+    };
+    const reconciliationPath = await writeArtifact(`${mutationPolicy.artifactPrefix}-reconciliation-${mode}-${stamp}.json`, reconciliationEvidence);
+    const retainRollbackMarkerForRehearsal = mutationPolicy.retainRollbackMarkerForRehearsal === true
+      && mutationPolicy.isProduction !== true;
+    const retainRollbackMarkerForProduction = mutationPolicy.isProduction === true;
+    rollbackMarker = retainRollbackMarkerForRehearsal
+      ? await updateParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+          status: "smoke_in_progress",
+          reconciliation: { ...reconciliationEvidence, artifact: reconciliationPath }
+        })
+      : retainRollbackMarkerForProduction
+        ? await updateParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+            status: "rollback_required",
+            pendingFinalization: true,
+            phase: "orchestrator_verification_pending",
+            reconciliation: { ...reconciliationEvidence, artifact: reconciliationPath }
+          })
+        : await resolveParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+            ...reconciliationEvidence,
+            artifact: reconciliationPath
+          });
+    await updateParadiseMutationLease({
+      phase: retainRollbackMarkerForRehearsal
+        ? "rebuild_reconciled_rehearsal_pending"
+        : retainRollbackMarkerForProduction
+          ? "rebuild_reconciled_orchestrator_pending"
+          : "rebuild_reconciled",
+      status: retainRollbackMarkerForRehearsal ? "active" : "completed",
+      rollback: {
+        markerId: rollbackMarker.markerId,
+        status: retainRollbackMarkerForRehearsal
+          ? "smoke_in_progress"
+          : retainRollbackMarkerForProduction
+            ? "rollback_required"
+            : "not_required"
+      },
+      reconciliation: reconciliationEvidence
+    });
+
+    const result = {
+      ...installed,
+      status: "LIVE DISCORD VERIFIED",
+      operation: mutationPolicy.operationLabel,
+      confirmation: expected,
+      deleted,
+      deletionFailures,
+      roleDeduplication,
+      channelDeduplication,
+      structureVerification,
+      preservedDesiredRoles: [...guild.roles.cache.values()]
+        .filter(role => desiredRoleNames.has(normalizedMutationResourceName(role.name))).length,
+      backup: timestampedBackupPath,
+      canonicalBackup: canonicalBackupPath,
+      restoreDryRun: { code: restoreDryRun.code, artifact: restoreDryRunPath },
+      rollback: {
+        required: retainRollbackMarkerForRehearsal || retainRollbackMarkerForProduction,
+        markerId: rollbackMarker.markerId,
+        markerStatus: rollbackMarker.status,
+        pendingFinalization: retainRollbackMarkerForProduction
+      },
+      reconciliation: { ...reconciliationEvidence, artifact: reconciliationPath }
+    };
+    await writeArtifact(`${mutationPolicy.artifactPrefix}-full-rebuild-${mode}.json`, result);
+    return result;
+  } catch (originalError) {
+    let rollback = null;
+    let rollbackError = null;
+    let reconciliation = null;
+    try {
+      rollbackMarker = await updateParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+        status: "rollback_in_progress",
+        failure: sanitizeParadiseMutationFailure(originalError, `${mutationPolicy.failurePrefix}_failed`)
+      });
+      await updateParadiseMutationLease({ phase: "automatic_rollback", status: "rolling_back" });
+      rollback = await withParadiseGuildMutationLock(guild, "automatic_rollback", async () => restoreParadiseGuildBackup({
+        guild,
+        backup: diskBackup,
+        confirmation: mutationPolicy.isProduction
+          ? paradiseProductionRestoreConfirmation(diskBackup)
+          : paradiseRestoreConfirmation(diskBackup),
+        allowedGuildId: mutationPolicy.allowedGuildId,
+        productionAuthorization: mutationPolicy.isProduction ? {
+          executionProof: mutationPolicy.executionProof,
+          executionProofSecret: mutationPolicy.executionProofSecret,
+          planId: mutationPolicy.planId,
+          mode,
+          nowMs: Date.now()
+        } : null,
+        currentState: await loadState(),
+        persistRestoredState: persistParadiseRestoredState,
+        reason: `FIMA automatic rollback after failed ${mutationPolicy.auditReason} ${mode} rebuild`
+      }));
+      rollbackMarker = await updateParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+        status: "restored_pending_reconciliation",
+        rollback
+      });
+      await updateParadiseMutationLease({ phase: "reconciling_automatic_rollback", rollback });
+
+      const restoredState = await loadState();
+      const restoredSnapshot = await captureParadiseGuildBackupSnapshot(guild, { state: restoredState });
+      reconciliation = buildParadiseRestoreDryRun({
+        backup: diskBackup,
+        currentSnapshot: restoredSnapshot,
+        expectedGuildId: guild.id,
+        allowedGuildId: mutationPolicy.allowedGuildId
+      });
+      const reconciliationPath = await writeArtifact(`${mutationPolicy.artifactPrefix}-rollback-reconciliation-${mode}-${stamp}.json`, {
+        ...reconciliation,
+        verifiedAt: new Date().toISOString(),
+        backupArtifact: timestampedBackupPath,
+        source: "fresh_post_rollback_snapshot"
+      });
+      reconciliation = { ...reconciliation, artifact: reconciliationPath };
+      if (!reconciliation.canRestore || reconciliation.mutationsPlanned !== 0) {
+        fail("automatic_rollback_reconciliation_failed", { reconciliation });
+      }
+      rollbackMarker = await resolveParadiseRollbackMarker(guild.id, rollbackMarker.markerId, reconciliation);
+      await updateParadiseMutationLease({
+        phase: "automatic_rollback_reconciled",
+        status: "failed_rolled_back",
+        rollback,
+        reconciliation
+      });
+    } catch (error) {
+      rollbackError = error;
+      rollbackMarker = await updateParadiseRollbackMarker(guild.id, rollbackMarker.markerId, {
+        status: "rollback_required",
+        rollback,
+        reconciliation,
+        rollbackError: sanitizeParadiseMutationFailure(error, "automatic_rollback_failed")
+      }).catch(() => rollbackMarker);
+      await updateParadiseMutationLease({
+        phase: "rollback_required",
+        status: "failed",
+        rollback,
+        reconciliation
+      }).catch(() => {});
+    }
+    originalError.rollback = rollback;
+    originalError.rollbackError = rollbackError;
+    originalError.reconciliation = reconciliation;
+    originalError.rollbackMarker = rollbackMarker;
+    throw originalError;
+  }
+}
+
+async function upsertParadiseCommunitySmokePanel(guild, key, channel, payload) {
+  const state = await loadState();
+  const storedId = configForGuild(state, guild.id).smokePanelMessageIds?.[key];
+  let message = storedId ? await channel.messages.fetch(storedId).catch(() => null) : null;
+  if (message) await message.edit(payload); else message = await channel.send(payload);
+  await saveState(next => {
+    next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
+    next.guildConfigs[guild.id].smokePanelMessageIds = next.guildConfigs[guild.id].smokePanelMessageIds || {};
+    next.guildConfigs[guild.id].smokePanelMessageIds[key] = message.id;
+    return next;
+  });
+  return message;
+}
+
+function communityActivityBoardDescription(board) {
+  const entries = board?.entries || [];
+  if (!entries.length) return "_No qualifying activity has been recorded for this UTC month yet._";
+  return entries.map(entry => {
+    const score = board.board === "voice"
+      ? `${Math.floor(Number(entry.voiceSeconds || 0) / 60)} min · ${entry.xp} XP`
+      : `${entry.textMessages} messages · ${entry.xp} XP`;
+    return `**${entry.rank}.** <@${entry.discordUserId}> · ${score}`;
+  }).join("\n");
+}
+
+async function runParadiseCommunityTestSmokeSuite(guild, { fast = false } = {}) {
+  assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "community_test_smoke" });
+  const state = await loadState();
+  const guildConfig = configForGuild(state, guild.id);
+  const activity = await inspectCommunityActivityReadiness(guild.client);
+  if (!activity.ready) {
+    const error = new Error("community_activity_not_ready");
+    error.code = "community_activity_not_ready";
+    error.readiness = activity;
+    throw error;
   }
 
-  const me = guild.members.me || await guild.members.fetchMe();
-  const desiredRoleNames = new Set(selected.roles);
-  const roles = [...guild.roles.cache.values()]
-    .filter(role => !role.managed
-      && role.id !== guild.id
-      && role.position < me.roles.highest.position
-      && !desiredRoleNames.has(role.name))
-    .sort((a, b) => a.position - b.position);
-  for (const role of roles) {
-    const removed = await role.delete(`3A65 owner-confirmed test ${mode} rebuild`).then(() => true).catch(() => false);
-    if (removed) deleted.roles += 1;
+  const channelByName = names => cachedValues(guild.channels?.cache).find(channel =>
+    names.includes(channel.name) && channel.isTextBased?.()
+  ) || null;
+  const textActivityChannel = await configuredChannel(guild, "level_channel", ["⌁・text-activity", "text-activity"]);
+  const voiceActivityChannel = channelByName(["⌁・voice-activity", "voice-activity"]);
+  const rewardsChannel = channelByName(["⌁・activity-rewards", "activity-rewards"]);
+  if (!textActivityChannel || !voiceActivityChannel || !rewardsChannel) {
+    const error = new Error("community_activity_channels_missing");
+    error.code = "community_activity_channels_missing";
+    throw error;
   }
 
-  const installed = await applyParadiseTemplateMissingOnly(guild, mode, { repairPermissions: true });
+  const color = await paradiseBrandColor();
+  const seasonLabel = activity.season.key;
+  const textBoard = await upsertParadiseCommunitySmokePanel(guild, "textActivity", textActivityChannel, {
+    embeds: [new EmbedBuilder().setColor(color).setTitle("FIMA · TEXT ACTIVITY")
+      .setDescription(`# ${seasonLabel} UTC leaderboard\n${communityActivityBoardDescription(activity.leaderboards.text)}\n\n-# Monthly reset · Anti-spam scoring · Top 3: 15 / 10 / 7 FIMA Macro days`)
+      .setFooter({ text: "FT Community · Text activity" })]
+  });
+  const voiceBoard = await upsertParadiseCommunitySmokePanel(guild, "voiceActivity", voiceActivityChannel, {
+    embeds: [new EmbedBuilder().setColor(color).setTitle("FIMA · VOICE ACTIVITY")
+      .setDescription(`# ${seasonLabel} UTC leaderboard\n${communityActivityBoardDescription(activity.leaderboards.voice)}\n\n-# Monthly reset · Non-AFK voice only · Top 3: 15 / 10 / 7 FIMA Macro days`)
+      .setFooter({ text: "FT Community · Voice activity" })]
+  });
+  const rewardBoard = await upsertParadiseCommunitySmokePanel(guild, "activityRewards", rewardsChannel, {
+    embeds: [new EmbedBuilder().setColor(color).setTitle("FIMA · ACTIVITY REWARDS")
+      .setDescription("# Monthly FIMA Macro rewards\n**1st:** 15 days\n**2nd:** 10 days\n**3rd:** 7 days\n\nText and Voice rewards stack. Every verified boost adds **3 days** for that UTC month. Lifetime entitlements are never shortened or replaced.\n\n-# Universal first-use trial: disabled")
+      .setFooter({ text: "FT Community · Idempotent reward ledger" })]
+  });
+
+  const ownerId = guild.ownerId;
+  const owner = await guild.members.fetch(ownerId).catch(() => null);
+  if (owner) {
+    await sendMemberLifecycleMessage(owner, "join");
+    await sendMemberLifecycleMessage(owner, "leave");
+  }
+  const staffTeam = await updateStaffTeamEmbed(guild).catch(() => null);
+  const helpGuide = fast ? null : await publishSetupGuides(guild, "community").catch(() => null);
+  const applicationChannel = await configuredChannel(guild, "application_ticket_channel", ["⌁・applications", "applications"]);
+  const supportChannel = await configuredChannel(guild, "support_ticket_channel", ["⌁・support", "support"]);
+  const moderationChannel = await configuredChannel(guild, "moderation_requests_channel", ["〆・staff-security-logs", "moderation-requests"]);
+  const securityChannel = await configuredChannel(guild, "quarantine_review_channel", ["〆・staff-security-logs", "quarantine-review"]);
+  const applicationPanel = applicationChannel
+    ? await upsertParadiseCommunitySmokePanel(guild, "application", applicationChannel, paradiseApplicationPanelPayload(
+      color, guildLanguage(guildConfig), guildConfig.applicationSettings
+    ))
+    : null;
+  const supportPanel = supportChannel
+    ? await upsertParadiseCommunitySmokePanel(guild, "support", supportChannel, paradiseSupportPanelPayload(
+      color, guildLanguage(guildConfig), "community"
+    ))
+    : null;
+  const supportTicket = owner && supportChannel
+    ? await createParadiseSupportTicket(guild, owner.user, supportChannel, { test: true })
+    : null;
+  const supportTicketLifecycle = supportTicket
+    ? await runParadiseSupportTicketLifecycleSmoke(guild, supportTicket)
+    : null;
+
+  let moderationPanel = null;
+  if (moderationChannel) {
+    const currentState = await loadState();
+    let moderationRecord = Object.values(currentState.moderationCases?.[guild.id] || {})
+      .find(item => item.test === true && item.action === "review-only" && item.status === "pending");
+    if (!moderationRecord) {
+      moderationRecord = {
+        id: crypto.randomUUID(), guildId: guild.id, action: "review-only", targetId: ownerId,
+        requestedBy: ownerId, reason: "Safe FT Community approval-queue test; no member action is executed.",
+        status: "pending", test: true, createdAt: new Date().toISOString()
+      };
+      await saveState(next => {
+        next.moderationCases[guild.id] = next.moderationCases[guild.id] || {};
+        next.moderationCases[guild.id][moderationRecord.id] = moderationRecord;
+        return next;
+      });
+    }
+    moderationPanel = await upsertParadiseCommunitySmokePanel(guild, "moderation", moderationChannel, {
+      embeds: [new EmbedBuilder().setColor(color).setTitle("FIMA MODERATION · SAFE TEST")
+        .setDescription(`Case: \`${moderationRecord.id.slice(0, 8)}\`\nRequested by: <@${ownerId}>\nAction: **review-only**\n\nThis validates the senior approval queue without applying a member action.`)
+        .setFooter({ text: "FT Community · No action on approval" })],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`paradise_mod_approve:${moderationRecord.id}`).setLabel("Approve safe test").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`paradise_mod_deny:${moderationRecord.id}`).setLabel("Deny safe test").setStyle(ButtonStyle.Secondary)
+      )]
+    });
+  }
+  const securityPanel = securityChannel
+    ? await upsertParadiseCommunitySmokePanel(guild, "security", securityChannel, {
+      embeds: [new EmbedBuilder().setColor(color).setTitle("FIMA SECURITY · LIVE STATUS")
+        .setDescription("# Audit-first protection\n- Discord AutoMod rules installed\n- Invite/scam and mention-spam guards configured\n- Quarantine review channel mapped\n- Raid mode and lockdown remain owner/senior-staff actions\n- No automatic first-offense ban\n\n-# Safe test: this message changes no moderation state.")
+        .setFooter({ text: "FT Community · Quarantine review" })]
+    })
+    : null;
+
+  const readbackReady = staffTeam?.ready === true && (fast || helpGuide?.ready === true);
+
   const result = {
-    ...installed,
-    status: "LIVE DISCORD VERIFIED",
-    operation: "full_test_server_rebuild",
-    confirmation: expected,
-    deleted,
-    preservedDesiredRoles: [...guild.roles.cache.values()]
-      .filter(role => desiredRoleNames.has(role.name)).length,
-    backup: `artifacts/post-security-backlog/3a65-test-server-backup-${mode}-${stamp}.json`,
-    restoreDryRun: restoreDryRun.code
+    status: readbackReady ? "LIVE DISCORD VERIFIED" : "LIVE DISCORD FAILED",
+    completedAt: new Date().toISOString(),
+    guildId: guild.id,
+    template: "community",
+    activity,
+    training: null,
+    tryout: null,
+    welcomeLeaveSimulation: Boolean(owner),
+    leaderboardBoards: [
+      { board: "text", channelId: textBoard.channelId, messageId: textBoard.id, url: textBoard.url },
+      { board: "voice", channelId: voiceBoard.channelId, messageId: voiceBoard.id, url: voiceBoard.url }
+    ],
+    staffTeam: sanitizeParadiseMessageReadback(staffTeam),
+    helpGuide: fast
+      ? { resolved: false, posted: false, verified: false, ready: false, reason: "fast_smoke_skipped" }
+      : sanitizeParadiseMessageReadback(helpGuide),
+    workflowPanels: {
+      application: applicationPanel ? { channelId: applicationPanel.channelId, messageId: applicationPanel.id, url: applicationPanel.url } : null,
+      support: supportPanel ? { channelId: supportPanel.channelId, messageId: supportPanel.id, url: supportPanel.url } : null,
+      supportTicket: supportTicket ? {
+        channelId: supportTicket.channel.id,
+        ticketId: supportTicket.record.id,
+        existing: supportTicket.existing,
+        transcriptSaved: Boolean(supportTicketLifecycle?.transcriptSaved),
+        closedThenReopened: Boolean(supportTicketLifecycle?.closedThenReopened)
+      } : null,
+      moderation: moderationPanel ? { channelId: moderationPanel.channelId, messageId: moderationPanel.id, url: moderationPanel.url } : null,
+      security: securityPanel ? { channelId: securityPanel.channelId, messageId: securityPanel.id, url: securityPanel.url } : null,
+      textActivity: { channelId: textBoard.channelId, messageId: textBoard.id, url: textBoard.url },
+      voiceActivity: { channelId: voiceBoard.channelId, messageId: voiceBoard.id, url: voiceBoard.url },
+      activityRewards: { channelId: rewardBoard.channelId, messageId: rewardBoard.id, url: rewardBoard.url }
+    }
   };
-  await writeArtifact(`3a65-test-server-full-rebuild-${mode}.json`, result);
+  await writeArtifact("3a80-ft-community-live-smoke-suite.json", result);
   return result;
 }
 
-export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
+async function runParadiseTestSmokeSuiteUnlocked(guild, { fast = false } = {}) {
   let smokeStep = "guard";
   try {
   assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "test_smoke" });
+  const initialSmokeConfig = configForGuild(await loadState(), guild.id);
+  const smokeTemplate = inferParadiseTemplate({
+    configuredTemplate: initialSmokeConfig.activeSetupMode,
+    guildName: guild.name
+  });
+  if (smokeTemplate === "community") return runParadiseCommunityTestSmokeSuite(guild, { fast });
   smokeStep = "channel_lookup";
   const ownerId = guild.ownerId;
   const trainingChannel = await configuredChannel(guild, "training_channel", "training");
@@ -2371,7 +5795,7 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
       "- Metal Bat",
       "",
       "### Link:",
-      "https://www.roblox.com/share?code=PARADISE-TEST",
+      "https://www.roblox.com/share?code=FIMA-TEST",
       "",
       `<@${ownerId}>`,
       "",
@@ -2384,7 +5808,7 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
       format: "First To 3",
       characters: "Saitama, Garou, Metal Bat",
       rules: ["LH yok / 2M1 shove tech yok", "TDS yok / True Downslam yok", "Overpassive yok", "2 Ragdoll Cancel yok", "Wall abuse yok", "Sırada birbirinize vurmak yok", "Sırayı terk etmek yok"],
-      link: "https://www.roblox.com/share?code=PARADISE-TEST",
+      link: "https://www.roblox.com/share?code=FIMA-TEST",
       hoster: `<@${ownerId}>`
     }),
     allowedMentions: { users: [], roles: [], parse: [] }
@@ -2396,7 +5820,7 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
       tryoutCopy.subtitle,
       "",
       "◆ **Server**",
-      "https://www.roblox.com/share?code=PARADISE-TEST",
+      "https://www.roblox.com/share?code=FIMA-TEST",
       "",
       "◆ **Format**",
       "- FT2 — one aggressive round",
@@ -2419,14 +5843,14 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
     content: tryoutAnnouncementMarkdown({
       language: smokeLanguage,
       server: "Frankfurt, Germany",
-      link: "https://www.roblox.com/share?code=PARADISE-TEST",
+      link: "https://www.roblox.com/share?code=FIMA-TEST",
       hoster: `<@${ownerId}>`
     }),
     allowedMentions: { users: [], roles: [], parse: [] }
   }, "smoke_tryout_send_failed");
 
   smokeStep = "lifecycle_send";
-  const smokeFooter = smokeLanguage === "tr" ? "-# Paradise yaşam döngüsü testi" : "-# Paradise lifecycle rendering test";
+  const smokeFooter = smokeLanguage === "tr" ? "-# FIMA Bot yaşam döngüsü testi" : "-# FIMA Bot lifecycle rendering test";
   await smokeReply(training, `${trainingCopy.lockedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
   await smokeReply(training, `${trainingCopy.unlockedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
   await smokeReply(training, `${trainingCopy.endedReply}\n${smokeFooter}`, "smoke_training_lifecycle_failed");
@@ -2498,7 +5922,7 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
       next.profiles[botMember.id] = next.profiles[botMember.id] || {
         profileId: 9002,
         discordUserId: botMember.id,
-        robloxUsername: "ParadiseTest",
+        robloxUsername: "FimaBotTest",
         region: "Paris, France",
         thumbnailUrl: botMember.user.displayAvatarURL(),
         stageRank: { stage: 2, level: "High", strength: "Strong" },
@@ -2571,7 +5995,7 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   }
   const securityPanel = securityChannel
     ? await upsertSmokePanel("security", securityChannel, {
-      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("PARADISE SECURITY · LIVE STATUS")
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("FIMA BOT SECURITY · LIVE STATUS")
         .setDescription("# Audit-first protection\n- Discord AutoMod rules installed\n- Invite/scam and mention-spam guards configured\n- Quarantine review channel mapped\n- Raid mode and lockdown remain owner/senior-staff actions\n- No automatic first-offense ban\n\n-# Safe test: this message changes no moderation state.")
         .setFooter(paradiseFooter("Quarantine and false-positive review"))]
     })
@@ -2587,16 +6011,17 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   });
   if (!guild.channels.cache.some(item => item.name === "level-leaderboard" && item.isTextBased?.())) {
     const parent = guild.channels.cache.find(item => item.type === ChannelType.GuildCategory && item.name === "LEADERBOARD");
-    await guild.channels.create({
+    await ensureSetupChannel(guild, {
       name: "level-leaderboard",
       type: ChannelType.GuildText,
       parent: parent?.id,
-      reason: "Paradise test-lab XP board verification"
+      reason: "FIMA Bot test-lab XP board verification"
     });
   }
   const xpBoard = await updateLevelLeaderboard(guild).catch(() => null);
+  const readbackReady = staffTeam?.ready === true && (fast || helpGuide?.ready === true);
   const result = {
-    status: "LIVE DISCORD VERIFIED",
+    status: readbackReady ? "LIVE DISCORD VERIFIED" : "LIVE DISCORD FAILED",
     completedAt: new Date().toISOString(),
     guildId: guild.id,
     training: { channelId: trainingChannel.id, messageId: training.id, url: training.url, plainMarkdown: Number(training.embeds?.size ?? training.embeds?.length ?? 0) === 0, lifecycleReplies: 3 },
@@ -2604,8 +6029,10 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
     lifecycleMessages: 6,
     welcomeLeaveSimulation: Boolean(owner),
     leaderboardBoards,
-    staffTeam: staffTeam ? { channelId: staffTeam.channelId, messageId: staffTeam.id, url: staffTeam.url } : null,
-    helpGuide: helpGuide ? { channelId: helpGuide.channelId, messageId: helpGuide.id, url: helpGuide.url } : null,
+    staffTeam: sanitizeParadiseMessageReadback(staffTeam),
+    helpGuide: fast
+      ? { resolved: false, posted: false, verified: false, ready: false, reason: "fast_smoke_skipped" }
+      : sanitizeParadiseMessageReadback(helpGuide),
     workflowPanels: {
       application: applicationPanel ? { channelId: applicationPanel.channelId, messageId: applicationPanel.id, url: applicationPanel.url } : null,
       support: supportPanel ? { channelId: supportPanel.channelId, messageId: supportPanel.id, url: supportPanel.url } : null,
@@ -2633,8 +6060,38 @@ export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
   }
 }
 
+export async function runParadiseTestSmokeSuite(guild, { fast = false } = {}) {
+  return withParadiseGuildMutationLock(guild, "smoke", async () => {
+    await updateParadiseMutationLease({ phase: "live_smoke" });
+    return runParadiseTestSmokeSuiteUnlocked(guild, { fast });
+  }, {
+    purposeKey: "discord_live_smoke",
+    idempotencyKey: `${guild?.id}:smoke:${fast ? "fast" : "full"}`,
+    phase: "request_validated",
+    expectedGuildId: PARADISE_TEST_GUILD_ID
+  });
+}
+
 function cachedValues(cache) {
   return cache?.values ? [...cache.values()] : [];
+}
+
+export function paradiseChannelNameMatches(actualName, expectedName) {
+  const normalize = value => String(value || "")
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("tr");
+  const actual = normalize(actualName);
+  const expected = normalize(expectedName);
+  if (!actual || !expected) return false;
+  return actual === expected || actual.split("・").at(-1) === expected;
+}
+
+export function paradiseTextChannelByName(guild, ...names) {
+  return cachedValues(guild?.channels?.cache).find(channel =>
+    channel?.isTextBased?.()
+    && names.some(name => paradiseChannelNameMatches(channel.name, name))
+  ) || null;
 }
 
 function permissionOverwriteFor(channel, targetId) {
@@ -2668,28 +6125,12 @@ async function liveMappedChannel(guild, guildConfig, mappingKey, legacyNames = [
     }
     return configured?.isTextBased?.() ? configured : null;
   }
-  return cachedValues(guild.channels?.cache).find(channel =>
-    legacyNames.includes(channel.name) && channel.isTextBased?.()
-  ) || null;
+  return paradiseTextChannelByName(guild, ...legacyNames);
 }
 
 function messageEmbedTitle(message) {
   const first = message?.embeds?.[0] || message?.embeds?.first?.() || null;
   return String(first?.title || "").trim();
-}
-
-function paradiseChannelNameMatches(actualName, expectedName) {
-  const normalize = value => String(value || "").normalize("NFKC").trim().toLocaleLowerCase("tr");
-  const actual = normalize(actualName);
-  const expected = normalize(expectedName);
-  if (!actual || !expected) return false;
-  return actual === expected || actual.split("・").at(-1) === expected;
-}
-
-function paradiseTextChannelByName(guild, ...names) {
-  return cachedValues(guild?.channels?.cache).find(channel =>
-    channel?.isTextBased?.() && names.some(name => paradiseChannelNameMatches(channel.name, name))
-  ) || null;
 }
 
 function rankedLeaderboardGroups(guildConfig = {}) {
@@ -2731,7 +6172,7 @@ export async function inspectParadiseLiveTestLabReadiness(guild, guildConfig = {
   const staffTeamReady = Boolean(
     staffMessage?.id === staffMessageId
     && (!staffMessage.channelId || staffMessage.channelId === staffChannel.id)
-    && messageEmbedTitle(staffMessage) === "✦ PARADISE STAFF TEAM"
+    && messageEmbedTitle(staffMessage) === "✦ FIMA STAFF TEAM"
   );
 
   return {
@@ -2740,6 +6181,227 @@ export async function inspectParadiseLiveTestLabReadiness(guild, guildConfig = {
     leaderboardBoardExpectedCount: groups.length,
     leaderboardBoardsReady: groups.length > 0 && leaderboardBoardCount === groups.length,
     staffTeamReady
+  };
+}
+
+function paradiseCollectionValues(collection) {
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (typeof collection.values === "function") return [...collection.values()];
+  return [];
+}
+
+function firstParadiseMessageEmbed(message) {
+  return message?.embeds?.[0] || message?.embeds?.first?.() || null;
+}
+
+function failedParadiseMessageReadback({ resolved = false, posted = false, reason }) {
+  return {
+    resolved,
+    posted,
+    verified: false,
+    ready: false,
+    reason,
+    message: null
+  };
+}
+
+async function verifyParadiseMessageReadback(channel, message, {
+  botUserId,
+  expectedTitle,
+  expectedBannerUrl = null,
+  expectedThumbnail = null
+} = {}) {
+  if (!channel?.isTextBased?.()) {
+    return failedParadiseMessageReadback({ reason: "channel_not_resolved" });
+  }
+  if (!message?.id) {
+    return failedParadiseMessageReadback({ resolved: true, reason: "message_not_posted" });
+  }
+  if (typeof channel.messages?.fetch !== "function") {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "readback_unavailable" });
+  }
+  const fetched = await channel.messages.fetch(message.id).catch(() => null);
+  if (!fetched) {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "readback_failed" });
+  }
+  if (fetched.id !== message.id) {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "message_id_mismatch" });
+  }
+  if (fetched.channelId !== channel.id) {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "channel_mismatch" });
+  }
+  if (!botUserId || fetched.author?.id !== botUserId) {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "author_mismatch" });
+  }
+  if (messageEmbedTitle(fetched) !== String(expectedTitle || "").trim()) {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "title_mismatch" });
+  }
+
+  const embed = firstParadiseMessageEmbed(fetched);
+  if (expectedBannerUrl && String(embed?.image?.url || "") !== String(expectedBannerUrl)) {
+    return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "banner_mismatch" });
+  }
+  if (expectedThumbnail) {
+    const expectedFilename = String(expectedThumbnail.file?.name || "");
+    const attachments = paradiseCollectionValues(fetched.attachments);
+    const attachment = attachments.find(item => item?.name === expectedFilename) || null;
+    if (!expectedFilename || !attachment) {
+      return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "thumbnail_filename_mismatch" });
+    }
+    const thumbnailUrl = String(embed?.thumbnail?.url || "");
+    const attachmentUrls = [attachment.url, attachment.proxyURL].filter(Boolean).map(String);
+    if (!thumbnailUrl || !attachmentUrls.includes(thumbnailUrl)) {
+      return failedParadiseMessageReadback({ resolved: true, posted: true, reason: "thumbnail_url_mismatch" });
+    }
+  }
+
+  return {
+    resolved: true,
+    posted: true,
+    verified: true,
+    ready: true,
+    reason: null,
+    message: fetched
+  };
+}
+
+function sanitizeParadiseMessageReadback(result, key = null) {
+  return {
+    ...(key ? { key } : {}),
+    resolved: result?.resolved === true,
+    posted: result?.posted === true,
+    verified: result?.verified === true,
+    ready: result?.ready === true,
+    reason: result?.reason || null
+  };
+}
+
+function paradisePayloadFirstEmbed(payload) {
+  const embed = payload?.embeds?.[0] || null;
+  return embed?.toJSON?.() || embed?.data || embed || {};
+}
+
+export async function inspectParadiseCommunityLiveEvidenceReadiness(guild, guildConfig = {}) {
+  const unavailable = {
+    liveEvidenceAvailable: false,
+    textActivityReady: false,
+    voiceActivityReady: false,
+    activityRewardsPanelReady: false,
+    applicationPanelReady: false,
+    supportPanelReady: false,
+    moderationPanelReady: false,
+    securityPanelReady: false,
+    helpGuideReady: false,
+    staffTeamReady: false,
+    verifiedCount: 0,
+    requiredCount: 9,
+    ready: false
+  };
+  if (!guild?.id || !guild.channels?.cache) return unavailable;
+
+  const language = guildLanguage(guildConfig);
+  const channelByName = names => paradiseTextChannelByName(guild, ...names);
+  const [
+    textActivityChannel,
+    applicationChannel,
+    supportChannel,
+    moderationChannel,
+    securityChannel,
+    helpGuideChannel
+  ] = await Promise.all([
+    liveMappedChannel(guild, guildConfig, "level_channel", ["⌁・text-activity", "text-activity"]),
+    liveMappedChannel(guild, guildConfig, "application_ticket_channel", ["⌁・applications", "applications", "application-ticket"]),
+    liveMappedChannel(guild, guildConfig, "support_ticket_channel", ["⌁・support", "support", "support-ticket"]),
+    liveMappedChannel(guild, guildConfig, "moderation_requests_channel", ["〆・staff-security-logs", "moderation-requests"]),
+    liveMappedChannel(guild, guildConfig, "quarantine_review_channel", ["〆・staff-security-logs", "quarantine-review"]),
+    liveMappedChannel(guild, guildConfig, "member_help_channel", [
+      "⌁・faq-help", "⌁・bot-komutları", "◇・bot-komutları", "bot-commands", "command-guide"
+    ])
+  ]);
+  const expectedApplicationTitle = safeApplicationPanelText(
+    guildConfig.applicationSettings?.panelTitle,
+    language === "en" ? "FIMA APPLICATIONS" : "FIMA BAŞVURULARI",
+    80
+  );
+  const records = [
+    {
+      key: "textActivityReady",
+      messageId: guildConfig.smokePanelMessageIds?.textActivity,
+      channel: textActivityChannel,
+      title: "FIMA · TEXT ACTIVITY"
+    },
+    {
+      key: "voiceActivityReady",
+      messageId: guildConfig.smokePanelMessageIds?.voiceActivity,
+      channel: channelByName(["⌁・voice-activity", "voice-activity"]),
+      title: "FIMA · VOICE ACTIVITY"
+    },
+    {
+      key: "activityRewardsPanelReady",
+      messageId: guildConfig.smokePanelMessageIds?.activityRewards,
+      channel: channelByName(["⌁・activity-rewards", "activity-rewards"]),
+      title: "FIMA · ACTIVITY REWARDS"
+    },
+    {
+      key: "applicationPanelReady",
+      messageId: guildConfig.smokePanelMessageIds?.application,
+      channel: applicationChannel,
+      title: expectedApplicationTitle
+    },
+    {
+      key: "supportPanelReady",
+      messageId: guildConfig.smokePanelMessageIds?.support,
+      channel: supportChannel,
+      title: language === "en" ? "FIMA SUPPORT" : "FIMA DESTEK"
+    },
+    {
+      key: "moderationPanelReady",
+      messageId: guildConfig.smokePanelMessageIds?.moderation,
+      channel: moderationChannel,
+      title: "FIMA MODERATION · SAFE TEST"
+    },
+    {
+      key: "securityPanelReady",
+      messageId: guildConfig.smokePanelMessageIds?.security,
+      channel: securityChannel,
+      title: "FIMA SECURITY · LIVE STATUS"
+    },
+    {
+      key: "helpGuideReady",
+      messageId: guildConfig.commandGuideMessageIds?.community,
+      channel: helpGuideChannel,
+      title: language === "en" ? "✦ FIMA MEMBER HELP" : "✦ FIMA ÜYE YARDIMI"
+    },
+    {
+      key: "staffTeamReady",
+      messageId: guildConfig.staffTeamMessageId,
+      channel: channelByName(["staff-team", "personel-merkezi", "〆・staff-hub"]),
+      title: "✦ FIMA STAFF TEAM"
+    }
+  ];
+
+  const readinessEntries = await Promise.all(records.map(async record => {
+    const storedId = String(record.messageId || "").trim();
+    if (!storedId || !record.channel?.isTextBased?.() || typeof record.channel.messages?.fetch !== "function") {
+      return [record.key, false];
+    }
+    const message = await record.channel.messages.fetch(storedId).catch(() => null);
+    return [record.key, Boolean(
+      message?.id === storedId
+      && message.channelId === record.channel.id
+      && message.author?.id === guild.client?.user?.id
+      && messageEmbedTitle(message) === record.title
+    )];
+  }));
+  const readiness = Object.fromEntries(readinessEntries);
+  const verifiedCount = readinessEntries.filter(([, ready]) => ready).length;
+  return {
+    liveEvidenceAvailable: true,
+    ...readiness,
+    verifiedCount,
+    requiredCount: records.length,
+    ready: verifiedCount === records.length
   };
 }
 
@@ -2810,10 +6472,17 @@ export async function inspectParadiseLiveSecurityReadiness(guild, guildConfig = 
       securityMessage = await securityChannel.messages.fetch(securityMessageId).catch(() => null);
     }
   }
+  const template = inferParadiseTemplate({
+    configuredTemplate: guildConfig.activeSetupMode,
+    guildName: guild.name
+  });
+  const expectedSecurityTitle = template === "community"
+    ? "FIMA SECURITY · LIVE STATUS"
+    : "FIMA BOT SECURITY · LIVE STATUS";
   const securityPanelReady = Boolean(
     securityMessage?.id === securityMessageId
     && (!securityMessage.channelId || securityMessage.channelId === securityChannel.id)
-    && messageEmbedTitle(securityMessage) === "PARADISE SECURITY · LIVE STATUS"
+    && messageEmbedTitle(securityMessage) === expectedSecurityTitle
   );
 
   return {
@@ -2828,14 +6497,55 @@ export async function inspectParadiseLiveSecurityReadiness(guild, guildConfig = 
 export function paradiseAutoSmokeRepairAction({
   existingTestLab = false,
   needsCompactLab = false,
-  blacklistPermissionReady = false
+  blacklistPermissionReady = false,
+  roleIconReady = true,
+  structureReady = true
 } = {}) {
   if (needsCompactLab) return "compact_rebuild";
-  if (!existingTestLab || !blacklistPermissionReady) return "repair_permissions";
+  if (!existingTestLab || !blacklistPermissionReady || !roleIconReady || !structureReady) {
+    return "repair_permissions";
+  }
   return "skip_existing_lab";
 }
 
+export function paradiseCommunitySmokeEvidenceReadiness(result = {}) {
+  const evidence = {
+    welcomeLeaveReady: result.welcomeLeaveReady === true,
+    leaderboardReady: Number(result.leaderboardBoardCount || 0) === 2,
+    staffTeamReady: result.staffTeamReady === true,
+    helpGuideReady: result.helpGuideReady === true,
+    applicationPanelReady: result.applicationPanelReady === true,
+    supportPanelReady: result.supportPanelReady === true,
+    supportTicketReady: result.supportTicketReady === true || Boolean(result.supportTicketChannelId),
+    supportTicketTranscriptReady: result.supportTicketTranscriptReady === true,
+    supportTicketReopenReady: result.supportTicketReopenReady === true,
+    moderationPanelReady: result.moderationPanelReady === true,
+    securityPanelReady: result.securityPanelReady === true,
+    textActivityReady: result.textActivityReady === true,
+    voiceActivityReady: result.voiceActivityReady === true,
+    activityRewardsPanelReady: result.activityRewardsPanelReady === true,
+    rewardPolicyReady: result.rewardPolicyReady === true,
+    activityWorkerReady: result.activityWorkerReady === true,
+    activityDatabaseReady: result.activityDatabaseReady === true,
+    blacklistedRoleReady: result.blacklistedRoleReady === true,
+    blacklistPermissionReady: result.blacklistPermissionReady === true
+  };
+  const missing = Object.entries(evidence)
+    .filter(([, ready]) => !ready)
+    .map(([key]) => key);
+  return {
+    ...evidence,
+    ready: missing.length === 0,
+    missing,
+    missingCount: missing.length
+  };
+}
+
 export async function runParadiseAutoSmokeOnce(guild) {
+  return withParadiseGuildMutationLock(guild, "auto_smoke", () => runParadiseAutoSmokeOnceUnlocked(guild));
+}
+
+async function runParadiseAutoSmokeOnceUnlocked(guild) {
   try {
     assertParadiseTestGuildMutation({ guildId: guild?.id, operation: "auto_smoke" });
   } catch (error) {
@@ -2845,15 +6555,73 @@ export async function runParadiseAutoSmokeOnce(guild) {
   try {
     const state = await loadState();
     const guildSecurityState = state.securityState?.[guild.id] || {};
-    const needsCompactLab = guildSecurityState.testLabLayoutRevision !== PARADISE_TEST_LAB_LAYOUT_REVISION;
+    const smokeConfig = configForGuild(state, guild.id);
+    const smokeTemplate = inferParadiseTemplate({
+      configuredTemplate: smokeConfig.activeSetupMode,
+      guildName: guild.name
+    });
+    const recordedTemplate = guildSecurityState.lastAutoSmokeResult?.template || null;
+    const needsCompactLab = guildSecurityState.testLabLayoutRevision !== PARADISE_TEST_LAB_LAYOUT_REVISION
+      || (Boolean(guildSecurityState.lastAutoSmokeResult) && recordedTemplate !== smokeTemplate);
     const existingTestLab = Boolean(guildSecurityState.lastAutoSmokeResult) && !needsCompactLab;
     const preSmokeReadiness = existingTestLab
-      ? await inspectParadiseLiveTestLabReadiness(guild, configForGuild(state, guild.id))
+      ? await inspectParadiseLiveTestLabReadiness(guild, smokeConfig)
+      : null;
+    const preCommunityLiveEvidence = existingTestLab && smokeTemplate === "community"
+      ? await inspectParadiseCommunityLiveEvidenceReadiness(guild, smokeConfig)
+      : null;
+    const preActivityReadiness = existingTestLab && smokeTemplate === "community"
+      ? await inspectCommunityActivityReadiness(guild.client)
+      : null;
+    const preRoleIconReadiness = existingTestLab && smokeTemplate === "community"
+      ? inspectParadiseCommunityExtendedRoleIconReadiness(guild)
+      : null;
+    const preStructureVerification = existingTestLab && PARADISE_SETUP_SCHEMAS[smokeTemplate]
+      ? verifyParadiseTemplateStructure(guild, PARADISE_SETUP_SCHEMAS[smokeTemplate])
+      : null;
+    const preStructureReady = preStructureVerification?.ready === true;
+    const previousSmokeResult = guildSecurityState.lastAutoSmokeResult || {};
+    const preCommunityEvidence = smokeTemplate === "community"
+      ? paradiseCommunitySmokeEvidenceReadiness({
+          ...previousSmokeResult,
+          staffTeamReady: preCommunityLiveEvidence?.staffTeamReady === true,
+          helpGuideReady: preCommunityLiveEvidence?.helpGuideReady === true,
+          applicationPanelReady: preCommunityLiveEvidence?.applicationPanelReady === true,
+          supportPanelReady: preCommunityLiveEvidence?.supportPanelReady === true,
+          moderationPanelReady: preCommunityLiveEvidence?.moderationPanelReady === true,
+          securityPanelReady: Boolean(
+            preCommunityLiveEvidence?.securityPanelReady
+            && preSmokeReadiness?.securityPanelReady
+          ),
+          textActivityReady: Boolean(
+            preCommunityLiveEvidence?.textActivityReady
+            && preActivityReadiness?.textLeaderboardReady
+          ),
+          voiceActivityReady: Boolean(
+            preCommunityLiveEvidence?.voiceActivityReady
+            && preActivityReadiness?.voiceLeaderboardReady
+          ),
+          activityRewardsPanelReady: preCommunityLiveEvidence?.activityRewardsPanelReady === true,
+          rewardPolicyReady: Boolean(
+            previousSmokeResult.rewardPolicyReady
+            && preActivityReadiness?.rewardPolicyReady
+          ),
+          activityWorkerReady: preActivityReadiness?.workerActive === true,
+          activityDatabaseReady: preActivityReadiness?.databaseReady === true,
+          blacklistedRoleReady: preSmokeReadiness?.blacklistedRoleReady === true,
+          blacklistPermissionReady: preSmokeReadiness?.blacklistPermissionReady === true
+        })
       : null;
     const completedRevisionIsHealthy = Boolean(
       existingTestLab
+      && preStructureReady
+      && !guildSecurityState.lastAutoSmokeError
       && preSmokeReadiness?.blacklistPermissionReady
       && preSmokeReadiness?.securityPanelReady
+      && (smokeTemplate !== "community" || preActivityReadiness?.ready)
+      && (smokeTemplate !== "community" || preRoleIconReadiness?.ready)
+      && (smokeTemplate !== "community" || preCommunityLiveEvidence?.ready)
+      && (smokeTemplate !== "community" || preCommunityEvidence?.ready)
       && preSmokeReadiness?.leaderboardBoardsReady
       && preSmokeReadiness?.staffTeamReady
     );
@@ -2866,66 +6634,135 @@ export async function runParadiseAutoSmokeOnce(guild) {
     const repairAction = paradiseAutoSmokeRepairAction({
       existingTestLab,
       needsCompactLab,
-      blacklistPermissionReady: preSmokeReadiness?.blacklistPermissionReady === true
+      blacklistPermissionReady: preSmokeReadiness?.blacklistPermissionReady === true,
+      roleIconReady: smokeTemplate !== "community" || preRoleIconReadiness?.ready === true,
+      structureReady: preStructureReady
     });
     // The test guild was expressly designated as a disposable template lab.
     // This call is still guarded inside rebuildParadiseTestTemplate by its
     // fixed guild ID and creates a timestamped backup before any deletion.
+    const rebuildConfirmation = smokeTemplate === "community"
+      ? "REBUILD TEST COMMUNITY"
+      : smokeTemplate === "clan" ? "REBUILD TEST CLAN" : "REBUILD TEST TSBTR";
     const compactRebuild = repairAction === "compact_rebuild"
-      ? await rebuildParadiseTestTemplate(guild, "tsbtr", "REBUILD TEST TSBTR")
+      ? await rebuildParadiseTestTemplate(guild, smokeTemplate, rebuildConfirmation)
       : null;
     // A full missing-only repair is needed for an empty lab, but repeating the
     // whole template on every healthy source revision delays panel smoke tests for minutes.
     // An existing lab with broken blacklist permissions must still be repaired.
     const repair = compactRebuild || (repairAction === "repair_permissions"
-      ? await applyParadiseTemplateMissingOnly(guild, "tsbtr", { repairPermissions: true })
+      ? await applyParadiseTemplateMissingOnly(guild, smokeTemplate, { repairPermissions: true })
       : { skipped: true, reason: "existing_test_lab" });
-    const result = await runParadiseTestSmokeSuite(guild, { fast: existingTestLab });
+    const fastSmoke = existingTestLab && (
+      smokeTemplate !== "community"
+      || (repairAction === "skip_existing_lab" && preCommunityLiveEvidence?.helpGuideReady === true)
+    );
+    const result = await runParadiseTestSmokeSuite(guild, { fast: fastSmoke });
+    const postSmokeConfig = configForGuild(await loadState(), guild.id);
     const liveReadiness = await inspectParadiseLiveTestLabReadiness(
       guild,
-      configForGuild(await loadState(), guild.id)
+      postSmokeConfig
     );
+    const liveCommunityEvidence = smokeTemplate === "community"
+      ? await inspectParadiseCommunityLiveEvidenceReadiness(guild, postSmokeConfig)
+      : null;
+    const roleIconReadiness = smokeTemplate === "community"
+      ? inspectParadiseCommunityExtendedRoleIconReadiness(guild)
+      : null;
+    if (roleIconReadiness && !roleIconReadiness.ready) {
+      const error = new Error("community_role_icons_not_ready");
+      error.code = "community_role_icons_not_ready";
+      error.roleIconMismatchCount = Number(roleIconReadiness.mismatches?.length || 0);
+      error.roleIconBlockerCount = Number(roleIconReadiness.blockers?.length || 0);
+      throw error;
+    }
+    const postStructureVerification = PARADISE_SETUP_SCHEMAS[smokeTemplate]
+      ? verifyParadiseTemplateStructure(guild, PARADISE_SETUP_SCHEMAS[smokeTemplate])
+      : null;
+    if (!postStructureVerification?.ready) {
+      const error = new Error("community_structure_not_ready");
+      error.code = "community_structure_not_ready";
+      error.structureMismatchCount = [
+        "missingDesiredRoles",
+        "duplicateDesiredRoles",
+        "rolePermissionMismatches",
+        "missingDesiredChannels",
+        "duplicateDesiredChannels",
+        "categoryPermissionMismatches",
+        "extraChannels",
+        "extraRoles"
+      ].reduce((count, key) => count + Number(postStructureVerification?.[key]?.length || 0), 0);
+      throw error;
+    }
+    const persistedSmokeResult = {
+      template: smokeTemplate,
+      trainingMessageId: result.training?.messageId || null,
+      tryoutMessageId: result.tryout?.messageId || null,
+      trainingPlainMarkdown: result.training?.plainMarkdown === true,
+      tryoutPlainMarkdown: result.tryout?.plainMarkdown === true,
+      trainingLifecycleReplies: Number(result.training?.lifecycleReplies || 0),
+      tryoutLifecycleReplies: Number(result.tryout?.lifecycleReplies || 0),
+      welcomeLeaveReady: result.welcomeLeaveSimulation === true,
+      leaderboardBoardCount: Number(result.leaderboardBoards?.length || 0),
+      staffTeamReady: liveCommunityEvidence?.staffTeamReady === true,
+      helpGuideReady: liveCommunityEvidence?.helpGuideReady === true,
+      supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
+      supportTicketReady: Boolean(result.workflowPanels?.supportTicket?.channelId),
+      supportTicketTranscriptReady: Boolean(result.workflowPanels?.supportTicket?.transcriptSaved),
+      supportTicketReopenReady: Boolean(result.workflowPanels?.supportTicket?.closedThenReopened),
+      applicationPanelReady: liveCommunityEvidence?.applicationPanelReady === true,
+      supportPanelReady: liveCommunityEvidence?.supportPanelReady === true,
+      moderationPanelReady: liveCommunityEvidence?.moderationPanelReady === true,
+      securityPanelReady: Boolean(
+        liveCommunityEvidence?.securityPanelReady
+        && liveReadiness.securityPanelReady
+      ),
+      xpPanelReady: Boolean(result.workflowPanels?.xp),
+      textActivityReady: liveCommunityEvidence?.textActivityReady === true,
+      voiceActivityReady: liveCommunityEvidence?.voiceActivityReady === true,
+      activityRewardsPanelReady: liveCommunityEvidence?.activityRewardsPanelReady === true,
+      rewardPolicyReady: result.activity?.rewardPolicyReady === true,
+      activityWorkerReady: result.activity?.workerActive === true,
+      activityDatabaseReady: result.activity?.databaseReady === true,
+      roleIconReady: roleIconReadiness?.ready === true,
+      roleIconMismatchCount: Number(roleIconReadiness?.mismatches?.length || 0),
+      roleIconBlockerCount: Number(roleIconReadiness?.blockers?.length || 0),
+      repairCreatedChannels: Number(repair?.createdChannels ?? repair?.created?.channels ?? 0),
+      repairCreatedRoles: Number(repair?.createdRoles ?? repair?.created?.roles ?? 0),
+      blacklistedRoleReady: liveReadiness.blacklistedRoleReady === true,
+      blacklistPermissionReady: liveReadiness.blacklistPermissionReady === true,
+      blacklistLayout: liveReadiness.blacklistLayout
+    };
+    if (smokeTemplate === "community") {
+      const smokeEvidence = paradiseCommunitySmokeEvidenceReadiness(persistedSmokeResult);
+      if (!smokeEvidence.ready) {
+        const error = new Error("community_smoke_evidence_incomplete");
+        error.code = "community_smoke_evidence_incomplete";
+        error.smokeEvidenceMissingCount = smokeEvidence.missingCount;
+        throw error;
+      }
+    }
     await saveState(next => {
       next.securityState[guild.id] = {
         ...(next.securityState[guild.id] || {}),
-          lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
-          testLabLayoutRevision: PARADISE_TEST_LAB_LAYOUT_REVISION,
+        lastAutoSmokeRevision: PARADISE_AUTO_SMOKE_REVISION,
+        testLabLayoutRevision: PARADISE_TEST_LAB_LAYOUT_REVISION,
         lastAutoSmokeAt: new Date().toISOString(),
         lastAutoSmokeError: null,
         lastAutoSmokeFailedAt: null,
-        lastAutoSmokeResult: {
-          trainingMessageId: result.training?.messageId || null,
-          tryoutMessageId: result.tryout?.messageId || null,
-          trainingPlainMarkdown: result.training?.plainMarkdown === true,
-          tryoutPlainMarkdown: result.tryout?.plainMarkdown === true,
-          trainingLifecycleReplies: Number(result.training?.lifecycleReplies || 0),
-          tryoutLifecycleReplies: Number(result.tryout?.lifecycleReplies || 0),
-          leaderboardBoardCount: Number(liveReadiness.leaderboardBoardCount || 0),
-          staffTeamReady: liveReadiness.staffTeamReady === true,
-          supportTicketChannelId: result.workflowPanels?.supportTicket?.channelId || null,
-          supportTicketTranscriptReady: Boolean(result.workflowPanels?.supportTicket?.transcriptSaved),
-          supportTicketReopenReady: Boolean(result.workflowPanels?.supportTicket?.closedThenReopened),
-          applicationPanelReady: Boolean(result.workflowPanels?.application),
-          supportPanelReady: Boolean(result.workflowPanels?.support),
-          moderationPanelReady: Boolean(result.workflowPanels?.moderation),
-          securityPanelReady: liveReadiness.securityPanelReady,
-          xpPanelReady: Boolean(result.workflowPanels?.xp),
-          repairCreatedChannels: Number(repair?.createdChannels ?? repair?.created?.channels ?? 0),
-          repairCreatedRoles: Number(repair?.createdRoles ?? repair?.created?.roles ?? 0),
-          blacklistedRoleReady: liveReadiness.blacklistedRoleReady,
-          blacklistPermissionReady: liveReadiness.blacklistPermissionReady,
-          blacklistLayout: liveReadiness.blacklistLayout
-        }
+        lastAutoSmokeResult: persistedSmokeResult
       };
       return next;
     });
     return {
       skipped: false,
       revision: PARADISE_AUTO_SMOKE_REVISION,
+      template: smokeTemplate,
       repair,
       blacklistedRoleReady: liveReadiness.blacklistedRoleReady,
       blacklistPermissionReady: liveReadiness.blacklistPermissionReady,
       blacklistLayout: liveReadiness.blacklistLayout,
+      roleIconReady: roleIconReadiness?.ready === true,
       result
     };
   } catch (error) {
@@ -2950,8 +6787,15 @@ export async function paradiseTestLabStatus(guild = null) {
   const state = await loadState();
   const record = state.securityState?.[PARADISE_TEST_GUILD_ID] || {};
   const result = record.lastAutoSmokeResult || {};
+  const stateConfig = guild?.id === PARADISE_TEST_GUILD_ID
+    ? configForGuild(state, guild.id)
+    : configForGuild(state, PARADISE_TEST_GUILD_ID);
+  const template = result.template || inferParadiseTemplate({
+    configuredTemplate: stateConfig.activeSetupMode,
+    guildName: guild?.name
+  });
   const liveReadiness = guild?.id === PARADISE_TEST_GUILD_ID
-    ? await inspectParadiseLiveTestLabReadiness(guild, configForGuild(state, guild.id))
+    ? await inspectParadiseLiveTestLabReadiness(guild, stateConfig)
     : {
         liveReadinessAvailable: false,
         blacklistedRoleReady: false,
@@ -2963,39 +6807,139 @@ export async function paradiseTestLabStatus(guild = null) {
         leaderboardBoardsReady: false,
         staffTeamReady: false
       };
-  return {
-    completed: Boolean(
-      record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION
-      && liveReadiness.blacklistPermissionReady
+  const liveCommunityEvidence = guild?.id === PARADISE_TEST_GUILD_ID && template === "community"
+    ? await inspectParadiseCommunityLiveEvidenceReadiness(guild, stateConfig)
+    : {
+        liveEvidenceAvailable: false,
+        textActivityReady: false,
+        voiceActivityReady: false,
+        activityRewardsPanelReady: false,
+        applicationPanelReady: false,
+        supportPanelReady: false,
+        moderationPanelReady: false,
+        securityPanelReady: false,
+        helpGuideReady: false,
+        staffTeamReady: false,
+        verifiedCount: 0,
+        requiredCount: 9,
+        ready: false
+      };
+  const liveActivityReadiness = guild?.id === PARADISE_TEST_GUILD_ID && template === "community"
+    ? await inspectCommunityActivityReadiness(guild.client)
+    : null;
+  const selectedTemplate = guild?.id === PARADISE_TEST_GUILD_ID
+    ? PARADISE_SETUP_SCHEMAS[template]
+    : null;
+  const structureVerification = selectedTemplate
+    ? verifyParadiseTemplateStructure(guild, selectedTemplate)
+    : null;
+  const structureMismatchCount = structureVerification
+    ? [
+        "missingDesiredRoles",
+        "duplicateDesiredRoles",
+        "rolePermissionMismatches",
+        "missingDesiredChannels",
+        "duplicateDesiredChannels",
+        "categoryPermissionMismatches",
+        "extraChannels",
+        "extraRoles"
+      ].reduce((count, key) => count + Number(structureVerification[key]?.length || 0), 0)
+    : 0;
+  const structureReady = structureVerification?.ready === true;
+  const roleIconReady = template === "community"
+    && structureVerification?.roleIconReadiness?.ready === true;
+  const roleIconMismatchCount = Number(structureVerification?.roleIconMismatches?.length || 0);
+  const roleIconBlockerCount = Number(structureVerification?.roleIconBlockers?.length || 0);
+  const smokeEvidence = paradiseCommunitySmokeEvidenceReadiness({
+    ...result,
+    staffTeamReady: liveCommunityEvidence.staffTeamReady === true,
+    helpGuideReady: liveCommunityEvidence.helpGuideReady === true,
+    applicationPanelReady: liveCommunityEvidence.applicationPanelReady === true,
+    supportPanelReady: liveCommunityEvidence.supportPanelReady === true,
+    moderationPanelReady: liveCommunityEvidence.moderationPanelReady === true,
+    securityPanelReady: Boolean(
+      liveCommunityEvidence.securityPanelReady
       && liveReadiness.securityPanelReady
-      && liveReadiness.leaderboardBoardsReady
-      && liveReadiness.staffTeamReady
     ),
+    textActivityReady: Boolean(
+      liveCommunityEvidence.textActivityReady
+      && liveActivityReadiness?.textLeaderboardReady
+    ),
+    voiceActivityReady: Boolean(
+      liveCommunityEvidence.voiceActivityReady
+      && liveActivityReadiness?.voiceLeaderboardReady
+    ),
+    activityRewardsPanelReady: liveCommunityEvidence.activityRewardsPanelReady === true,
+    rewardPolicyReady: Boolean(
+      result.rewardPolicyReady
+      && liveActivityReadiness?.rewardPolicyReady
+    ),
+    activityWorkerReady: liveActivityReadiness?.workerActive === true,
+    activityDatabaseReady: liveActivityReadiness?.databaseReady === true,
+    blacklistedRoleReady: liveReadiness.blacklistedRoleReady === true,
+    blacklistPermissionReady: liveReadiness.blacklistPermissionReady === true
+  });
+  const currentRevisionReady = Boolean(
+    record.lastAutoSmokeRevision === PARADISE_AUTO_SMOKE_REVISION
+    && !record.lastAutoSmokeError
+  );
+  const communityReady = template === "community" && Boolean(
+    currentRevisionReady
+    && structureReady
+    && roleIconReady
+    && liveActivityReadiness?.ready
+    && liveCommunityEvidence.ready
+    && smokeEvidence.ready
+  );
+  return {
+    completed: currentRevisionReady,
+    template,
+    communityReady,
     revision: record.lastAutoSmokeRevision || null,
     completedAt: record.lastAutoSmokeAt || null,
     lastError: record.lastAutoSmokeError || null,
     lastFailureAt: record.lastAutoSmokeFailedAt || null,
+    structureVerificationAvailable: Boolean(structureVerification),
+    structureReady,
+    structureMismatchCount,
+    roleIconReady,
+    roleIconMismatchCount,
+    roleIconBlockerCount,
+    smokeEvidenceReady: smokeEvidence.ready,
+    smokeEvidenceMissingCount: smokeEvidence.missingCount,
     trainingReady: Boolean(result.trainingMessageId),
     tryoutReady: Boolean(result.tryoutMessageId),
     trainingPlainMarkdown: result.trainingPlainMarkdown === true,
     tryoutPlainMarkdown: result.tryoutPlainMarkdown === true,
     trainingLifecycleReplies: Number(result.trainingLifecycleReplies || 0),
     tryoutLifecycleReplies: Number(result.tryoutLifecycleReplies || 0),
-    leaderboardBoardCount: Number(liveReadiness.leaderboardBoardCount || 0),
+    leaderboardBoardCount: Number(result.leaderboardBoardCount || 0),
+    leaderboardReady: smokeEvidence.leaderboardReady,
+    welcomeLeaveReady: smokeEvidence.welcomeLeaveReady,
+    staffTeamReady: smokeEvidence.staffTeamReady,
+    helpGuideReady: smokeEvidence.helpGuideReady,
+    supportTicketReady: smokeEvidence.supportTicketReady,
+    supportTicketTranscriptReady: smokeEvidence.supportTicketTranscriptReady,
+    supportTicketReopenReady: smokeEvidence.supportTicketReopenReady,
+    applicationPanelReady: smokeEvidence.applicationPanelReady,
+    supportPanelReady: smokeEvidence.supportPanelReady,
+    moderationPanelReady: smokeEvidence.moderationPanelReady,
     leaderboardBoardExpectedCount: Number(liveReadiness.leaderboardBoardExpectedCount || 0),
     leaderboardBoardsReady: liveReadiness.leaderboardBoardsReady === true,
-    staffTeamReady: liveReadiness.staffTeamReady === true,
-    supportTicketReady: Boolean(result.supportTicketChannelId),
-    supportTicketTranscriptReady: result.supportTicketTranscriptReady === true,
-    supportTicketReopenReady: result.supportTicketReopenReady === true,
-    applicationPanelReady: result.applicationPanelReady === true,
-    supportPanelReady: result.supportPanelReady === true,
-    moderationPanelReady: result.moderationPanelReady === true,
     liveReadinessAvailable: liveReadiness.liveReadinessAvailable,
-    securityPanelReady: liveReadiness.securityPanelReady,
+    liveEvidenceAvailable: liveCommunityEvidence.liveEvidenceAvailable,
+    liveEvidenceVerifiedCount: liveCommunityEvidence.verifiedCount,
+    liveEvidenceRequiredCount: liveCommunityEvidence.requiredCount,
+    securityPanelReady: smokeEvidence.securityPanelReady,
     xpPanelReady: result.xpPanelReady === true,
-    blacklistedRoleReady: liveReadiness.blacklistedRoleReady,
-    blacklistPermissionReady: liveReadiness.blacklistPermissionReady,
+    textActivityReady: smokeEvidence.textActivityReady,
+    voiceActivityReady: smokeEvidence.voiceActivityReady,
+    activityRewardsPanelReady: smokeEvidence.activityRewardsPanelReady,
+    rewardPolicyReady: smokeEvidence.rewardPolicyReady,
+    activityWorkerReady: smokeEvidence.activityWorkerReady,
+    activityDatabaseReady: smokeEvidence.activityDatabaseReady,
+    blacklistedRoleReady: smokeEvidence.blacklistedRoleReady,
+    blacklistPermissionReady: smokeEvidence.blacklistPermissionReady,
     blacklistLayout: liveReadiness.blacklistLayout,
     repairCreatedChannels: Number(result.repairCreatedChannels || 0),
     repairCreatedRoles: Number(result.repairCreatedRoles || 0)
@@ -3081,21 +7025,19 @@ async function verifyCheck(interaction) {
     });
   } catch (error) {
     if (error.code === "roblox_identity_already_verified") {
-      return interaction.reply({ content: "This Roblox account is already verified to another Paradise profile. Use the profile-transfer support flow instead.", ephemeral: true });
+      return interaction.reply({ content: "This Roblox account is already verified to another FIMA Bot profile. Use the profile-transfer support flow instead.", ephemeral: true });
     }
     throw error;
   }
   verifiedProfiles.set(interaction.user.id, savedProfile);
-  const role = await ensureRole(interaction.guild, "Verified Fighter");
-  await interaction.member.roles.add(role);
   verificationChallenges.delete(interaction.user.id);
   await saveState(state => { delete state.verificationChallenges[interaction.user.id]; return state; });
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✓ ROBLOX VERIFIED")
-      .setDescription(`Your Discord is now linked to **${challenge.username}**.\nYou can remove the code from your Roblox bio.\n\nPress **Create Fighter Profile** to choose your region.`)
+      .setDescription(`Your Discord is now linked to **${challenge.username}**.\nYou can remove the code from your Roblox bio.\n\nPress **Create FIMA Profile** to choose your region.`)
       .setFooter(paradiseFooter("Identity verified"))],
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("paradise_profile_create").setLabel("Create Fighter Profile").setStyle(ButtonStyle.Success)
+      new ButtonBuilder().setCustomId("paradise_profile_create").setLabel("Create FIMA Profile").setStyle(ButtonStyle.Success)
     )],
     ephemeral: true
   });
@@ -3116,7 +7058,7 @@ async function completedProfile(discordId, guildId = null) {
   const guildProfile = guildId ? state.guildProfiles?.[guildId]?.[discordId] || {} : {};
   // Legacy profileId/region is read only as a compatibility fallback. New
   // profile state is guild-scoped so one server cannot overwrite another.
-  const merged = { ...profile, ...guildProfile };
+  const merged = fimaGuildProfileProjection(profile, guildProfile);
   return merged.profileId && merged.region ? merged : null;
 }
 
@@ -3138,10 +7080,22 @@ async function robloxHeadshot(robloxId) {
 async function profileEmbed(guild, discordId, viewer = {}) {
   const profile = await completedProfile(discordId, guild.id);
   if (!profile) return null;
-  if (profile.visibility === "private" && viewer.userId && viewer.userId !== discordId && viewer.isStaff !== true) return null;
+  if (profile.visibility === "private" && viewer.userId !== discordId && viewer.isStaff !== true) return null;
   const member = await guild.members.fetch(discordId).catch(() => null);
+  if (!member) return null;
   const thumbnail = await robloxHeadshot(profile.robloxId);
   const state = await loadState();
+  if (inferParadiseTemplate({ configuredTemplate: configForGuild(state, guild.id).activeSetupMode, guildName: guild.name }) === "community") {
+    const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ FIMA PROFILE")
+      .setDescription(`${member}\nVerified Roblox identity`)
+      .addFields(
+        { name: "Profile ID", value: `#${profile.profileId}`, inline: true },
+        { name: "Roblox", value: String(profile.robloxUsername), inline: true },
+        { name: "Region", value: String(profile.region || "Not selected"), inline: true }
+      ).setFooter(paradiseFooter("Guild roles and permissions are managed separately"));
+    if (thumbnail) embed.setThumbnail(thumbnail);
+    return embed;
+  }
   const leaderboardRow = leaderboardForGuild(state, guild.id)[discordId] || {};
   const topSpot = leaderboardRow.spot || null;
   const storedRank = leaderboardRow.stageRank || profile.stageRank;
@@ -3155,7 +7109,7 @@ async function profileEmbed(guild, discordId, viewer = {}) {
           : "Challengeable";
   const createdAt = Math.floor(new Date(profile.createdAt || profile.verifiedAt || Date.now()).getTime() / 1000);
   const updatedAt = Math.floor(new Date(profile.updatedAt || profile.profileUpdatedAt || profile.verifiedAt || Date.now()).getTime() / 1000);
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ PARADISE FIGHTER PROFILE")
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("✦ FIMA BOT FIGHTER PROFILE")
     .setDescription(`## ${member || `<@${discordId}>`}\n-# Verified Roblox identity`)
     .addFields(
       { name: "Profile ID", value: `\`#${profile.profileId}\``, inline: true },
@@ -3193,7 +7147,7 @@ async function beginProfileCreation(interaction) {
   if (!existing) {
     return interaction.reply({
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("ROBLOX VERIFICATION REQUIRED")
-        .setDescription("You must link your Roblox account before creating a Paradise fighter profile.")],
+        .setDescription("You must link your Roblox account before creating a FIMA Bot fighter profile.")],
       components: [verificationStartButton()],
       ephemeral: true
     });
@@ -3202,7 +7156,7 @@ async function beginProfileCreation(interaction) {
   if (currentGuildProfile) {
     const embed = await profileEmbed(interaction.guild, interaction.user.id, { userId: interaction.user.id });
     return interaction.reply({
-      content: `You already have a Paradise fighter profile (ID: **#${currentGuildProfile.profileId}**).`,
+      content: `You already have a FIMA Bot fighter profile (ID: **#${currentGuildProfile.profileId}**).`,
       embeds: embed ? [embed] : [],
       components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId("paradise_profile_region_change").setLabel("Change Region").setStyle(ButtonStyle.Secondary)
@@ -3248,7 +7202,7 @@ async function handleProfile(interaction) {
       };
       return state;
     });
-    return interaction.reply({ content: visibility === "private" ? "Your Paradise profile is now private to other members; staff may still view it for moderation/support." : "Your Paradise profile is now visible to members in this server.", ephemeral: true });
+    return interaction.reply({ content: visibility === "private" ? "Your FIMA Bot profile is now private to other members; staff may still view it for moderation/support." : "Your FIMA Bot profile is now visible to members in this server.", ephemeral: true });
   }
   if (sub === "verify-status") {
     const profile = await verifiedProfile(interaction.user.id);
@@ -3277,9 +7231,10 @@ async function handleProfile(interaction) {
     const guildProfiles = profileState.guildProfiles?.[interaction.guildId] || {};
     const matches = [];
     for (const [discordId, identity] of Object.entries(profiles)) {
-      const profile = { ...identity, ...(guildProfiles[discordId] || {}) };
+      const profile = fimaGuildProfileProjection(identity, guildProfiles[discordId] || {});
       if (!profile.profileId || !profile.region) continue;
       const member = interaction.guild.members.cache.get(discordId);
+      if (!member || (profile.visibility === "private" && interaction.user.id !== discordId && !canModerate(interaction.member))) continue;
       const exactProfile = requestedProfileId && Number(profile.profileId) === Number(requestedProfileId);
       const exactRoblox = requestedRoblox && String(profile.robloxUsername || "").toLowerCase() === requestedRoblox;
       const queryMatch = requestedQuery && [
@@ -3292,10 +7247,10 @@ async function handleProfile(interaction) {
     if (matches.length > 1) {
       const profilesById = profiles;
       const menu = new StringSelectMenuBuilder().setCustomId("paradise_profile_lookup")
-        .setPlaceholder("Choose the matching Paradise profile")
+        .setPlaceholder("Choose the matching FIMA Bot profile")
         .addOptions(...matches.slice(0, 25).map(id => {
           const member = interaction.guild.members.cache.get(id);
-          const profile = { ...(profilesById[id] || {}), ...(guildProfiles[id] || {}) };
+          const profile = fimaGuildProfileProjection(profilesById[id] || {}, guildProfiles[id] || {});
           return {
             label: String(member?.displayName || profile.robloxUsername || `Profile ${profile.profileId || id}`).slice(0, 100),
             description: `#${profile.profileId || "—"} · Roblox: ${profile.robloxUsername || "Not linked"}`.slice(0, 100),
@@ -3312,7 +7267,7 @@ async function handleProfile(interaction) {
   }
   targetId ||= interaction.user.id;
   const embed = await profileEmbed(interaction.guild, targetId, { userId: interaction.user.id, isStaff: canModerate(interaction.member) });
-  if (!embed) return interaction.reply({ content: `<@${targetId}> has not completed a Paradise fighter profile.`, ephemeral: true });
+  if (!embed) return interaction.reply({ content: `<@${targetId}> has not completed a FIMA Bot fighter profile.`, ephemeral: true });
   return interaction.reply({ embeds: [embed] });
 }
 
@@ -3329,6 +7284,7 @@ async function handleProfileRegion(interaction) {
   await saveState(state => {
     const identity = state.profiles[interaction.user.id];
     if (!identity) return state;
+    ensureFimaGlobalProfileId(state, interaction.user.id);
     state.guildProfiles = state.guildProfiles || {};
     state.guildProfiles[interaction.guildId] = state.guildProfiles[interaction.guildId] || {};
     state.guildProfileMeta = state.guildProfileMeta || {};
@@ -3385,9 +7341,9 @@ async function assignRankRole(guild, member, rank) {
     names.push(`Stage ${stage} ${level} ${strength}`);
   }
   const old = member.roles.cache.filter(r => names.includes(r.name));
-  if (old.size) await member.roles.remove(old, "Paradise rank replacement");
+  if (old.size) await member.roles.remove(old, "FIMA Bot rank replacement");
   const role = await ensureRole(guild, rankToRoleName(rank));
-  await member.roles.add(role, "Approved Paradise tryout result");
+  await member.roles.add(role, "Approved FIMA Bot tryout result");
   return role;
 }
 
@@ -3627,7 +7583,7 @@ async function refreshChallengeHeader(guild, record) {
   const payload = { embeds: [await challengeHeaderEmbed(record)] };
   if (message) await message.edit(payload); else {
     message = await channel.send(payload);
-    await message.pin("Paradise live challenge context").catch(() => {});
+    await message.pin("FIMA Bot live challenge context").catch(() => {});
   }
   return message;
 }
@@ -3678,7 +7634,7 @@ async function createChallengeTicket(interaction, opponent, region = null) {
       { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] },
       ...staffOverwrites
     ],
-    reason: "Paradise verified challenge"
+    reason: "FIMA Bot verified challenge"
   });
   const record = {
     status: "open", guildId: interaction.guildId, ticketId: channel.id, challengerId: interaction.user.id,
@@ -3730,7 +7686,7 @@ async function handleChallenge(interaction) {
     }
     const state = await loadState();
     const ticket = state.pendingChallenges[interaction.channelId];
-    if (!ticket || ticket.status !== "open") return interaction.reply({ content: "Run this inside an open Paradise challenge ticket.", ephemeral: true });
+    if (!ticket || ticket.status !== "open") return interaction.reply({ content: "Run this inside an open FIMA Bot challenge ticket.", ephemeral: true });
     const reason = interaction.options.getString("reason");
     const closed = {
       ...ticket,
@@ -3808,7 +7764,7 @@ async function handleChallenge(interaction) {
   const state = await loadState();
   const ticket = state.pendingChallenges?.[ticketId];
   if (!ticket || !belongsToGuild(ticket, interaction.guildId) || ticket.status !== "open") {
-    return interaction.reply({ content: "Submit the score inside an open Paradise challenge ticket.", ephemeral: true });
+    return interaction.reply({ content: "Submit the score inside an open FIMA Bot challenge ticket.", ephemeral: true });
   }
   const participants = new Set([ticket.challengerId, ticket.opponentId]);
   if (submittedWinner.id === submittedLoser.id || !participants.has(submittedWinner.id) || !participants.has(submittedLoser.id)) {
@@ -3821,7 +7777,7 @@ async function handleChallenge(interaction) {
     return interaction.reply({ content: "Use a score such as `10-5` or `Auto`; do not include player names or `to`.", ephemeral: true });
   }
   if (!await completedProfile(submittedWinner.id, interaction.guildId) || !await completedProfile(submittedLoser.id, interaction.guildId)) {
-    return interaction.reply({ content: "Winner and loser must both have completed Paradise fighter profiles.", ephemeral: true });
+    return interaction.reply({ content: "Winner and loser must both have completed FIMA Bot fighter profiles.", ephemeral: true });
   }
   let coReferee;
   try {
@@ -4100,7 +8056,7 @@ async function handleTraining(interaction) {
   if (sub === "setup") {
     if (!canManageClan(interaction.member)) return interaction.reply({ content: "Training management role required.", ephemeral: true });
     const posted = await publishGuidePost(interaction.guild, GUIDE_POSTS.find(item => item.key === "training_rules"));
-    return interaction.reply({ content: posted ? "Training handbook updated." : "Create `training-hoster-rules` first.", ephemeral: true });
+    return interaction.reply({ content: posted.ready ? "Training handbook updated." : "Create `training-hoster-rules` first.", ephemeral: true });
   }
   if (sub === "start" || sub === "create") {
     const link = interaction.options.getString("link");
@@ -4313,7 +8269,7 @@ async function handleTournament(interaction) {
     };
     await saveState(state => { state.tournaments[id] = tournament; return state; });
     return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(tournament.title)
-      .setDescription(`**Server:** ${tournament.link}\n**Rules:** ${tournament.rules || "Standard Paradise tournament rules."}\n**Prize:** ${tournament.prize || "None announced"}`)
+      .setDescription(`**Server:** ${tournament.link}\n**Rules:** ${tournament.rules || "Standard FIMA Bot tournament rules."}\n**Prize:** ${tournament.prize || "None announced"}`)
       .addFields({ name: "Tournament ID", value: id, inline: true }, { name: "Host", value: `${interaction.user}`, inline: true })
       .setFooter({ text: "Simple tournament • Made By Fieel" })] });
   }
@@ -4438,9 +8394,9 @@ const DAILY_QUESTIONS = Object.freeze([
   { category: "TSB", prompt: "Garou karakterinin oyun içindeki unvanı nedir?", answers: ["hero hunter"] },
   { category: "TSB", prompt: "Training sonunda kullanılan iki ek etkinlikten birinin kısa adı nedir?", answers: ["ffa", "kotm"] },
   { category: "TSB", prompt: "FT3 ifadesindeki 3 neyi belirtir?", answers: ["3 galibiyet", "uc galibiyet", "ilk 3", "first to 3"] },
-  { category: "Paradise", prompt: "Bir challenge sonucu onaylanmadan önce hangi iki tarafsız kanıt türünden biri saklanmalıdır?", answers: ["video", "kayit", "recording", "proof"] },
-  { category: "Paradise", prompt: "Stage sisteminde en iyi stage numarası kaçtır?", answers: ["0", "stage 0"] },
-  { category: "Paradise", prompt: "Stage 1 Low Strong'dan sonraki rank nedir?", answers: ["stage 1 mid weak", "1 mid weak"] },
+  { category: "FIMA Bot", prompt: "Bir challenge sonucu onaylanmadan önce hangi iki tarafsız kanıt türünden biri saklanmalıdır?", answers: ["video", "kayit", "recording", "proof"] },
+  { category: "FIMA Bot", prompt: "Stage sisteminde en iyi stage numarası kaçtır?", answers: ["0", "stage 0"] },
+  { category: "FIMA Bot", prompt: "Stage 1 Low Strong'dan sonraki rank nedir?", answers: ["stage 1 mid weak", "1 mid weak"] },
   { category: "Community", prompt: "Bir tartışmada cevap vermeden önce yapılabilecek en iyi ilk adım nedir?", answers: ["sakinlesmek", "sakin olmak", "dinlemek", "beklemek"] },
   { category: "Community", prompt: "Güvenmediğin bir Discord bağlantısını açmadan önce ne yapmalısın?", answers: ["yetkiliye sor", "staffa sor", "raporla", "kontrol et"] },
   { category: "Life", prompt: "Bir hedefi sürdürülebilir hale getiren en önemli şeylerden biri nedir?", answers: ["duzen", "disiplin", "istikrar", "plan"] },
@@ -4485,7 +8441,7 @@ async function postDailyQuestion(guild, { force = false } = {}) {
     embeds: [new EmbedBuilder()
       .setColor(await paradiseBrandColor())
       .setTitle(`◆ GÜNÜN SORUSU · ${rewardLabel.toUpperCase()}`)
-      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını Paradise paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün ${String(hour).padStart(2, "0")}:00 Europe/Berlin · Made By Fieel`)
+      .setDescription(`# ${question.prompt}\n\nDoğru cevabı bu kanala yaz. İlk doğru cevap kazanır.\n\n> Ödül otomatik ödenmez. Kazanan güvenli gamepass bağlantısını FIMA Bot paneliyle gönderir; owner kontrol ederek öder.\n\n-# ${question.category} · Her gün ${String(hour).padStart(2, "0")}:00 Europe/Berlin · Made By Fieel`)
       .setTimestamp()]
   });
   const record = {
@@ -4627,13 +8583,13 @@ async function handleQotdGamepassModal(interaction) {
   const owner = await interaction.guild.fetchOwner().catch(() => null);
   const rewardLog = await configuredChannel(interaction.guild, "payout_queue_channel", "payout-queue")
     || interaction.guild.channels.cache.find(channel => ["bot-logs", "staff-logs", "giveaway-results"].includes(channel.name) && channel.isTextBased?.());
-  const payload = `QOTD reward claim · ${interaction.user} (${interaction.user.id}) · ${dateKey}\n${gamepassUrl}\nManual review required; Paradise does not auto-pay.`;
+  const payload = `QOTD reward claim · ${interaction.user} (${interaction.user.id}) · ${dateKey}\n${gamepassUrl}\nManual review required; FIMA Bot does not auto-pay.`;
   const dmSent = owner ? await owner.send(payload).then(() => true).catch(() => false) : false;
   let queueMessageId = null;
   if (rewardLog) {
     const queueMessage = await rewardLog.send({
       embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ 25 ROBUX PAYOUT · PENDING")
-        .setDescription(`Winner: ${interaction.user}\nDate: **${dateKey}**\n[Open official Roblox gamepass](${gamepassUrl})\n\n-# Manual owner/staff decision required. Paradise never auto-pays.`)
+        .setDescription(`Winner: ${interaction.user}\nDate: **${dateKey}**\n[Open official Roblox gamepass](${gamepassUrl})\n\n-# Manual owner/staff decision required. FIMA Bot never auto-pays.`)
         .setFooter(paradiseFooter("Winner-verified submission"))],
       components: [new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`paradise_payout_paid:${dateKey}`).setLabel("Mark Paid").setStyle(ButtonStyle.Success),
@@ -4667,7 +8623,7 @@ async function handleQotdPayoutReview(interaction) {
     return next;
   });
   const winner = await interaction.client.users.fetch(current.winnerId).catch(() => null);
-  await winner?.send(`Your ${dateKey} Paradise question reward was marked **${status}** by staff.`).catch(() => {});
+  await winner?.send(`Your ${dateKey} FIMA Bot question reward was marked **${status}** by staff.`).catch(() => {});
   return interaction.update({
     embeds: [EmbedBuilder.from(interaction.message.embeds[0]).setTitle(`◆ 25 ROBUX PAYOUT · ${status.toUpperCase()}`)
       .setFooter(paradiseFooter(`Reviewed by ${interaction.user.username}`))],
@@ -4685,24 +8641,28 @@ function safeApplicationPanelText(value, fallback, max, { multiline = false } = 
 
 function paradiseApplicationPanelPayload(color, language = "tr", applicationSettings = {}) {
   const tr = language !== "en";
-  const defaultTitle = tr ? "FIEEL'S COMMUNITY BAŞVURULARI" : "FIEEL'S COMMUNITY APPLICATIONS";
+  const defaultTitle = tr ? "FIMA BA\u015eVURU MERKEZ\u0130" : "FIMA APPLICATION CENTER";
   const defaultDescription = tr
-    ? "# Başvuru merkezi\nFieel's Community personel başlangıcı yalnızca **Helper** başvurusudur. Junior Moderator ve üzeri roller başvuruyla verilmez; ekip içi performans ve yetkili kararıyla ilerlenir.\n\n- Fima hesabı, bağlı Discord ve sunucu üyeliği zorunludur\n- Aynı anda yalnızca bir aktif başvuru açılabilir\n- Kanıtlar güvenlik taramasından geçmeden güvenli sayılmaz"
-    : "# Application center\nThe only public staff entry point for Fieel's Community is **Helper**. Junior Moderator and higher roles are not granted through applications; progression requires internal performance and an authorized decision.\n\n- Fima account, linked Discord and guild membership are required\n- Only one active application may exist at a time\n- Evidence is never treated as safe before security scanning";
-  const defaultButtonLabel = tr ? "Helper başvurusu" : "Apply as Helper";
+    ? "# Ba\u015fvuru merkezi\\nFIMA i\u00e7in uygun personel, topluluk, i\u015f birli\u011fi ve i\u00e7erik rollerini bu merkezden se\u00e7erek ba\u015fvurabilirsin. Her ak\u0131\u015f ayr\u0131 incelenir; hi\u00e7bir rol otomatik verilmez.\\n\\n- FIMA hesab\u0131, ba\u011fl\u0131 Discord ve sunucu \u00fcyeli\u011fi gerekir\\n- Staff, creator, partnership ve reseller ak\u0131\u015flar\u0131 ayn\u0131 g\u00fcvenli inceleme kuyru\u011funa gider\\n- Kan\u0131tlar g\u00fcvenlik taramas\u0131ndan ge\u00e7meden kabul edilmez\\n- Ba\u015fvuru t\u00fcr\u00fcn\u00fc web formunda se\u00e7ebilirsin"
+    : "# Application center\\nChoose the staff, community, partnership, creator or reseller track that fits you. Each workflow is reviewed separately and no role is granted automatically.\\n\\n- A FIMA account, linked Discord and guild membership are required\\n- Staff, creator, partnership and reseller requests enter the same secure review queue\\n- Evidence is scanned before it is accepted\\n- Choose the application type in the website form";
+  const buttonLabel = tr ? "Ba\u015fvuru merkezini a\u00e7" : "Open application center";
+  const businessLabel = tr ? "\u0130\u015f birli\u011fi ba\u015fvurusu" : "Business application";
   return {
     embeds: [new EmbedBuilder().setColor(color)
       .setTitle(safeApplicationPanelText(applicationSettings?.panelTitle, defaultTitle, 80))
-      .setDescription(safeApplicationPanelText(
-        applicationSettings?.panelDescription, defaultDescription, 1200, { multiline: true }
-      ))
-      .setFooter(paradiseFooter(tr ? "Özel inceleme kuyruğu" : "Private review queue"))],
+      .setDescription(safeApplicationPanelText(applicationSettings?.panelDescription, defaultDescription, 1200, { multiline: true }))
+      .setFooter(paradiseFooter(tr ? "\u00d6zel inceleme kuyru\u011fu" : "Private review queue"))],
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel(safeApplicationPanelText(applicationSettings?.panelButtonLabel, defaultButtonLabel, 40))
-        .setEmoji("📝")
+        .setLabel(safeApplicationPanelText(applicationSettings?.panelButtonLabel, buttonLabel, 40))
+        .setEmoji("\ud83d\udcdd")
         .setStyle(ButtonStyle.Link)
-        .setURL(`${PARADISE_PUBLIC_ASSET_BASE}/paradise-apply?workflow=staff&type=helper`)
+        .setURL(`${PARADISE_PUBLIC_ASSET_BASE}/fima-bot/apply?workflow=staff`),
+      new ButtonBuilder()
+        .setLabel(businessLabel)
+        .setEmoji("\ud83e\udd1d")
+        .setStyle(ButtonStyle.Link)
+        .setURL(`${PARADISE_PUBLIC_ASSET_BASE}/fima-bot/apply?workflow=business`)
     )]
   };
 }
@@ -4794,7 +8754,7 @@ export function paradiseSupportPanelPayload(color, language = "tr", mode = "comm
   const tr = language !== "en";
   const categories = paradiseTicketCategoriesForMode(mode);
   return {
-    embeds: [new EmbedBuilder().setColor(color).setTitle(tr ? "PARADISE DESTEK" : "PARADISE SUPPORT")
+    embeds: [new EmbedBuilder().setColor(color).setTitle(tr ? "FIMA DESTEK" : "FIMA SUPPORT")
       .setDescription(tr
         ? "# Özel destek ticketı\nKonuna en uygun kategoriyi seç; aynı anda yalnızca bir aktif ticket açabilirsin.\n\n- Ticket kapanırken transcript otomatik kaydedilir\n- Kapanınca üye erişimi kaldırılır, yetkililer erişimi korur\n- Silme yalnız güvenli transcript akışıyla yapılır\n- Şifre, cookie, token veya tam lisans anahtarı paylaşma"
         : "# Private support ticket\nChoose the category that fits your issue; you can have one active ticket at a time.\n\n- Closing saves a transcript automatically\n- Member access is removed after close while staff retain access\n- Deletion only uses the secure transcript-first flow\n- Never share passwords, cookies, tokens or a full license key")],
@@ -4990,9 +8950,9 @@ async function createParadiseSupportTicket(guild, user, sourceChannel, { test = 
     name: `${test ? "smoke-" : ""}${safeName}`.slice(0, 90),
     type: ChannelType.GuildText,
     parent: sourceChannel?.parentId || undefined,
-    topic: `Paradise support ticket ${ticketId.slice(0, 8)}. Keep secrets masked.`,
+    topic: `FIMA Bot support ticket ${ticketId.slice(0, 8)}. Keep secrets masked.`,
     permissionOverwrites: overwrites,
-    reason: test ? "Paradise live support-ticket smoke test" : "Paradise support ticket opened"
+    reason: test ? "FIMA Bot live support-ticket smoke test" : "FIMA Bot support ticket opened"
   });
   const record = {
     id: ticketId, guildId: guild.id, channelId: channel.id, userId: user.id, username: String(user.username || "member").slice(0, 64),
@@ -5032,7 +8992,7 @@ async function saveParadiseSupportTranscript(guild, channel, record, trigger) {
   });
   const sent = await destination.send({
     content: `Support transcript - Ticket **${record.id.slice(0, 8)}** - ${trigger}`,
-    files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `paradise-support-${record.id.slice(0, 8)}.txt` }]
+    files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `fima-bot-support-${record.id.slice(0, 8)}.txt` }]
   });
   return sent;
 }
@@ -5184,7 +9144,7 @@ async function handleParadiseSupportDeleteModal(interaction) {
   });
   await logParadiseAction(interaction.guild, "support_logs_channel", "support-logs", "Support ticket deleted", `Ticket \`${record.id.slice(0, 8)}\` was transcripted and deleted by <@${interaction.user.id}>.`).catch(() => null);
   try {
-    await interaction.channel.delete("Paradise transcript-first support ticket deletion");
+    await interaction.channel.delete("FIMA Bot transcript-first support ticket deletion");
     return interaction.editReply({ content: "Transcript kaydedildi ve ticket güvenle silindi." });
   } catch {
     await saveState(next => {
@@ -5250,7 +9210,7 @@ async function mutateParadiseSupportTicketLifecycle({ guild, channel, record, ti
       status: updated.status,
       claimedBy: updated.claimedBy || "staff"
     });
-    await channel.setName(channelName, `Paradise ticket ${normalizedAction} lifecycle name`).catch(() => null);
+    await channel.setName(channelName, `FIMA Bot ticket ${normalizedAction} lifecycle name`).catch(() => null);
     updated = { ...updated, channelName };
   }
 
@@ -5296,11 +9256,11 @@ async function handleParadiseTicketCommand(interaction) {
   }
   if (sub === "config") {
     if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Ticket Manager authority required.", ephemeral: true });
-    return interaction.reply({ content: "Configure ticket lifecycle, transcript retention and private log channels in Paradise Dashboard → Tickets.", ephemeral: true });
+    return interaction.reply({ content: "Configure ticket lifecycle, transcript retention and private log channels in FIMA Bot Dashboard → Tickets.", ephemeral: true });
   }
   const state = await loadState();
   const record = supportTicketRecordForChannel(state, interaction.guildId, interaction.channelId);
-  if (!record) return interaction.reply({ content: "Use this command inside a Paradise support ticket.", ephemeral: true });
+  if (!record) return interaction.reply({ content: "Use this command inside a FIMA Bot support ticket.", ephemeral: true });
   const isStaff = canModerate(interaction.member) || canApproveModeration(interaction.member);
   const isManager = canApproveModeration(interaction.member);
   const canClose = isStaff || record.userId === interaction.user.id;
@@ -5346,7 +9306,7 @@ async function handleParadiseTicketCommand(interaction) {
   if (sub === "rename") {
     const name = safeSupportTicketChannelName(interaction.options.getString("name"));
     if (!name) return interaction.reply({ content: "Use a readable channel name with letters, numbers, - or _.", ephemeral: true });
-    await interaction.channel.setName(name, "Paradise ticket manager rename");
+    await interaction.channel.setName(name, "FIMA Bot ticket manager rename");
     const updated = supportTicketAudit({ ...record, channelName: name, updatedAt: new Date().toISOString() }, "renamed", interaction.user.id);
     await saveState(next => { next.supportTickets[interaction.guildId][record.id] = updated; return next; });
     return interaction.reply({ content: `Ticket renamed to ${name}.`, ephemeral: true });
@@ -5430,6 +9390,10 @@ export function normalizeParadiseApplicationWorkflow(value) {
   return value === "business" ? "business" : "staff";
 }
 
+export function paradiseApplicationWorkflowForType(type) {
+  return BUSINESS_APPLICATION_TYPES.has(type) ? "business" : "staff";
+}
+
 function applicationTypeAllowedForMode(type, mode, workflow = "staff") {
   const normalizedWorkflow = normalizeParadiseApplicationWorkflow(workflow);
   if (normalizedWorkflow === "business") return BUSINESS_APPLICATION_TYPES.has(type);
@@ -5438,24 +9402,47 @@ function applicationTypeAllowedForMode(type, mode, workflow = "staff") {
   if (type === "helper") return false;
   if (mode === "tsbtr") return !TSBTR_BLOCKED_APPLICATION_TYPES.has(type);
   if (mode === "clan") return !COMMUNITY_ONLY_APPLICATION_TYPES.has(type);
-  return true;
+  return false;
 }
 
 export function paradiseWebsiteApplicationTypesForMode(mode, workflow = "staff") {
   const normalizedWorkflow = normalizeParadiseApplicationWorkflow(workflow);
-  if (normalizedWorkflow !== "staff") return [];
   return APPLICATION_TYPES
-    .filter(([type]) => COMMUNITY_PUBLIC_STAFF_APPLICATION_TYPES.has(type))
+    .filter(([type]) => applicationTypeAllowedForMode(type, mode, normalizedWorkflow))
     .map(([type, label]) => ({ type, label }));
 }
 
-function applicationQuestions(type) {
-  return APPLICATION_QUESTION_BANK_V2[type] || APPLICATION_QUESTION_BANK_V2.default
-    || APPLICATION_QUESTION_BANK[type] || APPLICATION_QUESTION_BANK.default;
+function applicationExtraQuestionBucket(type, applicationSettings = {}) {
+  const configured = applicationSettings?.extraQuestions;
+  if (!configured || typeof configured !== "object" || Array.isArray(configured)) return {};
+  const nested = Object.values(configured).some(value => value && typeof value === "object" && !Array.isArray(value));
+  if (nested) {
+    const bucket = configured[type];
+    return bucket && typeof bucket === "object" && !Array.isArray(bucket) ? bucket : {};
+  }
+  // Older dashboard versions stored one flat Helper-only question map.
+  return type === "helper" ? configured : {};
 }
 
-export function applicationQuestionChunks(type) {
-  const questions = applicationQuestions(type);
+function applicationQuestions(type, applicationSettings = {}) {
+  const base = APPLICATION_QUESTION_BANK_V2[type] || APPLICATION_QUESTION_BANK_V2.default
+    || APPLICATION_QUESTION_BANK[type] || APPLICATION_QUESTION_BANK.default;
+  const reserved = new Set(base.map(([key]) => String(key).toLowerCase()));
+  const extra = Object.entries(applicationExtraQuestionBucket(type, applicationSettings))
+    .slice(0, APPLICATION_EXTRA_QUESTION_LIMIT)
+    .map(([rawKey, rawLabel]) => {
+      const key = String(rawKey || "").replace(/[^a-z0-9_]/gi, "").toLowerCase().slice(0, 32);
+      const label = String(rawLabel || "").replace(/\s+/g, " ").trim().slice(0, 180);
+      if (!key || !label || reserved.has(key)) return null;
+      reserved.add(key);
+      return [key, label, "Yanıtını ayrıntılı ve güvenli biçimde yaz.", TextInputStyle.Paragraph, 1, 700];
+    })
+    .filter(Boolean);
+  return [...base, ...extra];
+}
+
+export function applicationQuestionChunks(type, applicationSettings = {}) {
+  const questions = applicationQuestions(type, applicationSettings);
   const chunks = [];
   for (let index = 0; index < questions.length; index += DISCORD_APPLICATION_MODAL_LIMIT) {
     chunks.push(questions.slice(index, index + DISCORD_APPLICATION_MODAL_LIMIT));
@@ -5463,22 +9450,22 @@ export function applicationQuestionChunks(type) {
   return chunks.length ? chunks : [[]];
 }
 
-function applicationModal(type, step = 0, draftId = "new") {
-  const chunks = applicationQuestionChunks(type);
+function applicationModal(type, step = 0, draftId = "new", applicationSettings = {}) {
+  const chunks = applicationQuestionChunks(type, applicationSettings);
   const safeStep = Math.min(Math.max(Number(step) || 0, 0), chunks.length - 1);
   const modal = new ModalBuilder()
     .setCustomId(`paradise_application_modal:${type}:${safeStep}:${draftId}`)
     .setTitle(`${applicationLabel(type)} ${safeStep + 1}/${chunks.length}`);
   modal.addComponents(...chunks[safeStep].map(([id, label, placeholder, style, min, max]) =>
     new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(style)
-        .setPlaceholder(placeholder).setMinLength(min).setMaxLength(max).setRequired(true)
+      new TextInputBuilder().setCustomId(id).setLabel(String(label).slice(0, 45)).setStyle(style)
+        .setPlaceholder(String(placeholder).slice(0, 100)).setMinLength(min).setMaxLength(max).setRequired(true)
     )));
   return modal;
 }
 
-function collectApplicationAnswers(interaction, type, step) {
-  const chunk = applicationQuestionChunks(type)[step] || [];
+function collectApplicationAnswers(interaction, type, step, applicationSettings = {}) {
+  const chunk = applicationQuestionChunks(type, applicationSettings)[step] || [];
   return Object.fromEntries(chunk.map(([key, label]) => [
     label,
     interaction.fields.getTextInputValue(key).trim()
@@ -5534,7 +9521,69 @@ function maskApplicationReviewText(value, max = 700) {
 }
 
 function applicationReviewStatus(action) {
-  return action === "approve" ? "approved" : action === "deny" ? "denied" : "more_info";
+  if (action === "approve") return "approved";
+  if (action === "deny") return "denied";
+  if (action === "more") return "more_info";
+  throw Object.assign(new Error("invalid_application_review_action"), {
+    code: "invalid_application_review_action",
+    statusCode: 400
+  });
+}
+
+export function transitionParadiseApplicationReview(record, {
+  action, reviewerId, reason = "", now = new Date()
+} = {}) {
+  if (!record || record.status !== "pending") {
+    throw Object.assign(new Error("application_not_pending"), {
+      code: "application_not_pending",
+      statusCode: 409
+    });
+  }
+  const status = applicationReviewStatus(action);
+  const reviewReason = ["denied", "more_info"].includes(status)
+    ? maskApplicationReviewText(reason, 700)
+    : "";
+  if (["denied", "more_info"].includes(status) && reviewReason.length < 5) {
+    throw Object.assign(new Error("application_review_reason_required"), {
+      code: "application_review_reason_required",
+      statusCode: 400
+    });
+  }
+  const timestamp = new Date(now).toISOString();
+  return {
+    ...record,
+    status,
+    reviewedBy: String(reviewerId || ""),
+    reviewedAt: timestamp,
+    updatedAt: timestamp,
+    reviewReason: reviewReason || null
+  };
+}
+
+export function transitionParadiseApplicationClarification(record, {
+  userId, response = "", now = new Date()
+} = {}) {
+  if (!record || record.userId !== userId || record.status !== "more_info") {
+    throw Object.assign(new Error("application_not_waiting_for_clarification"), {
+      code: "application_not_waiting_for_clarification",
+      statusCode: 409
+    });
+  }
+  const safeResponse = maskApplicationReviewText(response, 700);
+  if (safeResponse.length < 5) {
+    throw Object.assign(new Error("application_clarification_required"), {
+      code: "application_clarification_required",
+      statusCode: 400
+    });
+  }
+  const timestamp = new Date(now).toISOString();
+  return {
+    ...record,
+    status: "pending",
+    moreInfoResponse: safeResponse,
+    moreInfoRespondedAt: timestamp,
+    updatedAt: timestamp
+  };
 }
 
 function applicationReviewReasonModal(action, id, language = "tr") {
@@ -5649,7 +9698,7 @@ export function validateParadiseApplicationEvidenceFile(entry, validQuestionKeys
 
 export function setParadiseApplicationEvidenceScanner(scanner = null) {
   if (scanner !== null && typeof scanner !== "function") {
-    throw new TypeError("Paradise application evidence scanner must be a function or null.");
+    throw new TypeError("FIMA Bot application evidence scanner must be a function or null.");
   }
   paradiseApplicationEvidenceScanner = scanner;
 }
@@ -5801,7 +9850,7 @@ export async function applicationPrivateReviewTarget(reviewChannel, applicationI
       type: ChannelType.PrivateThread,
       autoArchiveDuration: 1440,
       invitable: false,
-      reason: "Paradise private application review"
+      reason: "FIMA Bot private application review"
     });
   } catch (error) {
     throw applicationPrivateReviewError(error);
@@ -5822,12 +9871,8 @@ function applicationRecordWorkflow(record) {
 
 export function paradiseApplicationAutoGrantRoleKey(record, guildConfig = {}) {
   const workflow = applicationRecordWorkflow(record);
-  if ((guildConfig.activeSetupMode || "community") === "community") {
-    if (workflow === "staff") return record?.type === "helper" ? "helper_role" : null;
-    if (record?.type === "partnership") return "partner_role";
-    if (record?.type === "reseller") return "reseller_role";
-    return null;
-  }
+  if (workflow !== "staff") return null;
+  if ((guildConfig.activeSetupMode || "community") === "community") return null;
   return {
     helper: "helper_role",
     staff: "staff_role",
@@ -5846,6 +9891,47 @@ export function paradiseApplicationAutoGrantRoleKey(record, guildConfig = {}) {
     fflag_staff: "fflag_staff_role",
     reseller: "reseller_role"
   }[record?.type] || null;
+}
+
+export function paradiseApplicationAutoGrantRoleName(record, guildConfig = {}) {
+  const roleKey = paradiseApplicationAutoGrantRoleKey(record, guildConfig);
+  if (!roleKey) return null;
+  return guildConfig.applicationSettings?.roleMappings?.[record.type]
+    || guildConfig.roleMappings?.[roleKey]
+    || (roleKey === "helper_role" ? "Helper" : null);
+}
+
+export function buildParadisePrivateApplicationPreview({
+  id, type, userId, answers = {}, evidence = []
+} = {}) {
+  const accepted = evidence.filter(file => file?.status === "accepted");
+  return {
+    title: `Application · ${maskApplicationReviewText(applicationLabel(type), 80)}`,
+    description: [
+      `Applicant: <@${String(userId || "").replace(/\D/g, "") || "unknown"}>`,
+      `Application ID: \`${String(id || "").slice(0, 8)}\``,
+      "Source: **Fima website**"
+    ].join("\n"),
+    fields: [
+      ...Object.entries(answers).map(([label, value]) => ({
+        name: maskApplicationReviewText(label, 256),
+        value: maskApplicationReviewText(value, 1024),
+        inline: false
+      })),
+      {
+        name: "Evidence security",
+        value: evidence.length
+          ? `Accepted after scan: **${accepted.length}**\nQuarantined or awaiting scanner: **${evidence.length - accepted.length}**`
+          : "No evidence files attached.",
+        inline: false
+      }
+    ],
+    attachments: accepted.map(file => ({
+      name: maskApplicationReviewText(file.originalName || file.name || "evidence", 120),
+      mimeType: String(file.mimeType || "application/octet-stream"),
+      size: Number(file.size || 0)
+    }))
+  };
 }
 
 export async function paradiseWebsiteApplicationContext(guild, userId, { workflow = "staff" } = {}) {
@@ -5872,10 +9958,10 @@ export async function paradiseWebsiteApplicationContext(guild, userId, { workflo
       createdAt: active.createdAt
     } : null,
     cooldownUntil: cooldownUntil > Date.now() ? new Date(cooldownUntil).toISOString() : null,
-    types: paradiseWebsiteApplicationTypesForMode(guildConfig.activeSetupMode, normalizedWorkflow).map(({ type, label }) => ({
+    types: paradiseWebsiteApplicationTypesForMode(guildConfig.activeSetupMode || "community", normalizedWorkflow).map(({ type, label }) => ({
       type,
       label,
-      questions: applicationQuestions(type).map(([key, questionLabel, placeholder, style, min, max]) => ({
+      questions: applicationQuestions(type, applicationSettings).map(([key, questionLabel, placeholder, style, min, max]) => ({
         key,
         label: questionLabel,
         placeholder,
@@ -5936,19 +10022,13 @@ export async function submitParadiseWebsiteApplication(guild, {
   let reviewMessage = null;
   try {
     reviewTarget = await applicationPrivateReviewTarget(review, id, type);
-    const acceptedEvidence = storedEvidence.filter(file => file.status === "accepted").length;
-    const quarantinedEvidence = storedEvidence.length - acceptedEvidence;
+    const preview = buildParadisePrivateApplicationPreview({
+      id, type, userId, answers: normalizedAnswers, evidence: storedEvidence
+    });
     reviewMessage = await reviewTarget.channel.send({
-      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`Application · ${applicationLabel(type)}`)
-        .setDescription(`Applicant: <@${userId}>\nApplication ID: \`${id.slice(0, 8)}\`\nSource: **Fima website**`)
-        .addFields(Object.entries(normalizedAnswers).map(([label, value]) => ({ name: label, value: maskApplicationReviewText(value, 1024), inline: false })))
-        .addFields({
-          name: "Evidence security",
-          value: storedEvidence.length
-            ? `Accepted after scan: **${acceptedEvidence}**\nQuarantined or awaiting scanner: **${quarantinedEvidence}**`
-            : "No evidence files attached.",
-          inline: false
-        })
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(preview.title)
+        .setDescription(preview.description)
+        .addFields(preview.fields)
         .setFooter(paradiseFooter("Pending private review")).setTimestamp()],
       components: applicationReviewComponents(id),
       files: applicationEvidenceDiscordFiles(storedEvidence)
@@ -6022,27 +10102,36 @@ async function handleApplicationCommand(interaction) {
   }
   const pending = records.find(item => ["pending", "more_info"].includes(item.status));
   if (pending) return interaction.reply({ content: `You already have an active **${applicationLabel(pending.type)}** application.`, ephemeral: true });
-  const cooldownDays = Number(configForGuild(state, interaction.guildId).applicationSettings?.cooldownDays ?? 7);
+  const guildConfig = configForGuild(state, interaction.guildId);
+  const applicationSettings = guildConfig.applicationSettings || {};
+  const selectedType = interaction.options.getString("type");
+  const workflow = paradiseApplicationWorkflowForType(selectedType);
+  if (!APPLICATION_TYPES.some(([value]) => value === selectedType)
+    || !applicationTypeAllowedForMode(selectedType, guildConfig.activeSetupMode, workflow)) {
+    return interaction.reply({ content: "This application type is not available for the active server template.", ephemeral: true });
+  }
+  const cooldownDays = Number(applicationSettings.cooldownDays ?? 7);
   const latestAt = records[0] ? Date.parse(records[0].createdAt) : 0;
   const cooldownUntil = latestAt + cooldownDays * 86_400_000;
   if (cooldownUntil > Date.now()) {
     return interaction.reply({ content: `Application cooldown ends <t:${Math.floor(cooldownUntil / 1000)}:R>.`, ephemeral: true });
   }
-  return interaction.showModal(applicationModal(interaction.options.getString("type"), 0, "new"));
+  return interaction.showModal(applicationModal(selectedType, 0, "new", applicationSettings));
 }
 
 async function handleApplicationModal(interaction) {
   const [, type, rawStep = "0", draftId = "new"] = interaction.customId.split(":");
-  const chunks = applicationQuestionChunks(type);
-  const step = Math.min(Math.max(Number(rawStep) || 0, 0), chunks.length - 1);
   if (!APPLICATION_TYPES.some(([value]) => value === type)) {
     return interaction.reply({ content: "Unknown application type.", ephemeral: true });
   }
-  const submittedAnswers = collectApplicationAnswers(interaction, type, step);
   const state = await loadState();
   const guildConfig = configForGuild(state, interaction.guildId);
   const applicationSettings = guildConfig.applicationSettings || {};
-  if (!applicationTypeAllowedForMode(type, guildConfig.activeSetupMode)) {
+  const workflow = paradiseApplicationWorkflowForType(type);
+  const chunks = applicationQuestionChunks(type, applicationSettings);
+  const step = Math.min(Math.max(Number(rawStep) || 0, 0), chunks.length - 1);
+  const submittedAnswers = collectApplicationAnswers(interaction, type, step, applicationSettings);
+  if (!applicationTypeAllowedForMode(type, guildConfig.activeSetupMode, workflow)) {
     return interaction.reply({ content: "This application type is not available for the active server template.", ephemeral: true });
   }
   if (applicationSettings.enabled === false) return interaction.reply({ content: "Applications are currently closed.", ephemeral: true });
@@ -6091,6 +10180,7 @@ async function handleApplicationModal(interaction) {
         guildId: interaction.guildId,
         userId: interaction.user.id,
         type,
+        workflow,
         answers: mergedAnswers,
         nextStep: step + 1,
         totalSteps: chunks.length,
@@ -6101,14 +10191,14 @@ async function handleApplicationModal(interaction) {
       return next;
     });
     return interaction.reply({
-      content: `Basvuru bolumu kaydedildi: **${step + 1}/${chunks.length}**. Sonraki bolumu doldurmak icin devam et.`,
+      content: `Başvuru bölümü kaydedildi: **${step + 1}/${chunks.length}**. Sonraki bölümü doldurmak için devam et.`,
       components: applicationContinueComponents(activeDraftId),
       ephemeral: true
     });
   }
   const id = crypto.randomUUID();
   const record = {
-    id, guildId: interaction.guildId, userId: interaction.user.id, type, answers: mergedAnswers,
+    id, guildId: interaction.guildId, userId: interaction.user.id, type, workflow, answers: mergedAnswers,
     status: "pending", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   };
   await saveState(next => {
@@ -6163,7 +10253,10 @@ async function handleApplicationContinueButton(interaction) {
     });
     return interaction.reply({ content: "This application draft expired. Start the application again.", ephemeral: true });
   }
-  return interaction.showModal(applicationModal(draft.type, draft.nextStep, draftId));
+  const guildConfig = configForGuild(state, interaction.guildId);
+  return interaction.showModal(applicationModal(
+    draft.type, draft.nextStep, draftId, guildConfig.applicationSettings || {}
+  ));
 }
 
 async function handleApplicationMoreInfoModal(interaction) {
@@ -6171,16 +10264,15 @@ async function handleApplicationMoreInfoModal(interaction) {
   const response = maskApplicationReviewText(interaction.fields.getTextInputValue("more_info_response"), 700);
   const state = await loadState();
   const record = state.applications?.[interaction.guildId]?.[id];
-  if (!record || record.userId !== interaction.user.id || record.status !== "more_info") {
+  let updatedRecord;
+  try {
+    updatedRecord = transitionParadiseApplicationClarification(record, {
+      userId: interaction.user.id,
+      response
+    });
+  } catch {
     return interaction.reply({ content: "This application is not waiting for your clarification.", ephemeral: true });
   }
-  const updatedRecord = {
-    ...record,
-    status: "pending",
-    moreInfoResponse: response,
-    moreInfoRespondedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
   await saveState(next => {
     next.applications = next.applications || {};
     next.applications[interaction.guildId] = next.applications[interaction.guildId] || {};
@@ -6219,7 +10311,7 @@ async function handleApplicationCancelButton(interaction) {
     return next;
   });
   return interaction.update({
-    content: "Basvuru taslagi iptal edildi. Istersen panelden tekrar baslayabilirsin. / Application draft cancelled.",
+    content: "Başvuru taslağı iptal edildi. İstersen panelden tekrar başlayabilirsin. / Application draft cancelled.",
     embeds: [],
     components: []
   });
@@ -6233,6 +10325,9 @@ function canReviewApplications(member) {
 async function handleApplicationReview(interaction) {
   if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
   const [action, id] = interaction.customId.replace("paradise_application_", "").split(":");
+  if (!["approve", "deny", "more"].includes(action) || !id) {
+    return interaction.reply({ content: "This application review control is invalid or outdated.", ephemeral: true });
+  }
   if (["deny", "more"].includes(action)) {
     const language = guildLanguage(configForGuild(await loadState(), interaction.guildId));
     return interaction.showModal(applicationReviewReasonModal(action, id, language));
@@ -6243,6 +10338,9 @@ async function handleApplicationReview(interaction) {
 async function handleApplicationReviewReasonModal(interaction) {
   if (!canReviewApplications(interaction.member)) return interaction.reply({ content: "Application reviewer authority required.", ephemeral: true });
   const [, action, id] = interaction.customId.split(":");
+  if (!["deny", "more"].includes(action) || !id) {
+    return interaction.reply({ content: "This application review control is invalid or outdated.", ephemeral: true });
+  }
   return finalizeApplicationReview(interaction, action, id, interaction.fields.getTextInputValue("review_reason"));
 }
 
@@ -6251,33 +10349,39 @@ async function finalizeApplicationReview(interaction, action, id, rawReason = ""
   const state = await loadState();
   const record = state.applications?.[interaction.guildId]?.[id];
   if (!record || record.status !== "pending") return interaction.reply({ content: "This application is no longer pending.", ephemeral: true });
-  const status = applicationReviewStatus(action);
-  const reviewReason = ["denied", "more_info"].includes(status) ? maskApplicationReviewText(rawReason, 700) : "";
+  let updatedRecord;
+  try {
+    updatedRecord = transitionParadiseApplicationReview(record, {
+      action,
+      reviewerId: interaction.user.id,
+      reason: rawReason
+    });
+  } catch (error) {
+    return interaction.reply({
+      content: error?.code === "application_review_reason_required"
+        ? "A review reason of at least five characters is required."
+        : "This application review control is invalid or outdated.",
+      ephemeral: true
+    });
+  }
+  const { status, reviewReason } = updatedRecord;
   let grantedRole = null;
-  if (status === "approved" && configForGuild(state, interaction.guildId).applicationSettings?.autoGrantRole === true) {
+  if (status === "approved" && configForGuild(state, interaction.guildId).applicationSettings?.autoGrantRole !== false) {
     const guildConfig = configForGuild(state, interaction.guildId);
-    const roleKey = paradiseApplicationAutoGrantRoleKey(record, guildConfig);
-    const roleName = roleKey
-      ? (
-        guildConfig.applicationSettings?.roleMappings?.[record.type]
-        || guildConfig.roleMappings?.[roleKey]
-        || (roleKey === "helper_role" ? "Helper" : null)
-      )
+    const roleName = paradiseApplicationAutoGrantRoleName(record, guildConfig);
+    const role = roleName
+      ? interaction.guild.roles.cache.find(item => item.name === roleName || item.id === roleName)
       : null;
-    const role = roleName ? interaction.guild.roles.cache.find(item => item.name === roleName || item.id === roleName) : null;
     const applicant = await interaction.guild.members.fetch(record.userId).catch(() => null);
     const botMember = interaction.guild.members.me;
     if (role && applicant && !role.managed
       && interaction.member.roles.highest.comparePositionTo(role) > 0
       && botMember?.roles.highest.comparePositionTo(role) > 0) {
-      await applicant.roles.add(role, `Paradise approved ${applicationLabel(record.type)} application`).catch(() => {});
+      await applicant.roles.add(role, `FIMA Bot approved ${applicationLabel(record.type)} application`).catch(() => {});
       grantedRole = role.id;
     }
   }
-  const updatedRecord = {
-    ...record, status, reviewedBy: interaction.user.id, reviewedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(), grantedRole, reviewReason: reviewReason || null
-  };
+  updatedRecord = { ...updatedRecord, grantedRole };
   await saveState(next => {
     next.applications[interaction.guildId][id] = updatedRecord;
     return next;
@@ -6355,9 +10459,9 @@ async function handleChannelCommand(interaction) {
       : sub === "hide" ? { ViewChannel: false }
         : { ViewChannel: null };
   try {
-    await interaction.channel.permissionOverwrites.edit(everyone, overwrite, { reason: `Paradise channel ${sub} by ${interaction.user.id}` });
+    await interaction.channel.permissionOverwrites.edit(everyone, overwrite, { reason: `FIMA Bot channel ${sub} by ${interaction.user.id}` });
   } catch {
-    return interaction.reply({ content: "Paradise could not update this channel. Check the bot's Manage Channels permission and role position.", ephemeral: true });
+    return interaction.reply({ content: "FIMA could not update this channel. Check the bot's Manage Channels permission and role position.", ephemeral: true });
   }
   await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Channel operation",
     `${interaction.user} used **/channel ${sub}** in ${interaction.channel}.`, { type: "moderation", metadata: { operation: sub, channelId: interaction.channelId } });
@@ -6397,7 +10501,7 @@ async function handleModCommand(interaction) {
   if (sub === "lockdown") {
     if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
     const enabled = interaction.options.getBoolean("enabled");
-    await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: enabled ? false : null }, { reason: `Paradise lockdown by ${interaction.user.id}` });
+    await interaction.channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: enabled ? false : null }, { reason: `FIMA Bot lockdown by ${interaction.user.id}` });
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Channel lockdown", `${interaction.user} set ${interaction.channel} lockdown to **${enabled}**.`);
     return interaction.reply({ content: `This channel is now **${enabled ? "locked" : "unlocked"}**.`, ephemeral: true });
   }
@@ -6405,7 +10509,7 @@ async function handleModCommand(interaction) {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return interaction.reply({ content: "Manage Messages permission required for purge.", ephemeral: true });
     const amount = interaction.options.getInteger("amount");
     const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
-    if (!deleted) return interaction.reply({ content: "Paradise could not purge these messages. Discord only permits recent bulk deletions.", ephemeral: true });
+    if (!deleted) return interaction.reply({ content: "FIMA could not purge these messages. Discord only permits recent bulk deletions.", ephemeral: true });
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Messages purged",
       `${interaction.user} purged **${deleted.size}** recent message(s) in ${interaction.channel}.`, { type: "moderation", metadata: { count: deleted.size, channelId: interaction.channelId } });
     return interaction.reply({ content: `Purged **${deleted.size}** recent message(s).`, ephemeral: true });
@@ -6413,8 +10517,8 @@ async function handleModCommand(interaction) {
   if (sub === "slowmode") {
     if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
     const seconds = interaction.options.getInteger("seconds");
-    try { await interaction.channel.setRateLimitPerUser(seconds, `Paradise slowmode by ${interaction.user.id}`); } catch {
-      return interaction.reply({ content: "Paradise could not change slowmode. Check the bot's Manage Channels permission.", ephemeral: true });
+    try { await interaction.channel.setRateLimitPerUser(seconds, `FIMA Bot slowmode by ${interaction.user.id}`); } catch {
+      return interaction.reply({ content: "FIMA could not change slowmode. Check the bot's Manage Channels permission.", ephemeral: true });
     }
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Slowmode changed",
       `${interaction.user} set ${interaction.channel} slowmode to **${seconds} seconds**.`, { type: "moderation", metadata: { seconds, channelId: interaction.channelId } });
@@ -6450,7 +10554,7 @@ async function handleModCommand(interaction) {
     const customMinutes = interaction.options.getInteger("minutes");
     const minutes = customMinutes || MODERATION_TIMEOUT_PRESETS[preset] || null;
     if (!minutes) return interaction.reply({ content: "Choose a policy preset or provide a custom timeout duration.", ephemeral: true });
-    if (!target.moderatable) return interaction.reply({ content: "Paradise cannot timeout this member because of Discord role hierarchy.", ephemeral: true });
+    if (!target.moderatable) return interaction.reply({ content: "FIMA Bot cannot timeout this member because of Discord role hierarchy.", ephemeral: true });
     await target.timeout(minutes * 60_000, reason);
     const record = await recordModerationCase(interaction, "timeout", target, reason, { minutes, preset: preset || null });
     const state = await loadState();
@@ -6467,14 +10571,14 @@ async function handleModCommand(interaction) {
     return interaction.reply({ content: `Timeout applied · case \`${record.id.slice(0, 8)}\`${warning ? ` · automatic warning \`${warning.id.slice(0, 8)}\`` : ""}.`, ephemeral: true });
   }
   if (sub === "timeout-remove") {
-    if (!target.moderatable) return interaction.reply({ content: "Paradise cannot change this member's timeout because of Discord role hierarchy.", ephemeral: true });
+    if (!target.moderatable) return interaction.reply({ content: "FIMA Bot cannot change this member's timeout because of Discord role hierarchy.", ephemeral: true });
     await target.timeout(null, reason);
     const record = await recordModerationCase(interaction, "timeout_removed", target, reason);
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Timeout removed", `${target} timeout removed by ${interaction.user}.`, { type: "moderation", metadata: { caseId: record.id } });
     return interaction.reply({ content: `Timeout removed · case \`${record.id.slice(0, 8)}\`.`, ephemeral: true });
   }
   if (sub === "nick-reset") {
-    if (!target.manageable) return interaction.reply({ content: "Paradise cannot reset this nickname because of Discord role hierarchy.", ephemeral: true });
+    if (!target.manageable) return interaction.reply({ content: "FIMA Bot cannot reset this nickname because of Discord role hierarchy.", ephemeral: true });
     await target.setNickname(null, reason);
     const record = await recordModerationCase(interaction, "nickname_reset", target, reason);
     await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Nickname reset", `${target} nickname reset by ${interaction.user}.`, { type: "moderation", metadata: { caseId: record.id } });
@@ -6630,8 +10734,8 @@ async function handleSecurityCommand(interaction) {
     `**Invite/scam policy:** ${config.automod?.blockInvites === false ? "Disabled" : "Enabled"}`
   ];
   return interaction.reply({
-    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ PARADISE SECURITY")
-      .setDescription(`# Safe operations\n${lines.join("\n")}\n\n-# False positives require staff review; Paradise does not auto-ban on the first mistake.`)
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ FIMA BOT SECURITY")
+      .setDescription(`# Safe operations\n${lines.join("\n")}\n\n-# False positives require staff review; FIMA Bot does not auto-ban on the first mistake.`)
       .setFooter(paradiseFooter("Quarantine and audit-first moderation"))],
     ephemeral: interaction.options.getSubcommand() !== "panel"
   });
@@ -6680,25 +10784,25 @@ async function handleTemporaryVoiceButton(interaction) {
   if (action === "lock") {
     const everyone = interaction.guild.roles.everyone;
     const locked = Boolean(record.locked);
-    await channel.permissionOverwrites.edit(everyone, { Connect: locked ? null : false }, { reason: "Paradise private voice owner control" });
+    await channel.permissionOverwrites.edit(everyone, { Connect: locked ? null : false }, { reason: "FIMA Bot private voice owner control" });
     await saveState(next => { next.temporaryVoices[channelId] = { ...record, locked: !locked }; return next; });
     return interaction.reply({ content: locked ? "Ses kanalı açıldı." : "Ses kanalı kilitlendi.", ephemeral: true });
   }
   if (action === "limit") {
     const limits = [0, 2, 4, 6, 8, 10];
     const nextLimit = limits[(limits.indexOf(channel.userLimit) + 1) % limits.length];
-    await channel.setUserLimit(nextLimit, "Paradise private voice owner control");
+    await channel.setUserLimit(nextLimit, "FIMA Bot private voice owner control");
     return interaction.reply({ content: `Kullanıcı limiti **${nextLimit || "sınırsız"}** olarak ayarlandı.`, ephemeral: true });
   }
   if (action === "hide") {
     const everyone = interaction.guild.roles.everyone;
     const hidden = Boolean(record.hidden);
-    await channel.permissionOverwrites.edit(everyone, { ViewChannel: hidden ? null : false }, { reason: "Paradise private voice owner control" });
+    await channel.permissionOverwrites.edit(everyone, { ViewChannel: hidden ? null : false }, { reason: "FIMA Bot private voice owner control" });
     await saveState(next => { next.temporaryVoices[channelId] = { ...record, hidden: !hidden }; return next; });
     return interaction.reply({ content: hidden ? "Ses kanalı görünür oldu." : "Ses kanalı gizlendi.", ephemeral: true });
   }
   if (channel.members.size > 0) return interaction.reply({ content: "Kanalı silmeden önce herkesin çıkması gerekir.", ephemeral: true });
-  await channel.delete("Paradise private voice owner request");
+  await channel.delete("FIMA Bot private voice owner request");
   await saveState(next => { delete next.temporaryVoices[channelId]; return next; });
   return interaction.reply({ content: "Ses kanalı silindi.", ephemeral: true }).catch(() => null);
 }
@@ -6714,7 +10818,7 @@ async function handleTemporaryVoiceRenameModal(interaction) {
   const fallback = `${interaction.member.displayName || interaction.user.username}'s room`;
   const requested = interaction.fields.getTextInputValue("voice_name");
   const safeName = sanitizeTemporaryVoiceName(requested, fallback);
-  await channel.setName(safeName, "Paradise private voice safe rename");
+  await channel.setName(safeName, "FIMA Bot private voice safe rename");
   return interaction.reply({
     content: safeName === requested.trim() ? `Kanal adı **${safeName}** oldu.` : `Uygunsuz ad reddedildi; kanal adı **${safeName}** olarak ayarlandı.`,
     ephemeral: true
@@ -6740,7 +10844,7 @@ async function handleTemporaryVoiceMemberModal(interaction) {
     return interaction.reply({ content: "Geçerli bir sunucu üyesi seç.", ephemeral: true });
   }
   if (action === "permit") {
-    await channel.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true }, { reason: "Paradise private voice permit" });
+    await channel.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true }, { reason: "FIMA Bot private voice permit" });
     await saveState(next => {
       const current = next.temporaryVoices[channelId] || record;
       next.temporaryVoices[channelId] = {
@@ -6751,8 +10855,8 @@ async function handleTemporaryVoiceMemberModal(interaction) {
       return next;
     });
   } else if (action === "reject") {
-    if (member.voice.channelId === channel.id) await member.voice.disconnect("Paradise private voice owner rejected member").catch(() => {});
-    await channel.permissionOverwrites.edit(member, { Connect: false }, { reason: "Paradise private voice reject" });
+    if (member.voice.channelId === channel.id) await member.voice.disconnect("FIMA Bot private voice owner rejected member").catch(() => {});
+    await channel.permissionOverwrites.edit(member, { Connect: false }, { reason: "FIMA Bot private voice reject" });
     await saveState(next => {
       const current = next.temporaryVoices[channelId] || record;
       next.temporaryVoices[channelId] = {
@@ -6763,10 +10867,10 @@ async function handleTemporaryVoiceMemberModal(interaction) {
       return next;
     });
   } else {
-    await channel.permissionOverwrites.edit(interaction.user.id, { ManageChannels: null, MoveMembers: null }, { reason: "Paradise voice ownership transfer" });
+    await channel.permissionOverwrites.edit(interaction.user.id, { ManageChannels: null, MoveMembers: null }, { reason: "FIMA Bot voice ownership transfer" });
     await channel.permissionOverwrites.edit(member, {
       ViewChannel: true, Connect: true, ManageChannels: true, MoveMembers: true
-    }, { reason: "Paradise voice ownership transfer" });
+    }, { reason: "FIMA Bot voice ownership transfer" });
     await saveState(next => { next.temporaryVoices[channelId] = { ...record, ownerId: member.id, transferredAt: new Date().toISOString() }; return next; });
   }
   await logParadiseAction(interaction.guild, "voice_logs_channel", "bot-logs", "Private voice control",
@@ -6779,15 +10883,16 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (!guild || newState.member?.user?.bot) return false;
   const guildConfig = configForGuild(await loadState(), guild.id);
   const activeMode = guildConfig.activeSetupMode;
-  const voiceConfig = guildConfig.voiceSettings || {};
+  const voiceConfig = fimaVoiceSettings(guildConfig);
+  if (!fimaRuntimeModuleAllowed(guildConfig, 'voice')) return false;
   if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
   const isJoinToCreate = joined?.type === ChannelType.GuildVoice
-    && (joined.id === voiceConfig.joinToCreateChannelId || ["◜・oda-oluştur", "Join to Create"].includes(joined.name));
+    && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : ["⌁・join-to-create", "◜・oda-oluştur", "Join to Create"].includes(joined.name));
   if (isJoinToCreate) {
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
     const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
-      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name));
+      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name));
     const channel = await guild.channels.create({
       name: sanitizeTemporaryVoiceName(fallbackName, "Private Room"),
       type: ChannelType.GuildVoice,
@@ -6797,7 +10902,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
         { id: guild.roles.everyone.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect] },
         { id: newState.member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.MoveMembers] }
       ],
-      reason: "Paradise Join to Create"
+      reason: "FIMA Bot Join to Create"
     });
     await saveState(state => {
       state.temporaryVoices[channel.id] = {
@@ -6815,7 +10920,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
       };
       return state;
     });
-    await newState.setChannel(channel, "Paradise Join to Create");
+    await newState.setChannel(channel, "FIMA Bot Join to Create");
     await channel.send(temporaryVoicePanel(channel.id)).catch(() => {});
     return true;
   }
@@ -6823,7 +10928,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (oldChannel && oldChannel.id !== newState.channelId) {
     const record = (await loadState()).temporaryVoices?.[oldChannel.id];
     if (record && oldChannel.members.size === 0 && voiceConfig.autoDelete !== false) {
-      await oldChannel.delete("Paradise empty temporary voice cleanup").catch(() => {});
+      await oldChannel.delete("FIMA Bot empty temporary voice cleanup").catch(() => {});
       await saveState(state => { delete state.temporaryVoices[oldChannel.id]; return state; });
       return true;
     }
@@ -6891,24 +10996,26 @@ async function addMemberXp(guild, member, amount, source, sourceChannel = null) 
     const rewardName = policy.roleRewards[String(result.level)];
     const rewardRole = rewardName ? guild.roles.cache.find(role => role.name === rewardName || role.id === rewardName) : null;
     if (rewardRole && guild.members.me?.roles.highest.comparePositionTo(rewardRole) > 0) {
-      await member.roles.add(rewardRole, `Paradise level ${result.level} reward`).catch(() => {});
+      await member.roles.add(rewardRole, `FIMA Bot level ${result.level} reward`).catch(() => {});
     }
   }
   return result;
 }
 
 async function updateLevelLeaderboard(guild) {
+  const state = await loadState();
+  const config = configForGuild(state, guild.id);
+  const template = inferParadiseTemplate({ configuredTemplate: config.activeSetupMode, guildName: guild.name });
+  if (template === "community") return null;
   const channel = await configuredChannel(guild, "level_channel", "level-leaderboard");
   if (!channel) return null;
-  const state = await loadState();
   const rows = Object.values(state.memberLevels)
     .filter(item => belongsToGuild(item, guild.id))
     .sort((a, b) => Number(b.xp) - Number(a.xp))
     .slice(0, 20);
   const description = rows.map((item, index) => `**${index + 1}.** <@${item.userId}> · Level **${item.level}** · ${item.xp} XP`).join("\n")
     || "_No chat or voice activity recorded yet._";
-  const config = configForGuild(state, guild.id);
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ PARADISE ACTIVITY LEADERBOARD")
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("◆ FIMA BOT ACTIVITY LEADERBOARD")
     .setDescription(`${description}\n\n-# Chat and non-AFK voice activity are rate-limited. Spam does not grant extra XP.`)
     .setFooter(paradiseFooter("Chat + voice levels"));
   let message = config.levelLeaderboardMessageId
@@ -6928,7 +11035,8 @@ async function handleMemberLevelMessage(message) {
   if (!message.guild || message.author.bot || !message.member) return false;
   if (!message.content?.trim() && !message.attachments?.size) return false;
   const config = configForGuild(await loadState(), message.guild.id);
-  if (!config.activeSetupMode || config.xpSettings?.enabled === false) return false;
+  if (!fimaRuntimeModuleAllowed(config, "levels") || !config.activeSetupMode || config.xpSettings?.enabled === false) return false;
+  if (inferParadiseTemplate({ configuredTemplate: config.activeSetupMode, guildName: message.guild.name }) === "community") return false;
   const excluded = new Set(config.xpSettings?.excludedChannels || []);
   if (excluded.has(message.channel.id)
     || /(?:^|[-_])(bot|spam|logs?|transcripts?)(?:$|[-_])/i.test(message.channel.name || "")) return false;
@@ -6946,7 +11054,7 @@ async function handleRankCommand(interaction) {
   const record = guildUserRecord((await loadState()).memberLevels, interaction.guildId, user.id)
     || { xp: 0, chatXp: 0, voiceXp: 0, weeklyXp: 0, monthlyXp: 0, level: 0 };
   return interaction.reply({
-    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ ${user.username}'s Paradise Rank`)
+    embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ ${user.username}'s FIMA Bot Rank`)
       .addFields(
         { name: "Level", value: `**${record.level || 0}**`, inline: true },
         { name: "Total XP", value: `**${record.xp || 0}**`, inline: true },
@@ -7067,7 +11175,7 @@ async function handleLeaderboardCommand(interaction) {
       ? rows.map((item, index) => `**${index + 1}.** <@${item.userId}> · **${item[key] || 0} XP** · Lv. ${item.level || 0}`).join("\n")
       : "_No XP has been recorded yet._";
     return interaction.reply({
-      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ PARADISE ${type.toUpperCase()} LEADERBOARD`)
+      embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`◆ FIMA BOT ${type.toUpperCase()} LEADERBOARD`)
         .setDescription(`${description}\n\n-# Bot, spam, log and configured excluded channels do not grant chat XP.`)
         .setFooter(paradiseFooter("Chat + voice activity"))]
     });
@@ -7182,9 +11290,15 @@ async function handleLeaderboardCommand(interaction) {
 
 async function sendMemberLifecycleMessage(member, kind, options = {}) {
   const state = await loadState();
-  const config = configForGuild(state, member.guild.id);
+  const rawConfig = configForGuild(state, member.guild.id);
+  if (!fimaRuntimeModuleAllowed(rawConfig, 'welcome')) return false;
+  const mode = rawConfig.activeSetupMode || "community";
+  const config = mergeParadiseCommunityAssetDefaults(rawConfig, {
+    guildId: member.guild.id,
+    mode
+  });
   const preview = options.preview === true;
-  if (!config.activeSetupMode && !preview) return false;
+  if (!rawConfig.activeSetupMode && !preview) return false;
   const joined = kind === "join";
   const publicChannel = options.channel || (joined
     ? await configuredChannel(member.guild, "welcome_channel", "welcome")
@@ -7196,7 +11310,6 @@ async function sendMemberLifecycleMessage(member, kind, options = {}) {
       const channel = id ? member.guild.channels.cache.get(id) : member.guild.channels.cache.find(item => item.name === fallback);
       return channel?.isTextBased?.() ? `${channel}` : null;
     };
-    const mode = config.activeSetupMode || "community";
     const tr = guildLanguage(config) === "tr";
     const channelRef = (mappingKey, fallback) => mentionIfFound(mappingKey, fallback);
     const destinations = [
@@ -7204,7 +11317,7 @@ async function sendMemberLifecycleMessage(member, kind, options = {}) {
       mode === "community" && channelRef("faq_channel", "security-and-trust") ? (tr ? `- Fima ve sunucu güvenliği için ${channelRef("faq_channel", "security-and-trust")} kanalına bak.` : `- Learn how Fima and this server stay safe in ${channelRef("faq_channel", "security-and-trust")}.`) : null,
       channelRef("role_guide_channel", "role-guide") ? (tr ? `- Dilini, bildirimlerini ve rollerini ${channelRef("role_guide_channel", "role-guide")} kanalından seç.` : `- Choose your language, pings and roles in ${channelRef("role_guide_channel", "role-guide")}.`) : null,
       mode !== "community" && channelRef("challenge_channel", "challenge-ticket") ? (tr ? `- ${channelRef("challenge_channel", "challenge-ticket")} kullanmadan önce profilini tamamla.` : `- Complete your profile before using ${channelRef("challenge_channel", "challenge-ticket")}.`) : null,
-      mode === "community" && channelRef("support_ticket_channel", "open-ticket") ? (tr ? `- Özel yardım için ${channelRef("support_ticket_channel", "open-ticket")} kanalından ticket aç.` : `- Open a private support ticket in ${channelRef("support_ticket_channel", "open-ticket")}.`) : null
+      mode === "community" && fimaRuntimeModuleAllowed(rawConfig, "tickets") && channelRef("support_ticket_channel", "open-ticket") ? (tr ? `- Özel yardım için ${channelRef("support_ticket_channel", "open-ticket")} kanalından ticket aç.` : `- Open a private support ticket in ${channelRef("support_ticket_channel", "open-ticket")}.`) : null
     ].filter(Boolean);
     const title = joined
       ? (tr ? `Hoş geldin, ${member.displayName}!` : `Welcome, ${member.displayName}!`)
@@ -7221,8 +11334,8 @@ async function sendMemberLifecycleMessage(member, kind, options = {}) {
       .setDescription(description)
       .setThumbnail(member.user.displayAvatarURL())
       .setTimestamp();
-    const banner = joined ? config.welcomeSettings?.bannerUrl : config.welcomeSettings?.leaveBannerUrl;
-    if (banner && /^https:\/\//i.test(banner)) embed.setImage(banner);
+    const banner = sanitizeParadiseHttpsUrl(joined ? config.welcomeSettings?.bannerUrl : config.welcomeSettings?.leaveBannerUrl);
+    if (banner) embed.setImage(banner);
     const sent = await publicChannel.send({
       content: joined ? `${member}` : undefined,
       embeds: [embed],
@@ -7230,7 +11343,7 @@ async function sendMemberLifecycleMessage(member, kind, options = {}) {
     }).catch(() => null);
     if (!sent) return false;
   }
-  if (!preview && log) await log.send(`${joined ? "Joined" : "Left"}: ${member.user.tag} (${member.id}) · <t:${Math.floor(Date.now() / 1000)}:F>`).catch(() => {});
+  if (!preview && log && fimaRuntimeModuleAllowed(rawConfig, "logs")) await log.send(`${joined ? "Joined" : "Left"}: ${member.user.tag} (${member.id}) · <t:${Math.floor(Date.now() / 1000)}:F>`).catch(() => {});
   return Boolean(publicChannel);
 }
 
@@ -7252,6 +11365,7 @@ export async function handleParadiseGuildMemberAdd(member) {
   await sendMemberLifecycleMessage(member, "join");
   const state = await loadState();
   const config = configForGuild(state, member.guild.id);
+  if (!fimaRuntimeModuleAllowed(config, "security")) return true;
   const policy = config.moderationSettings || {};
   const security = state.securityState?.[member.guild.id] || {};
   const ageDays = Math.max(0, (Date.now() - member.user.createdTimestamp) / 86_400_000);
@@ -7261,7 +11375,7 @@ export async function handleParadiseGuildMemberAdd(member) {
   if (shouldQuarantine) {
     const role = await ensureRole(member.guild, "Muted / Quarantined");
     if (member.guild.members.me?.roles.highest.comparePositionTo(role) > 0) {
-      await member.roles.add(role, security.raidMode ? "Paradise raid mode join quarantine" : "Paradise suspicious account-age review").catch(() => {});
+      await member.roles.add(role, security.raidMode ? "FIMA Bot raid mode join quarantine" : "FIMA Bot suspicious account-age review").catch(() => {});
       await logParadiseAction(member.guild, "quarantine_review_channel", "quarantine-review", "Join quarantine review",
         `${member} was quarantined for staff review.\n**Signal:** ${security.raidMode ? "Raid mode" : `Account age below ${threshold} days`}\n-# This is not a ban; staff can use /mod unquarantine after review.`);
     }
@@ -7315,7 +11429,7 @@ async function postAutomaticActivityCheck(guild, group, state) {
   );
   await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(`${group} Activity Check`)
     .setDescription(`Respond within ${deadlineHours} hours. Missing the deadline creates a flag and may remove the related staff role only when automatic role changes are explicitly enabled. Whitelist and LOA exemptions apply.\nDeadline: <t:${Math.floor(expiresAt / 1000)}:R>`)
-    .setFooter({ text: "Automatic Paradise activity check • Made By Fieel" })], components: [row] });
+    .setFooter({ text: "Automatic FIMA Bot activity check • Made By Fieel" })], components: [row] });
   return id;
 }
 
@@ -7363,25 +11477,25 @@ async function runParadiseMaintenance(guild) {
       return Number.isFinite(expiresAt) && expiresAt > now;
     });
     for (const [userId, item] of Object.entries(state.whitelists)) {
-      if (!belongsToGuild(item, guild.id)) continue;
+      if (!belongsToGuild(item, guild.id) || !fimaRuntimeModuleAllowed(config, "availability")) continue;
       if (item.expiresAt && Date.parse(item.expiresAt) <= now) {
         delete state.whitelists[userId];
         const member = guild.members.cache.get(item.userId || userId);
         const role = guild.roles.cache.find(entry => entry.name === "Activity Whitelist");
-        if (member && role) await member.roles.remove(role, "Paradise activity whitelist expired").catch(() => {});
+        if (member && role) await member.roles.remove(role, "FIMA Bot activity whitelist expired").catch(() => {});
       }
     }
     for (const [userId, item] of Object.entries(state.loa)) {
-      if (!belongsToGuild(item, guild.id)) continue;
+      if (!belongsToGuild(item, guild.id) || !fimaRuntimeModuleAllowed(config, "availability")) continue;
       if (item.status === "approved" && Number(item.expiresAt) <= now) {
         state.loa[userId] = { ...item, status: "expired", endedAt: new Date().toISOString() };
         const member = guild.members.cache.get(item.userId || userId);
         const role = guild.roles.cache.find(entry => entry.name === "LOA");
-        if (member && role) await member.roles.remove(role, "Paradise LOA expired").catch(() => {});
+        if (member && role) await member.roles.remove(role, "FIMA Bot LOA expired").catch(() => {});
       }
     }
     for (const [id, check] of Object.entries(state.activityChecks)) {
-      if (!belongsToGuild(check, guild.id)) continue;
+      if (!belongsToGuild(check, guild.id) || !fimaRuntimeModuleAllowed(config, "sessions")) continue;
       if (check.processedAt || Number(check.expiresAt) > now) continue;
       const roles = ACTIVITY_GROUP_ROLES[check.group] || [];
       const exempt = new Set(Object.entries(state.whitelists)
@@ -7407,7 +11521,7 @@ async function runParadiseMaintenance(guild) {
         || guild.channels.cache.find(channel => channel.name.includes("activity-review"));
       if (log) await log.send(`Activity check **${check.group}** closed. Responses: ${responded.size}. Role removals: ${removed.length}. Whitelists were respected.`).catch(() => {});
     }
-    if (config.autoActivityChecks === true) {
+    if (fimaRuntimeModuleAllowed(config, "sessions") && config.autoActivityChecks === true) {
       const last = Number(config.lastAutoActivityCheckAt || 0);
       const intervalHours = Number(config.activity?.checkEveryHours || 48);
       if (now - last >= intervalHours * 60 * 60_000) {
@@ -7416,7 +11530,7 @@ async function runParadiseMaintenance(guild) {
       }
     }
     const sundayKey = new Date(now).toISOString().slice(0, 10);
-    if (new Date(now).getUTCDay() === 0 && config.lastWeeklyReview !== sundayKey) {
+    if (fimaRuntimeModuleAllowed(config, "sessions") && new Date(now).getUTCDay() === 0 && config.lastWeeklyReview !== sundayKey) {
       const log = await configuredChannel(guild, "activity_logs_channel", "activity-review")
         || guild.channels.cache.find(channel => channel.name.includes("activity-review"));
       if (log) {
@@ -7441,7 +11555,8 @@ async function runParadiseMaintenance(guild) {
   });
   const state = await loadState();
   const config = configForGuild(state, guild.id);
-  if (config.activeSetupMode && config.xpSettings?.enabled !== false) {
+  const activeTemplate = inferParadiseTemplate({ configuredTemplate: config.activeSetupMode, guildName: guild.name });
+  if (fimaRuntimeModuleAllowed(config, "levels") && config.activeSetupMode && activeTemplate !== "community" && config.xpSettings?.enabled !== false) {
     const afkChannelId = guild.afkChannelId;
     for (const voiceState of guild.voiceStates.cache.values()) {
       if (!voiceState.member?.user?.bot && voiceState.channelId && voiceState.channelId !== afkChannelId
@@ -7452,14 +11567,15 @@ async function runParadiseMaintenance(guild) {
   }
   const clock = berlinClock();
   const questionHour = Math.min(23, Math.max(0, Number(config.eventSettings?.dailyQuestionHour ?? 13)));
-  if (config.activeSetupMode === "clan" && config.eventSettings?.dailyQuestionEnabled !== false && clock.hour >= questionHour) {
+  if (fimaRuntimeModuleAllowed(config, "events") && config.activeSetupMode === "clan" && config.eventSettings?.dailyQuestionEnabled !== false && clock.hour >= questionHour) {
     await postDailyQuestion(guild).catch(() => {});
   }
-  if (config.activeSetupMode && (!config.lastLevelLeaderboardAt || Date.now() - Number(config.lastLevelLeaderboardAt) >= 60 * 60_000)) {
+  if (fimaRuntimeModuleAllowed(config, "levels") && config.activeSetupMode && activeTemplate !== "community"
+    && (!config.lastLevelLeaderboardAt || Date.now() - Number(config.lastLevelLeaderboardAt) >= 60 * 60_000)) {
     await updateLevelLeaderboard(guild).catch(() => {});
   }
-  await updateLoaPanel(guild).catch(() => {});
-  await updateAvailabilityPanel(guild).catch(() => {});
+  if (fimaRuntimeModuleAllowed(config, "availability")) await updateLoaPanel(guild).catch(() => {});
+  if (fimaRuntimeModuleAllowed(config, "availability")) await updateAvailabilityPanel(guild).catch(() => {});
   await runParadiseGuildReconciliation(guild).catch(() => null);
 }
 
@@ -7491,7 +11607,7 @@ async function handleWhitelist(interaction) {
   await saveState(state => { state.whitelists[guildUserKey(interaction.guildId, user.id)] = item; return state; });
   const role = await ensureRole(interaction.guild, "Activity Whitelist");
   const member = await interaction.guild.members.fetch(user.id);
-  await member.roles.add(role, "Paradise activity whitelist");
+  await member.roles.add(role, "FIMA Bot activity whitelist");
   return interaction.reply({ content: `${user} whitelisted for **${item.group}** (${item.expiresAt ? `<t:${Math.floor(Date.parse(item.expiresAt) / 1000)}:R>` : "unlimited"}).`, ephemeral: true });
 }
 
@@ -7557,12 +11673,12 @@ export function paradiseMainerAnnouncement({ code = null, region = "EU", mainCha
   const mainChannel = mainChannelId ? `<#${mainChannelId}>` : (language === "tr" ? "_Henüz main kanalı seçilmedi._" : "_No main channel has been selected yet._");
   if (!normalizedCode) {
     return language === "tr"
-      ? "# ⚠️ Mainer kodu henüz ayarlanmadı\n\n> Owner, Paradise Dashboard veya `/mainer set` üzerinden kodu ve bölgeyi ayarladığında bu mesaj aynı yerde otomatik güncellenir."
-      : "# ⚠️ Mainer code has not been configured yet\n\n> Once the owner sets the code and region in Paradise Dashboard or with `/mainer set`, this same message updates automatically.";
+      ? "# ⚠️ Mainer kodu henüz ayarlanmadı\n\n> Owner, FIMA Bot Dashboard veya `/mainer set` üzerinden kodu ve bölgeyi ayarladığında bu mesaj aynı yerde otomatik güncellenir."
+      : "# ⚠️ Mainer code has not been configured yet\n\n> Once the owner sets the code and region in FIMA Bot Dashboard or with `/mainer set`, this same message updates automatically.";
   }
   return language === "tr"
-    ? `# 🌴 Mainer kodumuz hazır!\n\nParadise'ı main klanın olarak ayarlamak için aşağıdaki bilgileri kullanabilirsin.\n\n### Kod\n\`${normalizedCode}\`\n\n### Main kanalı\n${mainChannel}\n\n### Kullanacağın komut\n\`/mainclan code:${normalizedCode} region:${normalizedRegion}\`\n\n> Bir sorun yaşarsan destek kanalından bize ulaş. Hesap şifresi, cookie veya token paylaşma.`
-    : `# 🌴 Our mainer code is ready!\n\nUse the details below to set Paradise as your main clan.\n\n### Code\n\`${normalizedCode}\`\n\n### Main channel\n${mainChannel}\n\n### Command to use\n\`/mainclan code:${normalizedCode} region:${normalizedRegion}\`\n\n> If you need help, contact support. Never share a password, cookie or token.`;
+    ? `# 🌴 Mainer kodumuz hazır!\n\nFIMA Bot'u main klanın olarak ayarlamak için aşağıdaki bilgileri kullanabilirsin.\n\n### Kod\n\`${normalizedCode}\`\n\n### Main kanalı\n${mainChannel}\n\n### Kullanacağın komut\n\`/mainclan code:${normalizedCode} region:${normalizedRegion}\`\n\n> Bir sorun yaşarsan destek kanalından bize ulaş. Hesap şifresi, cookie veya token paylaşma.`
+    : `# 🌴 Our mainer code is ready!\n\nUse the details below to set FIMA Bot as your main clan.\n\n### Code\n\`${normalizedCode}\`\n\n### Main channel\n${mainChannel}\n\n### Command to use\n\`/mainclan code:${normalizedCode} region:${normalizedRegion}\`\n\n> If you need help, contact support. Never share a password, cookie or token.`;
 }
 
 async function updateParadiseMainerAnnouncement(guild) {
@@ -7683,7 +11799,7 @@ async function handleWar(interaction) {
   const sub = interaction.options.getSubcommand();
   if (sub === "logs") {
     const records = Object.values((await loadState()).wars?.[interaction.guildId] || {}).sort((a, b) => Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt)).slice(0, 10);
-    const lines = records.length ? records.map(record => `- \`${record.id.slice(0, 8)}\` **${record.kind}** · ${record.opponent} · **${record.status}**${record.score ? ` · ${record.score}` : ""}`).join("\n") : "No Paradise war or spar records yet.";
+    const lines = records.length ? records.map(record => `- \`${record.id.slice(0, 8)}\` **${record.kind}** · ${record.opponent} · **${record.status}**${record.score ? ` · ${record.score}` : ""}`).join("\n") : "No FIMA Bot war or spar records yet.";
     return interaction.reply({ content: lines, ephemeral: true });
   }
   if (sub === "create") {
@@ -7759,7 +11875,7 @@ async function handleStaffReport(interaction) {
       { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
       { id: interaction.guild.members.me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ManageChannels] }
     ],
-    reason: "Paradise private staff report"
+    reason: "FIMA Bot private staff report"
   });
   await channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("Private Staff Report")
     .addFields(
@@ -7774,13 +11890,13 @@ async function handleStaffReport(interaction) {
 const HELP_CATEGORIES = Object.freeze({
   community: {
     label: "Community",
-    en: "# Fieel's Community\n## Purpose\nProduct support, events, applications, roles and community activity. Challenge/ranked commands are hidden here.\n\n## Commands\n- `/fima_ticket` — open private product support in **open-ticket**\n- `/fima_help` — Fima product and account help\n- `/application panel` — staff: publish the application menu\n- `/giveaway create`, `/event create`, `/gamenight start`\n- `/rank`, `/leaderboard show`\n\n## Common mistake\nDo not use clan challenge or roster commands in Community.\n\n-# Dashboard: Template Setup → Fieel's Community",
-    tr: "# Fieel's Community\n## Amaç\nÜrün desteği, etkinlikler, başvurular, roller ve topluluk aktivitesi. Challenge/rank komutları burada gizlidir.\n\n## Komutlar\n- `/fima_ticket` — **open-ticket** kanalında özel ürün desteği\n- `/fima_help` — Fima ürün ve hesap yardımı\n- `/application panel` — staff: başvuru menüsünü yayınlar\n- `/giveaway create`, `/event create`, `/gamenight start`\n- `/rank`, `/leaderboard show`\n\n## Yaygın hata\nCommunity içinde klan challenge/roster komutlarını kullanmayın.\n\n-# Dashboard: Template Setup → Fieel's Community"
+    en: "# FIMA Community\n## Purpose\nProduct support, events, multi-role applications, self-roles and community activity.\n\n## Commands\n- `/help` — show only the commands currently available to you\n- `/ticket` — open private FIMA product and account support\n- `/application apply` — open the website-first application center and choose an available staff, support, event, content or FIMA product role\n- Partnership, Creator and Reseller use the business tab in the same application center\n- `/giveaway create`, `/event create`, `/gamenight start` — authorized staff tools\n\n## Review policy\nCommunity and business applications enter a private review queue. No role is auto-granted without an explicit configured mapping and authorized approval.\n\n## Monthly activity rewards\nText and voice have separate monthly Top 3 boards. Each board awards **15 / 10 / 7 FIMA Macro days**. Every boost adds **3 days** through the idempotent reward ledger.\n\n-# Dashboard: Template Setup → FIMA Community",
+    tr: "# FIMA Community\n## Amaç\nÜrün desteği, etkinlikler, çok rollü başvurular, kişisel roller ve topluluk aktivitesi.\n\n## Komutlar\n- `/help` — yalnızca şu anda kullanabildiğin komutları gösterir\n- `/ticket` — özel FIMA ürün ve hesap desteği açar\n- `/application apply` — website-first başvuru merkezini açar; uygun staff, support, etkinlik, içerik veya FIMA ürün rolünü seçersin\n- Partnership, Creator ve Reseller aynı merkezin iş birliği sekmesini kullanır\n- `/giveaway create`, `/event create`, `/gamenight start` — yetkili staff araçları\n\n## İnceleme politikası\nCommunity ve business başvuruları özel inceleme kuyruğuna gider. Açık rol eşlemesi ve yetkili onayı olmadan hiçbir rol otomatik verilmez.\n\n## Aylık aktivite ödülleri\nText ve voice için ayrı aylık Top 3 panoları bulunur. Her pano **15 / 10 / 7 FIMA Macro günü** verir. Her boost, idempotent ödül defteri üzerinden **3 gün** ekler.\n\n-# Dashboard: Template Setup → FIMA Community"
   },
   clan: {
     label: "Clan",
-    en: "# Paradise Clan\n## Fighters\n- `/profile create` — verify Roblox and choose region\n- `/challenge create` — use in **challenge-ticket**\n- `/availability panel` — refresh live status\n\n## Clan operations\n- `/lineup add board:main user:@user role:Starter`\n- `/roster update user:@user rank:<rank>`\n- `/relation add type:ally name:<clan>`\n- `/mainer guide`\n\n## Required access\nMember commands require a completed profile; board edits require configured clan management roles.\n\n-# Dashboard: Roster / Lineups / Relations",
-    tr: "# Paradise Clan\n## Oyuncular\n- `/profile create` — Roblox doğrula ve bölge seç\n- `/challenge create` — **challenge-ticket** kanalında kullan\n- `/availability panel` — canlı durumu yeniler\n\n## Klan operasyonları\n- `/lineup add board:main user:@user role:Starter`\n- `/roster update user:@user rank:<rank>`\n- `/relation add type:ally name:<clan>`\n- `/mainer guide`\n\n## Gerekli yetki\nÜye komutları tamamlanmış profil; pano düzenlemeleri ayarlı klan yönetim rolü gerektirir.\n\n-# Dashboard: Roster / Lineups / Relations"
+    en: "# FIMA Bot Clan\n## Fighters\n- `/profile create` — verify Roblox and choose region\n- `/challenge create` — use in **challenge-ticket**\n- `/availability panel` — refresh live status\n\n## Clan operations\n- `/lineup add board:main user:@user role:Starter`\n- `/roster update user:@user rank:<rank>`\n- `/relation add type:ally name:<clan>`\n- `/mainer guide`\n\n## Required access\nMember commands require a completed profile; board edits require configured clan management roles.\n\n-# Dashboard: Roster / Lineups / Relations",
+    tr: "# FIMA Bot Clan\n## Oyuncular\n- `/profile create` — Roblox doğrula ve bölge seç\n- `/challenge create` — **challenge-ticket** kanalında kullan\n- `/availability panel` — canlı durumu yeniler\n\n## Klan operasyonları\n- `/lineup add board:main user:@user role:Starter`\n- `/roster update user:@user rank:<rank>`\n- `/relation add type:ally name:<clan>`\n- `/mainer guide`\n\n## Gerekli yetki\nÜye komutları tamamlanmış profil; pano düzenlemeleri ayarlı klan yönetim rolü gerektirir.\n\n-# Dashboard: Roster / Lineups / Relations"
   },
   tsbtr: {
     label: "TSBTR",
@@ -7789,8 +11905,8 @@ const HELP_CATEGORIES = Object.freeze({
   },
   staff: {
     label: "Staff",
-    en: "# Staff Operations\n- `/activity check group:<group>` — Manage Roles\n- `/activity summary` — weekly quota review\n- `/whitelist add user:@user group:<group> days:<optional>`\n- `/loa approve|deny`\n- `/report staff user:@user reason:<reason>`\n\n## Rule\nNever grant ranks manually when Paradise has a controlled workflow.",
-    tr: "# Staff Operasyonları\n- `/activity check group:<group>` — Rolleri Yönet yetkisi\n- `/activity summary` — haftalık kota özeti\n- `/whitelist add user:@user group:<group> days:<opsiyonel>`\n- `/loa approve|deny`\n- `/report staff user:@user reason:<neden>`\n\n## Kural\nParadise kontrollü akış sağlıyorsa rankı elle vermeyin."
+    en: "# Staff Operations\n- `/activity check group:<group>` — Manage Roles\n- `/activity summary` — weekly quota review\n- `/whitelist add user:@user group:<group> days:<optional>`\n- `/loa approve|deny`\n- `/report staff user:@user reason:<reason>`\n\n## Rule\nNever grant ranks manually when FIMA Bot has a controlled workflow.",
+    tr: "# Staff Operasyonları\n- `/activity check group:<group>` — Rolleri Yönet yetkisi\n- `/activity summary` — haftalık kota özeti\n- `/whitelist add user:@user group:<group> days:<opsiyonel>`\n- `/loa approve|deny`\n- `/report staff user:@user reason:<neden>`\n\n## Kural\nFIMA Bot kontrollü akış sağlıyorsa rankı elle vermeyin."
   },
   moderator: {
     label: "Moderator",
@@ -7824,13 +11940,13 @@ const HELP_CATEGORIES = Object.freeze({
   },
   applications: {
     label: "Applications",
-    en: "# Applications\n- `/application panel`\n- `/application apply`\n- `/application status`\n\nReviewers use Approve, Deny or More Info. Role grants are blocked above reviewer/Paradise hierarchy; blacklisted users cannot apply.",
-    tr: "# Başvurular\n- `/application panel`\n- `/application apply`\n- `/application status`\n\nİnceleyenler Approve, Deny veya More Info kullanır. Reviewer/Paradise hiyerarşisinin üstündeki roller engellenir; blacklist kullanıcı başvuramaz."
+    en: "# Applications\n- `/application panel`\n- `/application apply`\n- `/application status`\n\nReviewers use Approve, Deny or More Info. Role grants are blocked above reviewer/FIMA Bot hierarchy; blacklisted users cannot apply.",
+    tr: "# Başvurular\n- `/application panel`\n- `/application apply`\n- `/application status`\n\nİnceleyenler Approve, Deny veya More Info kullanır. Reviewer/FIMA Bot hiyerarşisinin üstündeki roller engellenir; blacklist kullanıcı başvuramaz."
   },
   voice: {
     label: "Voice / Join-to-Create",
-    en: "# Join-to-Create\nJoin **Join to Create**. Paradise creates your room and gives controls: rename, limit, lock, hide, permit, reject, transfer and delete. Unsafe names reset automatically.",
-    tr: "# Join-to-Create\n**Join to Create** kanalına girin. Paradise odanızı kurup rename, limit, lock, hide, permit, reject, transfer ve delete kontrollerini verir. Güvensiz isimler otomatik sıfırlanır."
+    en: "# Join-to-Create\nJoin **Join to Create**. FIMA Bot creates your room and gives controls: rename, limit, lock, hide, permit, reject, transfer and delete. Unsafe names reset automatically.",
+    tr: "# Join-to-Create\n**Join to Create** kanalına girin. FIMA Bot odanızı kurup rename, limit, lock, hide, permit, reject, transfer ve delete kontrollerini verir. Güvensiz isimler otomatik sıfırlanır."
   },
   xp: {
     label: "XP / Levels",
@@ -7839,8 +11955,8 @@ const HELP_CATEGORIES = Object.freeze({
   },
   dashboard: {
     label: "Dashboard",
-    en: "# Paradise Operations Console\n1. Select a managed server.\n2. Select its template.\n3. Auto-detect/remap channels and roles.\n4. Preview before create/repair/repost actions.\n5. Destructive rebuild always requires backup and typed confirmation.\n\n-# Owner-only: https://fimamacro.com/paradise",
-    tr: "# Paradise Operations Console\n1. Yönetilecek sunucuyu seçin.\n2. Şablonunu seçin.\n3. Kanal/rolleri otomatik algılayın veya eşleyin.\n4. Create/repair/repost öncesi preview alın.\n5. Yıkıcı rebuild her zaman yedek ve yazılı onay ister.\n\n-# Yalnızca owner: https://fimamacro.com/paradise"
+    en: "# FIMA Operations Console\n1. Select a managed server.\n2. Select its template.\n3. Auto-detect/remap channels and roles.\n4. Preview before create/repair/repost actions.\n5. Destructive rebuild always requires backup and typed confirmation.\n\n-# Owner-only: https://fimamacro.com/fima-bot",
+    tr: "# FIMA Operations Console\n1. Yönetilecek sunucuyu seçin.\n2. Şablonunu seçin.\n3. Kanal/rolleri otomatik algılayın veya eşleyin.\n4. Create/repair/repost öncesi preview alın.\n5. Yıkıcı rebuild her zaman yedek ve yazılı onay ister.\n\n-# Yalnızca owner: https://fimamacro.com/fima-bot"
   },
   profile: {
     label: "Member / Profile / Verify",
@@ -7849,8 +11965,8 @@ const HELP_CATEGORIES = Object.freeze({
   },
   challenge: {
     label: "Challenge",
-    en: "# Challenge System\n- `/challenge create` — show only currently eligible targets\n- `/challenge post winner:@user loser:@user score:10-5`\n- `/autowin winner:@user reason:Dodged` — inside the ticket\n\nThe bot rechecks range, profile, cooldown, immunity and open tickets immediately before creation. Enter only the score; Paradise formats the winner wording.",
-    tr: "# Challenge Sistemi\n- `/challenge create` — yalnızca o anda uygun rakipleri gösterir\n- `/challenge post winner:@user loser:@user score:10-5`\n- `/autowin winner:@user reason:Dodged` — ticket içinde\n\nBot açmadan hemen önce range, profil, cooldown, immunity ve açık ticket kontrolünü tekrarlar. Yalnızca skoru girin; kazanan metnini Paradise yazar."
+    en: "# Challenge System\n- `/challenge create` — show only currently eligible targets\n- `/challenge post winner:@user loser:@user score:10-5`\n- `/autowin winner:@user reason:Dodged` — inside the ticket\n\nThe bot rechecks range, profile, cooldown, immunity and open tickets immediately before creation. Enter only the score; FIMA Bot formats the winner wording.",
+    tr: "# Challenge Sistemi\n- `/challenge create` — yalnızca o anda uygun rakipleri gösterir\n- `/challenge post winner:@user loser:@user score:10-5`\n- `/autowin winner:@user reason:Dodged` — ticket içinde\n\nBot açmadan hemen önce range, profil, cooldown, immunity ve açık ticket kontrolünü tekrarlar. Yalnızca skoru girin; kazanan metnini FIMA Bot yazar."
   },
   leaderboard: {
     label: "Leaderboard",
@@ -7864,8 +11980,8 @@ const HELP_CATEGORIES = Object.freeze({
   },
   security: {
     label: "Security / Logs",
-    en: "# Moderation Security\n- `/mod warn`, `/mod mute`\n- `/mod kick-request`, `/mod ban-request`\n- `/mod quarantine`, `/mod unquarantine`\n- `/mod lockdown`, `/mod raidmode`\n- `/security panel`\n\nLower staff submit approval requests. Paradise enforces role hierarchy and records audited actions.",
-    tr: "# Moderasyon Güvenliği\n- `/mod warn`, `/mod mute`\n- `/mod kick-request`, `/mod ban-request`\n- `/mod quarantine`, `/mod unquarantine`\n- `/mod lockdown`, `/mod raidmode`\n- `/security panel`\n\nAlt staff onay talebi açar. Paradise rol hiyerarşisini uygular ve işlemleri loglar."
+    en: "# Moderation Security\n- `/mod warn`, `/mod mute`\n- `/mod kick-request`, `/mod ban-request`\n- `/mod quarantine`, `/mod unquarantine`\n- `/mod lockdown`, `/mod raidmode`\n- `/security panel`\n\nLower staff submit approval requests. FIMA Bot enforces role hierarchy and records audited actions.",
+    tr: "# Moderasyon Güvenliği\n- `/mod warn`, `/mod mute`\n- `/mod kick-request`, `/mod ban-request`\n- `/mod quarantine`, `/mod unquarantine`\n- `/mod lockdown`, `/mod raidmode`\n- `/security panel`\n\nAlt staff onay talebi açar. FIMA Bot rol hiyerarşisini uygular ve işlemleri loglar."
   },
   autoresponder: {
     label: "Auto Responder",
@@ -7889,13 +12005,13 @@ const HELP_CATEGORIES = Object.freeze({
   },
   premium: {
     label: "Premium",
-    en: "# Paradise Premium\n**Status:** planning only. Billing is not enabled. Free/Starter/Pro/Ultimate feature boundaries will be published only after owner approval.",
-    tr: "# Paradise Premium\n**Durum:** yalnızca planlama. Ödeme açık değil. Free/Starter/Pro/Ultimate özellik sınırları owner onayından sonra yayınlanacak."
+    en: "# FIMA Bot Premium\n**Status:** planning only. Billing is not enabled. Free/Starter/Pro/Ultimate feature boundaries will be published only after owner approval.",
+    tr: "# FIMA Bot Premium\n**Durum:** yalnızca planlama. Ödeme açık değil. Free/Starter/Pro/Ultimate özellik sınırları owner onayından sonra yayınlanacak."
   },
   music: {
     label: "Music / Audio",
-    en: "# Music / Audio\n**Status:** blocked until a licensed/legal provider is configured. Paradise will not rip YouTube or Spotify audio and will not use circumvention tools.",
-    tr: "# Müzik / Ses\n**Durum:** lisanslı/yasal sağlayıcı ayarlanana kadar kapalı. Paradise YouTube veya Spotify sesi rip etmeyecek ve bypass aracı kullanmayacak."
+    en: "# Music / Audio\n**Status:** blocked until a licensed/legal provider is configured. FIMA Bot will not rip YouTube or Spotify audio and will not use circumvention tools.",
+    tr: "# Müzik / Ses\n**Durum:** lisanslı/yasal sağlayıcı ayarlanana kadar kapalı. FIMA Bot YouTube veya Spotify sesi rip etmeyecek ve bypass aracı kullanmayacak."
   },
   welcome: {
     label: "Welcome / Leave",
@@ -7919,22 +12035,52 @@ const HELP_CATEGORIES = Object.freeze({
   },
   admin: {
     label: "Admin / Owner",
-    en: "# Admin / Owner\n- `/setupfieelsclan preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelscommunity preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelstsbtr preview|create-missing|repost-guides|repair|rebuild`\n\nDestructive rebuild requires backup, preview and typed confirmation. Do not run production rebuild without owner approval.",
-    tr: "# Admin / Owner\n- `/setupfieelsclan preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelscommunity preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelstsbtr preview|create-missing|repost-guides|repair|rebuild`\n\nYıkıcı rebuild için yedek, preview ve yazılı onay gerekir. Owner onayı olmadan production rebuild çalıştırmayın."
+    en: "# Admin / Owner\n- `/setupfieelsclan preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfima preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelstsbtr preview|create-missing|repost-guides|repair|rebuild`\n\nDestructive rebuild requires backup, preview and typed confirmation. Do not run production rebuild without owner approval.",
+    tr: "# Admin / Owner\n- `/setupfieelsclan preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfima preview|create-missing|repost-guides|repair|rebuild`\n- `/setupfieelstsbtr preview|create-missing|repost-guides|repair|rebuild`\n\nYıkıcı rebuild için yedek, preview ve yazılı onay gerekir. Owner onayı olmadan production rebuild çalıştırmayın."
   }
 });
 
-function helpEmbed(scope, locale = "en") {
-  const category = HELP_CATEGORIES[scope] || HELP_CATEGORIES.clan;
+const COMMUNITY_HIDDEN_HELP_SCOPES = new Set([
+  "clan", "tsbtr", "referee", "training", "tryout", "profile", "challenge",
+  "leaderboard", "roster", "availability", "blacklist", "relations"
+]);
+
+export function paradiseHelpCategoryKeysForTemplate(template = "clan") {
+  return Object.keys(HELP_CATEGORIES)
+    .filter(scope => template !== "community" || !COMMUNITY_HIDDEN_HELP_SCOPES.has(scope));
+}
+
+function normalizedHelpScope(scope, template = "clan") {
+  const allowed = paradiseHelpCategoryKeysForTemplate(template);
+  return allowed.includes(scope) ? scope : (template === "community" ? "community" : "clan");
+}
+
+function normalizedApplicationHelpText(value, language = "en") {
+  const en = language === "en";
+  return String(value || "")
+    .replace(/Helper applications/g, en ? "applications" : "ba\u015fvurular")
+    .replace(/Helper ba\u00c5\u0178vurular\u00c4\u00b1/g, "ba\u015fvurular")
+    .replace(/`\/application apply type:helper`[^\n]*/g, en
+      ? "`/application apply` — choose staff, creator, partnership or reseller in the website form"
+      : "`/application apply` — web formunda staff, creator, partnership veya reseller t\u00fcr\u00fcn\u00fc se\u00e7")
+    .replace(/website-first Helper workflow/g, en ? "website-first application workflow" : "website-first ba\u015fvuru ak\u0131\u015f\u0131")
+    .replace(/website-first Helper ak\u00c4\u00b1\u00c5\u0178\u00c4\u00b1na devam eder/g, "website-first ba\u015fvuru ak\u0131\u015f\u0131na devam eder");
+}
+
+function helpEmbed(scope, locale = "en", template = "clan") {
+  const safeScope = normalizedHelpScope(scope, template);
+  const category = HELP_CATEGORIES[safeScope];
   const language = String(locale).toLowerCase().startsWith("tr") ? "tr" : "en";
   return new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR)
     .setTitle(`✦ ${category.label.toUpperCase()} COMMAND GUIDE`)
-    .setDescription(category[language])
+    .setDescription(normalizedApplicationHelpText(category[language], language))
     .setFooter(paradiseFooter(language === "tr" ? "Türkçe yardım" : "English help"));
 }
 
-function helpComponents(scope = "clan") {
-  const entries = Object.entries(HELP_CATEGORIES);
+function helpComponents(scope = "clan", template = "clan") {
+  const safeScope = normalizedHelpScope(scope, template);
+  const allowedKeys = new Set(paradiseHelpCategoryKeysForTemplate(template));
+  const entries = Object.entries(HELP_CATEGORIES).filter(([key]) => allowedKeys.has(key));
   const menuRows = [];
   const buildMenu = (chunk, index) => new StringSelectMenuBuilder()
     .setCustomId(`paradise_help_category:${index}`)
@@ -7942,14 +12088,14 @@ function helpComponents(scope = "clan") {
     .addOptions(chunk.map(([value, item]) => ({
       label: item.label,
       value,
-      default: value === scope
+      default: value === safeScope
     })));
   for (let index = 0; index < entries.length; index += 25) {
     menuRows.push(new ActionRowBuilder().addComponents(buildMenu(entries.slice(index, index + 25), index / 25)));
   }
   const languageRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`paradise_help_lang:en:${scope}`).setLabel("English").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`paradise_help_lang:tr:${scope}`).setLabel("Türkçe").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(`paradise_help_lang:en:${safeScope}`).setLabel("English").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`paradise_help_lang:tr:${safeScope}`).setLabel("Türkçe").setStyle(ButtonStyle.Secondary)
   );
   return [...menuRows, languageRow];
 }
@@ -7963,8 +12109,10 @@ function memberHelpEntries(context) {
     .filter(entry => entry.memberSafe);
 }
 
-function memberHelpPayload(entries, locale = "en", selectedId = null) {
+export function memberHelpPayload(entries, locale = "en", selectedId = null, template = "clan") {
   const tr = String(locale || "").toLowerCase().startsWith("tr");
+  const community = template === "community";
+  const visibleBrand = community ? "FIMA" : "FIMA Bot";
   const selected = entries.find(entry => entry.id === selectedId) || null;
   const description = selected
     ? [
@@ -7980,7 +12128,7 @@ function memberHelpPayload(entries, locale = "en", selectedId = null) {
       "",
       ...(entries.length
         ? entries.map(entry => `- **${registryCommandLabel(entry)}** — ${entry.description}`)
-        : [tr ? "- Bu sunucuda sana açık bir Paradise üye komutu yok." : "- No Paradise member command is currently available to you in this server."])
+        : [tr ? `- Bu sunucuda sana açık bir ${visibleBrand} üye komutu yok.` : `- No ${visibleBrand} member command is currently available to you in this server.`])
     ].join("\n");
   const components = [];
   if (entries.length) {
@@ -8002,7 +12150,9 @@ function memberHelpPayload(entries, locale = "en", selectedId = null) {
   ));
   return {
     embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR)
-      .setTitle(tr ? "✦ PARADISE ÜYE YARDIMI" : "✦ PARADISE MEMBER HELP")
+      .setTitle(community
+        ? (tr ? "✦ FIMA ÜYE YARDIMI" : "✦ FIMA MEMBER HELP")
+        : (tr ? "✦ FIMA BOT ÜYE YARDIMI" : "✦ FIMA BOT MEMBER HELP"))
       .setDescription(description)],
     components
   };
@@ -8052,7 +12202,7 @@ function staffGuideDetailPayload(entries, category, locale = "tr") {
     ? visible.map(entry => [
       `## ${registryCommandLabel(entry)}`,
       entry.description,
-      `**${tr ? "Gerekli Paradise yetkisi" : "Required Paradise permission"}:** ${entry.requiredParadisePermission || (tr ? "Yapılandırılmış staff yetkisi" : "Configured staff permission")}`,
+      `**${tr ? "Gerekli FIMA Bot yetkisi" : "Required FIMA Bot permission"}:** ${entry.requiredParadisePermission || (tr ? "Yapılandırılmış staff yetkisi" : "Configured staff permission")}`,
       entry.examples?.[0] ? `**${tr ? "Örnek" : "Example"}:** \`${entry.examples[0]}\`` : null,
       `**${tr ? "Kayıt" : "Audit"}:** ${entry.auditEvent || (tr ? "Yok" : "None")}`
     ].filter(Boolean).join("\n")).join("\n\n")
@@ -8066,22 +12216,26 @@ function staffGuideDetailPayload(entries, category, locale = "tr") {
 
 async function handleRegistryHelp(interaction) {
   const state = await loadState();
-  const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
+  const context = paradiseRegistryContextForInteraction(interaction, state);
+  const entries = memberHelpEntries(context);
   const query = interaction.options.getString("query")?.trim().toLowerCase();
   const matches = query
     ? entries.filter(entry => `${entry.id} ${entry.command} ${entry.subcommand || ""} ${entry.description} ${entry.examples.join(" ")}`.toLowerCase().includes(query))
     : entries;
-  const payload = memberHelpPayload(matches, interaction.locale, matches.length === 1 ? matches[0].id : null);
+  const payload = memberHelpPayload(matches, interaction.locale, matches.length === 1 ? matches[0].id : null, context.template);
   payload.embeds[0].setColor(await paradiseBrandColor());
   return interaction.reply({ ...payload, ephemeral: true });
 }
 
 async function handleHelp(interaction) {
   const turkish = String(interaction.locale || "").toLowerCase().startsWith("tr");
+  const state = await loadState();
+  const { template } = paradiseRegistryContextForInteraction(interaction, state);
+  const allowedKeys = new Set(paradiseHelpCategoryKeysForTemplate(template));
   const query = interaction.options.getString("query")?.trim().toLowerCase();
   if (query) {
-    const matches = Object.entries(HELP_CATEGORIES).filter(([, item]) =>
-      `${item.label} ${item.en} ${item.tr}`.toLowerCase().includes(query)
+    const matches = Object.entries(HELP_CATEGORIES).filter(([key, item]) =>
+      allowedKeys.has(key) && `${item.label} ${item.en} ${item.tr}`.toLowerCase().includes(query)
     ).slice(0, 12);
     const description = matches.length
       ? matches.map(([key, item]) => "- **" + item.label + "** — `" + key + "`").join("\n")
@@ -8091,7 +12245,7 @@ async function handleHelp(interaction) {
         .setTitle(turkish ? `✦ YARDIM ARAMASI: ${query}` : `✦ HELP SEARCH: ${query}`)
         .setDescription(`${description}\n\n-# ${turkish ? "Aşağıdaki menüden ilgili kategoriyi açın." : "Open the matching category from the menu below."}`)
         .setFooter(paradiseFooter("Searchable command directory"))],
-      components: helpComponents(matches[0]?.[0] || "profile"),
+      components: helpComponents(matches[0]?.[0] || template, template),
       ephemeral: true
     });
   }
@@ -8101,20 +12255,24 @@ async function handleHelp(interaction) {
         ? "Bir sistem seçin. Komutun ne yaptığı, gereken yetki ve kullanılacağı kanal yalnızca size gösterilir."
         : "Choose a system below. Its command guide is shown privately, including what each command does, required permissions and where it belongs.")
       .setFooter(paradiseFooter("Interactive command directory"))],
-    components: helpComponents(),
+    components: helpComponents(template, template),
     ephemeral: true
   });
 }
 
 async function publishSetupGuides(guild, mode) {
   const channel = await configuredChannel(guild, "member_help_channel", ["⌁・bot-komutları", "◇・bot-komutları", "bot-commands", "command-guide"]);
-  if (!channel?.isTextBased?.()) return null;
+  if (!channel?.isTextBased?.()) {
+    return failedParadiseMessageReadback({ reason: "member_help_channel_not_resolved" });
+  }
   const state = await loadState();
   const storedMessageId = configForGuild(state, guild.id).commandGuideMessageIds?.[mode];
   let message = storedMessageId ? await channel.messages.fetch(storedMessageId).catch(() => null) : null;
   const payload = memberHelpPayload(
     memberHelpEntries({ template: mode, enabledModules: null, roleKeys: [], plan: "free", isOwner: false }),
-    guildLanguage(configForGuild(state, guild.id))
+    guildLanguage(configForGuild(state, guild.id)),
+    null,
+    mode
   );
   payload.embeds[0].setColor(await paradiseBrandColor());
   if (message) await message.edit(payload);
@@ -8125,7 +12283,10 @@ async function publishSetupGuides(guild, mode) {
     state.guildConfigs[guild.id].commandGuideMessageIds[mode] = message.id;
     return state;
   });
-  return message;
+  return verifyParadiseMessageReadback(channel, message, {
+    botUserId: guild.client?.user?.id,
+    expectedTitle: paradisePayloadFirstEmbed(payload).title
+  });
 }
 
 async function configuredChannel(guild, mappingKey, fallbackName) {
@@ -8166,7 +12327,7 @@ async function saveChallengeTranscript(guild, channel, ticket, trigger) {
   const fetched = await channel.messages.fetch({ limit: 100 });
   const messages = [...fetched.values()].reverse();
   const lines = [
-    `Paradise challenge transcript`,
+    `FIMA Bot challenge transcript`,
     `Ticket: ${ticket.ticketId || channel.id}`,
     `Challenger: ${ticket.challengerId || "unknown"}`,
     `Challenged: ${ticket.opponentId || "unknown"}`,
@@ -8185,7 +12346,7 @@ async function saveChallengeTranscript(guild, channel, ticket, trigger) {
   ];
   const transcriptMessage = await destination.send({
     content: `Challenge transcript · Ticket **${ticket.ticketId || channel.id}** · ${trigger}`,
-    files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `paradise-challenge-${ticket.ticketId || channel.id}.txt` }]
+    files: [{ attachment: Buffer.from(lines.join("\n"), "utf8"), name: `fima-bot-challenge-${ticket.ticketId || channel.id}.txt` }]
   });
   await saveState(next => {
     next.transcripts[ticket.ticketId || channel.id] = {
@@ -8202,12 +12363,42 @@ async function saveChallengeTranscript(guild, channel, ticket, trigger) {
   return transcriptMessage;
 }
 
-const GUIDE_POSTS = Object.freeze([
+export const GUIDE_POSTS = Object.freeze([
   {
     key: "rules",
     channel: "rules",
-    title: "✦ PARADISE COMMUNITY RULES",
+    title: "✦ FIMA COMMUNITY RULES",
     body: "# English\n## Respect & safety\n- No harassment, threats, hate speech, scams, account theft or malicious links.\n- Never request cookies, passwords, tokens or private authentication data.\n- Use approved media channels for links and attachments.\n- Staff actions require evidence and remain auditable.\n\n# Türkçe\n## Saygı ve güvenlik\n- Taciz, tehdit, nefret söylemi, dolandırıcılık ve zararlı bağlantılar yasaktır.\n- Cookie, şifre, token veya özel giriş bilgisi istemeyin.\n- Link ve dosyaları yalnızca izin verilen kanallarda paylaşın.\n- Yetkili işlemleri kanıtlı ve denetlenebilir olmalıdır."
+  },
+  {
+    key: "announcement",
+    channel: "⟐・announcements",
+    title: "✦ FT COMMUNITY ANNOUNCEMENTS",
+    body: "# Official updates\nServer news, events, FIMA releases and important community changes are published here. Treat only messages posted by authorized staff or FIMA Bot as official.\n\n## Stay safe\n- FIMA never asks for passwords, cookies or authentication tokens.\n- Check the destination before opening a link.\n- Use the support panel when an announcement looks suspicious or unclear."
+  },
+  {
+    key: "booster",
+    channel: "⌁・activity-rewards",
+    title: "✦ BOOSTER & ACTIVITY REWARDS",
+    body: "# Thank you for supporting FT Community\nEach verified server boost grants **3 days of FIMA Macro access per month** while the boost remains eligible. Rewards are processed through the protected account-link and payout workflow.\n\n## Safe delivery\n- Link the correct FIMA account through the official flow.\n- Never post a license key, password, cookie or token in Discord.\n- Duplicate, refunded or unverifiable claims enter staff review instead of receiving an automatic reward.\n- Use the support panel if a verified reward is delayed."
+  },
+  {
+    key: "fieel_style_guide",
+    channel: "⌁・fieel-content",
+    title: "✦ FIEEL STYLE & CREATOR GUIDE",
+    body: "# Create in the FT Community style\nShare approved Fieel edits, clips, thumbnails and community art here. Keep every post readable, original and suitable for the shared Kaneki × Luffy visual language.\n\n## Publishing standard\n- Credit collaborators and the original creator when required.\n- Use the proper media channel and a clear title.\n- Do not repost stolen work, private files or misleading download links.\n- Ask the Video Team or Content Team for review before using an asset as an official server visual."
+  },
+  {
+    key: "turkish_community_guide",
+    channel: "〆・turkish-announcements",
+    title: "✦ TURKISH COMMUNITY HUB",
+    body: "# Turkish-language updates\nThis channel carries the Turkish counterpart of important FT Community news, events and safety notices. The main server structure remains English-first while this hub keeps Turkish members fully informed.\n\n## Community standard\n- Follow the same rules and safety boundaries as every FT Community channel.\n- Treat only authorized staff and FIMA Bot posts as official.\n- Use the correct support or report flow instead of sharing private account data in public."
+  },
+  {
+    key: "voice_guide",
+    channel: "⌁・voice-activity",
+    title: "✦ VOICE COMMUNITY GUIDE",
+    body: "# Voice activity\nJoin voice rooms to play, create and spend time with the community. Keep conversations welcoming and follow staff direction during organized sessions.\n\n## Voice safety\n- No harassment, disruptive audio, recording without consent or attempts to expose private information.\n- Move game, media and event conversations to the appropriate room when asked.\n- Report serious issues through the protected report flow; do not start public call-outs."
   },
   {
     key: "challenge_rules",
@@ -8219,25 +12410,25 @@ const GUIDE_POSTS = Object.freeze([
     key: "referee_guide",
     channel: "referee-guide",
     title: "👑 REFEREE GUIDE 👑",
-    body: "# __Ticket control checklist__\n1. Confirm both Paradise profiles exist.\n2. Check challenger cooldown and target immunity.\n3. Check allowed rank range and open challenges.\n4. Add/ping both players and keep the pinned context header current.\n5. Record the complete set and remain neutral.\n\n## __If the ticket is valid__\n- Claim the match and add a co-referee when required.\n- Use `/challenge post` or `/challenge autowin` **inside the ticket**.\n- Close first; save transcript before access is removed.\n\n## __Score format__\n- `winner` = winning fighter\n- `loser` = losing fighter\n- `score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never type `to @user`; Paradise formats the sentence.\n- Auto/strike requires a clear note; co-referee is optional.\n\n## __Recovery and corrections__\nIf a ticket was closed, recover context from the transcript/header. Managers use the correction workflow; never silently delete evidence.\n\n-# Yanlış postu aktif Referee Manager'a iletin."
+    body: "# __Ticket control checklist__\n1. Confirm both FIMA Bot profiles exist.\n2. Check challenger cooldown and target immunity.\n3. Check allowed rank range and open challenges.\n4. Add/ping both players and keep the pinned context header current.\n5. Record the complete set and remain neutral.\n\n## __If the ticket is valid__\n- Claim the match and add a co-referee when required.\n- Use `/challenge post` or `/challenge autowin` **inside the ticket**.\n- Close first; save transcript before access is removed.\n\n## __Score format__\n- `winner` = winning fighter\n- `loser` = losing fighter\n- `score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never type `to @user`; FIMA Bot formats the sentence.\n- Auto/strike requires a clear note; co-referee is optional.\n\n## __Recovery and corrections__\nIf a ticket was closed, recover context from the transcript/header. Managers use the correction workflow; never silently delete evidence.\n\n-# Yanlış postu aktif Referee Manager'a iletin."
   },
   {
     key: "referee_rules",
     channel: "referee-rules",
     title: "👑 REFEREE RULES 👑",
-    body: "# __Role expectations__\n## ◆ Referee Manager\nOwns referee policy, disputes, coaching, promotions and audit decisions.\n\n## ◆ Experienced Referee\nMay manage **Top 1–30**, approve configured score posts and coach lower referees.\n\n## ◆ Referee\nMay independently manage **Top 11–30**. Cannot approve/deny by default.\n\n## ◆ Trial Referee\nMay manage **Top 21–30** with a second referee. Cannot approve/deny.\n\n# __Core rules__\n- **Neutrality is mandatory.** Favoritism triggers immediate review.\n- Record every set; missing recordings may require a rematch.\n- Announce sets in **challenges** and approved scores in **challenge-results**.\n- Use the structured score-post workflow; no manual result messages.\n- Stay active. Approved referee work counts automatically; fake activity is punishable.\n\n> Default ranges are configurable in the Paradise dashboard.\n\n-# Trial/normal Referee approval is blocked unless the owner explicitly changes policy."
+    body: "# __Role expectations__\n## ◆ Referee Manager\nOwns referee policy, disputes, coaching, promotions and audit decisions.\n\n## ◆ Experienced Referee\nMay manage **Top 1–30**, approve configured score posts and coach lower referees.\n\n## ◆ Referee\nMay independently manage **Top 11–30**. Cannot approve/deny by default.\n\n## ◆ Trial Referee\nMay manage **Top 21–30** with a second referee. Cannot approve/deny.\n\n# __Core rules__\n- **Neutrality is mandatory.** Favoritism triggers immediate review.\n- Record every set; missing recordings may require a rematch.\n- Announce sets in **challenges** and approved scores in **challenge-results**.\n- Use the structured score-post workflow; no manual result messages.\n- Stay active. Approved referee work counts automatically; fake activity is punishable.\n\n> Default ranges are configurable in the FIMA Bot dashboard.\n\n-# Trial/normal Referee approval is blocked unless the owner explicitly changes policy."
   },
   {
     key: "referee_post_quick",
     channel: "referee-post",
     title: "📌 /POST QUICK GUIDE",
-    body: "# __How to post a score__\n- `winner` / `profile_id_1` = winner\n- `loser` / `profile_id_2` = loser\n- `ticket_id` = challenge ticket ID\n- `score` / `total_score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never write `to <user>` — Paradise adds consistent wording.\n- Add `co_referee` when another referee worked the set.\n- Add a note for Auto, no-show, dodge, strike or disqualification.\n\n## Example\n`/challenge post winner:@A loser:@B score:10-5 ticket_id:134 note:FF check was not requested`\n\n-# Submit from the ticket whenever possible so context is filled and rechecked."
+    body: "# __How to post a score__\n- `winner` / `profile_id_1` = winner\n- `loser` / `profile_id_2` = loser\n- `ticket_id` = challenge ticket ID\n- `score` / `total_score` = only `10-3`, `10-5`, `10-7` or `Auto`\n- Never write `to <user>` — FIMA Bot adds consistent wording.\n- Add `co_referee` when another referee worked the set.\n- Add a note for Auto, no-show, dodge, strike or disqualification.\n\n## Example\n`/challenge post winner:@A loser:@B score:10-5 ticket_id:134 note:FF check was not requested`\n\n-# Submit from the ticket whenever possible so context is filled and rechecked."
   },
   {
     key: "referee_works",
     channel: "referee-works",
     title: "🛡️ REFEREE WORK & ACTIVITY",
-    body: "# __What counts__\n- An approved, fully recorded challenge result.\n- A valid co-referee contribution attached to the same ticket.\n- A manager-approved Auto/no-show decision with evidence.\n\n## __Activity policy__\n- Default minimum: **2 approved matches per week**.\n- LOA and activity whitelist pause quota review.\n- Weekly summaries recommend promotion/demotion; automatic role changes remain off unless owner enables them.\n- Duplicate, false or recycled proof does not count and creates a staff review.\n\n-# Paradise writes approved work here automatically; staff should not self-post screenshots."
+    body: "# __What counts__\n- An approved, fully recorded challenge result.\n- A valid co-referee contribution attached to the same ticket.\n- A manager-approved Auto/no-show decision with evidence.\n\n## __Activity policy__\n- Default minimum: **2 approved matches per week**.\n- LOA and activity whitelist pause quota review.\n- Weekly summaries recommend promotion/demotion; automatic role changes remain off unless owner enables them.\n- Duplicate, false or recycled proof does not count and creates a staff review.\n\n-# FIMA Bot writes approved work here automatically; staff should not self-post screenshots."
   },
   {
     key: "training_rules",
@@ -8261,13 +12452,13 @@ const GUIDE_POSTS = Object.freeze([
     key: "faq_trust",
     channel: "security-and-trust",
     title: "🛡️ TRUST & SECURITY",
-    body: "# Paradise and Fima safety\n- Paradise never asks for cookies, passwords or Discord/Roblox tokens.\n- Fima downloads must come from official channels only.\n- Screenshots are not automatic proof of Roblox ownership or payment.\n- Suspicious links should be reported through the support ticket panel.\n\n# Güvenlik\n- Paradise cookie, şifre veya token istemez.\n- Fima dosyalarını yalnızca resmi kanallardan indirin.\n- Şüpheli bağlantıları destek ticket sistemiyle bildirin."
+    body: "# FIMA Bot and FIMA safety\n- FIMA Bot never asks for cookies, passwords or Discord/Roblox tokens.\n- FIMA downloads must come from official channels only.\n- Screenshots are not automatic proof of Roblox ownership or payment.\n- Suspicious links should be reported through the support ticket panel.\n\n# Güvenlik\n- FIMA Bot cookie, şifre veya token istemez.\n- FIMA dosyalarını yalnızca resmi kanallardan indirin.\n- Şüpheli bağlantıları destek ticket sistemiyle bildirin."
   },
   {
     key: "mainer_guide",
     channel: "maining-guide",
-    title: "✦ PARADISE MAINING GUIDE",
-    body: "# Official flow\nUse `/mainer guide` to display the current Paradise code and approved TSBCC command format.\n\n- Keep proof in **mainer-proof**.\n- Never share account credentials.\n- Staff role selection must match your approved role.\n\n-# Güncel kod bot state’inden alınır; eski mesajlardaki kodlara güvenmeyin."
+    title: "✦ FIMA BOT MAINING GUIDE",
+    body: "# Official flow\nUse `/mainer guide` to display the current FIMA Bot code and approved TSBCC command format.\n\n- Keep proof in **mainer-proof**.\n- Never share account credentials.\n- Staff role selection must match your approved role.\n\n-# Güncel kod bot state’inden alınır; eski mesajlardaki kodlara güvenmeyin."
   },
   {
     key: "availability_guide",
@@ -8285,25 +12476,25 @@ const GUIDE_POSTS = Object.freeze([
     key: "profile_guide",
     channel: "profile-guide",
     title: "◆ ROBLOX PROFILE & VERIFICATION",
-    body: "# Short, Roblox-safe verification\n1. Run `/profile create`.\n2. Enter the exact Roblox username.\n3. Put the six-character code in Roblox About.\n4. Confirm before it expires.\n\n## Safety\n- Paradise never requests a Roblox password, cookie or token.\n- Screenshots are not automatic ownership proof.\n- Existing profiles are not duplicated; use `/profile edit` for region changes.\n\n-# Challenge and tryout results require a completed profile."
+    body: "# Short, Roblox-safe verification\n1. Run `/profile create`.\n2. Enter the exact Roblox username.\n3. Put the six-character code in Roblox About.\n4. Confirm before it expires.\n\n## Safety\n- FIMA Bot never requests a Roblox password, cookie or token.\n- Screenshots are not automatic ownership proof.\n- Existing profiles are not duplicated; use `/profile edit` for region changes.\n\n-# Challenge and tryout results require a completed profile."
   },
   {
     key: "application_guide",
     channel: "application-guide",
     title: "▧ APPLICATION GUIDE",
-    body: "# Apply with `/application apply`\nChoose the correct position and answer motivation, experience and availability honestly.\n\n## Review flow\n- One active application at a time.\n- Blacklisted users are blocked.\n- Staff can approve, deny or request more information.\n- A role is granted only when configured and below both reviewer and Paradise role hierarchy.\n\n-# Başvuru durumu `/application status` ile özel olarak görüntülenebilir."
+    body: "# Apply with `/application apply`\nChoose the correct position and answer motivation, experience and availability honestly.\n\n## Review flow\n- One active application at a time.\n- Blacklisted users are blocked.\n- Staff can approve, deny or request more information.\n- A role is granted only when configured and below both reviewer and FIMA Bot role hierarchy.\n\n-# Başvuru durumu `/application status` ile özel olarak görüntülenebilir."
   },
   {
     key: "staff_command_guide",
     channel: "staff-command-guide",
     title: "⛨ STAFF COMMAND GUIDE",
-    body: "# Moderation\n- `/mod warn` records a documented warning.\n- `/mod mute` applies a bounded Discord timeout.\n- `/mod kick-request` and `/mod ban-request` enter senior review.\n- `/mod quarantine` isolates suspicious accounts for review.\n\n# Operations\n- Training, tryout, referee and activity actions use their structured command groups.\n- Never grant ranks manually when Paradise provides the controlled workflow.\n\n-# Every high-impact action is logged; lower staff cannot bypass the approval queue."
+    body: "# Moderation\n- `/mod warn` records a documented warning.\n- `/mod mute` applies a bounded Discord timeout.\n- `/mod kick-request` and `/mod ban-request` enter senior review.\n- `/mod quarantine` isolates suspicious accounts for review.\n\n# Operations\n- Training, tryout, referee and activity actions use their structured command groups.\n- Never grant ranks manually when FIMA Bot provides the controlled workflow.\n\n-# Every high-impact action is logged; lower staff cannot bypass the approval queue."
   },
   {
     key: "mod_command_guide",
     channel: "mod-command-guide",
     title: "🛡️ MODERATOR COMMAND GUIDE",
-    body: "# __Proportional moderation__\n- `/mod warn user:@user reason:<reason>` — documented low-impact first response.\n- `/mod mute user:@user duration:<minutes> reason:<reason>` — bounded timeout for spam/disruption.\n- `/mod kick-request user:@user reason:<reason>` — senior approval queue.\n- `/mod ban-request user:@user reason:<reason>` — senior approval queue.\n- `/mod quarantine user:@user reason:<reason>` — isolate suspicious links/accounts.\n\n## Suggested ladder\n- Spam: warn → short timeout → escalation.\n- Toxicity/slurs: evidence + configured timeout; severe/repeated cases escalate.\n- Scam/raid: quarantine or lockdown first, then senior review.\n\n-# Never punish Owner/Admin or roles above Paradise; role hierarchy is rechecked."
+    body: "# __Proportional moderation__\n- `/mod warn user:@user reason:<reason>` — documented low-impact first response.\n- `/mod mute user:@user duration:<minutes> reason:<reason>` — bounded timeout for spam/disruption.\n- `/mod kick-request user:@user reason:<reason>` — senior approval queue.\n- `/mod ban-request user:@user reason:<reason>` — senior approval queue.\n- `/mod quarantine user:@user reason:<reason>` — isolate suspicious links/accounts.\n\n## Suggested ladder\n- Spam: warn → short timeout → escalation.\n- Toxicity/slurs: evidence + configured timeout; severe/repeated cases escalate.\n- Scam/raid: quarantine or lockdown first, then senior review.\n\n-# Never punish Owner/Admin or roles above FIMA Bot; role hierarchy is rechecked."
   },
   {
     key: "training_hoster_guide",
@@ -8315,7 +12506,7 @@ const GUIDE_POSTS = Object.freeze([
     key: "tryout_hoster_guide",
     channel: "tryout-hoster-guide",
     title: "✦ TRYOUT HOSTER GUIDE",
-    body: "# __Start__\n`/tryout start link:<roblox link>`\n\nLock after 1–5 minutes. Evaluate **RC timing, catches, dash reactions, movement, pressure, adaptation and game sense**, not only wins.\n\n# __Result__\n`/tryout result user:@player stage:2 level:High strength:Strong note:<optional>`\n\nParadise enforces Stage → Level → Strength, completed profile, lowest grantable rank and hoster authority. Never grant roles manually.\n\n-# Winning alone does not guarantee a higher stage."
+    body: "# __Start__\n`/tryout start link:<roblox link>`\n\nLock after 1–5 minutes. Evaluate **RC timing, catches, dash reactions, movement, pressure, adaptation and game sense**, not only wins.\n\n# __Result__\n`/tryout result user:@player stage:2 level:High strength:Strong note:<optional>`\n\nFIMA Bot enforces Stage → Level → Strength, completed profile, lowest grantable rank and hoster authority. Never grant roles manually.\n\n-# Winning alone does not guarantee a higher stage."
   },
   {
     key: "giveaway_event_guide",
@@ -8332,8 +12523,8 @@ const GUIDE_POSTS = Object.freeze([
   {
     key: "dashboard_guide",
     channel: "dashboard-guide",
-    title: "⚙ PARADISE DASHBOARD GUIDE",
-    body: "# __Safe setup order__\n1. Select the managed server.\n2. Select Community, Clan or TSBTR template.\n3. Auto-detect and review channels/roles.\n4. Save each page and inspect its preview.\n5. Run **Preview**, **Create missing**, **Repost guides** or **Repair permissions**.\n6. Destructive rebuild requires backup and exact typed confirmation.\n\n-# Owner-only console: https://fimamacro.com/paradise"
+    title: "⚙ FIMA BOT DASHBOARD GUIDE",
+    body: "# __Safe setup order__\n1. Select the managed server.\n2. Select Community, Clan or TSBTR template.\n3. Auto-detect and review channels/roles.\n4. Save each page and inspect its preview.\n5. Run **Preview**, **Create missing**, **Repost guides** or **Repair permissions**.\n6. Destructive rebuild requires backup and exact typed confirmation.\n\n-# Owner-only console: https://fimamacro.com/fima-bot"
   },
   {
     key: "moderation_policy",
@@ -8360,8 +12551,28 @@ const GUIDE_POSTS = Object.freeze([
 // definitions remain the English canonical counterpart.
 export const PARADISE_GUIDE_TR_COPY = Object.freeze({
   rules: {
-    title: "✦ PARADISE KURALLARI",
+    title: "✦ FIMA KURALLARI",
     body: "# Herkese açık ve saygılı kal\n- Spam, toxic davranış, hakaret, scam ve hesap paylaşımı yasaktır.\n- Cookie, şifre, token, tam lisans anahtarı veya özel hesap verisi istemeyin/paylaşmayın.\n- Staff kararına itirazın varsa public tartışma yerine destek ticketı aç.\n\n## Kısa yol\nRollerini seç, kuralları oku ve yardıma ihtiyacın varsa destek panelini kullan."
+  },
+  announcement: {
+    title: "✦ FT COMMUNITY DUYURULARI",
+    body: "# Resmî güncellemeler\nSunucu haberleri, etkinlikler, FIMA sürümleri ve önemli topluluk değişiklikleri burada yayınlanır. Yalnız yetkili ekip veya FIMA Bot tarafından gönderilen mesajları resmî kabul et.\n\n## Güvenli kal\n- FIMA şifre, cookie veya giriş tokeni istemez.\n- Bağlantıyı açmadan önce hedefini kontrol et.\n- Şüpheli veya belirsiz duyuruları destek panelinden bildir."
+  },
+  booster: {
+    title: "✦ BOOSTER VE AKTİVİTE ÖDÜLLERİ",
+    body: "# FT Community desteğin için teşekkürler\nDoğrulanan her sunucu boostu, boost uygun kaldığı sürece aylık **3 günlük FIMA Macro erişimi** kazandırır. Ödül, korumalı hesap bağlantısı ve ödeme kuyruğu üzerinden işlenir.\n\n## Güvenli teslimat\n- Doğru FIMA hesabını yalnız resmî akıştan bağla.\n- Lisans anahtarı, şifre, cookie veya tokeni Discord'a yazma.\n- Yinelenen, iade edilmiş veya doğrulanamayan talepler otomatik ödül yerine incelemeye gider.\n- Doğrulanmış ödül gecikirse destek panelini kullan."
+  },
+  fieel_style_guide: {
+    title: "✦ FIEEL STİLİ VE İÇERİK REHBERİ",
+    body: "# FT Community stilinde üret\nOnaylı Fieel editlerini, kliplerini, thumbnaillerini ve topluluk çalışmalarını burada paylaş. Her gönderi okunaklı, özgün ve ortak Kaneki × Luffy görsel diline uygun olmalı.\n\n## Yayın standardı\n- Gerektiğinde birlikte çalıştığın kişileri ve asıl üreticiyi belirt.\n- Doğru medya kanalını ve anlaşılır bir başlığı kullan.\n- Çalıntı çalışma, özel dosya veya yanıltıcı indirme bağlantısı paylaşma.\n- Bir görseli resmî sunucu varlığı yapmadan önce Video Team ya da Content Team incelemesi iste."
+  },
+  turkish_community_guide: {
+    title: "✦ TÜRK TOPLULUK MERKEZİ",
+    body: "# Türkçe güncellemeler\nÖnemli FT Community haberlerinin, etkinliklerinin ve güvenlik duyurularının Türkçe karşılığı burada yayınlanır. Ana sunucu yapısı İngilizce kalırken Türk üyeler bu bölümden eksiksiz bilgilendirilir.\n\n## Topluluk standardı\n- Tüm FT Community kanallarındaki aynı kurallara ve güvenlik sınırlarına uy.\n- Yalnız yetkili ekip ve FIMA Bot mesajlarını resmî kabul et.\n- Özel hesap verisini public alanda paylaşmak yerine doğru support veya report akışını kullan."
+  },
+  voice_guide: {
+    title: "✦ SESLİ TOPLULUK REHBERİ",
+    body: "# Sesli aktivite\nOyun oynamak, üretmek ve toplulukla vakit geçirmek için ses odalarına katıl. Sohbeti kapsayıcı tut ve düzenlenen oturumlarda staff yönlendirmesine uy.\n\n## Ses güvenliği\n- Taciz, rahatsız edici ses, izinsiz kayıt veya özel bilgiyi açığa çıkarma girişimi yasaktır.\n- İstendiğinde oyun, medya ve etkinlik sohbetini uygun odaya taşı.\n- Ciddi sorunları korumalı report akışından bildir; public linç başlatma."
   },
   challenge_rules: {
     title: "✦ CHALLENGE KURALLARI",
@@ -8397,7 +12608,7 @@ export const PARADISE_GUIDE_TR_COPY = Object.freeze({
   },
   faq_trust: {
     title: "✦ GÜVENLİK VE GÜVEN",
-    body: "# Paradise / Fima güvenliği\n- Bot veya Fima asla cookie, şifre, token ya da Roblox parolası istemez.\n- Dosyaları yalnız resmi bağlantılardan indir.\n- Şüpheli linkleri açma; destek ticketı ile bildir.\n- Ekran görüntüsü tek başına ödeme veya hesap sahipliği kanıtı değildir."
+    body: "# FIMA Bot / FIMA güvenliği\n- FIMA Bot veya FIMA asla cookie, şifre, token ya da Roblox parolası istemez.\n- Dosyaları yalnız resmi bağlantılardan indir.\n- Şüpheli linkleri açma; destek ticketı ile bildir.\n- Ekran görüntüsü tek başına ödeme veya hesap sahipliği kanıtı değildir."
   },
   mainer_guide: {
     title: "✦ MAINER REHBERİ",
@@ -8413,7 +12624,7 @@ export const PARADISE_GUIDE_TR_COPY = Object.freeze({
   },
   profile_guide: {
     title: "✦ PROFİL VE ROBLOX DOĞRULAMA",
-    body: "# Güvenli doğrulama\n1. `/profile create` çalıştır.\n2. Kısa kodu Roblox About alanına koy.\n3. Süresi dolmadan doğrula.\n4. Bölge/gizlilik ayarını profilden düzenle.\n\nParadise Roblox şifresi, cookie veya token istemez. Aynı Roblox hesabı ikinci aktif profile bağlanamaz."
+    body: "# Güvenli doğrulama\n1. `/profile create` çalıştır.\n2. Kısa kodu Roblox About alanına koy.\n3. Süresi dolmadan doğrula.\n4. Bölge/gizlilik ayarını profilden düzenle.\n\nFIMA Bot Roblox şifresi, cookie veya token istemez. Aynı Roblox hesabı ikinci aktif profile bağlanamaz."
   },
   application_guide: {
     title: "✦ BAŞVURU REHBERİ",
@@ -8465,6 +12676,8 @@ export function localizeParadiseGuide(definition, language = "tr") {
 
 const GUIDE_MAPPING_KEYS = Object.freeze({
   rules: "rules_channel",
+  announcement: "announcement_channel",
+  booster: "activity_rewards_channel",
   challenge_rules: "challenge_rules_channel",
   availability_guide: "availability_channel",
   loa_guide: "loa_channel",
@@ -8500,7 +12713,9 @@ async function publishGuidePost(guild, definition) {
   const channel = mappingKey
     ? await configuredChannel(guild, mappingKey, definition.channel)
     : guild.channels.cache.find(item => item.name === definition.channel && item.isTextBased?.());
-  if (!channel) return false;
+  if (!channel?.isTextBased?.()) {
+    return failedParadiseMessageReadback({ reason: "guide_channel_not_resolved" });
+  }
   const state = await loadState();
   const oldId = configForGuild(state, guild.id).guideMessageIds?.[definition.key];
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
@@ -8513,27 +12728,165 @@ async function publishGuidePost(guild, definition) {
       const embed = new EmbedBuilder().setColor(color).setTitle(localizedDefinition.title)
         .setDescription(localizedDefinition.body.slice(0, 4096)).setTimestamp();
       if (GUIDE_FOOTER_KEYS.has(definition.key)) embed.setFooter(paradiseFooter("TR / EN handbook"));
+      const bannerUrl = paradiseCommunityGuideBannerUrl(definition.key);
+      if (bannerUrl) embed.setImage(bannerUrl);
       return { embeds: [embed] };
     })();
+  const thumbnail = paradiseCommunityGuideThumbnailAttachment(definition.key);
+  if (thumbnail) {
+    payload.embeds[0].setThumbnail(thumbnail.url);
+    payload.files = [thumbnail.file];
+  }
   payload.embeds[0].setColor(color);
   if (message) await message.edit(payload); else message = await channel.send(payload);
-  await message.pin?.("Paradise canonical channel handbook").catch(() => null);
+  await message.pin?.("FIMA Bot canonical channel handbook").catch(() => null);
   await saveState(next => {
     next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
     next.guildConfigs[guild.id].guideMessageIds = next.guildConfigs[guild.id].guideMessageIds || {};
     next.guildConfigs[guild.id].guideMessageIds[definition.key] = message.id;
     return next;
   });
-  return true;
+  return verifyParadiseMessageReadback(channel, message, {
+    botUserId: guild.client?.user?.id,
+    expectedTitle: paradisePayloadFirstEmbed(payload).title,
+    expectedBannerUrl: paradiseCommunityGuideBannerUrl(definition.key),
+    expectedThumbnail: thumbnail
+  });
+}
+
+export function paradiseCommunityVideoTeamPanelPayload({
+  color = DEFAULT_PARADISE_BRAND_COLOR,
+  language = "en",
+  bannerUrl = PARADISE_COMMUNITY_ASSETS.videoTeam
+} = {}) {
+  const turkish = language === "tr";
+  const embed = new EmbedBuilder()
+    .setColor(normalizeParadiseBrandColor(color))
+    .setTitle("✦ FIMA VIDEO TEAM")
+    .setDescription(turkish
+      ? [
+        "# İçerik üretim merkezi",
+        "FIMA Video Team; fikirden yayına kadar bütün üretim akışını tek yerde ve düzenli biçimde yönetir.",
+        "",
+        "**Akış**  →  Fikir › Senaryo › Asset › İnceleme › Yayın",
+        "",
+        "• `〆・video-ideas` — fikirler ve içerik briefleri",
+        "• `〆・video-scripts` — senaryo, başlık ve açıklama taslakları",
+        "• `〆・video-assets` — görsel, ses ve proje dosyaları",
+        "• `〆・video-review` — kalite kontrol ve son onay",
+        "• `〆・video-upload-schedule` — yayın planı ve teslim takibi",
+        "",
+        "-# Erişim yalnız Video Team ve yetkili staff rolleri içindir."
+      ].join("\n")
+      : [
+        "# Content production hub",
+        "FIMA Video Team keeps the complete production flow organized from the first idea to publication.",
+        "",
+        "**Flow**  →  Idea › Script › Assets › Review › Publish",
+        "",
+        "• `〆・video-ideas` — concepts and creative briefs",
+        "• `〆・video-scripts` — scripts, titles and descriptions",
+        "• `〆・video-assets` — visual, audio and project files",
+        "• `〆・video-review` — quality control and final approval",
+        "• `〆・video-upload-schedule` — publishing plan and delivery tracking",
+        "",
+        "-# Access is limited to Video Team and authorized staff roles."
+      ].join("\n"))
+    .setImage(sanitizeParadiseHttpsUrl(bannerUrl) || PARADISE_COMMUNITY_ASSETS.videoTeam)
+    .setFooter({ text: `${turkish ? "Video ekibi merkezi" : "Video team hub"} • ${DEFAULT_FIMA_FOOTER_BRAND}` })
+    .setTimestamp();
+  return { embeds: [embed] };
+}
+
+async function updateParadiseCommunityVideoTeamPanel(guild, mode) {
+  if (!isFimaCommunityManagedGuild(guild?.id) || mode !== "community") {
+    return failedParadiseMessageReadback({ reason: "video_team_not_applicable" });
+  }
+  const channel = guild.channels.cache.find(item => item.name === "〆・video-hub");
+  if (!channel?.isTextBased?.() || typeof channel.send !== "function") {
+    return failedParadiseMessageReadback({ reason: "video_team_channel_not_resolved" });
+  }
+
+  const state = await loadState();
+  const guildConfig = mergeParadiseCommunityAssetDefaults(configForGuild(state, guild.id), {
+    guildId: guild.id,
+    mode
+  });
+  const payload = paradiseCommunityVideoTeamPanelPayload({
+    color: guildConfig.brandColor,
+    language: guildLanguage(guildConfig),
+    bannerUrl: guildConfig.videoTeamBannerUrl || guildConfig.banners?.videoTeam
+  });
+  let message = guildConfig.videoTeamMessageId && typeof channel.messages?.fetch === "function"
+    ? await channel.messages.fetch(guildConfig.videoTeamMessageId).catch(() => null)
+    : null;
+  if (!message && typeof channel.messages?.fetch === "function") {
+    const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+    message = recent?.find?.(item => item.author?.id === guild.client?.user?.id
+      && item.embeds?.some?.(embed => embed.title === "✦ FIMA VIDEO TEAM")) || null;
+  }
+  if (message) await message.edit(payload); else message = await channel.send(payload);
+  await message.pin?.("FIMA canonical Video Team hub").catch(() => null);
+  await saveState(next => {
+    next.guildConfigs[guild.id] = mergeParadiseCommunityAssetDefaults(
+      next.guildConfigs[guild.id] || structuredClone(next.config || {}),
+      { guildId: guild.id, mode }
+    );
+    next.guildConfigs[guild.id].videoTeamMessageId = message.id;
+    if (guild.id === PARADISE_TEST_GUILD_ID) next.config = structuredClone(next.guildConfigs[guild.id]);
+    return next;
+  });
+  const embed = paradisePayloadFirstEmbed(payload);
+  return verifyParadiseMessageReadback(channel, message, {
+    botUserId: guild.client?.user?.id,
+    expectedTitle: embed.title,
+    expectedBannerUrl: embed.image?.url
+  });
 }
 
 async function publishAllGuides(guild, mode) {
-  let posted = 0;
-  if (await publishSetupGuides(guild, mode)) posted += 1;
-  for (const definition of GUIDE_POSTS) {
-    if (await publishGuidePost(guild, definition).catch(() => false)) posted += 1;
+  if (isFimaCommunityManagedGuild(guild?.id) && mode === "community") {
+    await saveState(state => {
+      state.guildConfigs[guild.id] = mergeParadiseCommunityAssetDefaults(
+        state.guildConfigs[guild.id] || structuredClone(state.config || {}),
+        { guildId: guild.id, mode }
+      );
+      if (guild.id === PARADISE_TEST_GUILD_ID) state.config = structuredClone(state.guildConfigs[guild.id]);
+      return state;
+    });
   }
-  return { posted, mode };
+  const details = [];
+  const collect = (key, result) => {
+    const sanitized = sanitizeParadiseMessageReadback(result, key);
+    details.push(sanitized);
+    return sanitized;
+  };
+  const runPublisher = async (key, publisher) => {
+    try {
+      return collect(key, await publisher());
+    } catch {
+      return collect(key, failedParadiseMessageReadback({ reason: "publisher_failed" }));
+    }
+  };
+
+  await runPublisher("member_help", () => publishSetupGuides(guild, mode));
+  for (const definition of GUIDE_POSTS) {
+    await runPublisher(definition.key, () => publishGuidePost(guild, definition));
+  }
+  if (isFimaCommunityManagedGuild(guild?.id) && mode === "community") {
+    await runPublisher("video_team", () => updateParadiseCommunityVideoTeamPanel(guild, mode));
+  }
+  const required = details.length;
+  const posted = details.filter(item => item.posted).length;
+  const verified = details.filter(item => item.verified).length;
+  return {
+    posted,
+    verified,
+    required,
+    ready: required > 0 && verified === required,
+    mode,
+    details
+  };
 }
 
 export async function publishParadiseGuidesFromDashboard(guild, mode = "clan") {
@@ -8547,12 +12900,21 @@ export async function publishParadiseGuidesFromDashboard(guild, mode = "clan") {
     error.code = "invalid_paradise_setup_mode";
     throw error;
   }
-  return paradiseGuildContext.run(guild.id, () => publishAllGuides(guild, mode));
+  return withParadiseGuildMutationLock(guild, "publish_guides", async () => {
+    await updateParadiseMutationLease({ phase: "publishing_guides" });
+    return paradiseGuildContext.run(guild.id, () => publishAllGuides(guild, mode));
+  }, {
+    purposeKey: "discord_publish_guides",
+    idempotencyKey: `${guild.id}:${mode}:publish-guides`,
+    phase: "request_validated"
+  });
 }
 
 export async function syncParadiseMappedPanels(guild) {
   if (!guild) throw Object.assign(new Error("paradise_guild_unavailable"), { code: "paradise_guild_unavailable" });
-  return paradiseGuildContext.run(guild.id, async () => {
+  return withParadiseGuildMutationLock(guild, "sync_panels", async () => {
+    await updateParadiseMutationLease({ phase: "syncing_mapped_panels" });
+    return paradiseGuildContext.run(guild.id, async () => {
     const state = await loadState();
     const config = configForGuild(state, guild.id);
     const details = [];
@@ -8564,7 +12926,7 @@ export async function syncParadiseMappedPanels(guild) {
       : null;
     if (challengeChannel?.isTextBased?.()) {
       await postChallengeCreatePanel(guild, challengeChannel);
-      details.push({ panel: "challenge_create", channelId: challengeChannel.id, status: "updated" });
+      details.push({ panel: "challenge_create", status: "updated" });
       updated += 1;
     } else {
       details.push({ panel: "challenge_create", status: "skipped", reason: "not_mapped" });
@@ -8572,17 +12934,34 @@ export async function syncParadiseMappedPanels(guild) {
     }
     for (const definition of GUIDE_POSTS) {
       const mappingKey = GUIDE_MAPPING_KEYS[definition.key];
-      if (!mappingKey || !config.channelMappings?.[mappingKey]) continue;
-      const ok = await publishGuidePost(guild, definition).catch(() => false);
-      details.push({ panel: definition.key, channelId: config.channelMappings[mappingKey], status: ok ? "updated" : "skipped" });
-      if (ok) updated += 1; else skipped += 1;
+      if (mappingKey && !config.channelMappings?.[mappingKey]) continue;
+      if (!mappingKey) {
+        const exactChannel = guild.channels.cache.find(item =>
+          item.name === definition.channel && item.isTextBased?.()
+        );
+        if (!exactChannel) continue;
+      }
+      let guide;
+      try {
+        guide = await publishGuidePost(guild, definition);
+      } catch {
+        guide = failedParadiseMessageReadback({ reason: "publisher_failed" });
+      }
+      const readback = sanitizeParadiseMessageReadback(guide);
+      details.push({ panel: definition.key, status: guide.ready ? "updated" : "skipped", ...readback });
+      if (guide.ready) updated += 1; else skipped += 1;
     }
     if (config.channelMappings?.availability_channel) {
       const panel = await updateAvailabilityPanel(guild).catch(() => null);
-      details.push({ panel: "availability", channelId: config.channelMappings.availability_channel, status: panel ? "updated" : "skipped" });
+      details.push({ panel: "availability", status: panel ? "updated" : "skipped" });
       if (panel) updated += 1; else skipped += 1;
     }
-    return { updated, skipped, details };
+      return { updated, skipped, details };
+    });
+  }, {
+    purposeKey: "discord_sync_mapped_panels",
+    idempotencyKey: `${guild.id}:sync-mapped-panels`,
+    phase: "request_validated"
   });
 }
 
@@ -8609,7 +12988,7 @@ async function updateRelationsPanel(guild) {
   const guildConfig = configForGuild(state, guild.id);
   const relationSettings = guildConfig.relationSettings || {};
   const relationState = state.relations?.[guild.id] || (state.relations?.allies || state.relations?.enemies ? state.relations : {});
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🤝 PARADISE CLAN RELATIONS")
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("🤝 FIMA BOT CLAN RELATIONS")
     .setDescription("Relations are managed by authorized clan leadership and update automatically.")
     .addFields(
       { name: "◆ __Currently Allies__", value: relationshipLines(relationState.allies, relationSettings).slice(0, 1024) },
@@ -8932,7 +13311,7 @@ async function handleFindFcw(interaction) {
     return interaction.reply({ content: "War Hoster or owner role required.", ephemeral: true });
   }
   return interaction.reply({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ FCW SEARCH OPEN")
-    .setDescription(`## ◆ Request\n- **Region:** ${interaction.options.getString("region").toUpperCase()}\n- **Format:** ${interaction.options.getString("format") || "Flexible"}\n\n> Paradise only contacts clans that explicitly opted into the FCW directory.\n\n-# No server scraping • No unsolicited DMs`)
+    .setDescription(`## ◆ Request\n- **Region:** ${interaction.options.getString("region").toUpperCase()}\n- **Format:** ${interaction.options.getString("format") || "Flexible"}\n\n> FIMA Bot only contacts clans that explicitly opted into the FCW directory.\n\n-# No server scraping • No unsolicited DMs`)
     .setFooter(paradiseFooter("Opt-in matching"))] });
 }
 
@@ -8964,7 +13343,7 @@ async function postChallengeCreatePanel(guild, channel) {
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
   const payload = {
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⚔️ CREATE A RANKED CHALLENGE")
-      .setDescription("# Ready to challenge?\nParadise will check your completed profile, leaderboard range, cooldown, opponent immunity, LOA and open tickets.\n\n## ◆ Before you continue\n- Record the complete set.\n- Keep evidence inside the ticket.\n- Result approval is restricted to senior referee roles.\n\n-# Hedef seçimi ve ticket açılışı sırasında durum iki kez kontrol edilir.")
+      .setDescription("# Ready to challenge?\nFIMA Bot will check your completed profile, leaderboard range, cooldown, opponent immunity, LOA and open tickets.\n\n## ◆ Before you continue\n- Record the complete set.\n- Keep evidence inside the ticket.\n- Result approval is restricted to senior referee roles.\n\n-# Hedef seçimi ve ticket açılışı sırasında durum iki kez kontrol edilir.")
       .setFooter(paradiseFooter("Guided challenge flow"))],
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("paradise_challenge_open").setLabel("Choose an eligible opponent").setStyle(ButtonStyle.Primary)
@@ -9038,7 +13417,7 @@ function paradiseLogTypeForMapping(mappingKey = "") {
 export function buildParadiseSafeLogEvent({
   guildId,
   type = "setup",
-  title = "Paradise event",
+  title = "FIMA Bot event",
   description = "",
   metadata = {},
   correlationId = crypto.randomUUID(),
@@ -9051,7 +13430,7 @@ export function buildParadiseSafeLogEvent({
     id: crypto.randomUUID(),
     guildId: String(guildId || ""),
     type: safeType,
-    title: redactParadiseLogValue(String(title || "Paradise event")).slice(0, 256),
+    title: redactParadiseLogValue(String(title || "FIMA Bot event")).slice(0, 256),
     description: redactParadiseLogValue(String(description || "")).slice(0, 1800),
     metadata: redactParadiseLogValue(metadata),
     correlationId: String(correlationId || crypto.randomUUID()).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96),
@@ -9102,6 +13481,7 @@ async function logParadiseAction(guild, mappingKey, fallbackName, title, descrip
       return next;
     });
   }
+  if (!fimaRuntimeModuleAllowed(configForGuild(state, guild?.id), 'logs')) return event;
   const channel = await configuredChannel(guild, mappingKey, fallbackName);
   if (!channel?.isTextBased?.()) return null;
   return channel.send({
@@ -9120,7 +13500,7 @@ async function updateLineupPanel(guild, board) {
   const guildConfig = configForGuild(state, guild.id);
   const messageKey = `${board}LineupMessageId`;
   let message = guildConfig[messageKey] ? await channel.messages.fetch(guildConfig[messageKey]).catch(() => null) : null;
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(board === "war" ? "⚔ PARADISE WAR LINEUP" : "♟ PARADISE MAIN LINEUP")
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(board === "war" ? "⚔ FIMA BOT WAR LINEUP" : "♟ FIMA BOT MAIN LINEUP")
     .setDescription(entries.length
       ? entries.map((entry, index) => `**${index + 1}.** <@${entry.userId}>${entry.role ? ` · **${entry.role}**` : ""}${entry.note ? `\n-# ${entry.note}` : ""}`).join("\n")
       : "_No members assigned yet._")
@@ -9206,7 +13586,7 @@ async function updateRosterPanel(guild) {
   const description = entries.length
     ? entries.map(item => `**${item.region}** · <@${item.userId}>${item.rank ? ` · **${item.rank}**` : ""}${item.main ? ` · ${item.main}` : ""}${item.note ? `\n-# ${item.note}` : ""}`).join("\n").slice(0, 3900)
     : "_Roster is currently empty._";
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("♟ PARADISE COMPETITIVE ROSTER").setDescription(description).setFooter(paradiseFooter("Managed with /roster")).setTimestamp();
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("♟ FIMA BOT COMPETITIVE ROSTER").setDescription(description).setFooter(paradiseFooter("Managed with /roster")).setTimestamp();
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
   await saveState(next => {
     next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
@@ -9265,8 +13645,8 @@ async function updateBlacklistPanel(guild) {
   let message = guildConfig.blacklistMessageId ? await channel.messages.fetch(guildConfig.blacklistMessageId).catch(() => null) : null;
   const description = records.length
     ? records.map(item => `<@${item.userId}> — ${item.reason}\n-# Added <t:${Math.floor(Date.parse(item.createdAt) / 1000)}:R>`).join("\n\n").slice(0, 3900)
-    : "_No active Paradise blacklist records._";
-  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⊘ PARADISE BLACKLIST").setDescription(description).setFooter(paradiseFooter("Evidence-backed records only")).setTimestamp();
+    : "_No active FIMA Bot blacklist records._";
+  const embed = new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle("⊘ FIMA BOT BLACKLIST").setDescription(description).setFooter(paradiseFooter("Evidence-backed records only")).setTimestamp();
   if (message) await message.edit({ embeds: [embed] }); else message = await channel.send({ embeds: [embed] });
   await saveState(next => {
     next.guildConfigs[guild.id] = next.guildConfigs[guild.id] || structuredClone(next.config || {});
@@ -9352,7 +13732,7 @@ export async function createBlacklistAppealPrivateReview({
       type: ChannelType.PrivateThread,
       autoArchiveDuration: 1440,
       invitable: false,
-      reason: "Paradise private blacklist appeal"
+      reason: "FIMA Bot private blacklist appeal"
     });
     if (
       !thread?.id
@@ -9392,8 +13772,8 @@ async function handleBlacklist(interaction) {
     const user = interaction.options.getUser("user") || interaction.user;
     const record = (await loadState()).blacklists?.[interaction.guildId]?.[user.id];
     const summary = record?.status === "active"
-      ? `${user} has an active Paradise blacklist record from <t:${Math.floor(Date.parse(record.createdAt) / 1000)}:R>. Use the private appeal flow for review.`
-      : `${user} does not have an active Paradise blacklist record in this server.`;
+      ? `${user} has an active FIMA Bot blacklist record from <t:${Math.floor(Date.parse(record.createdAt) / 1000)}:R>. Use the private appeal flow for review.`
+      : `${user} does not have an active FIMA Bot blacklist record in this server.`;
     return interaction.reply({ content: summary, ephemeral: true });
   }
   if (!canManageBlacklist(interaction.member)) return interaction.reply({ content: "Blacklist manager or security authority required.", ephemeral: true });
@@ -9428,16 +13808,16 @@ async function handleBlacklist(interaction) {
   let roleChanged = !targetMember;
   if (blacklistedRole && targetMember) {
     if (sub === "remove") {
-      roleChanged = await targetMember.roles.remove(blacklistedRole, "Paradise blacklist resolved").then(() => true).catch(() => false);
+      roleChanged = await targetMember.roles.remove(blacklistedRole, "FIMA Bot blacklist resolved").then(() => true).catch(() => false);
     } else {
-      roleChanged = await targetMember.roles.add(blacklistedRole, "Paradise blacklist active").then(() => true).catch(() => false);
+      roleChanged = await targetMember.roles.add(blacklistedRole, "FIMA Bot blacklist active").then(() => true).catch(() => false);
     }
   }
   await updateBlacklistPanel(interaction.guild).catch(() => {});
   await logParadiseAction(interaction.guild, "blacklist_logs_channel", "blacklist-logs", "Blacklist record updated",
     `${user} record was **${sub === "remove" ? "resolved" : "created"}** by <@${interaction.user.id}>.\n**Reason:** ${reason}`);
   return interaction.reply({
-    content: `${user} blacklist record ${sub === "remove" ? "resolved" : "created"}.${roleChanged ? "" : " Warning: the record was saved, but the BLACKLISTED role could not be changed. Move Paradise above that role and repair permissions."}`,
+    content: `${user} blacklist record ${sub === "remove" ? "resolved" : "created"}.${roleChanged ? "" : " Warning: the record was saved, but the BLACKLISTED role could not be changed. Move FIMA Bot above that role and repair permissions."}`,
     ephemeral: true
   });
 }
@@ -9532,7 +13912,7 @@ async function handleAppeal(interaction) {
     const blacklistedRole = interaction.guild.roles.cache.find(role => role.name === "BLACKLISTED");
     const targetMember = await interaction.guild.members.fetch(user.id).catch(() => null);
     if (blacklistedRole && targetMember) {
-      roleRemoved = await targetMember.roles.remove(blacklistedRole, "Paradise appeal approved").then(() => true).catch(() => false);
+      roleRemoved = await targetMember.roles.remove(blacklistedRole, "FIMA Bot appeal approved").then(() => true).catch(() => false);
     }
   }
   await updateBlacklistPanel(interaction.guild).catch(() => {});
@@ -9548,7 +13928,7 @@ async function handleBail(interaction) {
   if (!canManageBlacklist(interaction.member)) return interaction.reply({ content: "Owner, blacklist manager or security authority required.", ephemeral: true });
   const state = await loadState();
   if (configForGuild(state, interaction.guildId).blacklist?.bailEnabled !== true) {
-    return interaction.reply({ content: "Bail review is disabled for this server in the Paradise dashboard.", ephemeral: true });
+    return interaction.reply({ content: "Bail review is disabled for this server in the FIMA Bot dashboard.", ephemeral: true });
   }
   const sub = interaction.options.getSubcommand();
   const user = interaction.options.getUser("user");
@@ -9583,7 +13963,7 @@ async function handleSetChannel(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
   const key = interaction.options.getSubcommand();
   if (!PARADISE_CHANNEL_MAPPINGS.some(([name]) => name === key)) {
-    return interaction.reply({ content: "Unknown Paradise channel mapping.", ephemeral: true });
+    return interaction.reply({ content: "Unknown FIMA Bot channel mapping.", ephemeral: true });
   }
   const channel = interaction.options.getChannel("channel");
   await saveState(state => {
@@ -9605,7 +13985,7 @@ async function handleHandbook(interaction) {
   if (!isOwner(interaction)) return interaction.reply({ content: "Owner only.", ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
   const mode = interaction.options.getString("template");
-  const result = await publishAllGuides(interaction.guild, mode);
+  const result = await publishParadiseGuidesFromDashboard(interaction.guild, mode);
   return interaction.editReply(`Handbook regeneration complete: **${result.posted}** guide messages updated or created.`);
 }
 
@@ -9655,7 +14035,7 @@ function paradiseRegistryDenialMessage(code, locale) {
     command_not_registered_for_template: tr ? "Bu komut seçili sunucu şablonunda etkin değil." : "This command is not enabled for this server template.",
     command_not_available_for_template: tr ? "Bu komut seçili sunucu şablonunda etkin değil." : "This command is not enabled for this server template.",
     command_module_disabled: tr ? "Bu modül bu sunucuda kapalı." : "This module is disabled for this server.",
-    command_plan_required: tr ? "Bu komut seçili Paradise planını gerektiriyor." : "This command requires the selected Paradise plan.",
+    command_plan_required: tr ? "Bu komut seçili FIMA Bot planını gerektiriyor." : "This command requires the selected FIMA Bot plan.",
     command_wrong_channel: tr ? "Bu komutu yapılandırılmış kanalda kullan." : "Use this command in its configured channel.",
     command_permission_denied: tr ? "Bu komut için gerekli rol veya yetki sende yok." : "You do not have the required role or permission for this command."
   };
@@ -9741,7 +14121,7 @@ async function handleBranding(interaction) {
   }
   const color = normalizeParadiseBrandColor(configForGuild(await loadState(), interaction.guildId).brandColor);
   return interaction.reply({
-    embeds: [new EmbedBuilder().setColor(paradiseBrandColorInteger(color)).setTitle("✦ PARADISE STYLE PREVIEW")
+    embeds: [new EmbedBuilder().setColor(paradiseBrandColorInteger(color)).setTitle("✦ FIMA BOT STYLE PREVIEW")
       .setDescription("# Primary heading\n## ◆ Clear section\n### ◇ Supporting detail\n\n**Bold priority** • __Underlined label__ • _soft emphasis_\n\n- Clean bullet hierarchy\n- Consistent spacing\n- Short, readable sections\n\n> Important callout text stays visually separate.\n\n-# This smaller line is Discord subtext.")
       .addFields(
         { name: "Current accent", value: `\`${color}\``, inline: true },
@@ -9800,7 +14180,7 @@ async function handleParadiseMessageInner(message) {
     isOwner: message.guild.ownerId === message.author.id,
     config: guildConfig.automod || {}
   });
-  if (safety.blocked && guildConfig.automod?.runtimeSafety !== false) {
+  if (fimaRuntimeModuleAllowed(guildConfig, "security") && safety.blocked && guildConfig.automod?.runtimeSafety !== false) {
     await message.delete().catch(() => null);
     await logParadiseAction(message.guild, "security_logs_channel", "security-logs", "Message safety action",
       `A message was quarantined by the runtime safety policy. Reason: **${safety.reason}**.`, {
@@ -9809,10 +14189,10 @@ async function handleParadiseMessageInner(message) {
       }).catch(() => null);
     return true;
   }
-  const qotdWon = await handleQotdAnswer(message, state);
+  const qotdWon = fimaRuntimeModuleAllowed(guildConfig, "events") ? await handleQotdAnswer(message, state) : false;
   await handleMemberLevelMessage(message);
   const sticky = guildConfig.stickies?.[message.channelId];
-  if (!sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return qotdWon;
+  if (!fimaRuntimeModuleAllowed(guildConfig, "content") || !sticky || Date.now() - Number(sticky.lastSentAt || 0) < 15_000) return qotdWon;
   if (sticky.messageId) await message.channel.messages.delete(sticky.messageId).catch(() => {});
   const sent = await message.channel.send({ embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setDescription(sticky.text).setFooter(paradiseFooter("Sticky guide"))] });
   await saveState(next => {
@@ -9828,12 +14208,16 @@ export async function handleParadiseMessage(message) {
   return paradiseGuildContext.run(message.guild?.id || null, () => handleParadiseMessageInner(message));
 }
 
-async function updateStaffTeamEmbed(guild) {
-  const channel = paradiseTextChannelByName(guild, "staff-team", "personel-merkezi");
-  if (!channel) return null;
-  await guild.members.fetch().catch(() => {});
+async function updateStaffTeamEmbed(guild, requestedMode = null) {
   const state = await loadState();
-  const guildConfig = configForGuild(state, guild.id);
+  const storedGuildConfig = configForGuild(state, guild.id);
+  const mode = requestedMode || storedGuildConfig.activeSetupMode || null;
+  const guildConfig = mergeParadiseCommunityAssetDefaults(storedGuildConfig, { guildId: guild.id, mode });
+  const channel = paradiseTextChannelByName(guild, "staff-team", "personel-merkezi", "〆・staff-hub", "staff-hub");
+  if (!channel?.isTextBased?.()) {
+    return failedParadiseMessageReadback({ reason: "staff_team_channel_not_resolved" });
+  }
+  await guild.members.fetch().catch(() => {});
   const language = guildLanguage(guildConfig);
   const color = await paradiseBrandColor();
   const groups = [
@@ -9858,7 +14242,7 @@ async function updateStaffTeamEmbed(guild) {
   };
   const intro = new EmbedBuilder()
     .setColor(color)
-    .setTitle("✦ PARADISE STAFF TEAM")
+    .setTitle(mode === "community" ? "✦ FIMA STAFF TEAM" : "✦ FIMA BOT STAFF TEAM")
     .setDescription(language === "tr"
       ? [
         "# Staff Directory",
@@ -9872,8 +14256,8 @@ async function updateStaffTeamEmbed(guild) {
         "",
         "-# Check staff-command-guide and mod-command-guide for command details."
       ].join("\n"));
-  const banner = String(guildConfig.staffTeamBannerUrl || guildConfig.banners?.staffTeam || "").trim();
-  if (/^https?:\/\//i.test(banner)) intro.setImage(banner);
+  const banner = sanitizeParadiseHttpsUrl(guildConfig.staffTeamBannerUrl || guildConfig.banners?.staffTeam);
+  if (banner) intro.setImage(banner);
   intro.setFooter(paradiseFooter(language === "tr" ? "Staff dizini" : "Staff directory")).setTimestamp();
   const embeds = [intro];
   for (const group of groups) {
@@ -9899,10 +14283,15 @@ async function updateStaffTeamEmbed(guild) {
     next.guildConfigs[guild.id].staffTeamMessageId = message.id;
     return next;
   });
-  return message;
+  return verifyParadiseMessageReadback(channel, message, {
+    botUserId: guild.client?.user?.id,
+    expectedTitle: paradisePayloadFirstEmbed({ embeds: [intro] }).title,
+    expectedBannerUrl: banner
+  });
 }
 
 export async function handleParadiseGuildMemberUpdate(oldMember, newMember) {
+  if (!fimaRuntimeModuleAllowed(configForGuild(await loadState(), newMember.guild.id), 'roles')) return false;
   if (oldMember.roles.cache.size === newMember.roles.cache.size
     && [...oldMember.roles.cache.keys()].every(id => newMember.roles.cache.has(id))) return false;
   clearTimeout(staffTeamRefreshTimers.get(newMember.guild.id));
@@ -9915,10 +14304,28 @@ export async function handleParadiseGuildMemberUpdate(oldMember, newMember) {
   return true;
 }
 
-function localizedHelp(locale) {
-  return String(locale).toLowerCase().startsWith("tr")
-    ? "Komutlar: `/verifyroblox`, `/tryout start`, `/tryout result`, `/paradisetraining start`, `/challenge create`. Sonuçlar doğrulama ve yetki sınırlarından geçer."
-    : "Commands: `/verifyroblox`, `/tryout start`, `/tryout result`, `/paradisetraining start`, `/challenge create`. Results pass verification and authority checks.";
+function localizedHelpLegacy(locale, template = "clan") {
+  const tr = String(locale).toLowerCase().startsWith("tr");
+  if (template === "community") {
+    return tr
+      ? "FIMA komutları: `/help`, `/ticket`, `/application apply type:helper`. `/help` yalnız sana açık komutları gösterir. Text ve voice aylık Top 3 ödülleri ayrı ayrı 15/10/7 FIMA Macro günüdür; her boost 3 gün ekler."
+      : "FIMA commands: `/help`, `/ticket`, `/application apply type:helper`. `/help` shows only commands available to you. Monthly text and voice Top 3 rewards are 15/10/7 FIMA Macro days per board; every boost adds 3 days.";
+  }
+  return tr
+    ? "Komutlar: `/verifyroblox`, `/tryout start`, `/tryout result`, `/training start`, `/challenge create`. Sonuçlar doğrulama ve yetki sınırlarından geçer."
+    : "Commands: `/verifyroblox`, `/tryout start`, `/tryout result`, `/training start`, `/challenge create`. Results pass verification and authority checks.";
+}
+
+export function localizedHelp(locale, template = "clan") {
+  const tr = String(locale).toLowerCase().startsWith("tr");
+  if (template === "community") {
+    return tr
+      ? "FIMA komutlar\u0131: `/help`, `/ticket`, `/application apply`. Web formunda staff, creator, partnership veya reseller t\u00fcr\u00fcn\u00fc se\u00e7ebilirsin. `/help` yaln\u0131z sana a\u00e7\u0131k komutlar\u0131 g\u00f6sterir. Text ve voice ayl\u0131k Top 3 \u00f6d\u00fclleri ayr\u0131 ayr\u0131 15/10/7 FIMA Macro g\u00fcn\u00fcd\u00fcr; her boost 3 g\u00fcn ekler."
+      : "FIMA commands: `/help`, `/ticket`, `/application apply`. Choose staff, creator, partnership or reseller in the website form. `/help` shows only commands available to you. Monthly text and voice Top 3 rewards are 15/10/7 FIMA Macro days per board; every boost adds 3 days.";
+  }
+  return tr
+    ? "Komutlar: `/verifyroblox`, `/tryout start`, `/tryout result`, `/training start`, `/challenge create`. Sonu\u00e7lar do\u011frulama ve yetki s\u0131n\u0131rlar\u0131ndan ge\u00e7er."
+    : "Commands: `/verifyroblox`, `/tryout start`, `/tryout result`, `/training start`, `/challenge create`. Results pass verification and authority checks.";
 }
 
 const ROLE_PANEL_OPTIONS = Object.freeze({
@@ -9945,7 +14352,41 @@ const ROLE_PANEL_OPTIONS = Object.freeze({
   ]
 });
 
-function rolePanelCopy(kind, language = "tr") {
+const COMMUNITY_NOTIFICATION_ROLE_OPTIONS = Object.freeze([
+  { id: "product", role: "Product Notifications", labelTr: "Ürünler", labelEn: "Products", emoji: "🛍️" },
+  { id: "fima", role: "FIMA Updates", labelTr: "FIMA", labelEn: "FIMA", emoji: "◆" },
+  { id: "macro", role: "FIMA Macro Updates", labelTr: "FIMA Macro", labelEn: "FIMA Macro", emoji: "⌨️" },
+  { id: "ai", role: "FIMA AI Updates", labelTr: "FIMA AI", labelEn: "FIMA AI", emoji: "🧠" },
+  { id: "fieel", role: "Fieel Content Notifications", labelTr: "Fieel İçerik", labelEn: "Fieel Content", emoji: "🎬" },
+  { id: "tatu", role: "Tatu Content Notifications", labelTr: "Tatu İçerik", labelEn: "Tatu Content", emoji: "📹" },
+  { id: "event", role: "Event Notifications", labelTr: "Etkinlikler", labelEn: "Events", emoji: "🎉" },
+  { id: "security", role: "Security Alerts", labelTr: "Güvenlik", labelEn: "Security", emoji: "🛡️" }
+]);
+
+const LEGACY_PING_ROLE_OPTIONS = Object.freeze([
+  { value: "Training", role: "Training Ping" },
+  { value: "Tournament", role: "Tournament Ping" },
+  { value: "Event", role: "Event Ping" },
+  { value: "Giveaway", role: "Giveaway Ping" },
+  { value: "Game Night", role: "Game Night Ping" }
+]);
+
+export function rolePanelOptionsForTemplate(kind, template = "clan") {
+  if (kind === "ping" && template === "community") return COMMUNITY_NOTIFICATION_ROLE_OPTIONS;
+  return ROLE_PANEL_OPTIONS[kind] || [];
+}
+
+export function legacyPingRoleOptionsForTemplate(template = "clan") {
+  if (template === "community") {
+    // Existing Community panels may still submit the old "Event" value. Map
+    // only that non-competitive choice; never create or remove old competitive
+    // memberships during compatibility handling.
+    return Object.freeze([{ value: "Event", role: "Event Notifications" }]);
+  }
+  return LEGACY_PING_ROLE_OPTIONS;
+}
+
+export function rolePanelCopy(kind, language = "tr", template = "clan") {
   const tr = language === "tr";
   if (kind === "language") {
     return {
@@ -9958,9 +14399,13 @@ function rolePanelCopy(kind, language = "tr") {
   if (kind === "region") {
     return {
       title: tr ? "◆ Bölge Rolleri" : "◆ Region Roles",
-      description: tr
-        ? "Kendi bölgeni seç. Bölge rolleri matchmaking, etkinlik ve duyuru filtrelerinde kullanılır."
-        : "Pick your region. Region roles are used for matchmaking, events and announcement filters."
+      description: template === "community"
+        ? (tr
+          ? "Kendi bölgeni seç. Bölge rolleri etkinlikleri, topluluk buluşmalarını ve ilgili duyuruları sana göre düzenler."
+          : "Pick your region. Region roles tailor events, community meetups and relevant announcements to you.")
+        : (tr
+          ? "Kendi bölgeni seç. Bölge rolleri matchmaking, etkinlik ve duyuru filtrelerinde kullanılır."
+          : "Pick your region. Region roles are used for matchmaking, events and announcement filters.")
     };
   }
   return {
@@ -9971,8 +14416,8 @@ function rolePanelCopy(kind, language = "tr") {
   };
 }
 
-function rolePanelRows(kind, language = "tr") {
-  const options = ROLE_PANEL_OPTIONS[kind] || [];
+export function rolePanelRows(kind, language = "tr", template = "clan") {
+  const options = rolePanelOptionsForTemplate(kind, template);
   const rows = [];
   for (let index = 0; index < options.length; index += 5) {
     rows.push(new ActionRowBuilder().addComponents(
@@ -9988,20 +14433,21 @@ function rolePanelRows(kind, language = "tr") {
   return rows;
 }
 
-async function sendRolePanel(interaction, kind) {
+async function sendRolePanel(interaction, kind, template = "clan") {
   const state = await loadState();
   const language = guildLanguage(configForGuild(state, interaction.guildId));
-  const copy = rolePanelCopy(kind, language);
+  const copy = rolePanelCopy(kind, language, template);
+  const visibleBrand = template === "community" ? "FIMA" : "FIMA Bot";
   const embed = new EmbedBuilder()
     .setColor(await paradiseBrandColor())
     .setTitle(copy.title)
-    .setDescription(`${copy.description}\n\n-# ${language === "tr" ? "Rol panelleri Paradise tarafından yerinde güncellenir." : "Role panels are updated in place by Paradise."}`)
+    .setDescription(`${copy.description}\n\n-# ${language === "tr" ? `Rol panelleri ${visibleBrand} tarafından yerinde güncellenir.` : `Role panels are updated in place by ${visibleBrand}.`}`)
     .setFooter(paradiseFooter("Made By Fieel"));
-  await interaction.reply({ embeds: [embed], components: rolePanelRows(kind, language) });
+  await interaction.reply({ embeds: [embed], components: rolePanelRows(kind, language, template) });
 }
 
-async function handleRolePanelButton(interaction, kind, optionId) {
-  const options = ROLE_PANEL_OPTIONS[kind] || [];
+async function handleRolePanelButton(interaction, kind, optionId, template = "clan") {
+  const options = rolePanelOptionsForTemplate(kind, template);
   const option = options.find(item => item.id === optionId);
   if (!option) {
     await interaction.reply({ content: "This role option is no longer configured.", ephemeral: true });
@@ -10028,14 +14474,19 @@ async function handleRolePanelButton(interaction, kind, optionId) {
       await interaction.reply({ content: `Selected ${role.name}.`, ephemeral: true });
     }
   } catch {
+    const visibleBrand = template === "community" ? "FIMA" : "FIMA Bot";
     await interaction.reply({
-      content: "Paradise could not update that role. Check bot role position and Manage Roles permission.",
+      content: `${visibleBrand} could not update that role. Check bot role position and Manage Roles permission.`,
       ephemeral: true
     });
   }
 }
 
 async function handleParadiseInteractionInner(interaction) {
+  if (interaction.guildId && !fimaInteractionModuleAllowed(configForGuild(await loadState(), interaction.guildId), interaction)) {
+    await interaction.reply({ content: 'This FIMA module is disabled for this server.', ephemeral: true });
+    return true;
+  }
   if (interaction.isModalSubmit?.() && interaction.customId === "paradise_verify_modal") {
     await handleVerifyModal(interaction);
     return true;
@@ -10081,8 +14532,9 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_member_help_lang:")) {
       const [, locale, selectedId] = interaction.customId.split(":");
       const state = await loadState();
-      const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
-      const payload = memberHelpPayload(entries, locale, selectedId === "overview" ? null : selectedId);
+      const context = paradiseRegistryContextForInteraction(interaction, state);
+      const entries = memberHelpEntries(context);
+      const payload = memberHelpPayload(entries, locale, selectedId === "overview" ? null : selectedId, context.template);
       payload.embeds[0].setColor(await paradiseBrandColor());
       // This control may live on the canonical public help panel.  A personal
       // translation belongs to the clicker, not to everyone reading that
@@ -10150,12 +14602,16 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId === "paradise_setup_cancel") { await interaction.update({ content: "Setup cancelled.", embeds: [], components: [] }); return true; }
     if (interaction.customId.startsWith("paradise_help:")) {
       const scope = interaction.customId.split(":")[1];
-      await interaction.update({ embeds: [helpEmbed(scope, interaction.locale).setColor(await paradiseBrandColor())], components: helpComponents(scope) });
+      const state = await loadState();
+      const { template } = paradiseRegistryContextForInteraction(interaction, state);
+      await interaction.update({ embeds: [helpEmbed(scope, interaction.locale, template).setColor(await paradiseBrandColor())], components: helpComponents(scope, template) });
       return true;
     }
     if (interaction.customId.startsWith("paradise_help_lang:")) {
       const [, locale, scope] = interaction.customId.split(":");
-      await interaction.reply({ embeds: [helpEmbed(scope, locale).setColor(await paradiseBrandColor())], ephemeral: true });
+      const state = await loadState();
+      const { template } = paradiseRegistryContextForInteraction(interaction, state);
+      await interaction.reply({ embeds: [helpEmbed(scope, locale, template).setColor(await paradiseBrandColor())], ephemeral: true });
       return true;
     }
     if (interaction.customId.startsWith("paradise_loa_")) { await handleLoaDecision(interaction); return true; }
@@ -10165,8 +14621,11 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_activity_present:")) { await handleActivityResponse(interaction); return true; }
     if (interaction.customId.startsWith("paradise_support_")) { await handleParadiseSupportButton(interaction); return true; }
     if (interaction.customId === "paradise_application_open") {
-      const mode = configForGuild(await loadState(), interaction.guildId).activeSetupMode;
-      const types = APPLICATION_TYPES.filter(([value]) => applicationTypeAllowedForMode(value, mode));
+      const guildConfig = configForGuild(await loadState(), interaction.guildId);
+      const mode = guildConfig.activeSetupMode;
+      const types = APPLICATION_TYPES.filter(([value]) =>
+        applicationTypeAllowedForMode(value, mode, "staff")
+        || applicationTypeAllowedForMode(value, mode, "business"));
       const menu = new StringSelectMenuBuilder().setCustomId("paradise_application_type")
         .setPlaceholder("Choose application type / Basvuru turu").addOptions(
           types.map(([value, label]) => ({ value, label }))
@@ -10185,7 +14644,9 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_role_")) {
       const match = interaction.customId.match(/^paradise_role_(language|ping|region):(.+)$/);
       if (match) {
-        await handleRolePanelButton(interaction, match[1], match[2]);
+        const state = await loadState();
+        const { template } = paradiseRegistryContextForInteraction(interaction, state);
+        await handleRolePanelButton(interaction, match[1], match[2], template);
         return true;
       }
     }
@@ -10206,13 +14667,14 @@ async function handleParadiseInteractionInner(interaction) {
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_member_help") {
     const state = await loadState();
-    const entries = memberHelpEntries(paradiseRegistryContextForInteraction(interaction, state));
+    const context = paradiseRegistryContextForInteraction(interaction, state);
+    const entries = memberHelpEntries(context);
     const selectedId = interaction.values[0];
     if (!entries.some(entry => entry.id === selectedId)) {
       await interaction.reply({ content: "This help entry is no longer available to you.", ephemeral: true });
       return true;
     }
-    const payload = memberHelpPayload(entries, interaction.locale, selectedId);
+    const payload = memberHelpPayload(entries, interaction.locale, selectedId, context.template);
     payload.embeds[0].setColor(await paradiseBrandColor());
     // Command detail is role/personal-plan aware; keep the canonical panel
     // unchanged and show it privately.
@@ -10227,9 +14689,11 @@ async function handleParadiseInteractionInner(interaction) {
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId.startsWith("paradise_help_category")) {
     const scope = interaction.values[0];
+    const state = await loadState();
+    const { template } = paradiseRegistryContextForInteraction(interaction, state);
     await interaction.update({
-      embeds: [helpEmbed(scope, interaction.locale).setColor(await paradiseBrandColor())],
-      components: helpComponents(scope)
+      embeds: [helpEmbed(scope, interaction.locale, template).setColor(await paradiseBrandColor())],
+      components: helpComponents(scope, template)
     });
     return true;
   }
@@ -10238,7 +14702,10 @@ async function handleParadiseInteractionInner(interaction) {
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_application_type") {
-    await interaction.showModal(applicationModal(interaction.values[0], 0, "new"));
+    const guildConfig = configForGuild(await loadState(), interaction.guildId);
+    await interaction.showModal(applicationModal(
+      interaction.values[0], 0, "new", guildConfig.applicationSettings || {}
+    ));
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_support_category") {
@@ -10270,18 +14737,20 @@ async function handleParadiseInteractionInner(interaction) {
     return true;
   }
   if (interaction.isStringSelectMenu?.() && interaction.customId === "paradise_ping_roles") {
-    for (const label of ["Training", "Tournament", "Event", "Giveaway", "Game Night"]) {
-      const role = await ensureRole(interaction.guild, `${label} Ping`);
-      if (interaction.values.includes(label)) await interaction.member.roles.add(role); else if (interaction.member.roles.cache.has(role.id)) await interaction.member.roles.remove(role);
+    const state = await loadState();
+    const { template } = paradiseRegistryContextForInteraction(interaction, state);
+    for (const option of legacyPingRoleOptionsForTemplate(template)) {
+      const role = await ensureRole(interaction.guild, option.role);
+      if (interaction.values.includes(option.value)) await interaction.member.roles.add(role); else if (interaction.member.roles.cache.has(role.id)) await interaction.member.roles.remove(role);
     }
-    await interaction.reply({ content: "Paradise ping roles updated.", ephemeral: true }); return true;
+    await interaction.reply({ content: `${template === "community" ? "FIMA" : "FIMA Bot"} notification roles updated.`, ephemeral: true }); return true;
   }
   if (!interaction.isChatInputCommand?.()) return false;
   if (!(await enforceParadiseCommandRegistry(interaction)).allowed) return true;
   if (!await enforceCommandChannel(interaction)) return true;
   if (interaction.commandName === "setupfieels" || interaction.commandName === "previewserversetup") { await setupChooser(interaction); return true; }
   if (interaction.commandName === "backupserverstructure") { await setupPreview(interaction, "clan"); return true; }
-  if (interaction.commandName === "setupfieelscommunity") { await handleSetupAction(interaction, "community"); return true; }
+  if (interaction.commandName === "setupfima" || interaction.commandName === "setupfieelscommunity") { await handleSetupAction(interaction, "community"); return true; }
   if (interaction.commandName === "setupfieelsclan") { await handleSetupAction(interaction, "clan"); return true; }
   if (interaction.commandName === "setupfieelstsbtr") { await handleSetupAction(interaction, "tsbtr"); return true; }
   if (interaction.commandName === "setup") { await handleSetupAction(interaction, interaction.options.getString("mode") || "community"); return true; }
@@ -10290,15 +14759,25 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "verifyroblox") { await verifyStart(interaction); return true; }
   if (interaction.commandName === "verifyrobloxcheck") { await verifyCheck(interaction); return true; }
   if (interaction.commandName === "profile") { await handleProfile(interaction); return true; }
-  if (interaction.commandName === "paradisehelp") { await interaction.reply({ content: localizedHelp(interaction.locale), ephemeral: true }); return true; }
+  if (interaction.commandName === "paradisehelp") {
+    const state = await loadState();
+    const { template } = paradiseRegistryContextForInteraction(interaction, state);
+    await interaction.reply({ content: localizedHelp(interaction.locale, template), ephemeral: true }); return true;
+  }
   if (interaction.commandName === "sendlanguagequestion") {
-    await sendRolePanel(interaction, "language"); return true;
+    const state = await loadState();
+    const { template } = paradiseRegistryContextForInteraction(interaction, state);
+    await sendRolePanel(interaction, "language", template); return true;
   }
   if (interaction.commandName === "sendpingroleselector") {
-    await sendRolePanel(interaction, "ping"); return true;
+    const state = await loadState();
+    const { template } = paradiseRegistryContextForInteraction(interaction, state);
+    await sendRolePanel(interaction, "ping", template); return true;
   }
   if (interaction.commandName === "sendregionroleselector") {
-    await sendRolePanel(interaction, "region"); return true;
+    const state = await loadState();
+    const { template } = paradiseRegistryContextForInteraction(interaction, state);
+    await sendRolePanel(interaction, "region", template); return true;
   }
   if (interaction.commandName === "welcome") { await handleLifecyclePreview(interaction, "join"); return true; }
   if (interaction.commandName === "leave") { await handleLifecyclePreview(interaction, "leave"); return true; }
@@ -10338,7 +14817,7 @@ async function handleParadiseInteractionInner(interaction) {
   if (interaction.commandName === "security") { await handleSecurityCommand(interaction); return true; }
   if (interaction.commandName === "rank") { await handleRankCommand(interaction); return true; }
   if (interaction.commandName === "leaderboard") { await handleLeaderboardCommand(interaction); return true; }
-  if (interaction.commandName === "set" || interaction.commandName === "setlogchannel") { await handleSetChannel(interaction); return true; }
+  if (["set", "setlogchannel", "setcommunitychannel"].includes(interaction.commandName)) { await handleSetChannel(interaction); return true; }
   if (interaction.commandName === "handbook") { await handleHandbook(interaction); return true; }
   return false;
 }

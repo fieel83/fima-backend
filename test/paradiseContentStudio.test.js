@@ -75,6 +75,47 @@ test("save, load, overwrite, version history, and rollback preserve snapshots", 
   assert.equal(rolledBack.document.versions.length, 3);
 });
 
+test("explicitly clears saved delivery targets while omitted targets stay unchanged", () => {
+  const first = saveParadiseContentDocument(emptyParadiseContentStudioState(GUILD_ID), {
+    name: "Delivery target",
+    payload: { content: "Ready" },
+    targetChannelId: "1522709027715547226",
+    targetMessageId: "1522756261135777872"
+  }, {
+    actorId: ACTOR_ID,
+    now: new Date("2026-07-17T10:00:00.000Z"),
+    idFactory: (() => { const ids = ["delivery-target", "delivery-target-v1"]; return () => ids.shift(); })()
+  });
+
+  const cleared = saveParadiseContentDocument(first.state, {
+    id: first.document.id,
+    overwrite: true,
+    name: first.document.name,
+    payload: first.document.current,
+    targetChannelId: "",
+    targetMessageId: ""
+  }, {
+    actorId: ACTOR_ID,
+    now: new Date("2026-07-17T10:05:00.000Z"),
+    idFactory: () => "delivery-target-v2"
+  });
+  assert.equal(cleared.document.targetChannelId, null);
+  assert.equal(cleared.document.targetMessageId, null);
+
+  const omitted = saveParadiseContentDocument(first.state, {
+    id: first.document.id,
+    overwrite: true,
+    name: first.document.name,
+    payload: first.document.current
+  }, {
+    actorId: ACTOR_ID,
+    now: new Date("2026-07-17T10:10:00.000Z"),
+    idFactory: () => "delivery-target-v3"
+  });
+  assert.equal(omitted.document.targetChannelId, "1522709027715547226");
+  assert.equal(omitted.document.targetMessageId, "1522756261135777872");
+});
+
 test("supports multi-embed payloads and desktop/mobile previews", () => {
   const payload = { embeds: [{ title: "One" }, { title: "Two" }] };
   assert.equal(paradiseContentPreview(payload, "desktop").viewportWidth, 720);
@@ -284,6 +325,20 @@ test("keeps the imported Original immutable and enforces content stage transitio
   });
   assert.equal(production.document.stage, "production_version");
   assert.equal(production.document.originalSnapshot.payload.content, "Original owner message");
+
+  const rolledBack = rollbackParadiseContentDocument(production.state, {
+    documentId: first.document.id,
+    versionId: first.version.id
+  }, {
+    actorId: ACTOR_ID,
+    now: new Date("2026-07-17T10:20:00.000Z"),
+    idFactory: () => "rollback-to-imported-version"
+  });
+  assert.equal(rolledBack.document.stage, "imported");
+  assert.equal(rolledBack.document.current.content, "Original owner message");
+  assert.equal(rolledBack.document.originalSnapshot.payload.content, "Original owner message");
+  assert.equal(rolledBack.document.versions.length, 4);
+  assert.equal(rolledBack.document.versions.at(-1).id, "v_rollback-to-imported-version");
 });
 
 test("safe webhook policy rejects arbitrary URLs and disables mentions", () => {

@@ -5,8 +5,10 @@ import {
   buildFieelsCommunityStructureDraft,
   normalizeFieelsCommunityNamingStyle,
   reconcileFieelsCommunityRoles,
+  validateFieelsCommunityOperationalParity,
   validateFieelsCommunityStructureDraft
 } from "../src/fieelsCommunityStructure.js";
+import { buildParadiseCommunityOperationalSemantics } from "../src/paradise3a59.js";
 
 test("Fieel's Community draft contains one protected Turkish category", () => {
   const draft = buildFieelsCommunityStructureDraft({ language: "tr" });
@@ -34,11 +36,13 @@ test("naming hierarchy is coherent and role separators are permissionless", () =
 test("existing role and channel IDs are preserved without destructive actions", () => {
   const existingRoles = [
     { id: "role-tr", purposeKey: "turkish", name: "Türkçe" },
+    { id: "role-video", purposeKey: "video_team", name: "Video Team" },
     { id: "role-member", purposeKey: "member", name: "Member" },
     { id: "role-buyer", purposeKey: "buyer", name: "Buyer" }
   ];
   const existingChannels = [
-    { id: "channel-tr-chat", purposeKey: "turkish_chat", name: "eski-türk-sohbet" }
+    { id: "channel-tr-chat", purposeKey: "turkish_chat", name: "eski-türk-sohbet" },
+    { id: "channel-video-hub", purposeKey: "video_hub", name: "old-video-hub" }
   ];
   const draft = buildFieelsCommunityStructureDraft({ existingRoles, existingChannels });
   const turkishChat = draft.categories
@@ -47,6 +51,11 @@ test("existing role and channel IDs are preserved without destructive actions", 
   assert.equal(turkishChat.existingId, "channel-tr-chat");
   assert.equal(turkishChat.action, "rename_preserve_id");
   assert.equal(draft.roleReconciliation.mapped.find((role) => role.key === "turkish").existingId, "role-tr");
+  assert.equal(draft.roleReconciliation.mapped.find((role) => role.key === "video_team").existingId, "role-video");
+  assert.equal(
+    draft.categories.find((category) => category.key === "video_team").channels.find((channel) => channel.key === "video_hub").existingId,
+    "channel-video-hub"
+  );
   assert.deepEqual(draft.roleReconciliation.unrelated, [{ id: "role-buyer", name: "Buyer", action: "preserve_untouched" }]);
   assert.deepEqual(draft.roleReconciliation.destructiveActions, []);
 });
@@ -69,13 +78,61 @@ test("duplicate existing role purposes fail validation instead of replacing role
 test("all required permission personas are explicit", () => {
   const draft = buildFieelsCommunityStructureDraft();
   const personas = new Map(draft.personaMatrix.map((persona) => [persona.key, persona]));
-  assert.equal(personas.size, 8);
+  assert.equal(personas.size, 11);
   assert.equal(personas.get("new_member").turkishVisible, false);
+  assert.equal(personas.get("new_member").videoTeamVisible, false);
   assert.equal(personas.get("english_member").turkishVisible, false);
   assert.equal(personas.get("turkish_member").chatSend, true);
   assert.equal(personas.get("turkish_member").announcementsSend, false);
+  assert.equal(personas.get("turkish_member").videoTeamVisible, false);
+  assert.equal(personas.get("video_team").videoTeamVisible, true);
+  assert.equal(personas.get("video_editor").moderate, false);
+  assert.equal(personas.get("thumbnail_designer").videoTeamVisible, true);
   assert.equal(personas.get("helper").moderate, "assist_only");
+  assert.equal(personas.get("helper").videoTeamVisible, true);
   assert.equal(personas.get("owner").moderate, true);
+});
+
+test("private Video Team category is complete and hidden from everyone else", () => {
+  const draft = buildFieelsCommunityStructureDraft();
+  const videoTeam = draft.categories.find((category) => category.key === "video_team");
+  assert.ok(videoTeam);
+  assert.equal(videoTeam.access, "video_team");
+  assert.deepEqual(videoTeam.channels.map((channel) => channel.key), [
+    "video_hub",
+    "video_ideas",
+    "video_scripts",
+    "video_assets",
+    "video_review",
+    "video_upload_schedule",
+    "video_voice"
+  ]);
+  assert.deepEqual(videoTeam.channels.map((channel) => channel.type), [
+    "text", "text", "text", "text", "text", "text", "voice"
+  ]);
+  for (const channel of videoTeam.channels) {
+    assert.equal(channel.permissions.everyone.view, false);
+    assert.equal(channel.permissions.video_team.view, true);
+    assert.equal(channel.permissions.video_team.moderate, false);
+    assert.equal(channel.permissions.staff.view, true);
+    assert.equal(channel.permissions.staff.moderate, true);
+  }
+});
+
+test("Video Team roles are managed once under a permissionless separator", () => {
+  const draft = buildFieelsCommunityStructureDraft();
+  const group = draft.roleTree.find((separator) => separator.key === "video_team");
+  assert.ok(group);
+  assert.deepEqual(group.roles, ["video_team", "video_editor", "thumbnail_designer"]);
+  assert.equal(group.mentionable, false);
+  assert.equal(group.hoisted, false);
+  assert.deepEqual(group.permissions, []);
+  assert.deepEqual(group.members, []);
+
+  const managed = new Map(draft.roleReconciliation.mapped.map((role) => [role.key, role]));
+  assert.equal(managed.get("video_team").action, "create_if_approved");
+  assert.equal(managed.get("video_editor").action, "create_if_approved");
+  assert.equal(managed.get("thumbnail_designer").action, "create_if_approved");
 });
 
 test("unsafe or incomplete naming inputs fall back to the coherent identity family", () => {
@@ -97,4 +154,51 @@ test("unsafe or incomplete naming inputs fall back to the coherent identity fami
   assert.equal(draft.categories[0].channels[0].names.tr, "başlangıç");
   assert.equal(draft.roleTree[0].names.tr, "SAHİPLİK");
   assert.deepEqual(validateFieelsCommunityStructureDraft(draft), { ok: true, errors: [] });
+});
+
+test("canonical FT Community draft matches the runtime operational structure", () => {
+  const result = validateFieelsCommunityOperationalParity(
+    buildFieelsCommunityStructureDraft(),
+    buildParadiseCommunityOperationalSemantics()
+  );
+  assert.deepEqual(result, { ok: true, errors: [] });
+});
+
+test("operational parity rejects identity, category, type, access and mapping drift", () => {
+  const draft = buildFieelsCommunityStructureDraft();
+  const canonical = buildParadiseCommunityOperationalSemantics();
+  const clone = () => structuredClone(canonical);
+
+  const wrongIdentity = clone();
+  wrongIdentity.identity = "Legacy Community";
+  assert.ok(validateFieelsCommunityOperationalParity(draft, wrongIdentity).errors.includes(
+    "operational_identity_must_be_ft_community"
+  ));
+
+  const duplicateTurkish = clone();
+  duplicateTurkish.privateCategories.push(structuredClone(duplicateTurkish.privateCategories.find(
+    category => category.purpose === "turkish"
+  )));
+  assert.ok(validateFieelsCommunityOperationalParity(draft, duplicateTurkish).errors.includes(
+    "exactly_one_operational_turkish_category_required"
+  ));
+
+  const wrongVoice = clone();
+  wrongVoice.privateCategories.find(category => category.purpose === "video_team")
+    .channels.find(channel => channel.purpose === "video_voice").type = "text";
+  assert.ok(validateFieelsCommunityOperationalParity(draft, wrongVoice).errors.includes(
+    "operational_invalid_video_voice_type"
+  ));
+
+  const missingAccess = clone();
+  missingAccess.privateCategories.find(category => category.purpose === "staff").accessClasses = [];
+  assert.ok(validateFieelsCommunityOperationalParity(draft, missingAccess).errors.includes(
+    "operational_staff_missing_staff_access"
+  ));
+
+  const invalidMapping = clone();
+  invalidMapping.mappings.welcome = "missing-channel";
+  assert.ok(validateFieelsCommunityOperationalParity(draft, invalidMapping).errors.includes(
+    "operational_invalid_welcome_mapping"
+  ));
 });

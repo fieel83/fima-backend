@@ -1,6 +1,16 @@
 import { hasParadisePermission, PARADISE_PERMISSIONS } from "./paradiseRbac.js";
+import { fimaCanonicalModule, fimaModuleStates } from './fimaGuildArchitecture.js';
 
 const PLAN_ORDER = Object.freeze({ free: 0, pro: 1, premium: 2, network: 3 });
+
+// Old command entry points can still reach registration even when they are no
+// longer represented by the canonical registry. Community must fail closed for
+// every competitive command while Clan and TSBTR retain their own surfaces.
+const COMMUNITY_BLOCKED_LEGACY_COMMANDS = new Set([
+  "rank", "leaderboard",
+  "challenge", "training", "tryout", "referee",
+  "lineup", "roster", "availability", "spar", "war"
+]);
 
 const entry = (id, command, options) => Object.freeze({
   id, command, subcommand: null, description: "", templateScope: ["community", "clan", "tsbtr"],
@@ -41,9 +51,9 @@ export const PARADISE_COMMAND_REGISTRY = Object.freeze([
   entry("CMD-REFEREE-POST", "challenge", { subcommand: "post", description: "Submits a structured challenge score post.", templateScope: ["clan", "tsbtr"], requiredModule: "referee", requiredParadisePermission: PARADISE_PERMISSIONS.REFEREE_WORK, allowedChannels: ["challenge_ticket"], examples: ["/challenge post winner:@player loser:@player score:10-3"], auditEvent: "challenge_score_submitted", relatedGuideMessage: "referee-guide" }),
   entry("CMD-REFEREE-AUTOWIN", "challenge", { subcommand: "autowin", description: "Submits an in-ticket automatic win for review.", templateScope: ["clan", "tsbtr"], requiredModule: "referee", requiredParadisePermission: PARADISE_PERMISSIONS.REFEREE_WORK, allowedChannels: ["challenge_ticket"], examples: ["/challenge autowin winner:@player reason:no-show"], auditEvent: "challenge_autowin_submitted", relatedGuideMessage: "referee-guide" }),
   entry("CMD-CHALLENGE-CLOSE", "challenge", { subcommand: "close", description: "Closes a challenge ticket safely.", templateScope: ["clan", "tsbtr"], requiredModule: "challenge", requiredParadisePermission: PARADISE_PERMISSIONS.REFEREE_APPROVE, allowedChannels: ["challenge_ticket"], examples: ["/challenge close reason:resolved"], auditEvent: "challenge_closed", relatedGuideMessage: "referee-guide" }),
-  entry("CMD-TRAINING-START", "training", { subcommand: "start", description: "Posts an active training announcement.", templateScope: ["community", "clan", "tsbtr"], requiredModule: "training", requiredParadisePermission: PARADISE_PERMISSIONS.TRAINING_HOST, allowedChannels: ["training_channel"], examples: ["/training start link:<private-server-link>"], auditEvent: "training_started", relatedGuideMessage: "training-hoster-guide" }),
-  entry("CMD-TRAINING-CREATE", "training", { subcommand: "create", description: "Creates an active training announcement.", templateScope: ["community", "clan", "tsbtr"], requiredModule: "training", requiredParadisePermission: PARADISE_PERMISSIONS.TRAINING_HOST, allowedChannels: ["training_channel"], examples: ["/training create link:<private-server-link>"], auditEvent: "training_started", relatedGuideMessage: "training-hoster-guide" }),
-  entry("CMD-TRAINING-RESULT", "training", { subcommand: "result", description: "Posts an authorized training result.", templateScope: ["community", "clan", "tsbtr"], requiredModule: "training", requiredParadisePermission: PARADISE_PERMISSIONS.TRAINING_HOST, allowedChannels: ["training_results_channel"], examples: ["/training result score:3-1 winner:Red"], auditEvent: "training_result_submitted", relatedGuideMessage: "training-hoster-guide" }),
+  entry("CMD-TRAINING-START", "training", { subcommand: "start", description: "Posts an active training announcement.", templateScope: ["clan", "tsbtr"], requiredModule: "training", requiredParadisePermission: PARADISE_PERMISSIONS.TRAINING_HOST, allowedChannels: ["training_channel"], examples: ["/training start link:<private-server-link>"], auditEvent: "training_started", relatedGuideMessage: "training-hoster-guide" }),
+  entry("CMD-TRAINING-CREATE", "training", { subcommand: "create", description: "Creates an active training announcement.", templateScope: ["clan", "tsbtr"], requiredModule: "training", requiredParadisePermission: PARADISE_PERMISSIONS.TRAINING_HOST, allowedChannels: ["training_channel"], examples: ["/training create link:<private-server-link>"], auditEvent: "training_started", relatedGuideMessage: "training-hoster-guide" }),
+  entry("CMD-TRAINING-RESULT", "training", { subcommand: "result", description: "Posts an authorized training result.", templateScope: ["clan", "tsbtr"], requiredModule: "training", requiredParadisePermission: PARADISE_PERMISSIONS.TRAINING_HOST, allowedChannels: ["training_results_channel"], examples: ["/training result score:3-1 winner:Red"], auditEvent: "training_result_submitted", relatedGuideMessage: "training-hoster-guide" }),
   entry("CMD-TRYOUT-START", "tryout", { subcommand: "start", description: "Posts an active tryout announcement.", templateScope: ["clan", "tsbtr"], requiredModule: "tryout", requiredParadisePermission: PARADISE_PERMISSIONS.TRYOUT_HOST, allowedChannels: ["tryout_channel"], examples: ["/tryout start link:<private-server-link>"], auditEvent: "tryout_started", relatedGuideMessage: "tryout-hoster-guide" }),
   entry("CMD-TRYOUT-RESULT", "tryout", { subcommand: "result", description: "Submits an authorized tryout result.", templateScope: ["clan", "tsbtr"], requiredModule: "tryout", requiredParadisePermission: PARADISE_PERMISSIONS.TRYOUT_HOST, allowedChannels: ["tryout_results_channel"], examples: ["/tryout result user:@player stage:2 level:High strength:Strong"], auditEvent: "tryout_result_submitted", relatedGuideMessage: "tryout-hoster-guide" }),
   entry("CMD-REFEREE-GUIDE", "referee", { description: "Shows referee operations permitted by the selected template.", templateScope: ["clan", "tsbtr"], requiredModule: "referee", requiredParadisePermission: PARADISE_PERMISSIONS.REFEREE_WORK, examples: ["/referee works"], relatedGuideMessage: "referee-guide" }),
@@ -62,8 +72,9 @@ export const PARADISE_COMMAND_REGISTRY = Object.freeze([
   entry("CMD-ROSTER", "roster", { description: "Manages the competitive roster board.", templateScope: ["clan"], requiredModule: "roster", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/roster panel"], auditEvent: "roster_updated", relatedDashboardPage: "roster" }),
   entry("CMD-SPAR-REQUEST", "spar", { subcommand: "request", description: "Creates an audited clan spar request.", templateScope: ["clan"], requiredModule: "war", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/spar request opponent:Clan format:5v5 FT3"], auditEvent: "spar_requested", relatedDashboardPage: "roster" }),
   entry("CMD-WAR-CREATE", "war", { subcommand: "create", description: "Creates an auditable clan war record.", templateScope: ["clan"], requiredModule: "war", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/war create opponent:Clan format:5v5 FT3"], auditEvent: "war_created", relatedDashboardPage: "roster" }),
-  entry("CMD-WAR-RESULT", "war", { subcommand: "result", description: "Closes a war only with an HTTPS evidence link.", templateScope: ["clan"], requiredModule: "war", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/war result id:abcd1234 winner:paradise proof:https://discord.com/channels/..."], auditEvent: "war_completed", relatedDashboardPage: "roster" }),
+  entry("CMD-WAR-RESULT", "war", { subcommand: "result", description: "Closes a war only with an HTTPS evidence link.", templateScope: ["clan"], requiredModule: "war", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_CONFIG_WRITE, examples: ["/war result id:abcd1234 winner:FIMA-Bot proof:https://discord.com/channels/..."], auditEvent: "war_completed", relatedDashboardPage: "roster" }),
   entry("CMD-SETUP", "setupfieels", { description: "Opens the safe template selector.", requiredModule: "setup", requiredParadisePermission: PARADISE_PERMISSIONS.GUILD_SETUP_PREVIEW, examples: ["/setupfieels"], auditEvent: "setup_preview_opened", relatedDashboardPage: "setup", relatedGuideMessage: "owner-admin-guide" }),
+  entry("CMD-FIMA-SUPPORT-AI", "fima_support_ai", { description: "Answers safe FIMA support questions using approved knowledge and escalates uncertain or account-specific requests.", templateScope: ["community"], requiredModule: "fima_support", memberSafe: true, examples: ["/fima_support_ai question:Where can I download FIMA?"], auditEvent: "discord_ai_support_answered", relatedDashboardPage: "tickets", relatedGuideMessage: "fima-support-guide" }),
   entry("CMD-FIMA-LICENSE-CHECK", "fima_license_check", { description: "Shows masked license diagnostics to authorized support staff.", templateScope: ["community"], requiredModule: "fima_support", requiredParadisePermission: PARADISE_PERMISSIONS.LICENSE_DIAGNOSTICS, examples: ["/fima_license_check user:@buyer"], auditEvent: "license_diagnostics_viewed", relatedGuideMessage: "fima-support-guide" }),
   entry("CMD-FIMA-LICENSE-REPAIR", "fima_license_repair", { description: "Creates a safe paid-license repair task for owner/admin approval.", templateScope: ["community"], requiredModule: "fima_support", requiredParadisePermission: PARADISE_PERMISSIONS.LICENSE_REPAIR, premiumScope: "premium", examples: ["/fima_license_repair license_id:<masked-id>"], auditEvent: "license_repair_requested", relatedGuideMessage: "fima-support-guide" })
 ]);
@@ -82,12 +93,13 @@ export function commandRegistryEntries(command) {
 
 export function inferParadiseTemplate({ configuredTemplate = null, guildName = "" } = {}) {
   if (["community", "clan", "tsbtr"].includes(configuredTemplate)) return configuredTemplate;
-  if (/fieel'?s community/i.test(String(guildName || ""))) return "community";
+  if (/\bft community\b|fieel'?s community/i.test(String(guildName || ""))) return "community";
   if (/tsbtr|yedek/i.test(String(guildName || ""))) return "tsbtr";
   return "clan";
 }
 
 export function enabledParadiseModules(config = {}) {
+  if (config.modules && typeof config.modules === 'object' && !Array.isArray(config.modules)) return fimaModuleStates(config).filter(row => row.enabled).map(row => row.id);
   if (Array.isArray(config.enabledModules)) return [...new Set(config.enabledModules.filter(Boolean))];
   if (config.modules && typeof config.modules === "object") {
     return Object.entries(config.modules).filter(([, enabled]) => enabled !== false).map(([module]) => module);
@@ -114,7 +126,11 @@ export function paradiseCommandChannelContext({ config = {}, command, subcommand
 }
 
 export function paradiseCommandRegistrationAllowed({ command, template } = {}) {
-  const entries = commandRegistryEntries(command);
+  const normalizedCommand = String(command || "").trim().toLowerCase();
+  if (template === "community" && COMMUNITY_BLOCKED_LEGACY_COMMANDS.has(normalizedCommand)) {
+    return Object.freeze({ known: Boolean(commandRegistryEntries(normalizedCommand).length), allowed: false, code: "command_not_registered_for_template" });
+  }
+  const entries = commandRegistryEntries(normalizedCommand);
   if (!entries.length) return Object.freeze({ known: false, allowed: true, code: "legacy_command" });
   return Object.freeze({
     known: true,
@@ -127,7 +143,7 @@ export function paradiseCommandAccess({ command, subcommand = null, template, en
   const item = commandRegistryEntry(command, subcommand);
   if (!item) return Object.freeze({ allowed: false, code: "command_not_registered", entry: null });
   if (!item.templateScope.includes(template)) return Object.freeze({ allowed: false, code: "command_not_available_for_template", entry: item });
-  if (enabledModules && !enabledModules.includes(item.requiredModule)) return Object.freeze({ allowed: false, code: "command_module_disabled", entry: item });
+  if (item.requiredModule && item.requiredModule !== 'setup' && enabledModules && !enabledModules.map(fimaCanonicalModule).includes(fimaCanonicalModule(item.requiredModule))) return Object.freeze({ allowed: false, code: "command_module_disabled", entry: item });
   if (!isPlanAllowed(item.premiumScope, plan) && !isOwner) return Object.freeze({ allowed: false, code: "command_plan_required", entry: item });
   const actualChannelKeys = channelKeys || [channelKey];
   if (channelConstraintConfigured && !item.allowedChannels.includes("any") && !actualChannelKeys.some(key => item.allowedChannels.includes(key))) {

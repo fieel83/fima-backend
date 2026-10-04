@@ -92,6 +92,9 @@ async function fixture(t, provider, { loggedOut = false, oldState = false, pause
   const app = express(); app.use(cookieParser());
   const api = runInNewContext(executable, {
     app, prisma, crypto, Buffer, URL, Date, parseGoogleOAuthCookie,
+    clearOwnerFreshProofCookie: () => { writes.push("owner-proof-clear"); },
+    resolvedParadiseOwnerDiscordId: () => "",
+    ownerGateRequirementsConfigured: () => false,
     USER_SESSION_COOKIE: "fima_user_session", OAUTH_STATE_COOKIE: "fima_oauth_state", OAUTH_PKCE_COOKIE: "fima_oauth_pkce",
     oauthLimiter: (_req, _res, next) => next(), oauthSecret: () => "controlled-local-test-secret",
     timingSafeTextEqual: (a, b) => crypto.timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b))),

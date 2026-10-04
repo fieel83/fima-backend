@@ -73,8 +73,24 @@ test("RBAC keeps Trial Referee and hoster authority narrower than managers", () 
 
 test("central command registry filters help and runtime access by template, module and role", () => {
   const communityMember = visibleParadiseCommands({ template: "community", enabledModules: ["profiles", "tickets", "fima_support"], roleKeys: [], plan: "free" });
-  assert.equal(communityMember.some(item => item.command === "challenge"), false);
-  assert.equal(communityMember.some(item => item.command === "lineup"), false);
+  const aiSupport = communityMember.find(item => item.command === "fima_support_ai");
+  assert.equal(aiSupport?.memberSafe, true);
+  assert.equal(aiSupport?.auditEvent, "discord_ai_support_answered");
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "fima_support_ai", template: "community" }).allowed, true);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "fima_support_ai", template: "clan" }).allowed, false);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "fima_support_ai", template: "tsbtr" }).allowed, false);
+  assert.equal(paradiseCommandAccess({ command: "fima_support_ai", template: "community", enabledModules: ["fima_support"] }).allowed, true);
+  assert.equal(paradiseCommandAccess({ command: "fima_support_ai", template: "community", enabledModules: ["tickets"] }).code, "command_module_disabled");
+  assert.equal(communityMember.some(item => item.command === "profile"), true);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "profile", template: "community" }).allowed, true);
+  for (const command of ["rank", "leaderboard", "challenge", "training", "tryout", "referee", "lineup"]) {
+    assert.equal(communityMember.some(item => item.command === command), false);
+    assert.equal(paradiseCommandRegistrationAllowed({ command, template: "community" }).allowed, false);
+  }
+  const clanMember = visibleParadiseCommands({ template: "clan", enabledModules: ["profiles", "challenge", "training", "tryout", "referee"], roleKeys: ["Owner"], plan: "free" });
+  assert.equal(clanMember.some(item => item.command === "profile"), true);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "challenge", template: "clan" }).allowed, true);
+  assert.equal(paradiseCommandRegistrationAllowed({ command: "referee", template: "tsbtr" }).allowed, true);
   assert.equal(paradiseCommandAccess({ command: "challenge", subcommand: "create", template: "community", enabledModules: ["challenge"] }).code, "command_not_available_for_template");
   assert.equal(paradiseCommandAccess({ command: "training", subcommand: "start", template: "clan", enabledModules: ["training"], roleKeys: ["Training Hoster"], channelKey: "training_channel" }).allowed, true);
   assert.equal(paradiseCommandAccess({ command: "challenge", subcommand: "close", template: "tsbtr", enabledModules: ["challenge"], roleKeys: ["Trial Referee"], channelKey: "challenge_ticket" }).code, "command_permission_denied");

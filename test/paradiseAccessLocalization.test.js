@@ -27,6 +27,10 @@ function accessRuntime(language) {
   const storage = new Map([['paradiseUiLanguage', language]]);
   const context = vm.createContext({
     byId: id => elements.get(id),
+    currentPayload: null,
+    syncMobilePageLabels: () => {},
+    updateGuideResultCount: () => {},
+    localizeApplicationEditor: () => {},
     API_BASE: 'https://api.example.test',
     localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
     document: {
@@ -42,9 +46,9 @@ function accessRuntime(language) {
 }
 
 const reasons = {
-  login_required: ['Fima login required', 'Fima girişi gerekli'],
+  login_required: ['FIMA login required', 'FIMA girişi gerekli'],
   discord_link_required: ['Discord account required', 'Discord hesabı gerekli'],
-  not_owner: ['Paradise access is restricted', 'Paradise erişimi kısıtlı'],
+  not_owner: ['FIMA access is restricted', 'FIMA erişimi kısıtlı'],
   unavailable: ['Session check unavailable', 'Oturum kontrolü kullanılamıyor'],
 };
 

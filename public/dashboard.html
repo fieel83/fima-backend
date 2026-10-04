@@ -16,12 +16,13 @@
     <meta name="twitter:title" content="Fima Macro | Premium Macro App">
     <meta name="twitter:description" content="Premium Roblox macro app with secure account access, short-term, monthly and lifetime licenses.">
     <meta name="twitter:image" content="https://fimamacro.com/assets/fima-preview-v127.png?v=127">
-    <title>Dashboard | Fima Macro</title>
+    <title>Dashboard | FIMA</title>
     <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
     <link rel="stylesheet" href="/assets/css/account.css?v=20261002-identity-reveal-2">
-  </head>
-  <body data-account-page="dashboard">
-    <header class="account-header dashboard-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
+  <link rel="stylesheet" href="/assets/css/fima-design-system.css?v=20261004-1">
+</head>
+  <body data-fima-product="hub" data-fima-design-system="teal-obsidian" data-account-page="dashboard">
+    <header class="account-header dashboard-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>FIMA</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/download">Download</a><a href="/support">Support</a><button class="link-button" data-logout>Logout</button></div></div></header>
     <main class="shell account-shell">
       <div class="account-dashboard-layout">
         <aside class="account-dashboard-sidebar" aria-label="Account sections">
@@ -38,7 +39,7 @@
             <a href="/dashboard/referrals" data-dashboard-link="referrals"><span>Referrals</span><small>Invite rewards</small></a>
             <a href="/dashboard/downloads" data-dashboard-link="downloads"><span>Downloads</span><small>Latest app</small></a>
             <a href="/dashboard/support" data-dashboard-link="support"><span>Support</span><small>Tickets and help</small></a>
-            <a href="/paradise"><span>Paradise Dashboard</span><small>Discord bot console</small></a>
+            <a href="/paradise"><span>FIMA Dashboard</span><small>Discord bot console</small></a>
           </nav>
           <button class="dashboard-signout link-button" data-logout>Logout</button>
         </aside>
@@ -47,7 +48,7 @@
           <section class="panel panel-pad account-summary-card" id="overview">
             <div>
               <h2>Account</h2>
-              <p>Manage your profile, recovery, linked accounts and community reward eligibility from this overview.</p>
+              <p>Manage your recovery options and community preferences.</p>
             </div>
             <div class="summary-grid">
               <div class="row reveal-row"><span>Username</span><strong id="accountUsername">Loading...</strong><button class="reveal-button" type="button" data-reveal-target="accountUsername" aria-label="Show username"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5.5c5.1 0 8.4 4.6 9.3 6.1.2.3.2.5 0 .8-.9 1.5-4.2 6.1-9.3 6.1s-8.4-4.6-9.3-6.1a.8.8 0 0 1 0-.8c.9-1.5 4.2-6.1 9.3-6.1Zm0 2c-3.7 0-6.4 3-7.3 4.5.9 1.5 3.6 4.5 7.3 4.5s6.4-3 7.3-4.5C18.4 10.5 15.7 7.5 12 7.5Zm0 2.1a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z"/></svg></button></div>
@@ -65,7 +66,7 @@
               <div>
                 <p class="eyebrow">Security / Settings</p>
                 <h2>Identity, language and verification</h2>
-                <p>Discord is the primary identity connection. Your preferred language controls access to language-specific community spaces.</p>
+                <p>Connect Roblox and either Discord or Google to complete your account identity. Your preferred language controls access to language-specific community spaces.</p>
               </div>
               </div>
               <div id="emailVerification">Loading...</div>
@@ -166,7 +167,8 @@
     </main>
     <script src="/assets/js/config.js?v=20260526-9"></script>
     <script src="/assets/js/account-identity.js?v=20261003-identity-1" defer></script>
-    <script src="/assets/js/account.js?v=20261004-roblox-v2-1" defer></script>
+    <script src="/assets/js/account.js?v=20261004-ft-1" defer></script>
     <script src="/assets/js/dashboard-shell.js?v=20261002-account-premium" defer></script>
+    <footer class="account-footer"><p>FIMA is the secure account, product and support hub for FIMA Macro, FIMA AI and FIMA Bot.</p></footer>
   </body>
 </html>

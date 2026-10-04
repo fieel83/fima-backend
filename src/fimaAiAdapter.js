@@ -40,9 +40,9 @@ export const FIMA_APPROVED_KNOWLEDGE = Object.freeze([
   }),
   Object.freeze({
     id: "community.training",
-    title: "Training and events",
-    summary: "Fima training queues are community practice/support systems, not clan membership requirements.",
-    keywords: ["training", "event", "practice", "queue", "clan"]
+    title: "FT Community Activity and support",
+    summary: "FT Community has no training, tryout or competitive ranking system. It uses separate monthly Text Activity and Voice Activity rewards plus FIMA support. Payment, order and license status must always be verified; never invent an operation or entitlement.",
+    keywords: ["training", "tryout", "activity", "text", "voice", "support", "community"]
   }),
   Object.freeze({
     id: "oldtgmacro.proof",
@@ -60,9 +60,11 @@ export const FIMA_APPROVED_KNOWLEDGE = Object.freeze([
 
 const KNOWLEDGE_BY_ID = new Map(FIMA_APPROVED_KNOWLEDGE.map((item) => [item.id, item]));
 const RISKY_QUESTION = /\b(crack|bypass|injector|inject|cookie|token|stolen|steal|fake file|decompile|patch)\b/i;
-const COMMERCIAL_OR_ACCOUNT = /\b(payment|paid|refund|charge|invoice|order|robux|license|licence|key|hwid|account|activation)\b/i;
+const COMMERCIAL_OR_ACCOUNT = /(?:\b(?:payment|paid|refund|charge|invoice|order|robux|license|licence|key|hwid|account|activation)\b|(?:ödeme|iade|sipariş|lisans|anahtar|hesap|aktivasyon|etkinleştirme))/iu;
 const UNVERIFIED_OPERATION_CLAIM = /\b(payment (?:has been |was |is )?(?:received|verified|confirmed)|refund (?:has been |was |is )?(?:issued|approved|sent)|order (?:has been |was |is )?(?:paid|complete|completed|approved)|license (?:has been |is |was )?(?:active|activated|valid|approved)|key (?:has been |was |is )?(?:generated|activated|valid)|hwid (?:has been |was |is )?(?:reset|changed)|(?:i|we) (?:have )?(?:refunded|activated|approved|reset|changed|completed|verified))\b/i;
-const UNVERIFIED_OPERATION_CLAIM_TR = /(?:ödeme(?:n|niz|si|nizi|nızı)?(?:\s+başarıyla)?\s+(?:alındı|onaylandı|doğrulandı|tamamlandı|aldık)|[iİ]ade(?:n|niz|si|nizi|nızı)?(?:\s+başarıyla)?\s+(?:yapıldı|onaylandı|gönderildi|tamamlandı|ettik)|sipariş(?:in|iniz|i)?\s+(?:ödendi|tamamlandı|onaylandı)|lisans(?:ın|ınız|in|iniz|ı|i)?\s+(?:aktif|etkin|geçerli|onaylandı|aktifleştirildi|etkinleştirildi|aktive edildi)|anahtar(?:ın|ınız|in|iniz|ı|i)?\s+(?:oluşturuldu|etkinleştirildi|aktifleştirildi|geçerli)|hwid(?:'in|'iniz|in|iniz)?\s+(?:sıfırlandı|değiştirildi)|(?:[iİ]ade|lisans|ödeme|sipariş|anahtar|hwid)(?:nizi|ınızı|inizi|ı|i)?\s+(?:onayladık|doğruladık|aktifleştirdik|sıfırladık|değiştirdik|tamamladık))/iu;
+const UNVERIFIED_OPERATION_CLAIM_TR = /(?:^|[^\p{L}\p{N}_])(?:ödeme\p{L}*(?:\s+başarıyla)?\s+(?:alındı|doğrulandı|onaylandı|tamamlandı|aldık|doğruladık|onayladık)|[iİ]ade\p{L}*(?:\s+başarıyla)?\s+(?:yapıldı|onaylandı|gönderildi|tamamlandı|yaptık|onayladık|gönderdik|ettik)|sipariş\p{L}*\s+(?:ödendi|tamamlandı|onaylandı)|lisans\p{L}*\s+(?:aktif(?:tir)?|etkin(?:dir)?|etkinleştirildi|aktifleştirildi|geçerli(?:dir)?|onaylandı|aktive\s+edildi)|anahtar\p{L}*\s+(?:oluşturuldu|etkinleştirildi|aktifleştirildi|geçerli(?:dir)?)|hwid(?:['’]?\p{L}+)?\s+(?:sıfırlandı|değiştirildi)|(?:ödeme|[iİ]ade|sipariş|lisans|anahtar|hwid(?:['’]?\p{L}+))\p{L}*\s+(?:onayladık|doğruladık|aktifleştirdik|etkinleştirdik|sıfırladık|değiştirdik|tamamladık))(?=$|[^\p{L}\p{N}_])/iu;
+const URL_PATTERN = /https?:\/\/[^\s<>()]+/gi;
+const NUMBER_PATTERN = /\b\d+(?:[.,]\d+)?\b/g;
 const SECRET_PATTERNS = [
   /https:\/\/discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9._-]+/gi,
   /\b(?:mfa\.)?[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{20,}\b/g,
@@ -144,7 +146,13 @@ function fallbackAnswer(question, { reason = "offline" } = {}) {
     source: "approved_knowledge_fallback",
     confidence: risky || selected[0]?.id !== "support.escalate" ? 1 : 0,
     risky,
+    fallback: true,
     escalation: commercialOrAccount || selected[0]?.id === "support.escalate",
+    supportRoute: {
+      type: "private_ticket",
+      queue: "fima_support",
+      ownerIndependent: true
+    },
     reason,
     title: risky ? "Fima safety answer" : "Fima support answer",
     description: risky
@@ -230,6 +238,29 @@ export async function fimaAiHealth({
   }
 }
 
+function groundingWords(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .match(/[\p{L}\p{N}]+/gu)
+    ?.filter((word) => word.length >= 3) || [];
+}
+
+function groundedInCitations(answer, citations) {
+  const records = citations.map((id) => KNOWLEDGE_BY_ID.get(id)).filter(Boolean);
+  if (records.length !== citations.length) return false;
+  const source = records.map(({ title, summary }) => `${title} ${summary}`).join(" ");
+  const allowedWords = new Set(groundingWords(source));
+  const answerWords = groundingWords(answer);
+  if (answerWords.length < 3) return false;
+  const grounded = answerWords.filter((word) => allowedWords.has(word)).length / answerWords.length;
+  const allowedUrls = new Set(source.match(URL_PATTERN) || []);
+  const allowedNumbers = new Set(source.match(NUMBER_PATTERN) || []);
+  if ((answer.match(URL_PATTERN) || []).some((value) => !allowedUrls.has(value))) return false;
+  if ((answer.match(NUMBER_PATTERN) || []).some((value) => !allowedNumbers.has(value))) return false;
+  return grounded >= 0.6;
+}
+
 function validatedRemoteAnswer(body, selectedIds, minConfidence) {
   const answer = cleanText(body?.answer, 1500);
   const confidence = Number(body?.confidence);
@@ -239,6 +270,7 @@ function validatedRemoteAnswer(body, selectedIds, minConfidence) {
   if (!answer || !Number.isFinite(confidence) || confidence < minConfidence || confidence > 1) return null;
   if (!citations.length || citations.some((id) => !selectedIds.includes(id))) return null;
   if (UNVERIFIED_OPERATION_CLAIM.test(answer) || UNVERIFIED_OPERATION_CLAIM_TR.test(answer)) return null;
+  if (!groundedInCitations(answer, citations)) return null;
   const redacted = redactFimaSupportText(answer);
   if (redacted.includes("[REDACTED]")) return null;
   return { answer: redacted, confidence, citations };
@@ -286,6 +318,7 @@ export async function answerFimaSupportQuestion(question, {
       source: "fima_ai_adapter",
       reason: null,
       confidence: validated.confidence,
+      fallback: false,
       escalation: fallback.escalation || commercialOrAccount,
       description: commercialOrAccount
         ? `${validated.answer}\n\nAccount, payment, order, license and HWID status still requires staff verification in a private ticket.`

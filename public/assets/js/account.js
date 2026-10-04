@@ -110,7 +110,7 @@
         "logoutNav": "Logout",
         "dashboardNav": "Account",
         "myProductsNav": "My Products",
-        "registerEyebrow": "Fima Account",
+        "registerEyebrow": "FIMA Account",
         "registerTitle": "Create your Fima account.",
         "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
@@ -600,7 +600,7 @@
         "logoutNav": "Logout",
         "dashboardNav": "Konto",
         "myProductsNav": "Meine Produkte",
-        "registerEyebrow": "Fima Account",
+        "registerEyebrow": "FIMA Account",
         "registerTitle": "Account erstellen.",
         "registerIntro": "Erstelle dein Fima Konto nur mit Benutzername und Passwort. Discord kannst du spaeter fuer Wiederherstellung, Community-Belohnungen und Support verbinden.",
         "robloxUsername": "Roblox Nutzername",
@@ -879,7 +879,7 @@
         "logoutNav": "Logout",
         "dashboardNav": "Account",
         "myProductsNav": "My Products",
-        "registerEyebrow": "Fima Account",
+        "registerEyebrow": "FIMA Account",
         "registerTitle": "Create your Fima account.",
         "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
@@ -972,7 +972,7 @@
         "logoutNav": "Logout",
         "dashboardNav": "Account",
         "myProductsNav": "My Products",
-        "registerEyebrow": "Fima Account",
+        "registerEyebrow": "FIMA Account",
         "registerTitle": "Create your Fima account.",
         "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
@@ -1065,7 +1065,7 @@
         "logoutNav": "Logout",
         "dashboardNav": "Account",
         "myProductsNav": "My Products",
-        "registerEyebrow": "Fima Account",
+        "registerEyebrow": "FIMA Account",
         "registerTitle": "Create your Fima account.",
         "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
@@ -1158,7 +1158,7 @@
         "logoutNav": "Logout",
         "dashboardNav": "Account",
         "myProductsNav": "My Products",
-        "registerEyebrow": "Fima Account",
+        "registerEyebrow": "FIMA Account",
         "registerTitle": "Create your Fima account.",
         "registerIntro": "Create an account with only a username and password. You can link Discord later for recovery, community rewards and support.",
         "robloxUsername": "Roblox username",
@@ -1868,7 +1868,7 @@
     const nav = $(".account-header .nav");
     if (!nav) return;
     nav.innerHTML = `
-      <a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>Fima Macro</strong></a>
+      <a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>FIMA</strong></a>
       <div class="links account-main-links">
         ${user ? `
           <a href="/pricing">${t("pricingNav")}</a>

@@ -188,9 +188,13 @@
   async function refresh(guildId = selectedGuildId()) {
     if (!guildId || state.loadingGuildId === guildId) return;
     state.loadingGuildId = guildId;
+    state.payload = null;
+    for (const id of ["communityStructureSafety", "communityDesktopPreview", "communityMobilePreview", "communityMappingPreview", "communityRolePreview", "communityPersonaPreview"]) {
+      setText(id, "Loading the selected server…");
+    }
     setText("communityOperationStatus", "Loading the safe Community draft…");
     try {
-      const response = await fetch(ctx.apiBase + "/api/paradise/community-structure?guildId=" + encodeURIComponent(guildId), {
+      const response = await fetch(ctx.apiBase + "/api/fima-bot/community-structure?guildId=" + encodeURIComponent(guildId), {
         credentials: "include",
         headers: { accept: "application/json" },
         cache: "no-store"
@@ -205,16 +209,21 @@
         ? "Test guild selected. Draft and plan operations are available; Discord mutation remains stopped."
         : "Production/non-test guild selected. Draft and comparison are available; test apply is blocked.");
     } catch (error) {
+      if (guildId !== selectedGuildId()) return;
+      state.payload = null;
+      for (const id of ["communityStructureSafety", "communityDesktopPreview", "communityMobilePreview", "communityMappingPreview", "communityRolePreview", "communityPersonaPreview"]) {
+        setText(id, "Unavailable. Reload this server to try again.");
+      }
       setText("communityOperationStatus", "Community structure could not be loaded safely: " + error.message);
     } finally {
-      state.loadingGuildId = "";
+      if (state.loadingGuildId === guildId) state.loadingGuildId = "";
     }
   }
 
   async function saveDraft({ quiet = false } = {}) {
     const guildId = selectedGuildId();
     if (!guildId) throw new Error("select_a_managed_guild");
-    const { response, result } = await ctx.mutate("/api/paradise/community-structure/draft", {
+    const { response, result } = await ctx.mutate("/api/fima-bot/community-structure/draft", {
       guildId,
       value: inputDraft()
     }, "PATCH");
@@ -224,7 +233,7 @@
     render(state.payload);
     if (!quiet) {
       setText("communityOperationStatus", "Draft saved. No Discord roles or channels were changed.");
-      ctx.show?.("Fieel's Community draft saved without live Discord mutation.");
+      ctx.show?.("FIMA draft saved without live Discord mutation.");
     }
     return result;
   }
@@ -232,7 +241,7 @@
   async function plan(operation) {
     await saveDraft({ quiet: true });
     const guildId = selectedGuildId();
-    const { response, result } = await ctx.mutate("/api/paradise/community-structure/plan", { guildId, operation });
+    const { response, result } = await ctx.mutate("/api/fima-bot/community-structure/plan", { guildId, operation });
     if (!response.ok) {
       const reason = result.error === "test_guild_required"
         ? "Apply Test Guild is blocked because the selected server is not the fixed test guild."

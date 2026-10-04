@@ -6,7 +6,13 @@ const STAFF_ROLE_KEYS = Object.freeze([
   "owner"
 ]);
 
-export const FIEELS_COMMUNITY_STRUCTURE_REVISION = "identity-naming-v1";
+const VIDEO_TEAM_ROLE_KEYS = Object.freeze([
+  "video_team",
+  "video_editor",
+  "thumbnail_designer"
+]);
+
+export const FIEELS_COMMUNITY_STRUCTURE_REVISION = "identity-naming-video-team-v2";
 
 export const FIEELS_COMMUNITY_NAMING_STYLE = Object.freeze({
   categoryFrame: "╾━ {name} ━╼",
@@ -88,6 +94,20 @@ const CATEGORY_DEFINITIONS = Object.freeze([
     ]
   },
   {
+    key: "video_team",
+    names: { en: "VIDEO TEAM", tr: "VIDEO EKIBI" },
+    access: "video_team",
+    channels: [
+      ["video_hub", "private", "text", "video-hub", "video-merkezi"],
+      ["video_ideas", "private", "text", "video-ideas", "video-fikirleri"],
+      ["video_scripts", "private", "text", "video-scripts", "video-senaryolari"],
+      ["video_assets", "private", "text", "video-assets", "video-dosyalari"],
+      ["video_review", "private", "text", "video-review", "video-inceleme"],
+      ["video_upload_schedule", "private", "text", "video-upload-schedule", "video-yayin-takvimi"],
+      ["video_voice", "private", "voice", "Video Team Voice", "Video Ekibi Sesi"]
+    ]
+  },
+  {
     key: "voice",
     names: { en: "VOICE", tr: "SES" },
     channels: [
@@ -101,6 +121,7 @@ const ROLE_GROUPS = Object.freeze([
   ["ownership", "OWNERSHIP", "SAHİPLİK", ["owner"]],
   ["administration", "ADMINISTRATION", "YÖNETİM", ["administrator"]],
   ["moderation", "MODERATION", "MODERASYON", ["moderator", "junior_moderator", "helper"]],
+  ["video_team", "VIDEO TEAM", "VIDEO EKIBI", [...VIDEO_TEAM_ROLE_KEYS]],
   ["community", "COMMUNITY", "TOPLULUK", ["member"]],
   ["language", "LANGUAGE", "DİL", ["turkish", "english"]],
   ["ping", "PING ROLES", "BİLDİRİM ROLLERİ", []],
@@ -155,6 +176,13 @@ function channelPermissions(categoryKey, channelKey) {
       staff: { view: true, send: true, connect: true, moderate: true }
     };
   }
+  if (categoryKey === "video_team") {
+    return {
+      everyone: { view: false, send: false, connect: false },
+      video_team: { view: true, send: true, connect: true, moderate: false },
+      staff: { view: true, send: true, connect: true, moderate: true }
+    };
+  }
   return {
     everyone: { view: true, send: true, connect: true },
     staff: { view: true, send: true, connect: true, moderate: true }
@@ -180,14 +208,17 @@ function currentChannelLookup(existingChannels = []) {
 
 export function buildFieelsCommunityPersonaMatrix() {
   return [
-    { key: "new_member", turkishVisible: false, chatSend: false, mediaUpload: false, announcementsSend: false, voiceConnect: false, moderate: false },
-    { key: "english_member", turkishVisible: false, chatSend: false, mediaUpload: false, announcementsSend: false, voiceConnect: false, moderate: false },
-    { key: "turkish_member", turkishVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: false },
-    { key: "helper", turkishVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: "assist_only" },
-    { key: "junior_moderator", turkishVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
-    { key: "moderator", turkishVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
-    { key: "administrator", turkishVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
-    { key: "owner", turkishVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true }
+    { key: "new_member", turkishVisible: false, videoTeamVisible: false, chatSend: false, mediaUpload: false, announcementsSend: false, voiceConnect: false, moderate: false },
+    { key: "english_member", turkishVisible: false, videoTeamVisible: false, chatSend: false, mediaUpload: false, announcementsSend: false, voiceConnect: false, moderate: false },
+    { key: "turkish_member", turkishVisible: true, videoTeamVisible: false, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: false },
+    { key: "video_team", turkishVisible: false, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: false },
+    { key: "video_editor", turkishVisible: false, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: false },
+    { key: "thumbnail_designer", turkishVisible: false, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: false },
+    { key: "helper", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: "assist_only" },
+    { key: "junior_moderator", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
+    { key: "moderator", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
+    { key: "administrator", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
+    { key: "owner", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true }
   ];
 }
 
@@ -201,7 +232,7 @@ export function reconcileFieelsCommunityRoles(existingRoles = []) {
     if (byKey.has(key)) duplicates.push({ key, ids: [byKey.get(key).id, role.id] });
     else byKey.set(key, role);
   }
-  const managedKeys = new Set(["member", "turkish", "english", ...STAFF_ROLE_KEYS]);
+  const managedKeys = new Set(["member", "turkish", "english", ...VIDEO_TEAM_ROLE_KEYS, ...STAFF_ROLE_KEYS]);
   const mapped = [...managedKeys].map((key) => {
     const existing = byKey.get(key);
     return {
@@ -311,6 +342,31 @@ export function validateFieelsCommunityStructureDraft(draft) {
   if (announcements?.permissions?.turkish?.send !== false) errors.push("turkish_announcements_must_be_read_only");
   if (announcements?.permissions?.staff?.send !== true) errors.push("staff_must_post_turkish_announcements");
 
+  const videoTeamCategories = categories.filter((category) => category.key === "video_team");
+  if (videoTeamCategories.length !== 1) errors.push("exactly_one_video_team_category_required");
+  const videoTeamCategory = videoTeamCategories[0];
+  if (videoTeamCategory?.access !== "video_team") errors.push("video_team_category_access");
+  const videoTeamChannels = videoTeamCategory?.channels || [];
+  const requiredVideoTeamChannels = new Map([
+    ["video_hub", "text"],
+    ["video_ideas", "text"],
+    ["video_scripts", "text"],
+    ["video_assets", "text"],
+    ["video_review", "text"],
+    ["video_upload_schedule", "text"],
+    ["video_voice", "voice"]
+  ]);
+  for (const [key, type] of requiredVideoTeamChannels) {
+    const channel = videoTeamChannels.find((item) => item.key === key);
+    if (!channel) errors.push(`missing_${key}`);
+    else if (channel.type !== type) errors.push(`invalid_${key}_type`);
+  }
+  for (const channel of videoTeamChannels) {
+    if (channel.permissions?.everyone?.view !== false) errors.push(`${channel.key}_everyone_must_be_hidden`);
+    if (channel.permissions?.video_team?.view !== true) errors.push(`${channel.key}_video_team_must_view`);
+    if (channel.permissions?.staff?.view !== true) errors.push(`${channel.key}_staff_must_view`);
+  }
+
   const categoryNames = categories.map((category) => category.proposedName);
   if (new Set(categoryNames).size !== categoryNames.length) errors.push("duplicate_category_name");
   const channelNames = categories.flatMap((category) => category.channels || []).map((channel) => channel.proposedName);
@@ -322,17 +378,116 @@ export function validateFieelsCommunityStructureDraft(draft) {
       errors.push(`unsafe_role_separator_${separator.key}`);
     }
   }
+  const videoTeamRoles = roleTree
+    .filter((separator) => separator.key === "video_team")
+    .flatMap((separator) => separator.roles || []);
+  for (const roleKey of VIDEO_TEAM_ROLE_KEYS) {
+    if (videoTeamRoles.filter((key) => key === roleKey).length !== 1) errors.push(`invalid_video_team_role_${roleKey}`);
+  }
   if (draft?.roleReconciliation?.destructiveActions?.length) errors.push("destructive_role_action");
   if (draft?.roleReconciliation?.duplicates?.length) errors.push("duplicate_existing_role_key");
 
   const personas = new Map((draft?.personaMatrix || []).map((persona) => [persona.key, persona]));
-  for (const key of ["new_member", "english_member", "turkish_member", "helper", "junior_moderator", "moderator", "administrator", "owner"]) {
+  for (const key of ["new_member", "english_member", "turkish_member", ...VIDEO_TEAM_ROLE_KEYS, "helper", "junior_moderator", "moderator", "administrator", "owner"]) {
     if (!personas.has(key)) errors.push(`missing_persona_${key}`);
   }
   if (personas.get("new_member")?.turkishVisible !== false) errors.push("new_member_visibility");
   if (personas.get("english_member")?.turkishVisible !== false) errors.push("english_member_visibility");
   if (personas.get("turkish_member")?.announcementsSend !== false) errors.push("turkish_member_announcement_write");
+  if (personas.get("new_member")?.videoTeamVisible !== false) errors.push("new_member_video_team_visibility");
+  if (personas.get("turkish_member")?.videoTeamVisible !== false) errors.push("turkish_member_video_team_visibility");
+  for (const roleKey of VIDEO_TEAM_ROLE_KEYS) {
+    if (personas.get(roleKey)?.videoTeamVisible !== true) errors.push(`${roleKey}_video_team_visibility`);
+    if (personas.get(roleKey)?.moderate !== false) errors.push(`${roleKey}_moderation_bypass`);
+  }
   if (personas.get("helper")?.moderate !== "assist_only") errors.push("helper_security_bypass");
+  if (personas.get("helper")?.videoTeamVisible !== true) errors.push("staff_video_team_visibility");
+
+  return { ok: errors.length === 0, errors };
+}
+
+export function validateFieelsCommunityOperationalParity(draft, operational) {
+  const errors = [];
+  const draftValidation = validateFieelsCommunityStructureDraft(draft);
+  if (!draftValidation.ok) errors.push(...draftValidation.errors.map((code) => `draft:${code}`));
+  if (operational?.identity !== "FT Community") errors.push("operational_identity_must_be_ft_community");
+  if (operational?.publicLanguage !== "en") errors.push("public_structure_must_be_english_first");
+
+  const categories = Array.isArray(operational?.privateCategories) ? operational.privateCategories : [];
+  const categoryByPurpose = new Map();
+  for (const category of categories) {
+    const purpose = String(category?.purpose || "");
+    if (!categoryByPurpose.has(purpose)) categoryByPurpose.set(purpose, []);
+    categoryByPurpose.get(purpose).push(category);
+  }
+
+  const requirements = {
+    turkish: {
+      access: ["turkish", "staff"],
+      channels: {
+        turkish_chat: "text",
+        turkish_media: "text",
+        turkish_announcements: "text",
+        turkish_voice: "voice"
+      }
+    },
+    video_team: {
+      access: ["video_team", "staff"],
+      channels: {
+        video_hub: "text",
+        video_ideas: "text",
+        video_scripts: "text",
+        video_assets: "text",
+        video_review: "text",
+        video_upload_schedule: "text",
+        video_voice: "voice"
+      }
+    },
+    staff: {
+      access: ["staff"],
+      channels: {
+        staff_hub: "text",
+        staff_guides: "text",
+        application_reviews: "text",
+        staff_logs: "text",
+        security_logs: "text",
+        transcripts: "text"
+      }
+    }
+  };
+
+  for (const [purpose, requirement] of Object.entries(requirements)) {
+    const matches = categoryByPurpose.get(purpose) || [];
+    if (matches.length !== 1) {
+      errors.push(`exactly_one_operational_${purpose}_category_required`);
+      continue;
+    }
+    const category = matches[0];
+    if (category.private !== true) errors.push(`operational_${purpose}_category_must_be_private`);
+    const access = new Set(Array.isArray(category.accessClasses) ? category.accessClasses : []);
+    for (const accessClass of requirement.access) {
+      if (!access.has(accessClass)) errors.push(`operational_${purpose}_missing_${accessClass}_access`);
+    }
+    const channels = new Map((category.channels || []).map((channel) => [channel.purpose, channel]));
+    for (const [channelPurpose, type] of Object.entries(requirement.channels)) {
+      const channel = channels.get(channelPurpose);
+      if (!channel) errors.push(`operational_missing_${channelPurpose}`);
+      else if (channel.type !== type) errors.push(`operational_invalid_${channelPurpose}_type`);
+    }
+  }
+
+  const knownChannels = new Set(Array.isArray(operational?.channelNames) ? operational.channelNames : []);
+  const mappings = operational?.mappings && typeof operational.mappings === "object" ? operational.mappings : {};
+  for (const key of ["welcome", "leave", "rules", "support", "applications"]) {
+    if (!knownChannels.has(mappings[key])) errors.push(`operational_invalid_${key}_mapping`);
+  }
+
+  const roleClasses = operational?.roleClasses || {};
+  for (const role of ["Owner", "Administrator", "Moderator", "Junior Moderator", "Helper"]) {
+    if (!roleClasses.staff?.includes(role)) errors.push(`operational_staff_role_missing:${role}`);
+  }
+  if (!roleClasses.turkish?.includes("Turkish")) errors.push("operational_turkish_role_missing");
+  if (!roleClasses.video_team?.includes("Video Team")) errors.push("operational_video_team_role_missing");
 
   return { ok: errors.length === 0, errors };
 }
