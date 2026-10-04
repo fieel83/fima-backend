@@ -56,6 +56,7 @@ import {
   saveParadiseContentDocument
 } from "./paradiseContentStudio.js";
 import { buildParadiseCustomerWorkspaceCards } from "./paradiseCustomerWorkspaces.js";
+import { createDiscordGuildMembershipFetcher } from "./discordGuildMemberships.js";
 import {
   buildFieelsCommunityStructureDraft,
   normalizeFieelsCommunityNamingStyle,
@@ -10409,18 +10410,7 @@ async function requireUser(req, res, next) {
   }
 }
 
-async function fetchDiscordGuildMemberships(accessToken) {
-  const response = await fetchWithAbort("https://discord.com/api/v10/users/@me/guilds", {
-    headers: { authorization: `Bearer ${accessToken}` }
-  }, 8000);
-  if (!response.ok) {
-    const error = new Error(`discord_guilds_failed_${response.status}`);
-    error.code = response.status === 401 || response.status === 403 ? "discord_reauthorization_required" : "discord_guilds_unavailable";
-    throw error;
-  }
-  const guilds = await response.json();
-  return Array.isArray(guilds) ? guilds.filter(guild => guild?.id) : [];
-}
+const fetchDiscordGuildMemberships = createDiscordGuildMembershipFetcher({ fetch: fetchWithAbort });
 
 function publicDiscordGuildMembership(guild) {
   const id = String(guild?.id || "");
