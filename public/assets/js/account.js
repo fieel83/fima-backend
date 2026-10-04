@@ -3659,6 +3659,13 @@
   };
 
   document.addEventListener("DOMContentLoaded", () => {
+    if (page === "login" || page === "register") {
+      const requestedNext = new URLSearchParams(location.search).get("next");
+      const next = safeLocalRedirect(requestedNext, "");
+      if (next) document.querySelectorAll('a[href="/login"], a[href="/register"]').forEach(link => {
+        link.href = `${link.getAttribute("href")}?next=${encodeURIComponent(next)}`;
+      });
+    }
     applyStaticTranslations();
     initPasswordToggles();
     initOauthFlash();

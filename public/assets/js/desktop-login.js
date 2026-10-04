@@ -10,6 +10,9 @@
   const approveButton = document.getElementById("approve-button");
   const differentCodeButton = document.getElementById("different-code");
   const status = document.getElementById("page-status");
+  const requestId = new URLSearchParams(window.location.search).get("request") || "";
+  const state = new URLSearchParams(window.location.search).get("state") || "";
+  let accountName = "";
   let csrfToken = "";
   let approvedCode = "";
   let expiryTimer = null;
@@ -49,15 +52,18 @@
   };
 
   const redirectToLogin = () => {
-    window.location.replace("/login?next=%2Fdesktop-login");
+    window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
   };
 
   const ensureSession = async () => {
     try {
-      await api("/api/auth/me");
+      if (!requestId || !state) { setStatus("Giriş isteği eksik", "Hub’dan giriş başlat.", "error"); return; }
+      const account = await api("/api/auth/me");
+      accountName = String(account.user?.username || account.user?.displayName || account.user?.name || "FIMA hesabın");
       const csrf = await api("/api/csrf-token");
       csrfToken = String(csrf?.csrfToken || "");
       if (!csrfToken) throw new Error("Güvenlik anahtarı alınamadı.");
+      await inspectIntent();
     } catch (error) {
       if (error.status === 401) return redirectToLogin();
       setStatus("Hesap oturumu doğrulanamadı", "Sayfayı yenileyip tekrar deneyin.", "error");
@@ -75,7 +81,7 @@
       if (remaining <= 0) {
         window.clearInterval(expiryTimer);
         approveButton.disabled = true;
-        setStatus("Kodun süresi doldu", "FIMA uygulamasından yeni bir kod oluştur.", "error");
+        setStatus("Giriş isteğinin süresi doldu", "Hub’dan girişi yeniden başlat.", "error");
       }
     };
     render();
@@ -96,57 +102,66 @@
     input.value = normalizedCode(input.value);
   });
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const userCode = normalizedCode(input.value);
-    if (userCode.length !== 9) {
-      setStatus("Kod eksik", "FIMA uygulamasında görünen 8 karakterli kodu gir.", "error");
-      input.focus();
-      return;
-    }
-    inspectButton.disabled = true;
-    setStatus("Cihaz doğrulanıyor", "Bekleyen giriş isteği güvenli şekilde aranıyor.");
+  const inspectIntent = async () => {
+    form.hidden = true;
+    approveButton.disabled = true;
+    setStatus("Hesabın kontrol ediliyor", "Cihaz bilgileri hazırlanıyor.");
     try {
-      const context = await api("/api/desktop-login/context", { method: "POST", body: { userCode } });
-      approvedCode = userCode;
+      const context = await api("/api/desktop-login/context", { method: "POST", body: { requestId, state } });
+      approvedCode = requestId;
+      document.getElementById("approval-title").textContent = `Sen ${accountName} misin?`;
+      approveButton.querySelector("span").textContent = `${accountName} olarak devam et`;
+      differentCodeButton.textContent = "Başka bir hesapla giriş yap";
       document.getElementById("device-name").textContent = context.device?.name || "Windows PC";
       document.getElementById("device-meta").textContent = `${context.device?.platform || "Windows"} · FIMA ${context.appVersion || "Desktop"}`;
-      devicePanel.hidden = false;
-      approvalActions.hidden = false;
-      form.hidden = true;
+      devicePanel.hidden = false; approvalActions.hidden = false;
       approveButton.disabled = context.canApprove !== true;
       updateExpiry(context.expiresAt);
-      setStatus(
-        context.status === "approved" ? "Bu istek zaten onaylandı" : "Cihazı dikkatle kontrol et",
-        context.status === "approved" ? "Masaüstü uygulamasına dönerek girişin tamamlanmasını bekle." : "Yalnız cihaz adı ve sürüm sana aitse devam et.",
-        context.status === "approved" ? "success" : "info"
-      );
+      setStatus(context.canApprove ? "Hesabınla devam et" : "Onay Hub'a gönderildi", "Yalnız kendi başlattığın girişe izin ver.");
     } catch (error) {
       if (error.status === 401) return redirectToLogin();
-      setStatus("Kod bulunamadı", "Kod yanlış, süresi dolmuş veya daha önce kullanılmış olabilir.", "error");
-    } finally {
-      inspectButton.disabled = false;
+      setStatus("Giriş isteği geçersiz", "Hub'dan yeniden başlat.", "error");
     }
-  });
+  };
 
   approveButton.addEventListener("click", async () => {
-    if (!approvedCode) return reset();
+    if (!approvedCode) { setStatus("Giriş isteği geçersiz", "Hub’dan yeniden başlat.", "error"); return; }
     approveButton.disabled = true;
     differentCodeButton.disabled = true;
     setStatus("Giriş onaylanıyor", "Tek kullanımlık yetki FIMA masaüstü istemcisine hazırlanıyor.");
     try {
-      await api("/api/desktop-login/approve", { method: "POST", body: { userCode: approvedCode } });
+      const approval = await api("/api/desktop-login/approve", { method: "POST", body: { requestId, state } });
+      if (approval.callbackUri) {
+        const target = new URL(approval.callbackUri);
+        const valid = target.protocol === "http:" && target.hostname === "127.0.0.1" && Number(target.port) >= 1024 && target.pathname === "/auth/callback" && !target.username && !target.password && !target.hash && target.searchParams.get("state") === state && /^[A-Za-z0-9_-]{43}$/.test(target.searchParams.get("code") || "") && [...target.searchParams.keys()].length === 2;
+        if (!valid) throw new Error("Geçersiz geri dönüş adresi");
+        window.location.replace(target.href);
+      }
       setStatus("Cihaz onaylandı", "FIMA uygulamasına dönebilirsin. Bu pencereyi güvenle kapatabilirsin.", "success");
       approveButton.querySelector("span").textContent = "Onaylandı";
     } catch (error) {
       if (error.status === 401) return redirectToLogin();
       approveButton.disabled = false;
       differentCodeButton.disabled = false;
-      setStatus("Onay tamamlanamadı", "İstek sona ermiş olabilir. FIMA uygulamasından yeni kod oluştur.", "error");
+      setStatus("Onay tamamlanamadı", "İstek sona ermiş olabilir. Hub’dan girişi yeniden başlat.", "error");
     }
   });
 
-  differentCodeButton.addEventListener("click", reset);
+  differentCodeButton.addEventListener("click", async () => {
+    differentCodeButton.disabled = true;
+    approveButton.disabled = true;
+    try { await api("/api/auth/logout", { method: "POST", body: {} }); redirectToLogin(); }
+    catch { differentCodeButton.disabled = false; approveButton.disabled = false; setStatus("Hesap değiştirilemedi", "Tekrar dene.", "error"); }
+  });
+  document.getElementById("deny-button").addEventListener("click", async () => {
+    approveButton.disabled = true; differentCodeButton.disabled = true;
+    try {
+      await api("/api/desktop-login/deny", { method: "POST", body: { requestId, state } });
+      approvalActions.hidden = true;
+      if (expiryTimer) clearInterval(expiryTimer);
+      setStatus("Giriş iptal edildi", "Hub bu hesapla giriş yapmayacak.");
+    } catch { setStatus("İstek kapatılamadı", "Hub'dan iptal et veya yeniden dene.", "error"); }
+  });
   window.addEventListener("beforeunload", () => expiryTimer && window.clearInterval(expiryTimer));
   ensureSession();
 })();

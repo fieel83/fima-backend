@@ -625,6 +625,7 @@ const desktopLoginHandlers = createDesktopLoginHandlers({
 });
 app.post("/api/desktop-login/initiate", desktopLoginPublicLimiter, desktopLoginHandlers.initiate);
 app.post("/api/desktop-login/context", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.context);
+app.post("/api/desktop-login/deny", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.deny);
 app.post("/api/desktop-login/approve", desktopLoginApprovalLimiter, requireUser, desktopLoginHandlers.approve);
 app.post("/api/desktop-login/poll", desktopLoginPublicLimiter, desktopLoginHandlers.poll);
 app.post("/api/desktop-login/exchange", desktopLoginPublicLimiter, desktopLoginHandlers.exchange);

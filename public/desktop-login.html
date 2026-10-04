@@ -4,10 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="FIMA masaüstü istemcisinde güvenli hesap oturumu açın.">
+    <meta name="referrer" content="no-referrer">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Masaüstü Girişi | FIMA</title>
     <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
-    <link rel="stylesheet" href="/assets/css/desktop-login.css?v=20260718-1">
+    <link rel="stylesheet" href="/assets/css/desktop-login.css?v=20261004-browser-1">
   </head>
   <body>
     <div class="ambient ambient-a" aria-hidden="true"></div>
@@ -24,9 +25,9 @@
       <section class="intro" aria-labelledby="desktop-login-title">
         <p class="eyebrow">FIMA DESKTOP</p>
         <h1 id="desktop-login-title">Hesabını bu cihaza bağla.</h1>
-        <p class="lead">FIMA uygulamasında gösterilen tek kullanımlık kodu gir. Şifren, lisans anahtarın ve ödeme bilgin masaüstü uygulamasıyla paylaşılmaz.</p>
+        <p class="lead">Tarayıcıdaki hesabını kontrol et ve Hub için devam etmeyi onayla. Şifren, lisans anahtarın ve ödeme bilgin masaüstü uygulamasıyla paylaşılmaz.</p>
         <div class="trust-grid">
-          <article><span>01</span><div><strong>Kısa kod</strong><small>10 dakika içinde sona erer</small></div></article>
+          <article><span>01</span><div><strong>Güvenli tarayıcı</strong><small>10 dakika içinde sona erer</small></div></article>
           <article><span>02</span><div><strong>Cihaz kontrolü</strong><small>Onaydan önce ayrıntıları görürsün</small></div></article>
           <article><span>03</span><div><strong>Tek kullanımlık</strong><small>Onay yalnız bekleyen istemciye gider</small></div></article>
         </div>
@@ -36,10 +37,10 @@
         <div class="card-glow" aria-hidden="true"></div>
         <div class="card-head">
           <span class="status-orb" aria-hidden="true"></span>
-          <div><p>ACCOUNT LINK</p><h2 id="approval-title">Masaüstü kodunu gir</h2></div>
+          <div><p>ACCOUNT LINK</p><h2 id="approval-title">Hesabın kontrol ediliyor…</h2></div>
         </div>
 
-        <form id="code-form" novalidate>
+        <form id="code-form" novalidate hidden>
           <label for="user-code">TEK KULLANIMLIK KOD</label>
           <input id="user-code" name="userCode" type="text" inputmode="text" autocomplete="one-time-code" maxlength="9" placeholder="ABCD-EFGH" spellcheck="false" required>
           <button id="inspect-button" class="primary-action" type="submit"><span>Cihazı kontrol et</span><b aria-hidden="true">→</b></button>
@@ -57,18 +58,19 @@
 
         <div id="approval-actions" class="approval-actions" hidden>
           <button id="approve-button" class="primary-action approve" type="button"><span>Bu cihazda giriş yap</span><b aria-hidden="true">✓</b></button>
-          <button id="different-code" class="secondary-action" type="button">Farklı kod kullan</button>
+          <button id="different-code" class="secondary-action" type="button">Başka bir hesapla giriş yap</button>
+        <button id="deny-button" class="secondary-action" type="button">Bu girişe izin verme</button>
         </div>
 
         <div id="page-status" class="page-status" role="status" aria-live="polite">
           <span aria-hidden="true"></span>
-          <div><strong>FIMA hesabınla devam et</strong><p>Kodu yalnız kendi açtığın FIMA uygulamasından aldıysan onayla.</p></div>
+          <div><strong>FIMA hesabınla devam et</strong><p>Yalnız kendi başlattığın girişe izin ver.</p></div>
         </div>
-        <p class="legal-note">Tanımadığın bir cihazı onaylama. FIMA destek ekibi hiçbir zaman bu kodu senden istemez.</p>
+        <p class="legal-note">Tanımadığın bir cihazı onaylama. FIMA destek ekibi hiçbir zaman şifreni senden istemez.</p>
       </section>
     </main>
 
     <script src="/assets/js/config.js?v=20260526-9"></script>
-    <script src="/assets/js/desktop-login.js?v=20260718-1" defer></script>
+    <script src="/assets/js/desktop-login.js?v=20261004-browser-1" defer></script>
   </body>
 </html>

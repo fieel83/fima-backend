@@ -149,13 +149,14 @@ function fixture() {
   return { prisma, handlers, proof, verifier, state, entitlement };
 }
 
-async function initiate(subject) {
+async function initiate(subject, responseMode) {
   const res = response();
   await subject.handlers.initiate({
     body: {
       hwid: subject.proof.hwid,
       pkceChallenge: desktopPkceChallenge(subject.verifier),
       state: subject.state,
+      ...(responseMode ? { responseMode } : {}),
       appVersion: "0.2.0-candidate",
       deviceName: "  FIMA\u0000 Gaming   PC  ",
       devicePlatform: "Windows 11"
@@ -165,6 +166,87 @@ async function initiate(subject) {
   assert.equal(res.headers["cache-control"], "no-store");
   return res.body;
 }
+
+async function browserIntent(mode = "loopback") {
+  const subject = fixture();
+  if (mode === "loopback") {
+    const stateBytes = crypto.randomBytes(35);
+    stateBytes[0] = 1; stateBytes.writeUInt16BE(49152, 1);
+    subject.state = stateBytes.toString("base64url");
+    subject.proof.state = subject.state;
+  }
+  const login = await initiate(subject, mode);
+  const uri = new URL(login.verificationUri);
+  assert.equal(uri.searchParams.get("state"), subject.state);
+  const body = { requestId: uri.searchParams.get("request"), state: subject.state };
+  return { subject, login, body };
+}
+
+test("browser identity loopback code binds proof and account and is consumed once", async () => {
+  const { subject, login, body } = await browserIntent();
+  const wrongState = response();
+  await subject.handlers.context({ body: { ...body, state: "X".repeat(47) }, user: { id: "user-a" } }, wrongState);
+  assert.equal(wrongState.statusCode, 400);
+  const approval = response();
+  await subject.handlers.approve({ body, user: { id: "user-a" }, browserSession: "browser-v1" }, approval);
+  assert.equal(approval.statusCode, 200);
+  const callback = new URL(approval.body.callbackUri);
+  assert.equal(callback.origin, "http://127.0.0.1:49152");
+  const code = callback.searchParams.get("code");
+  for (const badProof of [{ state: "X".repeat(47) }, { pkceVerifier: "X".repeat(43) }, { hwid: "OTHER-DEVICE" }]) {
+    const rejected = response();
+    await subject.handlers.exchange({ body: { ...subject.proof, deviceCode: login.deviceCode, code, ...badProof } }, rejected);
+    assert.equal(rejected.statusCode, 400);
+    assert.equal(subject.prisma.records[0].status, "approved");
+  }
+  const wrongAccount = response();
+  await subject.handlers.context({ body, user: { id: "user-b" } }, wrongAccount);
+  assert.equal(wrongAccount.statusCode, 400);
+  const polls = response();
+  await subject.handlers.poll({ body: { ...subject.proof, deviceCode: login.deviceCode } }, polls);
+  assert.equal(polls.statusCode, 202);
+  const results = await Promise.all([1, 2].map(async () => {
+    const res = response(); await subject.handlers.exchange({ body: { ...subject.proof, deviceCode: login.deviceCode, code } }, res); return res;
+  }));
+  assert.deepEqual(results.map(r => r.statusCode).sort(), [200, 410]);
+  assert.equal(results.find(r => r.statusCode === 200).body.entitlementToken, "signed-account-token");
+  const replay = response();
+  await subject.handlers.poll({ body: { ...subject.proof, deviceCode: login.deviceCode } }, replay);
+  assert.equal(replay.statusCode, 410);
+});
+
+test("expired loopback code recovers through proof-bound poll then identical single-use exchange", async () => {
+  const { subject, login, body } = await browserIntent();
+  const approval = response();
+  await subject.handlers.approve({ body, user: { id: "user-a" }, browserSession: "browser-v1" }, approval);
+  const originalCode = new URL(approval.body.callbackUri).searchParams.get("code");
+  subject.prisma.records[0].authorizationCodeExpiresAt = new Date(Date.now() - 1000);
+  const recovery = response();
+  await subject.handlers.poll({ body: { ...subject.proof, deviceCode: login.deviceCode } }, recovery);
+  assert.equal(recovery.body.status, "authorization_code");
+  assert.notEqual(recovery.body.code, originalCode);
+  const stale = response(); await subject.handlers.exchange({ body: { ...subject.proof, deviceCode: login.deviceCode, code: originalCode } }, stale);
+  assert.equal(stale.statusCode, 410);
+  const accepted = response(); await subject.handlers.exchange({ body: { ...subject.proof, deviceCode: login.deviceCode, code: recovery.body.code } }, accepted);
+  assert.equal(accepted.statusCode, 200);
+});
+
+test("browser deny and expiry stop approval; polling fallback has no redirect URI", async () => {
+  for (const action of ["deny", "expire"]) {
+    const { subject, body } = await browserIntent();
+    if (action === "deny") {
+      const denied = response(); await subject.handlers.deny({ body, user: { id: "user-a" } }, denied);
+      assert.equal(denied.body.status, "cancelled");
+    } else subject.prisma.records[0].expiresAt = new Date(Date.now() - 1000);
+    const approval = response();
+    await subject.handlers.approve({ body, user: { id: "user-a" }, browserSession: "browser-v1" }, approval);
+    assert.equal(approval.statusCode, 400);
+  }
+  const { subject, body } = await browserIntent("authorization_code");
+  const approval = response();
+  await subject.handlers.approve({ body, user: { id: "user-a" }, browserSession: "browser-v1" }, approval);
+  assert.equal(approval.statusCode, 200); assert.equal(approval.body.callbackUri, undefined);
+});
 
 test("desktop-login route lifecycle is pending, approved and consumed exactly once", async () => {
   const subject = fixture();

@@ -26,6 +26,7 @@ function cleanDeviceLabel(value, fallback, maximumLength = 80) {
 }
 
 function noStore(res) {
+  res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
 }
@@ -37,6 +38,23 @@ function publicFailure(res, status = 400, error = "desktop_login_invalid_or_expi
     error,
     message: "This desktop sign-in request is invalid, expired, or no longer available."
   });
+}
+
+// Loopback port is cryptographically bound by the existing state hash. No schema change.
+function loopbackTarget(state) {
+  if (!/^[A-Za-z0-9_-]{47}$/.test(String(state || ""))) return null;
+  const bytes = Buffer.from(state, "base64url");
+  if (bytes.length !== 35 || bytes[0] !== 1 || bytes.toString("base64url") !== state) return null;
+  const port = bytes.readUInt16BE(1);
+  return port >= 1024 ? `http://127.0.0.1:${port}/auth/callback` : null;
+}
+function browserLookup(body) {
+  if (body?.requestId) {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(body.requestId)) return null;
+    return { id: body.requestId };
+  }
+  const userCodeHash = desktopUserCodeHash(normalizeDesktopUserCode(body?.userCode));
+  return userCodeHash ? { userCodeHash } : null;
 }
 
 function epochProof(request, body, deviceIdHash) {
@@ -144,6 +162,7 @@ export function createDesktopLoginHandlers({
         const deviceIdHash = hashDeviceId(hwid);
         if (!hwid || !deviceIdHash) return publicFailure(res);
 
+        if (req.body?.responseMode === "loopback" && !loopbackTarget(req.body?.state)) return publicFailure(res);
         let created = null;
         let publicCodes = null;
         for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt += 1) {
@@ -157,7 +176,7 @@ export function createDesktopLoginHandlers({
             created = await prisma.desktopLoginRequest.create({
               data: {
                 ...request.record,
-                callbackRequired: req.body?.responseMode === "authorization_code",
+                callbackRequired: ["authorization_code", "loopback"].includes(req.body?.responseMode),
                 environmentRisk: normalizeDeviceEnvironmentRisk(req.body?.environmentRisk),
                 deviceName: cleanDeviceLabel(req.body?.deviceName, "Windows PC"),
                 devicePlatform: cleanDeviceLabel(req.body?.devicePlatform, "Windows", 48)
@@ -174,7 +193,7 @@ export function createDesktopLoginHandlers({
           success: true,
           deviceCode: publicCodes.deviceCode,
           userCode: publicCodes.userCode,
-          verificationUri: `${String(frontendUrl()).replace(/\/$/, "")}${desktopLoginPolicy.verificationPath}${created.callbackRequired ? `?state=${encodeURIComponent(publicCodes.state)}` : ""}`,
+          verificationUri: `${String(frontendUrl()).replace(/\/$/, "")}${desktopLoginPolicy.verificationPath}${created.callbackRequired ? `?request=${encodeURIComponent(created.id)}&state=${encodeURIComponent(publicCodes.state)}` : ""}`,
           expiresAt: created.expiresAt.toISOString(),
           intervalMs: POLL_INTERVAL_MS
         });
@@ -186,12 +205,12 @@ export function createDesktopLoginHandlers({
 
     context: async (req, res) => {
       noStore(res);
-      const userCode = normalizeDesktopUserCode(req.body?.userCode);
-      const userCodeHash = desktopUserCodeHash(userCode);
-      if (!userCodeHash) return publicFailure(res);
-      const request = await prisma.desktopLoginRequest.findUnique({ where: { userCodeHash } });
+      const lookup = browserLookup(req.body);
+      if (!lookup) return publicFailure(res);
+      const request = await prisma.desktopLoginRequest.findUnique({ where: lookup });
       const now = new Date();
       if (!request || requestExpired(request, now)) return publicFailure(res);
+      if (req.body?.requestId && !request.callbackRequired) return publicFailure(res);
       if (request.callbackRequired && desktopStateHash(req.body?.state) !== request.stateHash) return publicFailure(res);
       if (request.status === "approved" && request.userId !== req.user.id) return publicFailure(res);
       if (!(["pending", "approved"].includes(request.status))) return publicFailure(res);
@@ -211,9 +230,8 @@ export function createDesktopLoginHandlers({
 
     approve: async (req, res) => {
       noStore(res);
-      const userCode = normalizeDesktopUserCode(req.body?.userCode);
-      const userCodeHash = desktopUserCodeHash(userCode);
-      if (!userCodeHash || !req.user?.id) return publicFailure(res);
+      const lookup = browserLookup(req.body);
+      if (!lookup || !req.user?.id) return publicFailure(res);
       try {
         const approval = await prisma.$transaction(async (db) => {
           await lockAccount(db, req.user.id);
@@ -227,8 +245,9 @@ export function createDesktopLoginHandlers({
             throw loginFailure(403, "desktop_login_authorization_expired");
           }
           const now = new Date();
-          const request = await db.desktopLoginRequest.findUnique({ where: { userCodeHash } });
+          const request = await db.desktopLoginRequest.findUnique({ where: lookup });
           if (!request || requestExpired(request, now)) throw loginFailure(400);
+          if (req.body?.requestId && !request.callbackRequired) throw loginFailure(400);
           const callbackState = String(req.body?.state || "").trim();
           if (request.callbackRequired && desktopStateHash(callbackState) !== request.stateHash) throw loginFailure(400);
           if (request.status === "approved" && request.userId === req.user.id) {
@@ -244,7 +263,7 @@ export function createDesktopLoginHandlers({
           });
           if (updated.count !== 1) throw loginFailure(400);
           return { success: true, status: "approved", expiresAt: request.expiresAt.toISOString(),
-            ...(authorizationCode ? { callbackUri: `fima://auth/callback?code=${encodeURIComponent(authorizationCode)}&state=${encodeURIComponent(callbackState)}` } : {}) };
+            ...(authorizationCode && loopbackTarget(callbackState) ? { callbackUri: `${loopbackTarget(callbackState) || "fima://auth/callback"}?code=${encodeURIComponent(authorizationCode)}&state=${encodeURIComponent(callbackState)}` } : {}) };
         });
         return res.json(approval);
       } catch (error) {
@@ -288,6 +307,20 @@ export function createDesktopLoginHandlers({
         });
         return res.status(410).json({ success: false, status: "expired", error: "desktop_login_expired" });
       }
+      if (request.callbackRequired && request.status === "approved" && request.userId &&
+          new Date(request.authorizationCodeExpiresAt || 0) <= now) {
+        // Recover only after the original callback code expires; never rotate a live code.
+        const code = createDesktopAuthorizationCode();
+        const changed = await prisma.desktopLoginRequest.updateMany({
+          where: { id: request.id, status: "approved", userId: request.userId,
+            authorizationCodeHash: request.authorizationCodeHash, authorizationCodeConsumedAt: null,
+            authorizationCodeExpiresAt: { lte: now }, expiresAt: { gt: now } },
+          data: { authorizationCodeHash: desktopAuthorizationCodeHash(code),
+            authorizationCodeExpiresAt: new Date(Math.min(request.expiresAt.getTime(), now.getTime() + 60_000)) }
+        });
+        if (changed.count === 1) return res.json({ success: true, status: "authorization_code", code });
+      }
+      if (request.callbackRequired && request.status === "consumed") return publicFailure(res, 410);
       if (request.status === "pending" || (request.callbackRequired && request.status === "approved")) {
         return res.status(202).json({ success: true, status: "pending", intervalMs: POLL_INTERVAL_MS, expiresAt: request.expiresAt.toISOString() });
       }
@@ -296,6 +329,21 @@ export function createDesktopLoginHandlers({
       } catch (error) {
         return publicFailure(res, error.desktopStatus || 503, error.desktopCode || "desktop_login_unavailable");
       }
+    },
+
+    deny: async (req, res) => {
+      noStore(res);
+      const lookup = browserLookup(req.body);
+      if (!lookup || !req.user?.id) return publicFailure(res);
+      const request = await prisma.desktopLoginRequest.findUnique({ where: lookup });
+      if (!request || !request.callbackRequired || desktopStateHash(req.body?.state) !== request.stateHash) return publicFailure(res);
+      const now = new Date();
+      const changed = await prisma.desktopLoginRequest.updateMany({
+        where: { id: request.id, status: "pending", userId: null, expiresAt: { gt: now } },
+        data: { status: "cancelled", cancelledAt: now }
+      });
+      if (changed.count !== 1) return publicFailure(res, 410);
+      return res.json({ success: true, status: "cancelled" });
     },
 
     cancel: async (req, res) => {

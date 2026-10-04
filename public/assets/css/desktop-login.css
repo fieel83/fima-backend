@@ -121,3 +121,11 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* Browser identity confirmation */
+[hidden] { display: none !important; }
+.approval-card { border-radius: 28px; background: linear-gradient(145deg,rgba(34,37,62,.92),rgba(13,16,28,.98)); box-shadow: 0 24px 90px rgba(0,0,0,.4),inset 0 1px rgba(255,255,255,.07); }
+.primary-action { min-height: 52px; }
+button:focus-visible,a:focus-visible { outline: 2px solid #aaa4ff; outline-offset: 4px; }
+.secondary-action { min-height: 44px; }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;transition:none!important; } }
