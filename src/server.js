@@ -5123,6 +5123,9 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
         if (result.validationSuccess) await prisma.validationLog.create({ data: result.validationSuccess }).catch(() => {});
       }
     });
+    if (refreshed.status === 200 && verified.payload.desktopAuthSession === true) {
+      refreshed.body.authSessionId = verified.payload.sessionId;
+    }
     return res.status(refreshed.status).json(refreshed.body);
   } catch (error) {
     if (error.entitlementReason && Number.isInteger(error.entitlementStatus)) {

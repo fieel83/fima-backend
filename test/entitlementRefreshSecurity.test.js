@@ -118,6 +118,14 @@ function routeFixture({ user = originalUser, accessUser = user, payload = issue(
   const nativeTransaction = f.db.$transaction;
   f.db.$transaction = callback => nativeTransaction(async tx => {
     tx.license = { async findUnique() { return license; } };
+    const accountQuery = tx.$queryRaw;
+    tx.$queryRaw = async (parts, ...args) => {
+      if (parts.join('?').includes('desktop_auth_sessions')) return;
+      return accountQuery(parts, ...args);
+    };
+    tx.desktopAuthSession = { async findUnique() {
+      return { userId: payload.userId, deviceIdHash: payload.hwidHash, revokedAt: null };
+    } };
     return callback(tx);
   });
   f.db.validationLog = { async create() {} };
@@ -160,4 +168,19 @@ test('actual account-only handler revokes stale generation before resolver', asy
 });
 test('actual account-only handler resolves through the locked transaction', async () => {
   const f = routeFixture({ licenseId: null }); const result = await f.request(); assert.equal(result.status, 200); assert.equal(f.signed(), true);
+});
+
+for (const licenseId of ['license-a', null]) test(`desktop refresh preserves auth session ID (${licenseId || 'account-only'})`, async () => {
+  const authSessionId = '01234567-89ab-4cde-8fab-0123456789ab';
+  const payload = issue(originalUser, { authSessionId }).payload;
+  const result = await routeFixture({ payload, licenseId }).request();
+  assert.equal(result.status, 200);
+  assert.equal(result.body.authSessionId, authSessionId);
+  if (licenseId) assert.equal(verifyAppEntitlement(result.body.entitlementToken).payload.sessionId, result.body.authSessionId);
+});
+
+test('legacy refresh does not invent a desktop auth session', async () => {
+  const result = await routeFixture().request();
+  assert.equal(result.status, 200);
+  assert.equal(result.body.authSessionId, undefined);
 });
