@@ -85,7 +85,7 @@ import { adminRbacSummary } from "./adminRbac.js";
 import { ADMIN_COOKIE_NAME, clearAdminCookie, createAdminToken, isAdminAuthenticated, requireAdmin, setAdminCookie } from "./adminAuth.js";
 import { csrfTokenPayload, requireCsrfForCookieMutations } from "./csrf.js";
 import { revealAccountIdentity } from "./accountIdentityReveal.js";
-import { minimumAppVersionStatus } from "./appVersionPolicy.js";
+import { minimumAppVersionStatus, entitlementVersionStatus } from "./appVersionPolicy.js";
 import { registerDesktopCommerceRoutes } from "./desktopCommerceRoutes.js";
 import {
   createManualRobuxOrder,
@@ -678,7 +678,7 @@ const desktopLoginHandlers = createDesktopLoginHandlers({
   hashDeviceId,
   frontendUrl,
   resolveEntitlementForUser: async (args) => {
-    const result = await resolveDesktopEntitlementForUser(args);
+    const result = await resolveDesktopEntitlementForUser({ ...args, clientApplication: "fima-hub" });
     const verified = verifyAppEntitlement(result?.entitlementToken);
     const payload = verified.payload;
     // Require the exact signed session/account/device produced in the caller transaction.
@@ -4979,8 +4979,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
   const token = extractEntitlementToken(req);
   const hwid = normalizeHwid(req.body?.hwid);
   const appVersion = String(req.body?.appVersion || "").trim().slice(0, 80) || null;
-  const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
-  const versionStatus = minimumAppVersionStatus(appVersion, minSupportedAppVersion);
+  let minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
 
   try {
     if (!entitlementSecretStatus().configured) {
@@ -4989,18 +4988,6 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
         canUseApp: false,
         reason: "entitlement_unavailable",
         message: licenseReasonMessage("entitlement_unavailable")
-      });
-    }
-
-    if (versionStatus.updateRequired) {
-      const updateTarget = await latestAppUpdateTarget(versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION);
-      return res.status(426).json({
-        valid: false,
-        canUseApp: false,
-        reason: "update_required",
-        message: "A security update is required. Please update Fima Macro.",
-        latestVersion: updateTarget.latestVersion,
-        downloadUrl: updateTarget.downloadUrl
       });
     }
 
@@ -5032,6 +5019,22 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
       });
     }
 
+    const versionStatus = entitlementVersionStatus(appVersion, verified.payload, {
+      macroMinimum: minSupportedAppVersion, hubMinimum: env("MIN_SUPPORTED_HUB_VERSION", "0.2.0")
+    });
+    minSupportedAppVersion = versionStatus.minimumVersion || "";
+    if (versionStatus.updateRequired) {
+      const updateTarget = await latestAppUpdateTarget(versionStatus.minimumVersion || DEFAULT_MIN_SUPPORTED_APP_VERSION);
+      return res.status(426).json({
+        valid: false,
+        canUseApp: false,
+        reason: "update_required",
+        message: "A security update is required. Please update Fima Macro.",
+        latestVersion: updateTarget.latestVersion,
+        downloadUrl: updateTarget.downloadUrl
+      });
+    }
+
     const incomingHwidHash = hashDeviceId(hwid);
     if (!incomingHwidHash || incomingHwidHash !== verified.payload.hwidHash) {
       return res.status(403).json({
@@ -5050,7 +5053,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
           if (!isStrictAccountOnlyEntitlementPayload(verified.payload) || !authoritativeUser) {
             return { status: 401, body: { valid: false, canUseApp: false, reason: "invalid_entitlement_payload", message: licenseReasonMessage("invalid_entitlement_payload") } };
           }
-          return { status: 200, body: await resolveDesktopEntitlementForUser({ user: authoritativeUser, hwid, appVersion, db: tx, authSessionId: verified.payload.desktopAuthSession === true ? verified.payload.sessionId : null }) };
+          return { status: 200, body: await resolveDesktopEntitlementForUser({ user: authoritativeUser, hwid, appVersion, clientApplication: verified.payload.clientApplication, db: tx, authSessionId: verified.payload.desktopAuthSession === true ? verified.payload.sessionId : null }) };
         }
 
         let license = await tx.license.findUnique({ where: { id: verified.payload.licenseId } });
@@ -5086,6 +5089,7 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
           user: authoritativeUser,
           hwid,
           appVersion,
+          clientApplication: verified.payload.clientApplication,
           minSupportedAppVersion,
           licenseStatus: "active",
           ownerAdminAccess: ownerAdminAccessForLicense(license, hwid, "valid", accountAccess),
@@ -9247,7 +9251,7 @@ function ownerLicenseBindingState(license, hwid) {
   return { ok: true, reason: "owner_key_bound" };
 }
 
-async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, authSessionId = null, db = prisma }) {
+async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, clientApplication = "fima-macro", authSessionId = null, db = prisma }) {
   const normalizedHwid = normalizeHwid(hwid);
   if (!user?.id || !normalizedHwid) {
     const error = new Error("Desktop entitlement identity is invalid.");
@@ -9260,7 +9264,9 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, authSe
     accountId: user.id, hwidHash: hashDeviceId(normalizedHwid)
   });
   const now = new Date();
-  const minSupportedAppVersion = env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
+  const minSupportedAppVersion = clientApplication === "fima-hub"
+    ? env("MIN_SUPPORTED_HUB_VERSION", "0.2.0")
+    : env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
   const candidates = await db.license.findMany({
     where: {
       customerEmail: { equals: user.email, mode: "insensitive" },
@@ -9311,6 +9317,7 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, authSe
       user,
       hwid: normalizedHwid,
       appVersion,
+      clientApplication,
       minSupportedAppVersion,
       licenseStatus: "active",
       ownerAdminAccess,
@@ -9340,6 +9347,7 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, authSe
     user,
     hwid: normalizedHwid,
     appVersion,
+    clientApplication,
     minSupportedAppVersion,
     licenseStatus: "account_only",
     allowedFeatures: [],

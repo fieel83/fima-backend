@@ -1,3 +1,4 @@
+import { entitlementVersionStatus } from "../src/appVersionPolicy.js";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -120,7 +121,7 @@ function routeFixture({ user = originalUser, accessUser = user, payload = issue(
     return callback(tx);
   });
   f.db.validationLog = { async create() {} };
-  const context = { app: { post(_path, _limiter, fn) { handler = fn; } }, entitlementRefreshLimiter: {},
+  const context = { entitlementVersionStatus, app: { post(_path, _limiter, fn) { handler = fn; } }, entitlementRefreshLimiter: {},
     extractEntitlementToken: () => 'signed-fixture', normalizeHwid: value => value, env: (_key, fallback) => fallback,
     DEFAULT_MIN_SUPPORTED_APP_VERSION: '1.0.130', minimumAppVersionStatus: () => ({ updateRequired: false }),
     entitlementSecretStatus: () => ({ configured: true }), licenseReasonMessage: value => value,

@@ -51,3 +51,10 @@ export function minimumAppVersionStatus(appVersion, minimumVersion) {
     appVersion: normalizedAppVersion
   };
 }
+
+// Application identity must come from a verified entitlement, never request data.
+export function entitlementVersionStatus(appVersion, verifiedPayload, { macroMinimum, hubMinimum = "0.2.0" }) {
+  const hub = verifiedPayload?.clientApplication === "fima-hub";
+  const version = hub ? String(appVersion || "").replace(/-(?:[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)$/, "") : appVersion;
+  return { ...minimumAppVersionStatus(version, hub ? hubMinimum : macroMinimum), clientApplication: hub ? "fima-hub" : "fima-macro" };
+}
