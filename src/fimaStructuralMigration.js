@@ -63,7 +63,8 @@ function advance(inventory, step, direction) {
 
 // save must durably commit before returning. The caller holds a guild mutation lease.
 // A crash after Discord accepts a write is recovered by exact whole-inventory comparison.
-export async function executeFimaStructuralMigration(plan, { inspect, edit, save, checkVersion }, { rollback = false } = {}) {
+export async function executeFimaStructuralMigration(plan, { inspect, edit, save, checkVersion }, { rollback = false, maxSteps = Infinity } = {}) {
+  if (maxSteps !== Infinity && (!Number.isInteger(maxSteps) || maxSteps < 1)) throw fimaOperationError('invalid_migration_batch', 400);
   const direction = rollback ? 'before' : 'after';
   const completed = rollback ? 'rolled_back' : 'completed';
   if (plan.status === completed) return plan;
@@ -78,7 +79,8 @@ export async function executeFimaStructuralMigration(plan, { inspect, edit, save
     await save(plan);
   }
   const steps = rollback ? [...plan.steps].reverse() : plan.steps;
-  for (let cursor = plan.cursor; cursor < steps.length; cursor++) {
+  const batchEnd = Math.min(steps.length, plan.cursor + maxSteps);
+  for (let cursor = plan.cursor; cursor < batchEnd; cursor++) {
     await checkVersion();
     const step = steps[cursor];
     const expectedNext = advance(plan.expectedInventory, step, direction);
@@ -94,6 +96,10 @@ export async function executeFimaStructuralMigration(plan, { inspect, edit, save
       journal: [...(plan.journal || []), { cursor, objectId: step.objectId, direction, verified: true }] };
     await save(plan);
   }
+  // Release the guild lease between verified batches rather than keeping one
+  // HTTP request open for an entire server migration. Resume uses the same
+  // immutable plan and exact inventory reconciliation above.
+  if (plan.cursor < steps.length) return plan;
   await checkVersion();
   if (fimaInventoryHash(await inspect()) !== fimaInventoryHash(plan.expectedInventory)) throw fimaOperationError('migration_drift_detected');
   plan = { ...plan, status: completed };

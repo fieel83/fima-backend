@@ -266,6 +266,29 @@ test('HTTP migration cannot bypass backup, expiry during capture, or integration
   } finally { await f.close(); }
 });
 
+test('HTTP migration returns durable batch progress and resumes the same verified plan', async () => {
+  const f = await operationsFixture();
+  try {
+    const categoryId = '1420401493260894248';
+    f.inventory.channels.push({ id: categoryId, name: 'WELCOME', type: 4, parentId: null });
+    const before = structuredClone(f.inventory);
+    const preview = await f.request('/migration/preview', { expectedVersion: 0, changes: [
+      { kind: 'channel', objectId: channelId, name: 'community-uploads' },
+      { kind: 'channel', objectId: categoryId, name: 'START' }
+    ] });
+    assert.equal(preview.status, 200);
+    const body = { planId: preview.data.planId };
+    const first = await f.request('/migration/apply', body);
+    assert.equal(first.data.status, 'applying'); assert.equal(first.data.completedSteps, 1); assert.equal(first.data.totalSteps, 2);
+    assert.equal(f.delivery.edits, 1);
+    const second = await f.request('/migration/apply', body);
+    assert.equal(second.data.status, 'completed'); assert.equal(second.data.completedSteps, 2); assert.equal(f.delivery.edits, 2);
+    assert.equal((await f.request('/migration/rollback', body)).data.status, 'rolling_back');
+    assert.equal((await f.request('/migration/rollback', body)).data.status, 'rolled_back');
+    assert.deepEqual(f.inventory, before); assert.equal(f.delivery.edits, 4);
+  } finally { await f.close(); }
+});
+
 test('HTTP category review deferral is explicit, durable and cannot allow channel edits', async () => {
   const f = await operationsFixture();
   try {

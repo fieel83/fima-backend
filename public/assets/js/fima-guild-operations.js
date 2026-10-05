@@ -128,7 +128,17 @@ export async function renderFimaOperations(panel, payload, context) {
       const migrationOutput = migrationPanel.querySelector('[data-migration-preview]');
       let migrationPlan = null;
       migrationForm.addEventListener('input', () => { migrationPlan = null; migrationOutput.replaceChildren(); setDirty(true); });
-      const applyMigration = async planId => { const result = await post('/migration/apply', { planId }); if (current()) { setDirty(false); say(`Geçiş: ${result.status}.`); await refresh(); } };
+      const applyMigration = async (planId, rollback = false) => {
+        let previous = -1;
+        while (current()) {
+          const result = await post(rollback ? '/migration/rollback' : '/migration/apply', { planId });
+          if (!current()) return;
+          say(`Geçiş: ${result.completedSteps}/${result.totalSteps} değişiklik doğrulandı.`);
+          if (!['applying', 'rolling_back'].includes(result.status)) { setDirty(false); await refresh(); return; }
+          if (result.completedSteps <= previous) throw new Error('Geçiş ilerlemedi. Geçmişten kontrol ederek devam et.');
+          previous = result.completedSteps;
+        }
+      };
       migrationForm.addEventListener('submit', event => {
         event.preventDefault();
         act(migrationForm.querySelector('button'), async fields => {
@@ -151,7 +161,7 @@ export async function renderFimaOperations(panel, payload, context) {
         });
       });
       for (const button of migrationPanel.querySelectorAll('[data-migration-apply]')) button.onclick = () => act(button, () => applyMigration(button.dataset.migrationApply));
-      for (const button of migrationPanel.querySelectorAll('[data-migration-rollback]')) button.onclick = () => act(button, async () => { await post('/migration/rollback', { planId: button.dataset.migrationRollback }); if (current()) { setDirty(false); await refresh(); } });
+      for (const button of migrationPanel.querySelectorAll('[data-migration-rollback]')) button.onclick = () => act(button, () => applyMigration(button.dataset.migrationRollback, true));
       return;
     }
     const polls = await request(root + '/polls');

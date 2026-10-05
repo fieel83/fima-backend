@@ -114,8 +114,8 @@ export function createFimaGuildOperationsRouter({ prisma, authenticate, csrf, au
         await store(tx, `fima_plan_${plan.id}`, value);
         await audit(tx, req, 'fima_migration_checkpoint', { planId: plan.id, status: value.status, cursor: value.cursor, pendingStep: value.pendingStep ?? null });
       }, { isolationLevel: 'Serializable' })
-    }, { rollback });
-    return { planId: result.id, status: result.status, completedSteps: result.cursor, journal: result.journal };
+    }, { rollback, maxSteps: 1 });
+    return { planId: result.id, status: result.status, completedSteps: result.cursor, totalSteps: result.steps.length, journal: result.journal };
   }
   router.post('/setup/preview', run(async req => {
     const { config } = await readConfig(prisma, req.fima.guildId);

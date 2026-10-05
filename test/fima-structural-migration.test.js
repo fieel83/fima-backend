@@ -65,6 +65,31 @@ test('restart reconciles a write accepted by Discord before checkpoint without d
   const result = await executeFimaStructuralMigration(f.stored, f.io);
   assert.equal(result.status, 'completed'); assert.equal(f.edits, 2); assert.equal(result.journal.length, 2);
 });
+
+test('bounded requests persist progress and resume apply and rollback without duplicate writes', async () => {
+  const f = fixture();
+  const first = await executeFimaStructuralMigration(f.plan, f.io, { maxSteps: 1 });
+  assert.equal(first.status, 'applying'); assert.equal(first.cursor, 1); assert.equal(f.edits, 1);
+  assert.deepEqual(f.stored, first);
+  const applied = await executeFimaStructuralMigration(f.stored, f.io, { maxSteps: 1 });
+  assert.equal(applied.status, 'completed'); assert.equal(applied.cursor, 2); assert.equal(f.edits, 2);
+  const reverse = await executeFimaStructuralMigration(f.stored, f.io, { rollback: true, maxSteps: 1 });
+  assert.equal(reverse.status, 'rolling_back'); assert.equal(reverse.cursor, 1); assert.equal(f.edits, 3);
+  await executeFimaStructuralMigration(f.stored, f.io, { rollback: true, maxSteps: 1 });
+  assert.equal(f.stored.status, 'rolled_back'); assert.deepEqual(f.live, inventory()); assert.equal(f.edits, 4);
+});
+
+test('drift between batches stops the next write and invalid batch limits cannot mutate', async () => {
+  const f = fixture();
+  for (const maxSteps of [0, -1, 1.5, NaN, '1']) {
+    await assert.rejects(executeFimaStructuralMigration(f.plan, f.io, { maxSteps }), /invalid_migration_batch/);
+  }
+  assert.equal(f.edits, 0); assert.equal(f.stored, undefined);
+  await executeFimaStructuralMigration(f.plan, f.io, { maxSteps: 1 });
+  f.live.roles[0].permissions = '8';
+  await assert.rejects(executeFimaStructuralMigration(f.stored, f.io, { maxSteps: 1 }), /migration_drift_detected/);
+  assert.equal(f.edits, 1); assert.equal(f.stored.cursor, 1);
+});
 test('permissions or unrelated inventory drift stop before editing or rollback', async () => {
   const f = fixture(); f.live.channels[0].permissionOverwrites[0].deny = '0';
   // Initial expected inventory must be an immutable durable snapshot.
