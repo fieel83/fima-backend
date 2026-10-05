@@ -63,3 +63,26 @@ test('backup requires readback checksum, guild ownership and all restoration cap
   backup.restoreCapabilities.channels = false; assert.throws(() => assertFimaStructuralBackup(backup, guildId));
   payload.restoreCapabilities.contentArchive = false; assert.throws(() => assertFimaStructuralBackup(createParadiseBackupEnvelope(payload), guildId));
 });
+
+test('staged takeover defers only category label review and records outstanding applications', () => {
+  const live = inventory();
+  live.integrations = [{ id: 'external-app', dependencyScope: 'unknown' }];
+  const category = { kind: 'channel', objectId: '200', name: 'START' };
+  const options = { deferCategoryApplicationReview: true };
+  assert.throws(() => buildFimaStructuralSteps(live, [category]), /external_dependency/);
+  assert.throws(() => buildFimaStructuralSteps(live, [category], { deferCategoryApplicationReview: 'true' }), /external_dependency/);
+  const [step] = buildFimaStructuralSteps(live, [category], options);
+  assert.deepEqual(step.applicationReview, { status: 'deferred_category_label_only', integrationIds: ['external-app'] });
+  assert.deepEqual(step.after, { name: 'START' });
+  assert.equal(step.permissionImpact, 'NO CHANGE');
+  for (const change of [...changes, { ...category, parentId: null }, { ...category, permissions: '8' }]) {
+    assert.throws(() => buildFimaStructuralSteps(live, [change], options));
+  }
+  for (const reference of [{ destinationChannelId: '200' }, { dependencyReferences: ['200'] }]) {
+    live.integrations.push(reference);
+    assert.throws(() => buildFimaStructuralSteps(live, [category], options), /external_dependency/);
+    live.integrations.pop();
+  }
+  live.errors.push('applications_not_accessible');
+  assert.throws(() => buildFimaStructuralSteps(live, [category], options), /inventory_incomplete/);
+});

@@ -3,7 +3,7 @@ import { validateParadiseBackupEnvelope } from './paradiseBackupIntegrity.js';
 
 // This executor deliberately has no delete, create, permission or webhook operation.
 // Every write targets the original Discord object and can be reconciled by reading it.
-export function buildFimaStructuralSteps(inventory, changes) {
+export function buildFimaStructuralSteps(inventory, changes, { deferCategoryApplicationReview = false } = {}) {
   if (inventory.errors?.length) throw fimaOperationError('migration_inventory_incomplete');
   if (!Array.isArray(changes) || !changes.length || changes.length > 100) throw fimaOperationError('invalid_migration_changes', 400);
   const seen = new Set();
@@ -14,9 +14,14 @@ export function buildFimaStructuralSteps(inventory, changes) {
     const row = rows.find(item => item.id === change.objectId);
     if (!row || row.managed || row.id === inventory.guildId || seen.has(row.id)) throw fimaOperationError('migration_object_not_editable');
     seen.add(row.id);
-    // Unverified destinations and application dependencies cannot be overridden by client input.
-    if (inventory.integrations?.some(item => item.dependencyScope === 'unknown'
-      || item.destinationChannelId === row.id || item.dependencyReferences?.includes(row.id))) throw fimaOperationError('migration_external_dependency_unverified');
+    // An explicit staged takeover can defer unknown application settings ONLY for
+    // category labels. Known references, channel/role edits and parent changes
+    // remain protected; this does not certify a provider as migrated or healthy.
+    const deferReview = deferCategoryApplicationReview === true && change.kind === 'channel'
+      && row.type === 4 && !Object.hasOwn(change, 'parentId');
+    if (inventory.integrations?.some(item => item.destinationChannelId === row.id
+      || item.dependencyReferences?.includes(row.id)
+      || (item.dependencyScope === 'unknown' && !deferReview))) throw fimaOperationError('migration_external_dependency_unverified');
     const before = { name: row.name };
     const after = { name: row.name };
     if (Object.hasOwn(change, 'name')) {
@@ -28,7 +33,8 @@ export function buildFimaStructuralSteps(inventory, changes) {
       before.parentId = row.parentId ?? null; after.parentId = change.parentId;
     }
     if (fimaSnapshotHash(before) === fimaSnapshotHash(after)) throw fimaOperationError('migration_has_no_change', 400);
-    return { kind: change.kind, objectId: row.id, type: row.type, before, after, permissionImpact: 'NO CHANGE', action: 'EDIT ORIGINAL', rollbackCapability: 'original_object_metadata' };
+    return { kind: change.kind, objectId: row.id, type: row.type, before, after, permissionImpact: 'NO CHANGE', action: 'EDIT ORIGINAL', rollbackCapability: 'original_object_metadata',
+      ...(deferReview ? { applicationReview: { status: 'deferred_category_label_only', integrationIds: (inventory.integrations || []).filter(item => item.dependencyScope === 'unknown').map(item => item.id) } } : {}) };
   });
 }
 

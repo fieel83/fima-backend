@@ -250,3 +250,24 @@ test('HTTP migration cannot bypass backup, expiry during capture, or integration
     assert.equal((await f.request('/migration/preview', change)).data.error, 'migration_external_dependency_unverified');
   } finally { await f.close(); }
 });
+
+test('HTTP category review deferral is explicit, durable and cannot allow channel edits', async () => {
+  const f = await operationsFixture();
+  try {
+    const categoryId = '1420401493260894248';
+    f.inventory.channels.push({ id: categoryId, name: 'WELCOME', type: 4, parentId: null });
+    f.inventory.integrations = [{ id: 'external-app', dependencyScope: 'unknown' }];
+    const body = { expectedVersion: 0, changes: [{ kind: 'channel', objectId: categoryId, name: 'START' }] };
+    assert.equal((await f.request('/migration/preview', body)).data.error, 'migration_external_dependency_unverified');
+    const preview = await f.request('/migration/preview', { ...body, deferCategoryApplicationReview: true });
+    assert.equal(preview.status, 200);
+    const stored = f.rows.get(`fima_plan_${preview.data.planId}`);
+    assert.equal(stored.actorId, actorId);
+    assert.deepEqual(stored.steps[0].applicationReview.integrationIds, ['external-app']);
+    assert.equal(preview.data.steps[0].applicationReview.status, 'deferred_category_label_only');
+    assert.equal((await f.request('/migration/preview', { ...body, deferCategoryApplicationReview: true, changes: [{ kind: 'channel', objectId: channelId, name: 'changed' }] })).data.error, 'migration_external_dependency_unverified');
+    f.gateway.captureBackup = async () => ({ guildId });
+    assert.equal((await f.request('/migration/apply', { planId: preview.data.planId })).data.error, 'migration_backup_not_verified');
+    assert.equal(f.delivery.edits || 0, 0);
+  } finally { await f.close(); }
+});
