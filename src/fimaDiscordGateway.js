@@ -89,7 +89,7 @@ export function createFimaDiscordGateway(getGuild) {
       return { guildId, observedAt: new Date().toISOString(), guild: { name: guild.name, afkChannelId: guild.afkChannelId, afkTimeout: guild.afkTimeout },
         channels: [...channels.values()].filter(Boolean).map(ch => ({ id: ch.id, name: ch.name, type: ch.type, parentId: ch.parentId, position: ch.rawPosition,
           topic: ch.topic || null, permissionOverwrites: [...(ch.permissionOverwrites?.cache.values() || [])].map(ow => ({ id: ow.id, type: ow.type, allow: ow.allow.bitfield.toString(), deny: ow.deny.bitfield.toString() })).sort((a,b) => a.id.localeCompare(b.id)) })).sort((a,b) => a.id.localeCompare(b.id)),
-        roles: [...roles.values()].map(role => ({ id: role.id, name: role.name, type: 'role', position: role.position, managed: role.managed, permissions: role.permissions.bitfield.toString() })).sort((a,b) => a.id.localeCompare(b.id)),
+        roles: [...roles.values()].map(role => ({ id: role.id, name: role.name, type: 'role', position: role.position, managed: role.managed, hoist: role.hoist === true, permissions: role.permissions.bitfield.toString() })).sort((a,b) => a.id.localeCompare(b.id)),
         integrations: integrations.sort((a,b) => a.id.localeCompare(b.id)), autoModRules: [...automod.values()].map(rule => ({ id: rule.id, name: rule.name, enabled: rule.enabled, eventType: rule.eventType, triggerType: rule.triggerType, exemptChannels: [...rule.exemptChannels.keys()], exemptRoles: [...rule.exemptRoles.keys()] })).sort((a,b) => a.id.localeCompare(b.id)),
         errors, structuralMigrationReady: false };
     },
@@ -115,7 +115,7 @@ export function createFimaDiscordGateway(getGuild) {
         }
       }
       // Moving a channel must preserve explicit overwrites, never sync category permissions.
-      await object.edit({ name: metadata.name, ...(Object.hasOwn(metadata, 'parentId') ? { parent: metadata.parentId, lockPermissions: false } : {}), reason: 'FIMA verified metadata migration' });
+      await object.edit({ name: metadata.name, ...(step.kind === 'role' && Object.hasOwn(metadata, 'hoist') ? { hoist: metadata.hoist } : {}), ...(Object.hasOwn(metadata, 'parentId') ? { parent: metadata.parentId, lockPermissions: false } : {}), reason: 'FIMA verified metadata migration' });
     },
     async checkPoll(guildId, actorId, channelId) { const ch = await pollChannel(guildId, actorId, channelId); return { id: ch.id, name: ch.name, type: ch.type }; },
     async reconcilePoll(plan, messageId) {

@@ -70,7 +70,7 @@ export function createFimaGuildOperationsRouter({ prisma, authenticate, csrf, au
     const { config } = await readConfig(prisma, req.fima.guildId);
     if (req.body?.expectedVersion !== versionOf(config)) throw fimaOperationError('workspace_version_conflict');
     const inventory = await gateway.inspect(req.fima.guildId, req.fima.actorId);
-    const steps = buildFimaStructuralSteps(inventory, req.body?.changes, { deferCategoryApplicationReview: req.body?.deferCategoryApplicationReview === true });
+    const steps = buildFimaStructuralSteps(inventory, req.body?.changes, { deferCategoryApplicationReview: req.body?.deferCategoryApplicationReview === true, stagedMetadataTakeover: req.body?.stagedMetadataTakeover === true });
     return preview(req, 'migration', null, inventory, config, { steps, expectedInventory: inventory, journal: [], cursor: 0 });
   }));
   router.get('/migration', run(async req => {

@@ -1,4 +1,5 @@
-import { renderFimaOperations } from './fima-guild-operations.js?v=20261005-2';
+import { renderFimaOperations } from './fima-guild-operations.js?v=20261005-3';
+import { observeFimaControls } from './fima-controls.js?v=20261005-3';
 const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
 function apiUrl(path) { return API_BASE + path; }
 const LIST_ENDPOINT = "/api/fima-bot/customer/workspaces";
@@ -891,4 +892,5 @@ document.addEventListener("fima:language-change", () => {
   if (state.payload?.workspace && state.selected) renderWorkspaceFacts(state.payload);
 });
 
+if (typeof MutationObserver === 'function') observeFimaControls();
 boot();

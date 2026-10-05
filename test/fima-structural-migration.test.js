@@ -8,6 +8,34 @@ const inventory = () => ({ guildId, observedAt: '2026-10-04', channels: [
   { id: '200', name: 'old-category', type: 4, parentId: null }, { id: '300', name: 'new-category', type: 4, parentId: null }
 ], roles: [{ id: '400', name: 'Member', managed: false, permissions: '1024' }], integrations: [], autoModRules: [], errors: [] });
 const changes = [{ kind: 'channel', objectId: '100', name: 'community', parentId: '300' }, { kind: 'role', objectId: '400', name: 'Community Member' }];
+test('explicit metadata takeover retains dependency audit and forbids permission or deletion writes', () => {
+  const live = inventory();
+  live.integrations = [{id: 'hook', destinationChannelId: '100'}, {id: 'app', dependencyScope: 'unknown'}];
+  for (const stagedMetadataTakeover of [false, 'true', 1]) assert.throws(() => buildFimaStructuralSteps(live, changes, {stagedMetadataTakeover}), /external_dependency/);
+  const steps = buildFimaStructuralSteps(live, changes, {stagedMetadataTakeover: true});
+  assert.deepEqual(steps[0].applicationReview.integrationIds, ['hook', 'app']);
+  assert.deepEqual(steps[1].applicationReview.integrationIds, ['app']);
+  assert.equal(steps[0].permissionImpact, 'NO CHANGE');
+  assert.deepEqual(steps[0].after, {name: 'community', parentId: '300'});
+  for (const field of ['action', 'permissions', 'permissionOverwrites', 'hoist']) assert.throws(() => buildFimaStructuralSteps(live, [{...changes[0], [field]: true}], {stagedMetadataTakeover: true}), /unsupported/);
+  live.errors.push('webhooks_not_accessible');
+  assert.throws(() => buildFimaStructuralSteps(live, changes, {stagedMetadataTakeover: true}), /inventory_incomplete/);
+});
+test('role display is reversible metadata and cannot change permissions', async () => {
+  const live = inventory(); live.roles[0].hoist = false;
+  const steps = buildFimaStructuralSteps(live, [{kind: 'role', objectId: '400', hoist: true}]);
+  assert.deepEqual(steps[0].before, {name: 'Member', hoist: false});
+  assert.deepEqual(steps[0].after, {name: 'Member', hoist: true});
+  assert.equal(steps[0].permissionImpact, 'NO CHANGE');
+  for (const hoist of ['true', 1, null]) assert.throws(() => buildFimaStructuralSteps(live, [{kind: 'role', objectId: '400', hoist}]), /unsupported/);
+  assert.throws(() => buildFimaStructuralSteps(live, [{kind: 'role', objectId: '400', hoist: true, permissions: '8'}]), /unsupported/);
+  const io = {inspect: async () => structuredClone(live), edit: async (step, direction) => Object.assign(live.roles[0], step[direction]), save: async () => {}, checkVersion: async () => {}};
+  const plan = {guildId, status: 'prepared', cursor: 0, steps, expectedInventory: structuredClone(live), journal: []};
+  const applied = await executeFimaStructuralMigration(plan, io);
+  assert.equal(live.roles[0].hoist, true); assert.equal(live.roles[0].permissions, '1024');
+  await executeFimaStructuralMigration(applied, io, {rollback: true});
+  assert.equal(live.roles[0].hoist, false); assert.equal(live.roles[0].permissions, '1024');
+});
 function fixture() {
   let live = inventory(), stored, edits = 0, fail = false, conflict = false;
   const plan = { id: 'migration', guildId, status: 'prepared', cursor: 0, steps: buildFimaStructuralSteps(live, changes), expectedInventory: live, journal: [] };

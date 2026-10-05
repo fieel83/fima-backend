@@ -5,6 +5,21 @@ import { createFimaGuildOperationsRouter } from '../src/fimaGuildOperationsRoute
 import { createParadiseBackupEnvelope } from '../src/paradiseBackupIntegrity.js';
 const guildId = '1419335632324657306', otherGuild = '1469750386033430661', actorId = '1419335632324657307', channelId = '1420401535204065311';
 const stateKey = 'paradise_3a59_state_v1';
+test('welcome wizard binds join and leave to the same channel through preview and apply', async () => {
+  const f = await operationsFixture();
+  try {
+    const preview = await f.request('/setup/preview', {setupType: 'community', expectedVersion: 0, channelMappings: {welcome: channelId}});
+    assert.equal(preview.status, 200);
+    const result = await f.request('/setup/apply', {planId: preview.data.planId});
+    assert.equal(result.status, 200);
+    const mappings = f.rows.get(stateKey).guildConfigs[guildId].channelMappings;
+    assert.equal(mappings.welcome_channel, channelId);
+    assert.equal(mappings.leave_channel, channelId);
+    f.inventory.channels.push({id: 'voice', type: 2, name: 'Voice'});
+    const rejected = await f.request('/setup/preview', {setupType: 'community', expectedVersion: 1, channelMappings: {welcome: 'voice'}});
+    assert.equal(rejected.data.error, 'invalid_welcome_binding');
+  } finally { await f.close(); }
+});
 export async function operationsFixture() {
   let rows = new Map([[stateKey, { guildConfigs: { [guildId]: { activeSetupMode: 'community', customerWorkspaceVersion: 0 }, [otherGuild]: { untouched: true } } }]]);
   let queue = Promise.resolve();

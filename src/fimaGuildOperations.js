@@ -23,6 +23,11 @@ export function normalizeFimaSetup(input, config, inventory) {
       target[key] = id;
     }
   }
+  if (input.channelMappings?.welcome) {
+    if (!inventory.channels.some(row => row.id === input.channelMappings.welcome && row.type === 0)) throw fimaOperationError('invalid_welcome_binding', 400);
+    channelMappings.welcome_channel = input.channelMappings.welcome;
+    channelMappings.leave_channel = input.channelMappings.welcome;
+  }
   for (const [key, type] of [['join_to_create', 2], ['private_voice', 4]]) {
     const id = channelMappings[key] || (key === 'join_to_create' ? config.voiceSettings?.joinToCreateChannelId : config.voiceSettings?.privateVoiceCategoryId);
     if (id && !inventory.channels.some(row => row.id === id && row.type === type)) throw fimaOperationError('invalid_voice_binding', 400);
