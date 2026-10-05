@@ -1,4 +1,5 @@
 import { entitlementVersionStatus } from "../src/appVersionPolicy.js";
+import { ownerIdentityStatus } from '../src/ownerAccess.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -112,7 +113,7 @@ const source = readFileSync(new URL('../src/server.js', import.meta.url), 'utf8'
 const start = source.indexOf('app.post("/api/license/refresh-entitlement",');
 const end = source.indexOf('app.get("/admin/login",', start);
 assert.ok(start >= 0 && end > start);
-function routeFixture({ user = originalUser, accessUser = user, payload = issue(user).payload, licenseId = 'license-a' } = {}) {
+function routeFixture({ user = originalUser, accessUser = user, payload = issue(user).payload, licenseId = 'license-a', ownerRequirements = null } = {}) {
   const f = fixture(user); let handler; let signed = false;
   const license = { id: 'license-a', plan: 'monthly', lifetime: false, hwid: 'DEVICE123', expiresAt: new Date(Date.now() + 86400000) };
   const nativeTransaction = f.db.$transaction;
@@ -138,7 +139,8 @@ function routeFixture({ user = originalUser, accessUser = user, payload = issue(
     buildLicenseAccountAccess: async (_license, tx) => { assert.notEqual(tx, f.db); return { user: accessUser }; },
     isStrictAccountOnlyEntitlementPayload: () => true,
     resolveDesktopEntitlementForUser: async ({ user: authoritativeUser, db }) => { assert.notEqual(db, f.db); signed = true; return { valid: true, userId: authoritativeUser.id }; },
-    licenseBlockedReason: () => null, ownerLicenseBindingState: () => ({ ok: true }), ownerAdminAccessForLicense: () => false,
+    licenseBlockedReason: () => null, ownerLicenseBindingState: () => ({ ok: true }),
+    ownerAdminAccessForLicense: (_license, _hwid, _reason, access) => ownerRequirements ? ownerIdentityStatus(access, ownerRequirements).ok : false,
     issueAppEntitlement: args => { signed = true; return issueAppEntitlement(args); }, publicEntitlementPayload: e => e.payload,
     licenseValidationPayload: () => ({}), validationLogLicenseKey: () => 'redacted', hashHwid: () => 'hashed',
     publicError: () => 'redacted', console: { error() {} }
@@ -183,4 +185,14 @@ test('legacy refresh does not invent a desktop auth session', async () => {
   const result = await routeFixture().request();
   assert.equal(result.status, 200);
   assert.equal(result.body.authSessionId, undefined);
+});
+
+test('licensed refresh preserves verified owner OAuth links with authoritative credential fields', async () => {
+  const user = { ...originalUser, email: 'owner@example.com', discordUserId: 'discord-owner' };
+  const accessUser = { ...user, passwordHash: 'stale-read', oauthLinks: [{ provider: 'discord', providerSubject: 'discord-owner' }] };
+  const result = await routeFixture({ user, accessUser, ownerRequirements: { ownerEmail: user.email, ownerDiscordId: user.discordUserId } }).request();
+  assert.equal(result.status, 200);
+  const payload = verifyAppEntitlement(result.body.entitlementToken).payload;
+  assert.equal(payload.ownerAdminAccess, true);
+  assert.equal(verifyEntitlementAccountGeneration(payload, user).ok, true);
 });

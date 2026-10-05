@@ -5063,7 +5063,9 @@ app.post("/api/license/refresh-entitlement", entitlementRefreshLimiter, async (r
         const accountAccess = await buildLicenseAccountAccess(license, tx);
         assertRefreshLicenseAccount(verified.payload, accountAccess);
         // Sign only the locked, authoritative credential generation.
-        accountAccess.user = authoritativeUser;
+        accountAccess.user = authoritativeUser
+          ? { ...accountAccess.user, ...authoritativeUser }
+          : null;
 
         const blockedReason = licenseBlockedReason(license);
         if (blockedReason) {
