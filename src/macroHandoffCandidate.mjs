@@ -22,7 +22,7 @@ const fields = body => {
   if(!release) throw fail(400);
   const {contract,version}=release;
   let identity,binding;
-  try { identity=normalizeRuntimeHandoffIdentity(body?.identity);binding=normalizeRuntimeHandoffBinding(body?.binding,{contract}); }
+  try { identity=normalizeRuntimeHandoffIdentity(body?.identity ?? body);binding=normalizeRuntimeHandoffBinding(body?.binding,{contract}); }
   catch { throw fail(400); }
   if(binding.appVersion!==version) throw fail(400);
   return {identity,binding};

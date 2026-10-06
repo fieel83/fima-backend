@@ -33,3 +33,13 @@ test('owner runtime versions use signed product identity',()=>{
  assert.equal(entitlementVersionStatus('0.1.0-owner-preview',{},{macroMinimum:'1.0.128'}).updateRequired,true);
 });
 
+for(const id of ['fima-mail','fima-cloud-pc']) test(`${id} exchanges flat owner identity`,async()=>{
+ const {contract,version}=runtimeContracts.get(id);
+ const f=fixture();const binding={...contract,hwid:('FIMA-DEVICE-'+'A'.repeat(64)),appVersion:version};
+ const grant=await f.candidate.issue({identity:f.identity,binding},f.token);
+ const result=await f.candidate.exchange({...f.identity,binding,grant:grant.grant});
+ assert.equal(result.entitlement.isOwner,true);
+ assert.equal(result.productId,id);
+ await assert.rejects(f.candidate.exchange({...f.identity,binding,grant:grant.grant}));
+});
+
