@@ -792,6 +792,10 @@ test("community notification panel preserves existing ping topics and Glads alon
   assert.deepEqual(rows.map(row => row.components.length), [5, 5, 5, 2]);
   assert.equal(rows.flatMap(row => row.components).length, 17);
   assert.equal(new Set(rows.flatMap(row => row.components).map(button => button.custom_id)).size, 17);
+  // Discord rejects plain geometric symbols as component emoji.
+  for (const button of rows.flatMap(row => row.components)) {
+    assert.match(button.emoji.name, /\p{Extended_Pictographic}/u);
+  }
 });
 
 test("clan notification panel retains competitive role choices", () => {

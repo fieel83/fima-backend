@@ -14363,7 +14363,7 @@ const COMMUNITY_NOTIFICATION_ROLE_OPTIONS = Object.freeze([
   { id: "glads_asia", role: "Glads • Asia", labelTr: "Glads Asia", labelEn: "Glads Asia", emoji: "🌏" },
   { id: "glads_na", role: "Glads • North America", labelTr: "Glads North America", labelEn: "Glads North America", emoji: "🌎" },
   { id: "product", role: "Product Notifications", labelTr: "Ürünler", labelEn: "Products", emoji: "🛍️" },
-  { id: "fima", role: "FIMA Updates", labelTr: "FIMA", labelEn: "FIMA", emoji: "◆" },
+  { id: "fima", role: "FIMA Updates", labelTr: "FIMA", labelEn: "FIMA", emoji: "💎" },
   { id: "macro", role: "FIMA Macro Updates", labelTr: "FIMA Macro", labelEn: "FIMA Macro", emoji: "⌨️" },
   { id: "ai", role: "FIMA AI Updates", labelTr: "FIMA AI", labelEn: "FIMA AI", emoji: "🧠" },
   { id: "fieel", role: "Fieel Content Notifications", labelTr: "Fieel İçerik", labelEn: "Fieel Content", emoji: "🎬" },
