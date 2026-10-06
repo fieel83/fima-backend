@@ -16,7 +16,7 @@ export function enhanceFimaControls(root = document) {
     trigger.setAttribute('role', 'combobox');
     trigger.setAttribute('aria-haspopup', 'listbox');
     trigger.setAttribute('aria-expanded', 'false');
-    const label = select.closest('label');
+    const label = select.labels?.[0] || select.closest('label');
     const labelText = label?.firstChild?.textContent?.trim() || select.getAttribute('aria-label') || select.name || 'Seçim';
     trigger.setAttribute('aria-label', labelText);
     const popup = document.createElement('div');

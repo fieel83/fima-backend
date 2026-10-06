@@ -1,0 +1,19 @@
+.panel{overflow:visible}
+.fima-select{position:relative;width:100%;text-transform:none;letter-spacing:normal}
+.fima-select-source{position:absolute!important;width:1px!important;height:1px!important;opacity:0;pointer-events:none}
+.fima-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:#071110;color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .18s,background .18s,box-shadow .18s}
+.fima-select-trigger::after{content:'⌄';color:var(--violet);transition:transform .18s}
+.fima-select-trigger[aria-expanded=true]::after{transform:rotate(180deg)}
+.fima-select-trigger:hover,.fima-select-trigger[aria-expanded=true]{border-color:#54e7cf;background:#0c211f}
+.fima-select-trigger:focus-visible,.fima-select.is-invalid .fima-select-trigger{outline:3px solid #20d9ba38;outline-offset:2px}
+.fima-select-popup{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:50;min-width:180px;padding:8px;border:1px solid #54e7cf55;border-radius:15px;background:#0b1716;box-shadow:0 20px 50px #0009;animation:content-menu-in .16s ease-out}
+.fima-select-popup[hidden]{display:none}
+.fima-select-popup input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#071110;color:var(--text);font:inherit}
+.fima-select-options{max-height:min(280px,40vh);overflow-y:auto;margin-top:6px}
+.fima-select-options button{display:block;width:100%;padding:11px 12px;border:0;border-radius:9px;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.fima-select-options button:hover,.fima-select-options button.is-active{background:#153b34}
+.fima-select-options button[aria-selected=true]{background:#12302b;color:#80efde}
+.fima-select-trigger:disabled,.fima-select-options button:disabled{opacity:.5;cursor:default}
+.button:active:not(:disabled){transform:translateY(1px) scale(.98)}
+@keyframes content-menu-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.fima-select *,.button{animation:none!important;transition:none!important}}
