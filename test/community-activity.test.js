@@ -104,6 +104,13 @@ test("production activity mutations require the production runtime and feature f
   );
 });
 
+test("enabling production activity alone cannot grant paid rewards", async () => {
+  await assert.rejects(grantCommunityActivityReward("reward-1", {
+    source: { ...enabledSource, PARADISE_RUNTIME_ENV: "production" },
+    db: { communityActivityReward: { findUnique: async () => ({ id: "reward-1", guildId: "1419335632324657306" }) } }
+  }), { code: "production_rewards_disabled" });
+});
+
 function rewardDb({ rewards, license }) {
   const state = {
     rewards: rewards.map((reward) => ({ ...reward })),

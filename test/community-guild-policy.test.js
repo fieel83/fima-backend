@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
+  communityActivityGuildIds,
+  communityActivityGuildPolicy,
   communityRewardGuildIds,
   communityRewardGuildPolicy,
   isCommunityRewardGuild
@@ -10,6 +12,16 @@ import { PARADISE_TEST_GUILD_ID } from "../src/runtimeEnvironment.js";
 import fs from "node:fs";
 
 const discordBotSource = fs.readFileSync(new URL("../src/discordBot.js", import.meta.url), "utf8");
+
+test("production XP and cosmetic roles run while paid rewards remain disabled", () => {
+  const source = { PARADISE_RUNTIME_ENV: "production", COMMUNITY_ACTIVITY_ENABLED: "true" };
+  assert.equal(communityActivityGuildPolicy({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source }).allowed, true);
+  assert.deepEqual(communityActivityGuildIds(source), [PARADISE_TEST_GUILD_ID, FIMA_COMMUNITY_PRODUCTION_GUILD_ID]);
+  assert.equal(communityRewardGuildPolicy({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source }).allowed, false);
+  assert.equal(communityActivityGuildPolicy({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source: { ...source, COMMUNITY_ACTIVITY_ENABLED: "false" } }).allowed, false);
+  assert.equal(communityActivityGuildPolicy({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source: { ...source, PARADISE_RUNTIME_ENV: "development" } }).allowed, false);
+  assert.equal(communityActivityGuildPolicy({ guildId: "999999999999999999", source }).allowed, false);
+});
 
 test("test guild remains allowed without production settings", () => {
   const source = {};

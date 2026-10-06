@@ -6,7 +6,8 @@ import { communityActivityRoleTargets, reconcileCommunityActivityRoles } from ".
 import {
   FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
   assertCommunityRewardGuild,
-  communityRewardGuildIds,
+  assertCommunityActivityGuild,
+  communityActivityGuildIds,
   communityRewardGuildPolicy
 } from "./communityGuildPolicy.js";
 
@@ -84,7 +85,7 @@ export function qualifyCommunityTextMessage(message, { source = process.env } = 
 }
 
 function assertActivityMutation(guildId, source) {
-  return assertCommunityRewardGuild({ guildId, source });
+  return assertCommunityActivityGuild({ guildId, source });
 }
 
 async function ensureSeason(db, guildId, now) {
@@ -278,7 +279,7 @@ export async function handleCommunityVoiceActivity(oldState, newState, options =
 }
 
 function assertActivityReadGuild(guildId, source) {
-  return assertCommunityRewardGuild({ guildId, source });
+  return assertCommunityActivityGuild({ guildId, source });
 }
 
 async function findSeasonForDate(db, guildId, now) {
@@ -346,7 +347,7 @@ export async function communityActivityRewards({ guildId, discordUserId, db = pr
 export async function grantCommunityActivityReward(rewardId, { db = prisma, source = process.env, now = new Date() } = {}) {
   const reward = await db.communityActivityReward.findUnique({ where: { id: rewardId }, include: { entitlementGrant: true } });
   if (!reward) return { granted: false, reason: "reward_not_found" };
-  assertActivityMutation(reward.guildId, source);
+  assertCommunityRewardGuild({ guildId: reward.guildId, source });
   if (reward.entitlementGrant) return { granted: true, reason: "already_granted", reward };
   const user = await db.user.findUnique({ where: { discordUserId: reward.discordUserId } });
   if (!user) {
@@ -425,7 +426,7 @@ export async function grantCommunityActivityReward(rewardId, { db = prisma, sour
 export async function finalizeCommunityActivitySeason(seasonId, { db = prisma, source = process.env, now = new Date() } = {}) {
   const season = await db.communityActivitySeason.findUnique({ where: { id: seasonId } });
   if (!season) return { finalized: false, reason: "season_not_found" };
-  assertActivityMutation(season.guildId, source);
+  assertCommunityRewardGuild({ guildId: season.guildId, source });
   if (season.endsAt > now) return { finalized: false, reason: "season_not_ended" };
 
   for (const board of COMMUNITY_ACTIVITY_BOARDS) {
@@ -467,7 +468,7 @@ export async function runCommunityActivityWorker(client, { db = prisma, source =
   const config = communityActivityConfig(source);
   if (!config.enabled) return { ran: false, reason: "activity_disabled" };
   const guildResults = [];
-  for (const guildId of communityRewardGuildIds(source)) {
+  for (const guildId of communityActivityGuildIds(source)) {
     const guild = client?.guilds?.cache?.get?.(guildId) || null;
     if (!guild) {
       guildResults.push({ guildId, ran: false, reason: "guild_unavailable" });

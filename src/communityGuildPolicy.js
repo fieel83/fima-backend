@@ -48,3 +48,27 @@ export function communityRewardGuildIds(source = process.env) {
   if (isCommunityRewardGuild(FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source)) ids.push(FIMA_COMMUNITY_PRODUCTION_GUILD_ID);
   return ids;
 }
+
+// XP and cosmetic roles do not grant paid entitlements.
+export function communityActivityGuildPolicy({ guildId, source = process.env } = {}) {
+  const policy = communityRewardGuildPolicy({ guildId, source });
+  if (policy.code !== "production_rewards_disabled") return policy;
+  return enabled(source.COMMUNITY_ACTIVITY_ENABLED)
+    ? { ...policy, allowed: true, code: "production_activity_allowed" }
+    : { ...policy, code: "production_activity_disabled" };
+}
+
+export function assertCommunityActivityGuild(input = {}) {
+  const policy = communityActivityGuildPolicy(input);
+  if (policy.allowed) return policy;
+  const error = new Error(policy.code);
+  error.code = policy.code;
+  error.policy = policy;
+  throw error;
+}
+
+export function communityActivityGuildIds(source = process.env) {
+  const ids = [PARADISE_TEST_GUILD_ID];
+  if (communityActivityGuildPolicy({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source }).allowed) ids.push(FIMA_COMMUNITY_PRODUCTION_GUILD_ID);
+  return ids;
+}
