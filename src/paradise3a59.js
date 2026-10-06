@@ -12668,7 +12668,21 @@ export const PARADISE_GUIDE_TR_COPY = Object.freeze({
   }
 });
 
-export function localizeParadiseGuide(definition, language = "tr") {
+const FT_COMMUNITY_RULES_COPY = Object.freeze({
+  en: {
+    title: "FT Community Rules",
+    body: "**1. No spam, flooding or raids**\nDo not repeat messages, flood chat with emojis or characters, or organize raids. Raids and mass disruption can result in an immediate ban.\n\n**2. Respect others**\nNo trolling, harassment or deliberate provocation. Mentioning politics is allowed; political debates are not.\n\n**3. No hate speech**\nRacist, sexist, homophobic or other hateful content is forbidden. Keep swearing moderate and never use it to attack someone.\n\n**4. No unauthorized advertising**\nAsk a moderator before advertising or promoting your own content.\n\n**5. Follow moderation decisions**\nYou may ask why you were moderated. Discuss further concerns privately with staff rather than arguing in public.\n\n**6. No NSFW or graphic content**\nDo not share sexual or graphic violent images, videos, links or descriptions.\n\n**7. Follow Discord policies**\nFollow the [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines)."
+  },
+  tr: {
+    title: "FT Community Kuralları",
+    body: "**1. Spam, flood ve raid yasaktır**\nMesaj tekrarı, emoji veya karakter spamı ve sohbeti doldurmak yasaktır. Raid ve toplu düzen bozma doğrudan ban ile sonuçlanabilir.\n\n**2. Diğer üyelere saygılı ol**\nTrolleme, taciz ve kasıtlı kışkırtma yasaktır. Siyasetten bahsedebilirsin; siyasi tartışma başlatamazsın.\n\n**3. Nefret söylemi yasaktır**\nIrkçı, cinsiyetçi, homofobik ve diğer nefret içerikleri yasaktır. Küfrü ölçülü tut ve kimseye saldırmak için kullanma.\n\n**4. İzinsiz reklam yapma**\nReklam veya kendi içeriğini tanıtmak için önce bir moderatörden izin al.\n\n**5. Moderasyon kararlarına uy**\nNeden işlem yapıldığını sorabilirsin. Devam eden itirazlarını herkesin önünde tartışmak yerine yetkililere özelden ilet.\n\n**6. NSFW ve vahşet içeriği yasaktır**\nCinsel veya aşırı şiddet içeren görsel, video, bağlantı ve açıklama paylaşma.\n\n**7. Discord kurallarına uy**\n[Hizmet Koşullarına](https://discord.com/terms) ve [Topluluk Kurallarına](https://discord.com/guidelines) uy."
+  }
+});
+
+export function localizeParadiseGuide(definition, language = "tr", guildId = "") {
+  if (definition?.key === "rules" && guildId === FIMA_COMMUNITY_PRODUCTION_GUILD_ID) {
+    return { ...definition, ...FT_COMMUNITY_RULES_COPY[language === "en" ? "en" : "tr"] };
+  }
   if (language === "en") return definition;
   const localized = PARADISE_GUIDE_TR_COPY[definition?.key];
   return localized ? { ...definition, ...localized } : definition;
@@ -12712,7 +12726,10 @@ async function publishGuidePost(guild, definition) {
   const mappingKey = GUIDE_MAPPING_KEYS[definition.key];
   const channel = mappingKey
     ? await configuredChannel(guild, mappingKey, definition.channel)
-    : guild.channels.cache.find(item => item.name === definition.channel && item.isTextBased?.());
+    : guild.channels.cache.find(item => (
+      item.name === definition.channel ||
+      (definition.key === "turkish_community_guide" && item.name === "turkce-duyurular")
+    ) && item.isTextBased?.());
   if (!channel?.isTextBased?.()) {
     return failedParadiseMessageReadback({ reason: "guide_channel_not_resolved" });
   }
@@ -12720,7 +12737,8 @@ async function publishGuidePost(guild, definition) {
   const oldId = configForGuild(state, guild.id).guideMessageIds?.[definition.key];
   let message = oldId ? await channel.messages.fetch(oldId).catch(() => null) : null;
   const language = guildLanguage(configForGuild(state, guild.id));
-  const localizedDefinition = localizeParadiseGuide(definition, language);
+  const localizedDefinition = localizeParadiseGuide(definition,
+    definition.key === "turkish_community_guide" ? "tr" : language, guild.id);
   const color = await paradiseBrandColor();
   const payload = definition.key === "staff_command_guide"
     ? staffGuidePayload(language)
@@ -12937,7 +12955,8 @@ export async function syncParadiseMappedPanels(guild) {
       if (mappingKey && !config.channelMappings?.[mappingKey]) continue;
       if (!mappingKey) {
         const exactChannel = guild.channels.cache.find(item =>
-          item.name === definition.channel && item.isTextBased?.()
+          (item.name === definition.channel ||
+            (definition.key === "turkish_community_guide" && item.name === "turkce-duyurular")) && item.isTextBased?.()
         );
         if (!exactChannel) continue;
       }

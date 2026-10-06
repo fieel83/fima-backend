@@ -2577,6 +2577,18 @@ test("canonical guide text has Turkish copy for every non-dynamic handbook", asy
   assert.equal(english.title, "English");
 });
 
+test("FT Community preserves all seven original rules without changing another guild's handbook", () => {
+  const definition = { key: "rules", title: "Existing rules", body: "Existing body" };
+  for (const language of ["en", "tr"]) {
+    const localized = localizeParadiseGuide(definition, language, "1419335632324657306");
+    assert.equal([...localized.body.matchAll(/\*\*\d\./g)].length, 7);
+    assert.match(localized.body, /https:\/\/discord.com\/terms/);
+    assert.match(localized.body, /https:\/\/discord.com\/guidelines/);
+    assert.ok(localized.body.length < 4096);
+  }
+  assert.deepEqual(localizeParadiseGuide(definition, "en", "another-guild"), definition);
+});
+
 test("announcement and booster handbooks are canonical mapped visual consumers", async () => {
   const source = await (await import("node:fs/promises")).readFile(new URL("../src/paradise3a59.js", import.meta.url), "utf8");
   const guideSection = source.slice(source.indexOf("const GUIDE_POSTS"), source.indexOf("const GUIDE_MAPPING_KEYS"));
