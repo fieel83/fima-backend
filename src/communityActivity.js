@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { prisma } from "./db.js";
 import { generateUniqueLicenseKey } from "./license.js";
 import { PARADISE_TEST_GUILD_ID } from "./runtimeEnvironment.js";
+import { communityActivityRoleTargets, reconcileCommunityActivityRoles } from "./communityActivityRoles.js";
 import {
   FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
   assertCommunityRewardGuild,
@@ -27,6 +28,7 @@ export function communityActivityConfig(source = process.env) {
   return Object.freeze({
     enabled: enabled(source.COMMUNITY_ACTIVITY_ENABLED),
     rewardWorkerEnabled: enabled(source.COMMUNITY_ACTIVITY_REWARD_WORKER_ENABLED),
+    rolesEnabled: enabled(source.COMMUNITY_ACTIVITY_ROLES_ENABLED),
     messageContentIntent: enabled(source.DISCORD_MESSAGE_CONTENT_INTENT),
     textXpPerMessage: intFromEnv(source.COMMUNITY_ACTIVITY_TEXT_XP_PER_MESSAGE, 10, { min: 1, max: 100 }),
     voiceXpPerMinute: intFromEnv(source.COMMUNITY_ACTIVITY_VOICE_XP_PER_MINUTE, 5, { min: 1, max: 100 }),
@@ -477,7 +479,18 @@ export async function runCommunityActivityWorker(client, { db = prisma, source =
       const ended = await db.communityActivitySeason.findMany({ where: { guildId, endsAt: { lte: now }, status: { in: ["active", "finalized"] } } });
       for (const season of ended) finalized.push(await finalizeCommunityActivitySeason(season.id, { db, source, now }));
     }
-    guildResults.push({ guildId, ran: true, voice, finalized });
+    let roles = { ran: false, reason: "activity_roles_disabled" };
+    if (config.rolesEnabled) {
+      try {
+        const boards = {};
+        for (const board of COMMUNITY_ACTIVITY_BOARDS) boards[board] = await communityActivityLeaderboard({ guildId, board, limit: 3, db, source, now });
+        const totals = await db.communityActivityMember.groupBy({ by: ["discordUserId"], where: { guildId }, _sum: { textXp: true, voiceXp: true } });
+        roles = { ran: true, ...await reconcileCommunityActivityRoles(guild, communityActivityRoleTargets(boards, totals)) };
+      } catch (error) {
+        roles = { ran: false, reason: activityReadinessErrorCode(error, "activity_roles_reconcile_failed") };
+      }
+    }
+    guildResults.push({ guildId, ran: true, voice, finalized, roles });
   }
   const completed = guildResults.filter(result => result.ran);
   if (!completed.length) return { ran: false, reason: "community_guilds_unavailable", guilds: guildResults };
@@ -586,9 +599,15 @@ export function startCommunityActivityWorker(client, { db = prisma, source = pro
   const config = communityActivityConfig(source);
   if (!config.enabled) return { started: false, reason: "activity_disabled" };
   if (activeWorkers.has(client)) return { started: false, reason: "already_started" };
-  const run = () => runCommunityActivityWorker(client, { db, source }).catch(error => {
-    console.warn("FIMA community activity worker failed", { message: error.message, code: error.code || null });
-  });
+  let running = false;
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try { await runCommunityActivityWorker(client, { db, source }); }
+    catch (error) {
+      console.warn("FIMA community activity worker failed", { message: error.message, code: error.code || null });
+    } finally { running = false; }
+  };
   const timer = setInterval(run, config.workerIntervalMs);
   timer.unref?.();
   activeWorkers.set(client, timer);
