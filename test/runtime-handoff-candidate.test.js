@@ -43,3 +43,15 @@ for(const id of ['fima-mail','fima-cloud-pc']) test(`${id} exchanges flat owner 
  await assert.rejects(f.candidate.exchange({...f.identity,binding,grant:grant.grant}));
 });
 
+for(const id of ['fima-mail','fima-cloud-pc']) test(`${id} exchanges v1 envelope with a pinned tree identity`,async()=>{
+ const {contract,version}=runtimeContracts.get(id);
+ const f=fixture();const binding={...contract,hwid:('FIMA-DEVICE-'+'A'.repeat(64)),appVersion:version};
+ const grant=await f.candidate.issue({identity:f.identity,binding},f.token);
+ const legacy=Object.fromEntries(['protocol','productId','hwid','executableSha256','packageIdentity','appVersion'].map(k=>[k,binding[k]]));
+ await assert.rejects(f.candidate.issue({identity:f.identity,binding:legacy},f.token));
+ await assert.rejects(f.candidate.exchange({...f.identity,binding:{...legacy,packageIdentity:'0'.repeat(64)},grant:grant.grant}));
+ await assert.rejects(f.candidate.exchange({...f.identity,binding:{...legacy,runtimeTreeSha256:'0'.repeat(64)},grant:grant.grant}));
+ const result=await f.candidate.exchange({...f.identity,binding:legacy,grant:grant.grant});
+ assert.equal(result.entitlement.isOwner,true);
+ await assert.rejects(f.candidate.exchange({...f.identity,binding:legacy,grant:grant.grant}));
+});

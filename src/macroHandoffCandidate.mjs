@@ -17,12 +17,14 @@ export const runtimeContracts = new Map([
   ].map(value=>[value.productId,{contract:createRuntimeHandoffContract({...value,schemaVersion:2,ownerOnly:true,executableSha256:'67cff2ce5ac7976408aac30e17e9266443a351b44ec1ee613b444867a78dc9d7'}),version:value.appVersion}])
 ]);
 const contractFor = binding => runtimeContracts.get(binding?.productId==='fima-macro' ? binding?.executableSha256 : binding?.productId);
-const fields = body => {
+const fields = (body, {legacyEnvelope=false}={}) => {
   const release=contractFor(body?.binding);
   if(!release) throw fail(400);
   const {contract,version}=release;
   let identity,binding;
-  try { identity=normalizeRuntimeHandoffIdentity(body?.identity ?? body);binding=normalizeRuntimeHandoffBinding(body?.binding,{contract}); }
+  const receivedBinding = legacyEnvelope && contract.schemaVersion===2 && body?.binding?.schemaVersion===undefined && body?.binding?.runtimeTreeSha256===undefined
+    ? {...body.binding,schemaVersion:contract.schemaVersion,runtimeTreeSha256:contract.runtimeTreeSha256} : body?.binding;
+  try { identity=normalizeRuntimeHandoffIdentity(body?.identity ?? body);binding=normalizeRuntimeHandoffBinding(receivedBinding,{contract}); }
   catch { throw fail(400); }
   if(binding.appVersion!==version) throw fail(400);
   return {identity,binding};
@@ -80,7 +82,7 @@ export function createMacroHandoffCandidate({db,resolveEntitlement}) {
       }});
     },
     async exchange(body) {
-      const {identity,binding}=fields(body);const grant=body?.grant;
+      const {identity,binding}=fields(body,{legacyEnvelope:true});const grant=body?.grant;
       if(typeof grant!=='string'||!runtimeHandoffGrantPattern.test(grant)) throw fail(400);
       let row,generation;
       const response=await db.$transaction(async tx=>{
