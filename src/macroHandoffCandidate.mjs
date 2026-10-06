@@ -90,7 +90,11 @@ export function createMacroHandoffCandidate({db,resolveEntitlement}) {
         const current=await resolve(tx,user,identity,binding,row.authSessionId);
         const consumed=await tx.runtimeHandoffGrant.updateMany({where:{id:row.id,consumedAt:null,revokedAt:null,expiresAt:{gt:new Date()}},data:{consumedAt:new Date()}});
         if(consumed.count!==1) throw fail();
-        return current.response;
+        const entitlementFields = ['tokenType','entitlementVersion','entitlementId','sessionId','licenseId','userId','accountId','plan','allowedFeatures','ownerAdminAccess','isOwner','isAdmin','adminTools','capabilities','issuedAt','expiresAt','appVersion','minSupportedAppVersion','hwidHash','deviceIdHash','nonce','licenseStatus'];
+        return {valid:true,canUseApp:true,reason:'valid',protocol:binding.protocol,productId:binding.productId,
+          entitlementToken:current.response.entitlementToken,
+          entitlement:Object.fromEntries(entitlementFields.map(key=>[key,current.payload[key]])),
+          entitlementExpiresAt:current.payload.expiresAt,minSupportedAppVersion:current.payload.minSupportedAppVersion};
       },options);
       // Delivery barrier shares user→session lock order with logout/reset.
       await db.$transaction(async tx=>{

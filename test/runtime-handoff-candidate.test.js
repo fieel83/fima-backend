@@ -20,6 +20,11 @@ for(const {contract,version} of runtimeContracts.values()) {
   if(contract.ownerOnly&&!owner) {await assert.rejects(f.candidate.issue(body,f.token));return;}
   const grant=await f.candidate.issue(body,f.token);assert.equal(grant.grantExpiresAt,grant.expiresAt);
   const result=await f.candidate.exchange({...body,grant:grant.grant});assert.equal(result.canUseApp,true);
+  assert.deepEqual(Object.keys(result).sort(),['valid','canUseApp','reason','protocol','productId','entitlementToken','entitlement','entitlementExpiresAt','minSupportedAppVersion'].sort());
+  assert.equal(result.protocol,binding.protocol);assert.equal(result.productId,binding.productId);
+  assert.equal(result.reason,'valid');assert.equal(result.entitlement.desktopAuthSession,undefined);
+  assert.equal(result.entitlement.accountId,f.identity.accountId);
+  assert.equal(result.entitlementExpiresAt,result.entitlement.expiresAt);
   await assert.rejects(f.candidate.exchange({...body,grant:grant.grant}));
  });
 }
