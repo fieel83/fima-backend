@@ -14455,13 +14455,14 @@ async function sendRolePanel(interaction, kind, template = "clan") {
   await interaction.reply({ embeds: [embed], components: rolePanelRows(kind, language, template) });
 }
 
-async function handleRolePanelButton(interaction, kind, optionId, template = "clan") {
+export async function handleRolePanelButton(interaction, kind, optionId, template = "clan") {
   const options = rolePanelOptionsForTemplate(kind, template);
   const option = options.find(item => item.id === optionId);
   if (!option) {
     await interaction.reply({ content: "This role option is no longer configured.", ephemeral: true });
     return;
   }
+  await interaction.deferReply({ ephemeral: true });
   const exclusive = kind === "language" || kind === "region";
   try {
     const role = await ensureRole(interaction.guild, option.role);
@@ -14477,16 +14478,15 @@ async function handleRolePanelButton(interaction, kind, optionId, template = "cl
     const hadRole = interaction.member.roles.cache.has(role.id);
     if (hadRole && !exclusive) {
       await interaction.member.roles.remove(role);
-      await interaction.reply({ content: `Removed ${role.name}.`, ephemeral: true });
+      await interaction.editReply({ content: `Removed ${role.name}.` });
     } else {
       if (!hadRole) await interaction.member.roles.add(role);
-      await interaction.reply({ content: `Selected ${role.name}.`, ephemeral: true });
+      await interaction.editReply({ content: `Selected ${role.name}.` });
     }
   } catch {
     const visibleBrand = template === "community" ? "FIMA" : "FIMA Bot";
-    await interaction.reply({
-      content: `${visibleBrand} could not update that role. Check bot role position and Manage Roles permission.`,
-      ephemeral: true
+    await interaction.editReply({
+      content: `${visibleBrand} could not update that role. Check bot role position and Manage Roles permission.`
     });
   }
 }

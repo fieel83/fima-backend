@@ -31,7 +31,7 @@ import {
   sanitizeParadiseCommunityRoleIconDescriptor, sanitizeParadiseHttpsUrl, sanitizeParadisePublicAssetBase,
   publishParadiseGuidesFromDashboard, syncParadiseMappedPanels,
   rebuildFimaCommunityProduction, rebuildParadiseTestTemplate,
-  rolePanelOptionsForTemplate, rolePanelRows,
+  rolePanelOptionsForTemplate, rolePanelRows, handleRolePanelButton,
   verifyParadiseTemplateStructure, withParadiseGuildMutationLock,
   FIMA_COMMUNITY_PRODUCTION_GUILD_ID, PARADISE_TEST_GUILD_ID
 } from "../src/paradise3a59.js";
@@ -2671,4 +2671,24 @@ test("challenge tickets and leaderboards stay isolated between managed guilds", 
   assert.equal(challengeBlockReason(state, "challenger", "opponent", now, "guildB"), null);
   assert.match(timedAvailabilityLines(state, "cooldownUntil", now, "guildA"), /<@challenger>/);
   assert.equal(timedAvailabilityLines(state, "cooldownUntil", now, "guildB"), "_None._");
+});
+
+test("notification role mutations acknowledge before Discord work and finish the deferred reply", async () => {
+  for (const mode of ["add", "remove", "error"]) {
+    const calls = [];
+    const role = { id: "poll-role", name: "Poll Notifications", managed: false };
+    const interaction = {
+      guild: { id: "panel-test", roles: { cache: new Collection([[role.id, role]]) } },
+      member: { roles: {
+        cache: new Collection(mode === "remove" ? [[role.id, role]] : []),
+        add: async () => { calls.push("add"); if (mode === "error") throw new Error("Discord unavailable"); },
+        remove: async () => { calls.push("remove"); }
+      } },
+      deferReply: async payload => { assert.equal(payload.ephemeral, true); calls.push("defer"); },
+      editReply: async payload => { calls.push("finish"); assert.match(payload.content, mode === "error" ? /could not update/ : /Poll Notifications/); },
+      reply: async () => assert.fail("must finish deferred response")
+    };
+    await handleRolePanelButton(interaction, "ping", "poll", "community");
+    assert.deepEqual(calls, ["defer", mode === "remove" ? "remove" : "add", "finish"]);
+  }
 });
