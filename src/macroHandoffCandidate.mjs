@@ -1,30 +1,43 @@
 import {createHash, randomBytes} from 'node:crypto';
 import {entitlementCredentialGeneration, verifyAppEntitlement, hashDeviceId, entitlementSecretStatus} from './entitlements.js';
 import {assertRefreshDesktopSession, runEntitlementRefreshWithAccountLock} from './entitlementRefreshSecurity.js';
-import {runtimeHandoffDefaultContract as contract, normalizeRuntimeHandoffIdentity, normalizeRuntimeHandoffBinding, runtimeHandoffGrantPattern} from './macroHandoffContract.mjs';
+import {runtimeHandoffDefaultContract, createRuntimeHandoffContract, normalizeRuntimeHandoffIdentity, normalizeRuntimeHandoffBinding, runtimeHandoffGrantPattern} from './macroHandoffContract.mjs';
 
 const fail = (status=401) => Object.assign(new Error('runtime_handoff_denied'), {handoffStatus:status});
 const options = {maxWait:5000, timeout:15000};
 // Generation-bound lookup: reset changes the lookup even if session revocation fails.
 // No password hash, bearer token or generation proof is stored in the grant row.
 const lookup = (grant,user) => createHash('sha256').update(JSON.stringify(['fima-macro-grant-generation:v1',grant,entitlementCredentialGeneration(user)])).digest('hex');
+export const runtimeContracts = new Map([
+  [runtimeHandoffDefaultContract.executableSha256, {contract:runtimeHandoffDefaultContract, version:'1.0.131'}],
+  ['47187016ac88327fd2450bb084c242797c449b32cccf9944754613c3b6a1b278', {contract:createRuntimeHandoffContract({productId:'fima-macro',executableName:'FimaMacroStudio.exe',executableSha256:'47187016ac88327fd2450bb084c242797c449b32cccf9944754613c3b6a1b278',feature:'macro_runtime'}),version:'1.0.130'}],
+  ...[
+    {productId:'fima-mail',executableName:'FIMA Mail Manager.exe',appVersion:'0.1.0-owner-preview',runtimeTreeSha256:'45e8fb89e2027ec53dc5257df8e56a5613b1cc3e0ebed847de34844bd838a34e',packageIdentity:'75fd0b34f9df47548ff71a3484291797eb7c7c3bbf74a6d1828abfe82f0a0979',feature:'owner_email_manager'},
+    {productId:'fima-cloud-pc',executableName:'FIMA Cloud PC.exe',appVersion:'0.1.0-mvp',runtimeTreeSha256:'5c8b6dfc4cb0686a7633cfe8ea3c6c5c6374142bd44e9a1f3773d84eb9b533d9',packageIdentity:'ed5c9058a7952ca333d4a39a000946514179ed356a0dbf21985e33937672e066',feature:'owner_cloud_pc'},
+  ].map(value=>[value.productId,{contract:createRuntimeHandoffContract({...value,schemaVersion:2,ownerOnly:true,executableSha256:'67cff2ce5ac7976408aac30e17e9266443a351b44ec1ee613b444867a78dc9d7'}),version:value.appVersion}])
+]);
+const contractFor = binding => runtimeContracts.get(binding?.productId==='fima-macro' ? binding?.executableSha256 : binding?.productId);
 const fields = body => {
+  const release=contractFor(body?.binding);
+  if(!release) throw fail(400);
+  const {contract,version}=release;
   let identity,binding;
   try { identity=normalizeRuntimeHandoffIdentity(body?.identity);binding=normalizeRuntimeHandoffBinding(body?.binding,{contract}); }
   catch { throw fail(400); }
-  if(binding.appVersion!=='1.0.131') throw fail(400);
+  if(binding.appVersion!==version) throw fail(400);
   return {identity,binding};
 };
 const matches = (payload,identity,binding) => payload?.desktopAuthSession===true
   && typeof payload.sessionId==='string' && payload.sessionId.length>0
   && ['licenseId','userId','accountId'].every(k=>payload[k]===identity[k])
   && payload.hwidHash===hashDeviceId(binding.hwid)
-  && payload.licenseStatus==='active' && payload.allowedFeatures?.includes('macro_runtime');
+  && payload.licenseStatus==='active' && payload.allowedFeatures?.includes(contractFor(binding).contract.feature)
+  && (!contractFor(binding).contract.ownerOnly || (payload.ownerAdminAccess===true && payload.isOwner===true));
 
 export function createMacroHandoffCandidate({db,resolveEntitlement}) {
   if(typeof db?.$transaction!=='function'||typeof resolveEntitlement!=='function') throw fail(503);
   async function resolve(tx,user,identity,binding,sessionId) {
-    const response=await resolveEntitlement({db:tx,user,hwid:binding.hwid,appVersion:binding.appVersion,authSessionId:sessionId});
+    const response=await resolveEntitlement({db:tx,user,hwid:binding.hwid,appVersion:binding.appVersion,clientApplication:binding.productId,authSessionId:sessionId});
     const verified=verifyAppEntitlement(response?.entitlementToken);
     if(response?.valid!==true||response.canUseApp!==true||!verified.ok||!matches(verified.payload,identity,binding)||verified.payload.sessionId!==sessionId) throw fail();
     return {response,payload:verified.payload};
@@ -63,7 +76,7 @@ export function createMacroHandoffCandidate({db,resolveEntitlement}) {
           executableSha256:binding.executableSha256,packageIdentity:binding.packageIdentity,
           entitlementId:current.payload.entitlementId,sessionVersion:current.payload.sessionVersion,
           authSessionId:verified.payload.sessionId,issuedAt,expiresAt}});
-        return {valid:true,canUseApp:true,...identity,protocol:binding.protocol,productId:binding.productId,grant,expiresAt:expiresAt.toISOString()};
+        return {valid:true,canUseApp:true,...identity,protocol:binding.protocol,productId:binding.productId,grant,grantExpiresAt:expiresAt.toISOString(),expiresAt:expiresAt.toISOString()};
       }});
     },
     async exchange(body) {

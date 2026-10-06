@@ -141,7 +141,7 @@ export function issueAppEntitlement({
   const plan = license?.plan || null;
   const baseFeatures = Array.isArray(allowedFeatures) ? allowedFeatures : allowedFeaturesForPlan(plan);
   const safeFeatures = ownerAdminAccess
-    ? Array.from(new Set([...baseFeatures, "owner_admin", "admin_panel", "admin_macro_editor"]))
+    ? Array.from(new Set([...baseFeatures, "owner_admin", "admin_panel", "admin_macro_editor", "owner_email_manager", "owner_cloud_pc"]))
     : baseFeatures;
   const payload = {
     tokenType: TOKEN_TYPE,
@@ -159,11 +159,11 @@ export function issueAppEntitlement({
     isOwner: Boolean(ownerAdminAccess),
     isAdmin: Boolean(ownerAdminAccess),
     adminTools: Boolean(ownerAdminAccess),
-    capabilities: ownerAdminAccess ? ["owner_admin", "admin_panel", "admin_macro_editor"] : [],
+    capabilities: ownerAdminAccess ? ["owner_admin", "admin_panel", "admin_macro_editor", "owner_email_manager", "owner_cloud_pc"] : [],
     issuedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     appVersion: appVersion || null,
-    clientApplication: clientApplication === "fima-hub" ? "fima-hub" : "fima-macro",
+    clientApplication: ["fima-hub", "fima-mail", "fima-cloud-pc"].includes(clientApplication) ? clientApplication : "fima-macro",
     minSupportedAppVersion: minSupportedAppVersion || "",
     hwidHash: hashDeviceId(hwid),
     deviceIdHash: hashDeviceId(hwid),
@@ -208,7 +208,7 @@ export function verifyAppEntitlement(token) {
       return { ok: false, reason: "entitlement_session_revoked", payload };
     }
   } else if (payload.ownerAdminAccess || payload.isOwner || payload.isAdmin || payload.adminTools
-    || (payload.capabilities || []).length || (payload.allowedFeatures || []).some((feature) => ["owner_admin", "admin_panel", "admin_macro_editor"].includes(feature))) {
+    || (payload.capabilities || []).length || (payload.allowedFeatures || []).some((feature) => ["owner_admin", "admin_panel", "admin_macro_editor", "owner_email_manager", "owner_cloud_pc"].includes(feature))) {
     return { ok: false, reason: "entitlement_session_revoked", payload };
   }
 

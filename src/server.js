@@ -9271,6 +9271,7 @@ async function resolveDesktopEntitlementForUser({ user, hwid, appVersion, client
   const now = new Date();
   const minSupportedAppVersion = clientApplication === "fima-hub"
     ? env("MIN_SUPPORTED_HUB_VERSION", "0.2.0")
+    : ["fima-mail", "fima-cloud-pc"].includes(clientApplication) ? "0.1.0"
     : env("MIN_SUPPORTED_APP_VERSION", DEFAULT_MIN_SUPPORTED_APP_VERSION);
   const candidates = await db.license.findMany({
     where: {
