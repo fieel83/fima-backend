@@ -1327,6 +1327,11 @@ test("community channel repair enforces read-only Turkish announcements and priv
     { target: helper.id, permissions: { ViewChannel: true, SendMessages: true } }
   ]);
 
+  const legacyAnnouncementEdits = edits.slice();
+  edits.length = 0;
+  await repairParadiseCommunityChannelPermissions(guild, channel, "turkce-duyurular", "TURKISH");
+  assert.deepEqual(edits, legacyAnnouncementEdits);
+
   edits.length = 0;
   channel.type = ChannelType.GuildVoice;
   await repairParadiseCommunityChannelPermissions(

@@ -3079,10 +3079,10 @@ export async function repairParadiseCommunityChannelPermissions(
 ) {
   const normalizedChannel = normalizedMutationResourceName(channelName || channel?.name);
   const normalizedCategory = normalizedMutationResourceName(categoryName);
-  const isTurkish = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE TURKISH");
+  const isTurkish = ["〆・PRIVATE TURKISH", "TURKISH"].some(name => normalizedCategory === normalizedMutationResourceName(name));
   const isVideo = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE VIDEO TEAM");
   const isAnnouncements = isTurkish
-    && normalizedChannel === normalizedMutationResourceName("〆・turkish-announcements");
+    && ["〆・turkish-announcements", "turkce-duyurular"].some(name => normalizedChannel === normalizedMutationResourceName(name));
   const isPrivateVoice = channel?.type === ChannelType.GuildVoice && (isTurkish || isVideo);
   if (!isAnnouncements && !isPrivateVoice) return;
 
@@ -5122,10 +5122,10 @@ export function verifyParadiseTemplateStructure(guild, selected, roleIconOptions
         : matches[0];
       const normalizedCategory = normalizedMutationResourceName(categoryName);
       const normalizedChannel = normalizedMutationResourceName(channelName);
-      const isTurkish = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE TURKISH");
+      const isTurkish = ["〆・PRIVATE TURKISH", "TURKISH"].some(name => normalizedCategory === normalizedMutationResourceName(name));
       const isVideo = normalizedCategory === normalizedMutationResourceName("〆・PRIVATE VIDEO TEAM");
       const isAnnouncements = isTurkish
-        && normalizedChannel === normalizedMutationResourceName("〆・turkish-announcements");
+        && ["〆・turkish-announcements", "turkce-duyurular"].some(name => normalizedChannel === normalizedMutationResourceName(name));
       const isPrivateVoice = expectedType === ChannelType.GuildVoice && (isTurkish || isVideo);
       if (canonical && (isAnnouncements || isPrivateVoice)) {
         const expectedRoles = isTurkish
@@ -14451,7 +14451,7 @@ async function sendRolePanel(interaction, kind, template = "clan") {
     .setColor(await paradiseBrandColor())
     .setTitle(copy.title)
     .setDescription(`${copy.description}\n\n-# ${language === "tr" ? `Rol panelleri ${visibleBrand} tarafından yerinde güncellenir.` : `Role panels are updated in place by ${visibleBrand}.`}`)
-    .setFooter(paradiseFooter("Made By Fieel"));
+    .setFooter(paradiseFooter());
   await interaction.reply({ embeds: [embed], components: rolePanelRows(kind, language, template) });
 }
 
