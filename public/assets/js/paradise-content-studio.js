@@ -33,6 +33,10 @@
       "Verified source imports": "Doğrulanmış kaynak içe aktarımları",
       "Outfits": "Kıyafetler",
       "Capes": "Pelerinler",
+      "FT content starters": "FT içerik taslakları",
+      "Fake Headless": "Fake Headless",
+      "Fieel Info": "Fieel Bilgi",
+      "Clean drafts rebuilt from the visible source copy. Review and save before test-guild publishing.": "Görünür kaynak kopyasından yeniden hazırlanan temiz taslaklar. Test sunucusunda yayınlamadan önce inceleyip kaydet.",
       "Captured read-only from the real owner messages. Editing creates an Improved Draft while preserving the immutable Original snapshot.": "Gerçek owner mesajlarından salt okunur yakalanır. Düzenleme, değiştirilemez Orijinal anlık görüntüsünü koruyarak İyileştirilmiş Taslak oluşturur.",
       "Validated server backup": "Doğrulanmış sunucu yedeği",
       "Loading checksum-verified owner, bot and webhook messages…": "Sağlama toplamı doğrulanmış owner, bot ve webhook mesajları yükleniyor…",
@@ -290,6 +294,63 @@
       title: "Booster spotlight",
       description: "Thank you for powering FT Community and helping every member get more from the server.",
       imageUrl: "https://fimamacro.com/assets/images/discord/v5/ft-community-booster-v5.png"
+    })
+  });
+  function createFtContentStarter({ name, content = "", embeds }) {
+    return Object.freeze({
+      name,
+      deliveryMode: "bot",
+      stage: "starter_draft",
+      source: "starter",
+      importStatus: "not_applicable",
+      originalSnapshot: null,
+      targetChannelId: "",
+      targetMessageId: "",
+      metadata: Object.freeze({ starterKind: "ft_content" }),
+      current: Object.freeze({ content, embeds: Object.freeze(embeds) })
+    });
+  }
+  const ftContentStarters = Object.freeze({
+    "fake-headless": createFtContentStarter({
+      name: "FT Community · Fake Headless & Korblox",
+      embeds: [
+        Object.freeze({
+          color: "#20d9ba",
+          title: "Fake Headless & Korblox Tutorial",
+          description: "This guide installs client-side Fake Headless and Korblox for an R6 avatar. Only you can see these changes; other players cannot.",
+          fields: Object.freeze([
+            Object.freeze({ name: "Tutorial video", value: "[Watch on Medal](https://medal.tv/de/games/roblox/clips/mfqULk9pcDzFuJNT0?invite=cr-MSxZSjQsMzM5NzQ0NjE1&v=110)", inline: false }),
+            Object.freeze({ name: "Downloads", value: "[Fake Korblox meshes](https://drive.google.com/file/d/1AbGdsXa5u65xp5MWcivZy1-L_KaI2v-Y/view?usp=sharing)\n[Original Headless files](https://drive.google.com/file/d/14FbefwxTTGoUDsNxYaoATT8hrYpgwFe9/view?usp=sharing)\n[Original Korblox files](https://drive.google.com/file/d/1F1qV-HasRsK1nZy8p9GRLs1KYUx-fcWV/view?usp=sharing)", inline: false })
+          ]),
+          footer: Object.freeze({ text: "FT Community · FIMA" })
+        }),
+        Object.freeze({
+          color: "#162d33",
+          title: "Installation",
+          description: "**Fake Korblox**\n1. Download and extract the Korblox ZIP.\n2. Find Roblox, open its file location, then open the Roblox file location again.\n3. Open `content → avatar → meshes`.\n4. Delete the files in `meshes` and paste the downloaded mesh files.\n\n**Fake Headless**\n1. Open `content → avatar → heads`.\n2. Delete the files in `heads`.\n3. Join a Roblox game with an R6 avatar.",
+          fields: Object.freeze([
+            Object.freeze({ name: "Restore Headless", value: "Extract the original files, open `content → avatar → heads`, and paste the original files back.", inline: false }),
+            Object.freeze({ name: "Restore Korblox", value: "Extract the original files, open `content → avatar → meshes`, delete the modified files, and paste the originals.", inline: false }),
+            Object.freeze({ name: "Notes", value: "Roblox updates can restore old files. If the change does not appear, repeat the process. These changes remain client-side.", inline: false })
+          ]),
+          footer: Object.freeze({ text: "R6 avatar customization guide" })
+        })
+      ]
+    }),
+    "fieel-info": createFtContentStarter({
+      name: "FT Community · Fieel Info",
+      embeds: [Object.freeze({
+        color: "#20d9ba",
+        title: "About Fieel",
+        url: "https://guns.lol/fieel",
+        description: "Fieel is a 19-year-old content creator focused on The Strongest Battlegrounds on Roblox. Known for energetic edits, striking effects and creative battle videos, he is one of the rising creators in the TSB community.",
+        fields: Object.freeze([
+          Object.freeze({ name: "TikTok", value: "[Follow @fieel_](https://www.tiktok.com/@fieel_?_t=ZS-901gUS05llB&_r=1)", inline: true }),
+          Object.freeze({ name: "YouTube", value: "[Watch @fieel83](https://youtube.com/@fieel83?si=kI-mxXiMQNKK_qCh)", inline: true }),
+          Object.freeze({ name: "Links", value: "[Open Fieel's profile](https://guns.lol/fieel)", inline: false })
+        ]),
+        footer: Object.freeze({ text: "FT Community · FIMA" })
+      })]
     })
   });
   const allowedLocalVisualPaths = new Set([
@@ -1101,6 +1162,13 @@
     showNotice(`${starter.name} loaded as an unsaved Starter Draft. Review and save it before test-guild publishing.`, "good");
   }
 
+  function loadFtContentStarter(id) {
+    const starter = ftContentStarters[id];
+    if (!starter) return;
+    applyDocument(starter);
+    showNotice(`${starter.name} loaded as an unsaved Starter Draft. Review and save it before test-guild publishing.`, "good");
+  }
+
   async function importMessage() {
     const channelId = byId("importChannelId").value.trim();
     const messageId = byId("importMessageId").value.trim();
@@ -1212,6 +1280,9 @@
     for (const button of document.querySelectorAll("[data-preset]")) button.addEventListener("click", () => loadPreset(button.dataset.preset));
     for (const button of document.querySelectorAll("[data-ft-banner-starter]")) {
       button.addEventListener("click", () => loadFtBannerStarter(button.dataset.ftBannerStarter));
+    }
+    for (const button of document.querySelectorAll("[data-ft-content-starter]")) {
+      button.addEventListener("click", () => loadFtContentStarter(button.dataset.ftContentStarter));
     }
     for (const button of document.querySelectorAll("[data-preview-mode]")) {
       button.addEventListener("click", () => {

@@ -1100,7 +1100,8 @@ export const PARADISE_CLAN_ROLES = [
 
 export const PARADISE_COMMUNITY_ROLES = [
   "━━━━━ OWNERSHIP ━━━━━", "Owner",
-  "━━━━━ STAFF ━━━━━", "Administrator", "Senior Moderator", "Moderator", "Junior Moderator", "Helper",
+  "━━━━━ ADMINISTRATION ━━━━━", "Administrator", "Manager",
+  "━━━━━ MODERATION ━━━━━", "Senior Moderator", "Moderator", "Junior Moderator", "Helper",
   "━━━━━ CREATIVE TEAM ━━━━━", "Content Creator", "Outfit Designer", "Cape Designer",
   "━━━━━ VIDEO TEAM ━━━━━", "Video Team", "Video Editor", "Thumbnail Designer",
   "━━━━━ PRODUCT SUPPORT ━━━━━", "FIMA Support", "Macro Specialist", "FFlag Specialist",
@@ -1108,9 +1109,11 @@ export const PARADISE_COMMUNITY_ROLES = [
   "━━━━━ SAFETY ━━━━━", "BLACKLISTED", "Muted / Quarantined",
   "━━━━━ LANGUAGE ━━━━━", "Turkish", "English",
   "━━━━━ REGIONS ━━━━━", "Europe", "Asia", "North America", "South America", "Oceania",
-  "━━━━━ PRODUCT ACCESS ━━━━━", "FIMA Customer", "FIMA Macro Customer", "FIMA AI Customer", "Lifetime Customer",
-  "━━━━━ NOTIFICATIONS ━━━━━", "Product Notifications", "FIMA Updates", "FIMA Macro Updates", "FIMA AI Updates",
+  "━━━━━ PRODUCT ACCESS ━━━━━", "FIMA", "FIMA Customer", "FIMA Macro Customer", "FIMA AI Customer", "Lifetime Customer",
+  "━━━━━ NOTIFICATIONS ━━━━━", "Glads", "Announcements Ping", "Events Ping", "Giveaway Ping", "Product Notifications", "FIMA Updates", "FIMA Macro Updates", "FIMA AI Updates",
   "Fieel Content Notifications", "Tatu Content Notifications", "Event Notifications", "Security Alerts",
+  "━━━━━ RANKING ━━━━━", "Top 1", "Top 2", "Top 3",
+  "━━━━━ LEVELS ━━━━━", "Level 25", "Level 50", "Level 75", "Level 100",
   "━━━━━ TEXT ACTIVITY ━━━━━", "Text Level 5", "Text Level 10", "Text Level 20", "Text Level 35", "Text Level 50",
   "━━━━━ VOICE ACTIVITY ━━━━━", "Voice Level 5", "Voice Level 10", "Voice Level 20", "Voice Level 35", "Voice Level 50",
   "━━━━━ BOOSTERS ━━━━━", "Booster"
@@ -1119,6 +1122,7 @@ export const PARADISE_COMMUNITY_ROLES = [
 export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
   Owner: Object.freeze({ unicodeEmoji: "👑" }),
   Administrator: Object.freeze({ unicodeEmoji: "🛡️" }),
+  Manager: Object.freeze({ unicodeEmoji: "🛡️" }),
   "Senior Moderator": Object.freeze({ unicodeEmoji: "🛡️" }),
   Moderator: Object.freeze({ unicodeEmoji: "🔨" }),
   "Junior Moderator": Object.freeze({ unicodeEmoji: "🤝" }),
@@ -1145,10 +1149,15 @@ export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
   "North America": Object.freeze({ unicodeEmoji: "🌎" }),
   "South America": Object.freeze({ unicodeEmoji: "🌎" }),
   Oceania: Object.freeze({ unicodeEmoji: "🌏" }),
+  FIMA: Object.freeze({ unicodeEmoji: "◆" }),
   "FIMA Customer": Object.freeze({ unicodeEmoji: "◆" }),
   "FIMA Macro Customer": Object.freeze({ unicodeEmoji: "⌨️" }),
   "FIMA AI Customer": Object.freeze({ unicodeEmoji: "🧠" }),
   "Lifetime Customer": Object.freeze({ unicodeEmoji: "♾️" }),
+  Glads: Object.freeze({ unicodeEmoji: "⚔️" }),
+  "Announcements Ping": Object.freeze({ unicodeEmoji: "📣" }),
+  "Events Ping": Object.freeze({ unicodeEmoji: "📅" }),
+  "Giveaway Ping": Object.freeze({ unicodeEmoji: "🎁" }),
   "Product Notifications": Object.freeze({ unicodeEmoji: "🔔" }),
   "FIMA Updates": Object.freeze({ unicodeEmoji: "◆" }),
   "FIMA Macro Updates": Object.freeze({ unicodeEmoji: "⌨️" }),
@@ -1157,6 +1166,13 @@ export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
   "Tatu Content Notifications": Object.freeze({ unicodeEmoji: "🎬" }),
   "Event Notifications": Object.freeze({ unicodeEmoji: "📅" }),
   "Security Alerts": Object.freeze({ unicodeEmoji: "🚨" }),
+  "Top 1": Object.freeze({ unicodeEmoji: "🥇" }),
+  "Top 2": Object.freeze({ unicodeEmoji: "🥈" }),
+  "Top 3": Object.freeze({ unicodeEmoji: "🥉" }),
+  "Level 25": Object.freeze({ unicodeEmoji: "⭐" }),
+  "Level 50": Object.freeze({ unicodeEmoji: "⭐" }),
+  "Level 75": Object.freeze({ unicodeEmoji: "⭐" }),
+  "Level 100": Object.freeze({ unicodeEmoji: "🌟" }),
   "Text Level 5": Object.freeze({ unicodeEmoji: "💬" }),
   "Text Level 10": Object.freeze({ unicodeEmoji: "💬" }),
   "Text Level 20": Object.freeze({ unicodeEmoji: "💬" }),
@@ -1173,6 +1189,7 @@ export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
 const PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS = Object.freeze({
   Owner: "owner",
   Administrator: "administrator",
+  Manager: "administrator",
   "Senior Moderator": "moderator",
   Moderator: "moderator",
   "Junior Moderator": "helper",
@@ -1199,10 +1216,15 @@ const PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS = Object.freeze({
   "North America": "region",
   "South America": "region",
   Oceania: "region",
+  FIMA: "member",
   "FIMA Customer": "member",
   "FIMA Macro Customer": "macro-specialist",
   "FIMA AI Customer": "fima-ai",
   "Lifetime Customer": "verified",
+  Glads: "member",
+  "Announcements Ping": "notifications",
+  "Events Ping": "notifications",
+  "Giveaway Ping": "notifications",
   "Product Notifications": "notifications",
   "FIMA Updates": "notifications",
   "FIMA Macro Updates": "macro-specialist",
@@ -1211,6 +1233,13 @@ const PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS = Object.freeze({
   "Tatu Content Notifications": "creative",
   "Event Notifications": "notifications",
   "Security Alerts": "safety",
+  "Top 1": "booster",
+  "Top 2": "booster",
+  "Top 3": "booster",
+  "Level 25": "member",
+  "Level 50": "member",
+  "Level 75": "member",
+  "Level 100": "verified",
   "Text Level 5": "member",
   "Text Level 10": "member",
   "Text Level 20": "member",
@@ -1317,7 +1346,7 @@ export function sanitizeParadiseCommunityRoleIconDescriptor(descriptor) {
 }
 
 export const COMMUNITY_STAFF_ACCESS_ROLES = [
-  "Owner", "Administrator", "Senior Moderator", "Moderator", "Junior Moderator", "Helper"
+  "Owner", "Administrator", "Manager", "Senior Moderator", "Moderator", "Junior Moderator", "Helper"
 ];
 
 export const COMMUNITY_TURKISH_ACCESS_ROLES = [
@@ -1351,6 +1380,11 @@ export function paradiseXpPolicy(config = {}) {
 export const PARADISE_ROLES = PARADISE_CLAN_ROLES;
 
 export const PARADISE_VOICE_CHANNEL_NAMES = Object.freeze([
+  "Create Room",
+  "Community Lounge",
+  "Focus Room",
+  "Türkçe Sohbet",
+  "Video Team Voice",
   "⌁・join-to-create",
   "⌁・community-voice",
   "⌁・afk",
@@ -1386,11 +1420,11 @@ export function paradiseSetupChannelTypeMismatch(channel, categoryName, channelN
 function paradiseVoiceSetupIds(guild) {
   const find = names => guild.channels.cache.find(channel => names.includes(channel.name) && channel.type === ChannelType.GuildVoice)?.id || null;
   return {
-    joinToCreateChannelId: find(["⌁・join-to-create", "◜・oda-oluştur", "Join to Create"]),
-    communityVoiceChannelId: find(["⌁・community-voice", "◜・topluluk-sesi", "Community Voice"]),
+    joinToCreateChannelId: find(["Create Room", "⌁・join-to-create", "◜・oda-oluştur", "Join to Create"]),
+    communityVoiceChannelId: find(["Community Lounge", "⌁・community-voice", "◜・topluluk-sesi", "Community Voice"]),
     warVoiceChannelId: find(["◜・savaş-odası", "War VC"]),
     afkChannelId: find(["⌁・afk", "◞・afk", "AFK"]),
-    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name))?.id || null
+    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["VOICE", "⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name))?.id || null
   };
 }
 
@@ -1458,17 +1492,15 @@ export const PARADISE_CHANNEL_MAPPINGS = Object.freeze([
 // defaults.  Extra modules use existing mapped channels or are enabled later;
 // they never produce an empty channel by default.
 export const PARADISE_COMMUNITY_SCHEMA = [
-  ["⟐・START", ["⟐・overview", "⟐・rules", "⟐・announcements", "⌁・get-roles", "⌁・faq-help"], false],
-  ["⌁・COMMUNITY", ["⌁・general", "⌁・media", "⌁・events", "⌁・commands"], false],
-  ["⌁・FIEEL-AND-TATU", ["⌁・content-feed", "⌁・fieel-content", "⌁・tatu-content", "⌁・collaborations"], false],
-  ["⟐・FIMA", ["⟐・fima-overview", "⌁・fima-macro", "⌁・fima-ai", "⌁・fima-updates", "⌁・vouches", "⌁・support"], false],
-  ["⟐・ACTIVITY", ["⌁・text-activity", "⌁・voice-activity", "⌁・activity-rewards"], false],
-  ["⌁・STYLE", ["⌁・outfits", "⌁・capes"], false],
-  ["⟐・APPLICATIONS", ["⌁・applications", "⌁・application-status"], false],
-  ["⌁・VOICE", ["⌁・join-to-create", "⌁・community-voice", "⌁・afk"], false],
-  ["〆・PRIVATE TURKISH", ["〆・turkish-chat", "〆・turkish-media", "〆・turkish-announcements", "〆・turkish-voice"], true, COMMUNITY_TURKISH_ACCESS_ROLES],
-  ["〆・PRIVATE VIDEO TEAM", ["〆・video-hub", "〆・video-ideas", "〆・video-scripts", "〆・video-assets", "〆・video-review", "〆・video-upload-schedule", "〆・video-voice"], true, COMMUNITY_VIDEO_TEAM_ACCESS_ROLES],
-  ["〆・PRIVATE STAFF", ["〆・staff-hub", "〆・staff-guides", "〆・staff-application-reviews", "〆・staff-logs", "〆・staff-security-logs", "〆・staff-transcripts"], true, COMMUNITY_STAFF_ACCESS_ROLES]
+  ["START", ["start-here", "rules", "announcements", "roles", "fieel-info", "joins-leaves"], false],
+  ["COMMUNITY", ["general", "media", "events", "levels"], false],
+  ["FIMA", ["fima-updates", "fima-support", "fima-guide"], false],
+  ["FIEEL STYLE", ["fake-headless", "outfits", "capes"], false],
+  ["TURKISH", ["turkce-sohbet", "turkce-medya", "turkce-duyurular", "Türkçe Sohbet"], true, COMMUNITY_TURKISH_ACCESS_ROLES],
+  ["SUPPORT", ["support", "support-faq", "applications"], false],
+  ["PERSONNEL", ["staff-hub", "staff-guides", "staff-application-reviews", "staff-logs", "staff-security-logs", "staff-transcripts"], true, COMMUNITY_STAFF_ACCESS_ROLES],
+  ["VIDEO TEAM", ["video-hub", "video-ideas", "video-scripts", "video-assets", "video-review", "video-upload-schedule", "Video Team Voice"], true, COMMUNITY_VIDEO_TEAM_ACCESS_ROLES],
+  ["VOICE", ["Create Room", "Community Lounge", "Focus Room"], false]
 ];
 
 export const PARADISE_CLAN_SCHEMA = [
@@ -1495,13 +1527,13 @@ export const PARADISE_TSBTR_SCHEMA = [
 
 const PARADISE_TEMPLATE_CHANNEL_DEFAULTS = Object.freeze({
   community: {
-    start_here_channel: "⟐・overview", rules_channel: "⟐・rules", welcome_channel: "⟐・overview", leave_channel: "⟐・overview", roles_channel: "⌁・get-roles",
-    announcement_channel: "⟐・announcements", activity_rewards_channel: "⌁・activity-rewards",
-    member_help_channel: "⌁・faq-help", level_channel: "⌁・text-activity", faq_channel: "⌁・faq-help", role_guide_channel: "⌁・get-roles",
-    support_ticket_channel: "⌁・support", application_ticket_channel: "⌁・applications", blacklist_appeal_channel: "⌁・support", staff_command_guide_channel: "〆・staff-hub", staff_guides_channel: "〆・staff-guides",
-    application_review_channel: "〆・staff-application-reviews", moderation_requests_channel: "〆・staff-security-logs", quarantine_review_channel: "〆・staff-security-logs",
-    support_transcripts_channel: "〆・staff-transcripts", challenge_transcripts_channel: "〆・staff-transcripts",
-    support_logs_channel: "〆・staff-logs", application_logs_channel: "〆・staff-logs", moderation_logs_channel: "〆・staff-security-logs", activity_logs_channel: "〆・staff-logs", voice_logs_channel: "〆・staff-logs", level_logs_channel: "〆・staff-logs", blacklist_logs_channel: "〆・staff-security-logs", payout_queue_channel: "〆・staff-logs"
+    start_here_channel: "start-here", rules_channel: "rules", welcome_channel: "joins-leaves", leave_channel: "joins-leaves", roles_channel: "roles",
+    announcement_channel: "announcements", activity_rewards_channel: "levels",
+    member_help_channel: "fieel-info", level_channel: "levels", faq_channel: "support-faq", role_guide_channel: "roles",
+    support_ticket_channel: "support", application_ticket_channel: "applications", blacklist_appeal_channel: "support", staff_command_guide_channel: "staff-hub", staff_guides_channel: "staff-guides",
+    application_review_channel: "staff-application-reviews", moderation_requests_channel: "staff-security-logs", quarantine_review_channel: "staff-security-logs",
+    support_transcripts_channel: "staff-transcripts", challenge_transcripts_channel: "staff-transcripts",
+    support_logs_channel: "staff-logs", application_logs_channel: "staff-logs", moderation_logs_channel: "staff-security-logs", activity_logs_channel: "staff-logs", voice_logs_channel: "staff-logs", level_logs_channel: "staff-logs", blacklist_logs_channel: "staff-security-logs", payout_queue_channel: "staff-logs"
   },
   clan: {
     start_here_channel: "⌁・başlangıç", rules_channel: "⌁・kurallar", welcome_channel: "⌁・hoş-geldin", leave_channel: "⌁・hoş-geldin", roles_channel: "⌁・roller",
@@ -1565,21 +1597,21 @@ export function buildParadiseCommunityOperationalSemantics() {
   const typeFor = (categoryName, channelName) =>
     paradiseSetupChannelType(categoryName, channelName) === ChannelType.GuildVoice ? "voice" : "text";
   const categoryPurpose = (name) => {
-    if (name === "〆・PRIVATE TURKISH") return "turkish";
-    if (name === "〆・PRIVATE VIDEO TEAM") return "video_team";
-    if (name === "〆・PRIVATE STAFF") return "staff";
+    if (name === "TURKISH") return "turkish";
+    if (name === "VIDEO TEAM") return "video_team";
+    if (name === "PERSONNEL") return "staff";
     return null;
   };
   const channelPurpose = new Map([
-    ["〆・turkish-chat", "turkish_chat"], ["〆・turkish-media", "turkish_media"],
-    ["〆・turkish-announcements", "turkish_announcements"], ["〆・turkish-voice", "turkish_voice"],
-    ["〆・video-hub", "video_hub"], ["〆・video-ideas", "video_ideas"],
-    ["〆・video-scripts", "video_scripts"], ["〆・video-assets", "video_assets"],
-    ["〆・video-review", "video_review"], ["〆・video-upload-schedule", "video_upload_schedule"],
-    ["〆・video-voice", "video_voice"], ["〆・staff-hub", "staff_hub"],
-    ["〆・staff-guides", "staff_guides"], ["〆・staff-application-reviews", "application_reviews"],
-    ["〆・staff-logs", "staff_logs"], ["〆・staff-security-logs", "security_logs"],
-    ["〆・staff-transcripts", "transcripts"]
+    ["turkce-sohbet", "turkish_chat"], ["turkce-medya", "turkish_media"],
+    ["turkce-duyurular", "turkish_announcements"], ["Türkçe Sohbet", "turkish_voice"],
+    ["video-hub", "video_hub"], ["video-ideas", "video_ideas"],
+    ["video-scripts", "video_scripts"], ["video-assets", "video_assets"],
+    ["video-review", "video_review"], ["video-upload-schedule", "video_upload_schedule"],
+    ["Video Team Voice", "video_voice"], ["staff-hub", "staff_hub"],
+    ["staff-guides", "staff_guides"], ["staff-application-reviews", "application_reviews"],
+    ["staff-logs", "staff_logs"], ["staff-security-logs", "security_logs"],
+    ["staff-transcripts", "transcripts"]
   ]);
   const accessClasses = (roles = []) => [
     ...(roles.some(role => COMMUNITY_TURKISH_ACCESS_ROLES.includes(role) && role === "Turkish") ? ["turkish"] : []),
@@ -2504,7 +2536,7 @@ async function handleSetupAction(interaction, mode) {
 const ROLE_PERMISSION_NAMES = Object.freeze({
   Owner: ["Administrator"],
   Admin: ["Administrator"],
-  Administrator: ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "BanMembers", "ViewAuditLog"],
+  Administrator: ["Administrator"],
   Overseer: ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "BanMembers", "ViewAuditLog"],
   "Administration Manager": ["ManageGuild", "ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Head Admin": ["ManageRoles", "ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
@@ -2512,7 +2544,7 @@ const ROLE_PERMISSION_NAMES = Object.freeze({
   "Moderator Manager": ["ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   "Head Moderator": ["ManageMessages", "ModerateMembers", "KickMembers"],
   "Senior Moderator": ["ManageMessages", "ModerateMembers", "KickMembers"],
-  Manager: ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
+  Manager: ["ManageGuild", "ManageChannels", "ManageRoles", "ManageMessages", "ManageEvents", "ManageThreads"],
   "Community Manager": ["ManageChannels", "ManageMessages", "ModerateMembers", "KickMembers", "ViewAuditLog"],
   Moderator: ["ManageMessages", "ModerateMembers"],
   "Junior Moderator": ["ManageMessages"],
@@ -2527,6 +2559,22 @@ const ROLE_PERMISSION_NAMES = Object.freeze({
   "Referee Manager": ["ManageChannels", "ManageMessages", "ModerateMembers"],
   "Head Referee": ["ManageMessages"],
   "Experienced Referee": ["ManageMessages"]
+});
+
+const COMMUNITY_ROLE_PRESENTATION = Object.freeze({
+  Administrator: Object.freeze({ hoist: true, mentionable: false }),
+  Manager: Object.freeze({ hoist: true, mentionable: false }),
+  "Top 1": Object.freeze({ hoist: true, mentionable: false }),
+  "Top 2": Object.freeze({ hoist: true, mentionable: false }),
+  "Top 3": Object.freeze({ hoist: true, mentionable: false }),
+  "Level 25": Object.freeze({ hoist: true, mentionable: false }),
+  "Level 50": Object.freeze({ hoist: true, mentionable: false }),
+  "Level 75": Object.freeze({ hoist: true, mentionable: false }),
+  "Level 100": Object.freeze({ hoist: true, mentionable: false }),
+  Glads: Object.freeze({ hoist: false, mentionable: true }),
+  "Announcements Ping": Object.freeze({ hoist: false, mentionable: true }),
+  "Events Ping": Object.freeze({ hoist: false, mentionable: true }),
+  "Giveaway Ping": Object.freeze({ hoist: false, mentionable: true })
 });
 
 const PRIVATE_ACCESS_ROLES = new Set([
@@ -2612,6 +2660,15 @@ export async function ensureRole(guild, name, applyPermissions = false) {
           actualPermissions: actual?.toString() ?? null,
           discordCode: String(cause?.code || "unknown")
         }, cause);
+      }
+    }
+    const presentation = COMMUNITY_ROLE_PRESENTATION[name];
+    if (presentation) {
+      if (role.hoist !== presentation.hoist && typeof role.setHoist === "function") {
+        await role.setHoist(presentation.hoist, "FIMA FT Community role display policy");
+      }
+      if (role.mentionable !== presentation.mentionable && typeof role.setMentionable === "function") {
+        await role.setMentionable(presentation.mentionable, "FIMA FT Community role ping policy");
       }
     }
   }
@@ -12788,11 +12845,11 @@ export function paradiseCommunityVideoTeamPanelPayload({
         "",
         "**Akış**  →  Fikir › Senaryo › Asset › İnceleme › Yayın",
         "",
-        "• `〆・video-ideas` — fikirler ve içerik briefleri",
-        "• `〆・video-scripts` — senaryo, başlık ve açıklama taslakları",
-        "• `〆・video-assets` — görsel, ses ve proje dosyaları",
-        "• `〆・video-review` — kalite kontrol ve son onay",
-        "• `〆・video-upload-schedule` — yayın planı ve teslim takibi",
+        "• `video-ideas` — fikirler ve içerik briefleri",
+        "• `video-scripts` — senaryo, başlık ve açıklama taslakları",
+        "• `video-assets` — görsel, ses ve proje dosyaları",
+        "• `video-review` — kalite kontrol ve son onay",
+        "• `video-upload-schedule` — yayın planı ve teslim takibi",
         "",
         "-# Erişim yalnız Video Team ve yetkili staff rolleri içindir."
       ].join("\n")
@@ -12802,11 +12859,11 @@ export function paradiseCommunityVideoTeamPanelPayload({
         "",
         "**Flow**  →  Idea › Script › Assets › Review › Publish",
         "",
-        "• `〆・video-ideas` — concepts and creative briefs",
-        "• `〆・video-scripts` — scripts, titles and descriptions",
-        "• `〆・video-assets` — visual, audio and project files",
-        "• `〆・video-review` — quality control and final approval",
-        "• `〆・video-upload-schedule` — publishing plan and delivery tracking",
+        "• `video-ideas` — concepts and creative briefs",
+        "• `video-scripts` — scripts, titles and descriptions",
+        "• `video-assets` — visual, audio and project files",
+        "• `video-review` — quality control and final approval",
+        "• `video-upload-schedule` — publishing plan and delivery tracking",
         "",
         "-# Access is limited to Video Team and authorized staff roles."
       ].join("\n"))
@@ -12820,7 +12877,7 @@ async function updateParadiseCommunityVideoTeamPanel(guild, mode) {
   if (!isFimaCommunityManagedGuild(guild?.id) || mode !== "community") {
     return failedParadiseMessageReadback({ reason: "video_team_not_applicable" });
   }
-  const channel = guild.channels.cache.find(item => item.name === "〆・video-hub");
+  const channel = guild.channels.cache.find(item => item.name === "video-hub");
   if (!channel?.isTextBased?.() || typeof channel.send !== "function") {
     return failedParadiseMessageReadback({ reason: "video_team_channel_not_resolved" });
   }

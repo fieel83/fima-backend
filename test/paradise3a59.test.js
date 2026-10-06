@@ -699,8 +699,8 @@ test("Community canonical image URLs and Video Team payload use the versioned ba
   const embed = payload.embeds[0].toJSON();
   assert.equal(embed.title, "✦ FIMA VIDEO TEAM");
   assert.equal(embed.image.url, PARADISE_COMMUNITY_ASSETS.videoTeam);
-  assert.match(embed.description, /〆・video-upload-schedule/);
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("〆・video-hub")));
+  assert.match(embed.description, /`video-upload-schedule`/);
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("video-hub")));
 });
 
 test("Paradise image URL sanitizer rejects insecure, credentialed, script, and malformed values", () => {
@@ -2450,7 +2450,7 @@ test("Paradise brand color accepts safe HEX and rejects malformed values", () =>
 
 test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.deepEqual(Object.keys(PARADISE_SETUP_SCHEMAS), ["community", "clan", "tsbtr"]);
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("⌁・support")));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([, channels]) => channels.includes("support")));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("◆・lineuplar")));
   assert.ok(PARADISE_SETUP_SCHEMAS.tsbtr.schema.some(([, channels]) => channels.includes("⟡・top-30")));
   assert.ok(PARADISE_SETUP_SCHEMAS.clan.schema.some(([, channels]) => channels.includes("⟡・müsaitlik-ve-loa")));
@@ -2461,7 +2461,7 @@ test("Community, Clan and TSBTR setup templates remain separate", () => {
   assert.ok(PARADISE_COMMUNITY_ROLES.includes("BLACKLISTED"));
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("⟡・sonuçlar"), false);
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("◇・destek"), false);
-  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("⌁・support"), true);
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("support"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("◇・destek"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("◜・oda-oluştur"), true);
   assert.equal(PARADISE_SETUP_SCHEMAS.tsbtr.schema.flatMap(([, channels]) => channels).includes("〢・incelemeler"), true);
@@ -2496,18 +2496,21 @@ test("canonical templates keep their required public and private surfaces", () =
   const privateCount = mode => PARADISE_SETUP_SCHEMAS[mode].schema
     .filter(([, , privateCategory]) => privateCategory)
     .flatMap(([, channels]) => channels).length;
-  assert.equal(count("community"), 46);
+  assert.equal(count("community"), 39);
   assert.equal(count("clan"), 28);
   assert.equal(count("tsbtr"), 25);
-  assert.equal(publicCount("community"), 26);
+  assert.equal(publicCount("community"), 19);
   assert.equal(publicCount("clan"), 18);
   assert.equal(publicCount("tsbtr"), 16);
   assert.equal(privateCount("community"), 17);
   for (const mode of ["clan", "tsbtr"]) assert.equal(privateCount(mode), 6);
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "〆・PRIVATE TURKISH"));
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "〆・PRIVATE VIDEO TEAM"));
-  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "〆・PRIVATE STAFF"));
-  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("role-guide"), false);
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "TURKISH"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "VIDEO TEAM"));
+  assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "PERSONNEL"));
+  assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("roles"), true);
+  for (const role of ["Manager", "Glads", "Top 1", "Top 2", "Top 3", "Level 25", "Level 100"]) {
+    assert.ok(PARADISE_SETUP_SCHEMAS.community.roles.includes(role));
+  }
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("〢・personel-rehberleri"), true);
 });
 
@@ -2516,7 +2519,7 @@ test("FT Community operational projection preserves identity, private access and
   assert.equal(projection.identity, "FT Community");
   assert.equal(projection.publicLanguage, "en");
   assert.deepEqual(projection.privateCategories.map(category => category.purpose), [
-    "turkish", "video_team", "staff"
+    "turkish", "staff", "video_team"
   ]);
   assert.equal(
     projection.privateCategories.find(category => category.purpose === "turkish")
@@ -2531,8 +2534,8 @@ test("FT Community operational projection preserves identity, private access and
   assert.ok(projection.privateCategories.find(category => category.purpose === "staff")
     .accessClasses.includes("staff"));
   assert.ok(projection.channelNames.includes(projection.mappings.applications));
-  assert.equal(projection.mappings.announcements, "⟐・announcements");
-  assert.equal(projection.mappings.activityRewards, "⌁・activity-rewards");
+  assert.equal(projection.mappings.announcements, "announcements");
+  assert.equal(projection.mappings.activityRewards, "levels");
   assert.ok(PARADISE_CHANNEL_MAPPINGS.some(([key]) => key === "announcement_channel"));
   assert.ok(PARADISE_CHANNEL_MAPPINGS.some(([key]) => key === "activity_rewards_channel"));
 });

@@ -4,6 +4,8 @@ import fs from "node:fs";
 
 const html = fs.readFileSync(new URL("../public/fima-bot-dashboard.html", import.meta.url), "utf8");
 const script = fs.readFileSync(new URL("../public/assets/js/fima-bot-dashboard.js", import.meta.url), "utf8");
+const operationsScript = fs.readFileSync(new URL("../public/assets/js/fima-guild-operations.js", import.meta.url), "utf8");
+const controlsScript = fs.readFileSync(new URL("../public/assets/js/fima-controls.js", import.meta.url), "utf8");
 const i18nScript = fs.readFileSync(new URL("../public/assets/js/fima-bot-dashboard-i18n.js", import.meta.url), "utf8");
 const css = fs.readFileSync(new URL("../public/assets/css/fima-bot-dashboard.css", import.meta.url), "utf8");
 
@@ -101,8 +103,19 @@ test("dashboard provides grouped mobile navigation, route pagination and accessi
   assert.match(script, /panel\?\.focus\(\{ preventScroll: true \}\)/);
   assert.match(script, /workspace_route_unavailable/);
   assert.match(script, /Bu sunucuda gösterilecek modül yok/);
-  assert.match(css, /\.mobile-module-picker select:disabled\{/);
+  assert.match(css, /\.mobile-module-picker \.fima-select-trigger:disabled\{/);
   assert.match(css, /\.module-pagination>a:.*focus-visible/);
+});
+
+test("dashboard replaces native channel menus in dynamically rendered operation panels", () => {
+  assert.match(operationsScript, /import \{ enhanceFimaControls \}/);
+  assert.ok((operationsScript.match(/enhanceFimaControls\(body\)/g) || []).length >= 2);
+  assert.match(operationsScript, /enhanceFimaControls\(voicePanel\)/);
+  assert.match(operationsScript, /enhanceFimaControls\(migrationPanel\)/);
+  assert.match(controlsScript, /setAttribute\('role', 'combobox'\)/);
+  assert.match(controlsScript, /setAttribute\('role', 'listbox'\)/);
+  assert.match(controlsScript, /classList\.add\('fima-select-source'\)/);
+  assert.match(html, /fima-bot-dashboard\.js\?v=20261006-1/);
 });
 
 test("dashboard shares language preferences and translates dynamic browser UI without resetting the editor", () => {

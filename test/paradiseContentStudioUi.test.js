@@ -59,6 +59,8 @@ test("Content Studio exposes the complete owner workflow", () => {
   ]) assert.match(htmlSource, new RegExp(`id="${id}"`), `missing ${id}`);
   assert.match(htmlSource, /data-preset="outfits"/);
   assert.match(htmlSource, /data-preset="capes"/);
+  assert.match(htmlSource, /data-ft-content-starter="fake-headless"/);
+  assert.match(htmlSource, /data-ft-content-starter="fieel-info"/);
   assert.match(htmlSource, /data-preview-mode="desktop"/);
   assert.match(htmlSource, /data-preview-mode="mobile"/);
   assert.match(htmlSource, /PUBLISH TEST CONTENT/);
@@ -73,6 +75,26 @@ test("Content Studio exposes the complete owner workflow", () => {
   assert.match(htmlSource, /class="panel library-panel"/);
   assert.match(htmlSource, /class="panel editor-panel"/);
   assert.match(htmlSource, /Library → Editor → Publish/);
+});
+
+test("Content Studio includes cleaned Fake Headless and Fieel Info starter drafts", () => {
+  for (const id of ["fake-headless", "fieel-info"]) {
+    assert.match(htmlSource, new RegExp(`data-ft-content-starter="${id}"`));
+  }
+  for (const sourceUrl of [
+    "medal.tv/de/games/roblox/clips/mfqULk9pcDzFuJNT0",
+    "drive.google.com/file/d/1AbGdsXa5u65xp5MWcivZy1-L_KaI2v-Y",
+    "drive.google.com/file/d/14FbefwxTTGoUDsNxYaoATT8hrYpgwFe9",
+    "drive.google.com/file/d/1F1qV-HasRsK1nZy8p9GRLs1KYUx-fcWV",
+    "guns.lol/fieel",
+    "tiktok.com/@fieel_",
+    "youtube.com/@fieel83"
+  ]) assert.ok(clientSource.includes(sourceUrl), `missing source link ${sourceUrl}`);
+  assert.match(clientSource, /function loadFtContentStarter\(id\)/);
+  assert.match(clientSource, /querySelectorAll\("\[data-ft-content-starter\]"\)/);
+  assert.match(clientSource, /metadata:\s*Object\.freeze\(\{ starterKind: "ft_content" \}\)/);
+  assert.match(clientSource, /stage:\s*"starter_draft"/);
+  assert.match(clientSource, /originalSnapshot:\s*null/);
 });
 
 test("Content Studio browser flow uses every safe API and optimistic revision", () => {

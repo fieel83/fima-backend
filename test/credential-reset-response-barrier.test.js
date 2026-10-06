@@ -95,7 +95,9 @@ test('actual HTTP refresh route rejects a reset during validation audit instead 
   runInNewContext(extract('app.post("/api/license/refresh-entitlement",', 'app.get("/admin/login",'), {
     app: { post: (_path, _limiter, fn) => { handler = fn; } }, entitlementRefreshLimiter: {},
     extractEntitlementToken: () => 'signed', normalizeHwid: value => value, env: (_key, fallback) => fallback,
-    DEFAULT_MIN_SUPPORTED_APP_VERSION: '1.0.130', minimumAppVersionStatus: () => ({ updateRequired: false }),
+    DEFAULT_MIN_SUPPORTED_APP_VERSION: '1.0.130',
+    minimumAppVersionStatus: () => ({ updateRequired: false }),
+    entitlementVersionStatus: () => ({ updateRequired: false, minimumVersion: '1.0.130' }),
     entitlementSecretStatus: () => ({ configured: true }), licenseReasonMessage: value => value,
     verifyAppEntitlement: () => ({ ok: true, payload }), hashDeviceId: () => payload.hwidHash,
     runEntitlementRefreshWithAccountLock, assertRefreshLicenseAccount, prisma: f.db,

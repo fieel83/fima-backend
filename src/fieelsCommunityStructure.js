@@ -2,6 +2,7 @@ const STAFF_ROLE_KEYS = Object.freeze([
   "helper",
   "junior_moderator",
   "moderator",
+  "manager",
   "administrator",
   "owner"
 ]);
@@ -12,16 +13,20 @@ const VIDEO_TEAM_ROLE_KEYS = Object.freeze([
   "thumbnail_designer"
 ]);
 
-export const FIEELS_COMMUNITY_STRUCTURE_REVISION = "identity-naming-video-team-v2";
+const PING_ROLE_KEYS = Object.freeze(["glads", "announcements_ping", "events_ping", "giveaway_ping"]);
+const RANK_ROLE_KEYS = Object.freeze(["top_1", "top_2", "top_3"]);
+const LEVEL_ROLE_KEYS = Object.freeze(["level_25", "level_50", "level_75", "level_100"]);
+
+export const FIEELS_COMMUNITY_STRUCTURE_REVISION = "plain-ft-content-roles-v3";
 
 export const FIEELS_COMMUNITY_NAMING_STYLE = Object.freeze({
-  categoryFrame: "╾━ {name} ━╼",
-  importantMarker: "⫸",
-  normalMarker: "⟢",
-  privateMarker: "⫷",
-  textSeparator: "・",
-  voiceStyle: "⟢ {name}",
-  roleSeparatorStyle: "╺╾ {name} ╼╸"
+  categoryFrame: "{name}",
+  importantMarker: "",
+  normalMarker: "",
+  privateMarker: "",
+  textSeparator: "",
+  voiceStyle: "{name}",
+  roleSeparatorStyle: "{name}"
 });
 
 const CATEGORY_DEFINITIONS = Object.freeze([
@@ -32,7 +37,9 @@ const CATEGORY_DEFINITIONS = Object.freeze([
       ["start_here", "important", "text", "start-here", "başlangıç"],
       ["rules", "important", "text", "rules", "kurallar"],
       ["announcements", "important", "text", "announcements", "duyurular"],
-      ["choose_language", "normal", "text", "choose-language", "dil-seçimi"]
+      ["roles", "normal", "text", "roles", "roller"],
+      ["fieel_info", "normal", "text", "fieel-info", "fieel-bilgi"],
+      ["joins_leaves", "normal", "text", "joins-leaves", "giriş-çıkış"]
     ]
   },
   {
@@ -58,19 +65,20 @@ const CATEGORY_DEFINITIONS = Object.freeze([
     key: "fieel_style",
     names: { en: "FIEEL STYLE", tr: "FIEEL STİLİ" },
     channels: [
-      ["style_showcase", "normal", "text", "style-showcase", "stil-vitrini"],
-      ["creative_lab", "normal", "text", "creative-lab", "yaratıcı-atölye"]
+      ["fake_headless", "normal", "text", "fake-headless", "fake-headless"],
+      ["outfits", "normal", "text", "outfits", "outfits"],
+      ["capes", "normal", "text", "capes", "capes"]
     ]
   },
   {
     key: "turkish",
-    names: { en: "TURKISH COMMUNITY", tr: "TÜRKÇE TOPLULUK" },
+    names: { en: "TURKISH", tr: "TURKISH" },
     access: "turkish_role",
     channels: [
-      ["turkish_chat", "normal", "text", "turkish-chat", "türk-sohbet"],
-      ["turkish_media", "normal", "text", "turkish-media", "türk-medya"],
-      ["turkish_announcements", "important", "text", "turkish-announcements", "türk-duyurular"],
-      ["turkish_voice", "normal", "voice", "Turkish Voice", "Türk Ses"]
+      ["turkish_chat", "normal", "text", "turkce-sohbet", "turkce-sohbet"],
+      ["turkish_media", "normal", "text", "turkce-medya", "turkce-medya"],
+      ["turkish_announcements", "important", "text", "turkce-duyurular", "turkce-duyurular"],
+      ["turkish_voice", "normal", "voice", "Türkçe Sohbet", "Türkçe Sohbet"]
     ]
   },
   {
@@ -88,9 +96,10 @@ const CATEGORY_DEFINITIONS = Object.freeze([
     channels: [
       ["staff_hub", "private", "text", "staff-hub", "personel-merkezi"],
       ["staff_guides", "important", "text", "staff-guides", "personel-rehberleri"],
-      ["reviews", "private", "text", "reviews", "incelemeler"],
-      ["transcripts", "private", "text", "transcripts", "kayıt-dökümleri"],
-      ["security_logs", "private", "text", "security-logs", "güvenlik-kayıtları"]
+      ["application_reviews", "private", "text", "staff-application-reviews", "personel-başvuru-incelemeleri"],
+      ["staff_logs", "private", "text", "staff-logs", "personel-kayıtları"],
+      ["security_logs", "private", "text", "staff-security-logs", "güvenlik-kayıtları"],
+      ["transcripts", "private", "text", "staff-transcripts", "kayıt-dökümleri"]
     ]
   },
   {
@@ -111,6 +120,7 @@ const CATEGORY_DEFINITIONS = Object.freeze([
     key: "voice",
     names: { en: "VOICE", tr: "SES" },
     channels: [
+      ["join_to_create", "normal", "voice", "Create Room", "Oda Oluştur"],
       ["community_voice", "normal", "voice", "Community Lounge", "Topluluk Salonu"],
       ["focus_voice", "normal", "voice", "Focus Room", "Odak Odası"]
     ]
@@ -119,15 +129,32 @@ const CATEGORY_DEFINITIONS = Object.freeze([
 
 const ROLE_GROUPS = Object.freeze([
   ["ownership", "OWNERSHIP", "SAHİPLİK", ["owner"]],
-  ["administration", "ADMINISTRATION", "YÖNETİM", ["administrator"]],
+  ["administration", "ADMINISTRATION", "YÖNETİM", ["administrator", "manager"]],
   ["moderation", "MODERATION", "MODERASYON", ["moderator", "junior_moderator", "helper"]],
   ["video_team", "VIDEO TEAM", "VIDEO EKIBI", [...VIDEO_TEAM_ROLE_KEYS]],
   ["community", "COMMUNITY", "TOPLULUK", ["member"]],
   ["language", "LANGUAGE", "DİL", ["turkish", "english"]],
-  ["ping", "PING ROLES", "BİLDİRİM ROLLERİ", []],
-  ["product", "PRODUCTS", "ÜRÜNLER", []],
-  ["trust", "TRUST & LEVEL", "GÜVEN & SEVİYE", []]
+  ["ping", "PING ROLES", "BİLDİRİM ROLLERİ", [...PING_ROLE_KEYS]],
+  ["product", "PRODUCTS", "ÜRÜNLER", ["fima"]],
+  ["trust", "RANK & LEVEL", "SIRALAMA & SEVİYE", [...RANK_ROLE_KEYS, ...LEVEL_ROLE_KEYS]]
 ]);
+
+const ROLE_POLICIES = Object.freeze({
+  administrator: Object.freeze({ permissions: ["Administrator"], hoisted: true, mentionable: false }),
+  manager: Object.freeze({ permissions: ["ManageGuild", "ManageChannels", "ManageRoles", "ManageMessages", "ManageEvents", "ManageThreads"], hoisted: true, mentionable: false }),
+  top_1: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  top_2: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  top_3: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  level_25: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  level_50: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  level_75: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  level_100: Object.freeze({ permissions: [], hoisted: true, mentionable: false }),
+  glads: Object.freeze({ permissions: [], hoisted: false, mentionable: true }),
+  announcements_ping: Object.freeze({ permissions: [], hoisted: false, mentionable: true }),
+  events_ping: Object.freeze({ permissions: [], hoisted: false, mentionable: true }),
+  giveaway_ping: Object.freeze({ permissions: [], hoisted: false, mentionable: true }),
+  fima: Object.freeze({ permissions: [], hoisted: false, mentionable: false })
+});
 
 function localized(value, language) {
   return value?.[language] || value?.en || "";
@@ -217,6 +244,7 @@ export function buildFieelsCommunityPersonaMatrix() {
     { key: "helper", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: false, voiceConnect: true, moderate: "assist_only" },
     { key: "junior_moderator", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
     { key: "moderator", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
+    { key: "manager", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
     { key: "administrator", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true },
     { key: "owner", turkishVisible: true, videoTeamVisible: true, chatSend: true, mediaUpload: "policy", announcementsSend: true, voiceConnect: true, moderate: true }
   ];
@@ -232,7 +260,14 @@ export function reconcileFieelsCommunityRoles(existingRoles = []) {
     if (byKey.has(key)) duplicates.push({ key, ids: [byKey.get(key).id, role.id] });
     else byKey.set(key, role);
   }
-  const managedKeys = new Set(["member", "turkish", "english", ...VIDEO_TEAM_ROLE_KEYS, ...STAFF_ROLE_KEYS]);
+  const managedKeys = new Set([
+    "member", "turkish", "english", "fima",
+    ...VIDEO_TEAM_ROLE_KEYS,
+    ...STAFF_ROLE_KEYS,
+    ...PING_ROLE_KEYS,
+    ...RANK_ROLE_KEYS,
+    ...LEVEL_ROLE_KEYS
+  ]);
   const mapped = [...managedKeys].map((key) => {
     const existing = byKey.get(key);
     return {
@@ -299,6 +334,10 @@ export function buildFieelsCommunityStructureDraft({
     naming,
     categories,
     roleTree,
+    rolePolicies: Object.fromEntries(Object.entries(ROLE_POLICIES).map(([key, policy]) => [key, {
+      ...policy,
+      permissions: [...policy.permissions]
+    }])),
     roleReconciliation: reconcileFieelsCommunityRoles(existingRoles),
     personaMatrix: buildFieelsCommunityPersonaMatrix(),
     safety: {
@@ -384,11 +423,26 @@ export function validateFieelsCommunityStructureDraft(draft) {
   for (const roleKey of VIDEO_TEAM_ROLE_KEYS) {
     if (videoTeamRoles.filter((key) => key === roleKey).length !== 1) errors.push(`invalid_video_team_role_${roleKey}`);
   }
+  const rolePolicies = draft?.rolePolicies && typeof draft.rolePolicies === "object" ? draft.rolePolicies : {};
+  if (!rolePolicies.administrator?.permissions?.includes("Administrator") || rolePolicies.administrator?.hoisted !== true) {
+    errors.push("administrator_policy");
+  }
+  const managerPermissions = new Set(rolePolicies.manager?.permissions || []);
+  for (const permission of ["ManageGuild", "ManageChannels", "ManageRoles", "ManageMessages", "ManageEvents", "ManageThreads"]) {
+    if (!managerPermissions.has(permission)) errors.push(`manager_missing_${permission}`);
+  }
+  if (managerPermissions.has("Administrator") || rolePolicies.manager?.hoisted !== true) errors.push("manager_policy");
+  for (const key of [...RANK_ROLE_KEYS, ...LEVEL_ROLE_KEYS]) {
+    if (rolePolicies[key]?.hoisted !== true || rolePolicies[key]?.permissions?.length) errors.push(`invalid_display_policy_${key}`);
+  }
+  for (const key of PING_ROLE_KEYS) {
+    if (rolePolicies[key]?.mentionable !== true || rolePolicies[key]?.permissions?.length) errors.push(`invalid_ping_policy_${key}`);
+  }
   if (draft?.roleReconciliation?.destructiveActions?.length) errors.push("destructive_role_action");
   if (draft?.roleReconciliation?.duplicates?.length) errors.push("duplicate_existing_role_key");
 
   const personas = new Map((draft?.personaMatrix || []).map((persona) => [persona.key, persona]));
-  for (const key of ["new_member", "english_member", "turkish_member", ...VIDEO_TEAM_ROLE_KEYS, "helper", "junior_moderator", "moderator", "administrator", "owner"]) {
+  for (const key of ["new_member", "english_member", "turkish_member", ...VIDEO_TEAM_ROLE_KEYS, "helper", "junior_moderator", "moderator", "manager", "administrator", "owner"]) {
     if (!personas.has(key)) errors.push(`missing_persona_${key}`);
   }
   if (personas.get("new_member")?.turkishVisible !== false) errors.push("new_member_visibility");

@@ -1,5 +1,5 @@
-import { renderFimaOperations } from './fima-guild-operations.js?v=20261005-4';
-import { observeFimaControls } from './fima-controls.js?v=20261005-4';
+import { renderFimaOperations } from './fima-guild-operations.js?v=20261006-1';
+import { observeFimaControls } from './fima-controls.js?v=20261006-1';
 const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
 function apiUrl(path) { return API_BASE + path; }
 const LIST_ENDPOINT = "/api/fima-bot/customer/workspaces";

@@ -20,11 +20,21 @@ test("Fieel's Community draft contains one protected Turkish category", () => {
   assert.equal(turkish[0].channels.find((channel) => channel.key === "turkish_announcements").permissions.turkish.send, false);
 });
 
-test("naming hierarchy is coherent and role separators are permissionless", () => {
+test("channel names are plain and role separators are permissionless", () => {
   const draft = buildFieelsCommunityStructureDraft();
-  assert.notEqual(FIEELS_COMMUNITY_NAMING_STYLE.importantMarker, FIEELS_COMMUNITY_NAMING_STYLE.normalMarker);
-  assert.notEqual(FIEELS_COMMUNITY_NAMING_STYLE.privateMarker, FIEELS_COMMUNITY_NAMING_STYLE.normalMarker);
-  assert.ok(draft.categories.every((category) => category.proposedName.includes("━")));
+  assert.equal(FIEELS_COMMUNITY_NAMING_STYLE.importantMarker, "");
+  assert.equal(FIEELS_COMMUNITY_NAMING_STYLE.normalMarker, "");
+  assert.equal(FIEELS_COMMUNITY_NAMING_STYLE.privateMarker, "");
+  assert.deepEqual(draft.categories.find((category) => category.key === "onboarding").channels.map((channel) => channel.proposedName), [
+    "start-here", "rules", "announcements", "roles", "fieel-info", "joins-leaves"
+  ]);
+  assert.deepEqual(draft.categories.find((category) => category.key === "fieel_style").channels.map((channel) => channel.proposedName), [
+    "fake-headless", "outfits", "capes"
+  ]);
+  assert.deepEqual(draft.categories.find((category) => category.key === "turkish").channels.map((channel) => channel.proposedName), [
+    "turkce-sohbet", "turkce-medya", "turkce-duyurular", "Türkçe Sohbet"
+  ]);
+  assert.ok(draft.categories.every((category) => !/[⟐⌁〆━]/u.test(category.proposedName)));
   assert.ok(draft.roleTree.every((separator) =>
     separator.permissions.length === 0
     && separator.members.length === 0
@@ -78,7 +88,7 @@ test("duplicate existing role purposes fail validation instead of replacing role
 test("all required permission personas are explicit", () => {
   const draft = buildFieelsCommunityStructureDraft();
   const personas = new Map(draft.personaMatrix.map((persona) => [persona.key, persona]));
-  assert.equal(personas.size, 11);
+  assert.equal(personas.size, 12);
   assert.equal(personas.get("new_member").turkishVisible, false);
   assert.equal(personas.get("new_member").videoTeamVisible, false);
   assert.equal(personas.get("english_member").turkishVisible, false);
@@ -90,7 +100,27 @@ test("all required permission personas are explicit", () => {
   assert.equal(personas.get("thumbnail_designer").videoTeamVisible, true);
   assert.equal(personas.get("helper").moderate, "assist_only");
   assert.equal(personas.get("helper").videoTeamVisible, true);
+  assert.equal(personas.get("manager").moderate, true);
   assert.equal(personas.get("owner").moderate, true);
+});
+
+test("administrator, manager, ranking, level and ping role policies are explicit", () => {
+  const draft = buildFieelsCommunityStructureDraft();
+  assert.deepEqual(draft.rolePolicies.administrator.permissions, ["Administrator"]);
+  assert.equal(draft.rolePolicies.administrator.hoisted, true);
+  assert.equal(draft.rolePolicies.manager.permissions.includes("Administrator"), false);
+  assert.deepEqual(draft.rolePolicies.manager.permissions, [
+    "ManageGuild", "ManageChannels", "ManageRoles", "ManageMessages", "ManageEvents", "ManageThreads"
+  ]);
+  assert.equal(draft.rolePolicies.manager.hoisted, true);
+  for (const key of ["top_1", "top_2", "top_3", "level_25", "level_50", "level_75", "level_100"]) {
+    assert.equal(draft.rolePolicies[key].hoisted, true);
+    assert.deepEqual(draft.rolePolicies[key].permissions, []);
+  }
+  for (const key of ["glads", "announcements_ping", "events_ping", "giveaway_ping"]) {
+    assert.equal(draft.rolePolicies[key].mentionable, true);
+    assert.deepEqual(draft.rolePolicies[key].permissions, []);
+  }
 });
 
 test("private Video Team category is complete and hidden from everyone else", () => {
@@ -133,6 +163,10 @@ test("Video Team roles are managed once under a permissionless separator", () =>
   assert.equal(managed.get("video_team").action, "create_if_approved");
   assert.equal(managed.get("video_editor").action, "create_if_approved");
   assert.equal(managed.get("thumbnail_designer").action, "create_if_approved");
+  assert.equal(managed.get("manager").action, "create_if_approved");
+  assert.equal(managed.get("glads").action, "create_if_approved");
+  assert.equal(managed.get("top_1").action, "create_if_approved");
+  assert.equal(managed.get("level_100").action, "create_if_approved");
 });
 
 test("unsafe or incomplete naming inputs fall back to the coherent identity family", () => {
