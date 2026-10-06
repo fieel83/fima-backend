@@ -14353,6 +14353,15 @@ const ROLE_PANEL_OPTIONS = Object.freeze({
 });
 
 const COMMUNITY_NOTIFICATION_ROLE_OPTIONS = Object.freeze([
+  { id: "live", role: "Live Notifications", labelTr: "Canlı Yayın", labelEn: "Live Streams", emoji: "🔴" },
+  { id: "upload", role: "Upload Notifications", labelTr: "Yeni Videolar", labelEn: "Uploads", emoji: "🎬" },
+  { id: "giveaway", role: "Giveaway Notifications", labelTr: "Çekilişler", labelEn: "Giveaways", emoji: "🎁" },
+  { id: "community", role: "Community Notifications", labelTr: "Topluluk", labelEn: "Community", emoji: "💬" },
+  { id: "poll", role: "Poll Notifications", labelTr: "Anketler", labelEn: "Polls", emoji: "📊" },
+  { id: "anti_teamer", role: "Anti-Teamer Notifications", labelTr: "Anti-Teamer", labelEn: "Anti-Teamer", emoji: "⚔️" },
+  { id: "glads_eu", role: "Glads • Europe", labelTr: "Glads Europe", labelEn: "Glads Europe", emoji: "🌍" },
+  { id: "glads_asia", role: "Glads • Asia", labelTr: "Glads Asia", labelEn: "Glads Asia", emoji: "🌏" },
+  { id: "glads_na", role: "Glads • North America", labelTr: "Glads North America", labelEn: "Glads North America", emoji: "🌎" },
   { id: "product", role: "Product Notifications", labelTr: "Ürünler", labelEn: "Products", emoji: "🛍️" },
   { id: "fima", role: "FIMA Updates", labelTr: "FIMA", labelEn: "FIMA", emoji: "◆" },
   { id: "macro", role: "FIMA Macro Updates", labelTr: "FIMA Macro", labelEn: "FIMA Macro", emoji: "⌨️" },
@@ -14453,9 +14462,9 @@ async function handleRolePanelButton(interaction, kind, optionId, template = "cl
     await interaction.reply({ content: "This role option is no longer configured.", ephemeral: true });
     return;
   }
-  const role = await ensureRole(interaction.guild, option.role);
   const exclusive = kind === "language" || kind === "region";
   try {
+    const role = await ensureRole(interaction.guild, option.role);
     if (exclusive) {
       for (const other of options) {
         if (other.role === option.role) continue;

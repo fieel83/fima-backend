@@ -778,17 +778,20 @@ test("template-aware AutoMod names migrate safely without deleting managed dupli
   });
 });
 
-test("community notification panel exposes only the eight canonical FIMA roles", () => {
+test("community notification panel preserves existing ping topics and Glads alongside FIMA", () => {
   const options = rolePanelOptionsForTemplate("ping", "community");
   assert.deepEqual(options.map(option => option.role), [
+    "Live Notifications", "Upload Notifications", "Giveaway Notifications", "Community Notifications",
+    "Poll Notifications", "Anti-Teamer Notifications", "Glads • Europe", "Glads • Asia", "Glads • North America",
     "Product Notifications", "FIMA Updates", "FIMA Macro Updates", "FIMA AI Updates",
     "Fieel Content Notifications", "Tatu Content Notifications", "Event Notifications", "Security Alerts"
   ]);
   assert.equal(options.some(option => /Training|Tryout|Spar|Tournament/.test(option.role)), false);
 
   const rows = rolePanelRows("ping", "en", "community").map(row => row.toJSON());
-  assert.deepEqual(rows.map(row => row.components.length), [5, 3]);
-  assert.equal(rows.flatMap(row => row.components).length, 8);
+  assert.deepEqual(rows.map(row => row.components.length), [5, 5, 5, 2]);
+  assert.equal(rows.flatMap(row => row.components).length, 17);
+  assert.equal(new Set(rows.flatMap(row => row.components).map(button => button.custom_id)).size, 17);
 });
 
 test("clan notification panel retains competitive role choices", () => {
