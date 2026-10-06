@@ -12,7 +12,7 @@ export const runtimeContracts = new Map([
   [runtimeHandoffDefaultContract.executableSha256, {contract:runtimeHandoffDefaultContract, version:'1.0.131'}],
   ['47187016ac88327fd2450bb084c242797c449b32cccf9944754613c3b6a1b278', {contract:createRuntimeHandoffContract({productId:'fima-macro',executableName:'FimaMacroStudio.exe',executableSha256:'47187016ac88327fd2450bb084c242797c449b32cccf9944754613c3b6a1b278',feature:'macro_runtime'}),version:'1.0.130'}],
   ...[
-    {productId:'fima-mail',executableName:'FIMA Mail Manager.exe',appVersion:'0.1.0-owner-preview',runtimeTreeSha256:'45e8fb89e2027ec53dc5257df8e56a5613b1cc3e0ebed847de34844bd838a34e',packageIdentity:'75fd0b34f9df47548ff71a3484291797eb7c7c3bbf74a6d1828abfe82f0a0979',feature:'owner_email_manager'},
+    {productId:'fima-mail',executableName:'FIMA Mail Manager.exe',appVersion:'0.1.0-owner-preview',runtimeTreeSha256:'0a287ed0795cf13d22df2fb84d19bafe4a8c167dced0a3a2555389739398012b',packageIdentity:'a832060dff9519e53c10bea3e4f6b1a93581af319ac8870044621f5213e62cf6',feature:'owner_email_manager'},
     {productId:'fima-cloud-pc',executableName:'FIMA Cloud PC.exe',appVersion:'0.1.0-mvp',runtimeTreeSha256:'5c8b6dfc4cb0686a7633cfe8ea3c6c5c6374142bd44e9a1f3773d84eb9b533d9',packageIdentity:'ed5c9058a7952ca333d4a39a000946514179ed356a0dbf21985e33937672e066',feature:'owner_cloud_pc'},
   ].map(value=>[value.productId,{contract:createRuntimeHandoffContract({...value,schemaVersion:2,ownerOnly:true,executableSha256:'67cff2ce5ac7976408aac30e17e9266443a351b44ec1ee613b444867a78dc9d7'}),version:value.appVersion}])
 ]);
