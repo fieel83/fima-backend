@@ -1,8 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ticketClaimant, topicWithClaim, withTicketLock } from "../src/fimaTicketState.js";
+import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "../src/fimaTicketState.js";
 
 const staff = "123456789012345678";
+test("assignment transfers ownership and preserves opener and category", () => {
+  const before = `Fima ticket: Security. openedBy:987654321098765432 claimedBy:${staff}`;
+  const assigned = topicWithAssignment(before, "234567890123456789");
+  assert.equal(assigned, "Fima ticket: Security. openedBy:987654321098765432 claimedBy:234567890123456789");
+  assert.equal(topicWithAssignment(assigned, "234567890123456789"), assigned);
+  assert.throws(() => topicWithAssignment(before, "invalid"), /invalid_ticket_claimant/);
+});
 test("claim persists in topic without changing existing ticket metadata", () => {
   const before = "Fima ticket: Security. openedBy:987654321098765432";
   const saved = topicWithClaim(before, staff);

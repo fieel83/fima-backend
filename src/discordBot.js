@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { ticketClaimant, topicWithClaim, withTicketLock } from "./fimaTicketState.js";
+import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
 import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from "./ftCommunityChannelMigration.js";
@@ -7,7 +7,7 @@ import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder, UserSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { createAiSupportDiscordBridge } from "./aiSupportDiscordBridge.js";
@@ -990,6 +990,9 @@ async function handleCommunityActivityCommand(interaction) {
 
 async function handleDiscordInteraction(interaction) {
   if (await handleParadiseInteraction(interaction)) return;
+  if (interaction?.isUserSelectMenu?.() && String(interaction.customId || "").startsWith("fima_ticket_assign:")) {
+    return handleTicketAssignment(interaction);
+  }
   if (interaction?.isModalSubmit?.() && String(interaction.customId || "").startsWith("fima_ticket_intake:")) {
     return handleTicketIntakeSubmit(interaction);
   }
@@ -2234,7 +2237,8 @@ function ticketActionRows({ claimed = false, closed = false } = {}) {
       new ButtonBuilder().setCustomId("fima_ticket_escalate").setLabel("Escalate").setStyle(ButtonStyle.Secondary).setDisabled(closed)
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("fima_ticket_transcript").setLabel("Transcript").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId("fima_ticket_transcript").setLabel("Transcript").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("fima_ticket_assign").setLabel("Assign staff").setStyle(ButtonStyle.Secondary).setDisabled(closed)
     )
   ];
 }
@@ -2527,6 +2531,36 @@ async function setClosedTicketParticipantAccess(interaction, closed) {
   return { userId, changed: true };
 }
 
+function isTicketStaff(member, permissions = member?.permissions) {
+  const roleId = String(process.env.FIMA_SUPPORT_ROLE_ID || process.env.SUPPORT_ROLE_ID || "").trim();
+  return Boolean((roleId && (member?.roles?.cache?.has(roleId) || (Array.isArray(member?.roles) && member.roles.includes(roleId)))) || permissions?.has(PermissionsBitField.Flags.ManageChannels) || permissions?.has(PermissionsBitField.Flags.Administrator));
+}
+
+async function handleTicketAssignment(interaction) {
+  const actor = await interaction.guild.members.fetch(interaction.user.id);
+  if (!isTicketStaff(actor)) return interaction.reply({ content: "Only staff can assign tickets.", ephemeral: true });
+  await interaction.deferReply({ ephemeral: true });
+  try {
+    await withTicketLock(interaction.channelId, async () => {
+      const channel = await interaction.guild.channels.fetch(interaction.channelId, { force: true });
+      if (!/openedBy:\d{15,25}/.test(String(channel?.topic || "")) || String(channel.name).startsWith("closed-")) throw new Error("ticket_not_open");
+      const target = await interaction.guild.members.fetch(interaction.values[0]);
+      if (target.user.bot || !isTicketStaff(target)) throw new Error("ticket_target_not_staff");
+      const panel = await channel.messages.fetch(interaction.customId.split(":")[1]);
+      if (panel.author.id !== interaction.client.user.id || !panel.components.some(row => row.components.some(component => component.customId === "fima_ticket_claim"))) throw new Error("ticket_panel_invalid");
+      const topic = topicWithAssignment(channel.topic, target.id);
+      await channel.permissionOverwrites.edit(target.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket assigned by staff" });
+      await channel.setTopic(topic, "Ticket assigned by staff");
+      await panel.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, category: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
+      await auditDiscordBotAction("discord_ticket_assigned", "discord_channel", channel.id, { actorId: interaction.user.id, assignedTo: target.id, contentStored: false });
+      await interaction.editReply({ content: `Assigned to <@${target.id}>.`, allowedMentions: { parse: [] } });
+    });
+  } catch (error) {
+    const messages = { ticket_action_in_progress: "Another ticket action is in progress. Try again shortly.", ticket_not_open: "This ticket is no longer open.", ticket_target_not_staff: "Choose a support staff member.", ticket_panel_invalid: "The original ticket panel is unavailable." };
+    await interaction.editReply({ content: messages[error.message] || "Assignment could not be completed. Check the ticket before retrying." });
+  }
+}
+
 async function handleTicketButton(interaction) {
   try {
     return await withTicketLock(interaction.channelId, () => handleTicketButtonLocked(interaction));
@@ -2543,6 +2577,10 @@ async function handleTicketButtonLocked(interaction) {
   const isStaff = hasSupportRole || interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageChannels) || interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator);
   if (!isStaff) {
     return interaction.reply({ content: "Staff will handle that button.", ephemeral: true });
+  }
+
+  if (action === "assign") {
+    return interaction.reply({ content: "Choose the staff member to handle this ticket.", ephemeral: true, components: [new ActionRowBuilder().addComponents(new UserSelectMenuBuilder().setCustomId(`fima_ticket_assign:${interaction.message.id}`).setPlaceholder("Select support staff").setMinValues(1).setMaxValues(1))] });
   }
 
   if (["claim", "close", "reopen", "transcript"].includes(action)) await interaction.deferReply({ ephemeral: true });
