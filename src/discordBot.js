@@ -2532,7 +2532,7 @@ async function setClosedTicketParticipantAccess(interaction, closed) {
 }
 
 function isTicketStaff(member, permissions = member?.permissions) {
-  const roleId = String(process.env.FIMA_SUPPORT_ROLE_ID || process.env.SUPPORT_ROLE_ID || "").trim();
+  const roleId = String(env("DISCORD_FIMA_SUPPORT_ROLE_ID") || env("DISCORD_SUPPORT_ROLE_ID") || env("FIMA_SUPPORT_ROLE_ID") || env("SUPPORT_ROLE_ID") || "").trim();
   return Boolean((roleId && (member?.roles?.cache?.has(roleId) || (Array.isArray(member?.roles) && member.roles.includes(roleId)))) || permissions?.has(PermissionsBitField.Flags.ManageChannels) || permissions?.has(PermissionsBitField.Flags.Administrator));
 }
 
@@ -2551,7 +2551,7 @@ async function handleTicketAssignment(interaction) {
       const topic = topicWithAssignment(channel.topic, target.id);
       await channel.permissionOverwrites.edit(target.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket assigned by staff" });
       await channel.setTopic(topic, "Ticket assigned by staff");
-      await panel.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, category: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
+      await panel.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, categoryLabel: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
       await auditDiscordBotAction("discord_ticket_assigned", "discord_channel", channel.id, { actorId: interaction.user.id, assignedTo: target.id, contentStored: false });
       await interaction.editReply({ content: `Assigned to <@${target.id}>.`, allowedMentions: { parse: [] } });
     });
@@ -2572,9 +2572,7 @@ async function handleTicketButton(interaction) {
 
 async function handleTicketButtonLocked(interaction) {
   const action = String(interaction.customId || "").replace("fima_ticket_", "");
-  const supportRoleId = String(process.env.FIMA_SUPPORT_ROLE_ID || process.env.SUPPORT_ROLE_ID || "").trim();
-  const hasSupportRole = Boolean(supportRoleId && (interaction.member?.roles?.cache?.has(supportRoleId) || (Array.isArray(interaction.member?.roles) && interaction.member.roles.includes(supportRoleId))));
-  const isStaff = hasSupportRole || interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageChannels) || interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator);
+  const isStaff = isTicketStaff(interaction.member, interaction.memberPermissions);
   if (!isStaff) {
     return interaction.reply({ content: "Staff will handle that button.", ephemeral: true });
   }
@@ -2583,7 +2581,7 @@ async function handleTicketButtonLocked(interaction) {
     return interaction.reply({ content: "Choose the staff member to handle this ticket.", ephemeral: true, components: [new ActionRowBuilder().addComponents(new UserSelectMenuBuilder().setCustomId(`fima_ticket_assign:${interaction.message.id}`).setPlaceholder("Select support staff").setMinValues(1).setMaxValues(1))] });
   }
 
-  if (["claim", "close", "reopen", "transcript"].includes(action)) await interaction.deferReply({ ephemeral: true });
+  if (["claim", "close", "reopen", "transcript", "escalate"].includes(action)) await interaction.deferReply({ ephemeral: true });
 
   await auditDiscordBotAction(`discord_ticket_${action}`, "discord_channel", interaction.channelId, {
     actorId: interaction.user.id,
@@ -2641,7 +2639,24 @@ async function handleTicketButtonLocked(interaction) {
     return interaction.reply({ content: "Add your staff note as a normal message. Keep keys and emails masked.", ephemeral: true });
   }
   if (action === "escalate") {
-    return interaction.reply({ content: "Automatic senior staff escalation is not configured. Ask a staff member in this ticket; no escalation was sent.", ephemeral: true });
+    if (String(channel.name || "").startsWith("closed-")) return interaction.editReply({ content: "Reopen this ticket before escalating it." });
+    const lastEscalation = Number(String(channel.topic || "").match(/(?:^|\s)escalatedAt:(\d+)(?=\s|$)/)?.[1] || 0);
+    if (Date.now() - lastEscalation < 10 * 60 * 1000) return interaction.editReply({ content: "Senior staff were notified recently. Wait 10 minutes before escalating again." });
+    const roleId = env("DISCORD_TICKET_ESCALATION_ROLE_ID");
+    const role = roleId ? await interaction.guild.roles.fetch(roleId).catch(() => null) : null;
+    if (roleId && (!role || role.id === interaction.guildId || role.managed)) return interaction.editReply({ content: "The senior staff role is unavailable. Ask an administrator to update the ticket configuration." });
+    const targetId = role?.id || interaction.guild.ownerId;
+    const nextTopic = `${String(channel.topic || "").replace(/(?:^|\s)escalatedAt:\d+(?=\s|$)/, "").trimEnd()} escalatedAt:${Date.now()}`;
+    if (nextTopic.length > 1024) return interaction.editReply({ content: "Ticket metadata is full. Ask an administrator to review this ticket." });
+    try {
+      await channel.permissionOverwrites.edit(targetId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket escalated to senior staff" });
+      const notification = await channel.send({ content: `${role ? `<@&${targetId}>` : `<@${targetId}>`} — staff requested senior review of this ticket. / Personel bu destek talebi için üst yetkili incelemesi istedi.`, allowedMentions: { parse: [], roles: role ? [targetId] : [], users: role ? [] : [targetId] } });
+      await channel.setTopic(nextTopic, "Record ticket escalation cooldown");
+      await auditDiscordBotAction("discord_ticket_escalation_sent", "discord_channel", channel.id, { actorId: interaction.user.id, targetId, messageId: notification.id, contentStored: false });
+      return interaction.editReply({ content: "Senior staff notified. / Üst yetkiliye bildirim gönderildi." });
+    } catch (error) {
+      return interaction.editReply({ content: "Escalation could not finish. Check this ticket for a notification before retrying." });
+    }
   }
   if (action === "transcript") {
     try {
