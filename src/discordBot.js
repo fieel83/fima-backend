@@ -3267,7 +3267,6 @@ export async function publishParadiseContentMessage({
   };
 }
 
-const IMPORTANT_AUDIT_CHANNEL = /(welcome|rule|guide|verify|faq|trust|challenge|availability|loa|training|tryout|referee|hoster|activity|report|support|application|blacklist|appeal|bail|lineup|line-up|roster|mainer|relation|ally|enemy|announcement|update|mod-|message-|channel-|member-|ticket|log)/i;
 
 function auditMessageType(channelName, message) {
   const haystack = `${channelName} ${message.embeds?.map(embed => `${embed.title || ""} ${embed.description || ""}`).join(" ") || ""}`;
@@ -3310,13 +3309,13 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
   }
   await Promise.all([guild.channels.fetch(), guild.roles.fetch()]);
   const me = guild.members.me || await guild.members.fetchMe();
-  const [commands, autoModRules, webhooks] = await Promise.all([
-    guild.commands.fetch().catch(() => new Map()),
-    guild.autoModerationRules.fetch().catch(() => new Map()),
-    guild.fetchWebhooks().catch(() => new Map())
+  const discovery = await Promise.allSettled([
+    guild.commands.fetch(), guild.autoModerationRules.fetch(), guild.fetchWebhooks()
   ]);
+  const [commands, autoModRules, webhooks] = discovery.map(result => result.status === 'fulfilled' ? result.value : new Map());
+  const discoveryFailures = ['commands', 'autoModRules', 'webhooks'].filter((name, index) => discovery[index].status === 'rejected');
   const importantChannels = [...guild.channels.cache.values()]
-    .filter(channel => channel.type !== ChannelType.GuildCategory && !channel.isThread?.() && IMPORTANT_AUDIT_CHANNEL.test(channel.name))
+    .filter(channel => channel.type !== ChannelType.GuildCategory && !channel.isThread?.() && channel.isTextBased?.())
     .sort((a, b) => a.rawPosition - b.rawPosition);
   const sampledChannels = [];
   let pinnedMessages = 0;
@@ -3331,9 +3330,10 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
       && channel.isTextBased?.()
       && channel.messages?.fetch
     );
-    const messages = readable ? await channel.messages.fetch({ limit: 25 }).catch(() => new Map()) : new Map();
+    let messagesFetchFailed = false, pinsFetchFailed = false;
+    const messages = readable ? await channel.messages.fetch({ limit: 25 }).catch(() => { messagesFetchFailed = true; return new Map(); }) : new Map();
     const pins = readable && channel.messages?.fetchPinned
-      ? await channel.messages.fetchPinned().catch(() => new Map())
+      ? await channel.messages.fetchPinned().catch(() => { pinsFetchFailed = true; return new Map(); })
       : new Map();
     pinnedMessages += pins.size || 0;
     const classified = [...messages.values()].map(message => {
@@ -3363,6 +3363,8 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
       type: ChannelType[channel.type] || String(channel.type),
       parentId: channel.parentId,
       readable,
+      messagesFetchFailed,
+      pinsFetchFailed,
       missingPermission: readable ? null : "ViewChannel or ReadMessageHistory",
       pinnedMessageCount: pins.size || 0,
       sampledMessageCount: classified.length,
@@ -3373,7 +3375,9 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
   }
   const channels = [...guild.channels.cache.values()].filter(channel => !channel.isThread?.());
   return {
-    status: "LIVE DISCORD VERIFIED",
+    status: discoveryFailures.length || sampledChannels.some(channel => !channel.readable || channel.messagesFetchFailed || channel.pinsFetchFailed) ? "LIVE DISCORD PARTIAL" : "LIVE DISCORD VERIFIED",
+    discoveryFailures,
+    coverage: { messageLimitPerChannel: 25, fullHistoryAudited: false, threadsAudited: false },
     capturedAt: new Date().toISOString(),
     guild: {
       id: guild.id,
@@ -3407,7 +3411,10 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
       registeredCommands: commands.size
     },
     categories: channels.filter(channel => channel.type === ChannelType.GuildCategory)
-      .map(channel => ({ id: channel.id, name: channel.name, position: channel.rawPosition })),
+      .map(channel => ({ id: channel.id, name: channel.name, position: channel.rawPosition,
+        permissionOverwrites: [...(channel.permissionOverwrites?.cache?.values?.() || [])].map(overwrite => ({
+          id: overwrite.id, type: overwrite.type, allow: overwrite.allow.toArray(), deny: overwrite.deny.toArray()
+        })) })),
     channels: channels.filter(channel => channel.type !== ChannelType.GuildCategory)
       .map(channel => ({
         id: channel.id,
@@ -3437,6 +3444,8 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
       actionTypes: rule.actions.map(action => action.type)
     })),
     webhooksCount: webhooks.size,
+    webhooks: [...webhooks.values()].map(webhook => ({ id: webhook.id, name: webhook.name,
+      channelId: webhook.channelId, applicationId: webhook.applicationId, type: webhook.type })),
     sampledChannels
   };
 }

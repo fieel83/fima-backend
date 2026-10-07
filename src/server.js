@@ -46,6 +46,7 @@ import {
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
 import { fimaOwnerToolsFragment } from "./fimaOwnerToolsFragment.js";
+import { buildFtCommunityMigrationPlan } from "./ftCommunityMigrationPlan.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import {
   loadParadiseContentDocument,
@@ -2187,7 +2188,8 @@ app.get("/api/fima-bot/real-audit", requireUser, requireParadiseOwner, async (re
   const guildId = String(req.query?.guildId || "");
   if (!guildId) return res.status(400).json({ error: "guild_id_required" });
   const row = await prisma.setting.findUnique({ where: { key: `paradise_3a61_audit_${guildId}` } });
-  return res.json({ success: true, guildId, audit: row?.value || null });
+  const audit = row?.value || null;
+  return res.json({ success: true, guildId, audit, migrationPlan: buildFtCommunityMigrationPlan(audit) });
 });
 
 app.post("/api/fima-bot/actions/audit", requireUser, requireParadiseOwner, async (req, res) => {
@@ -2208,7 +2210,7 @@ app.post("/api/fima-bot/actions/audit", requireUser, requireParadiseOwner, async
       actorUserId: req.user.id,
       counts: audit.counts
     });
-    return res.json({ success: true, guildId, audit });
+    return res.json({ success: true, guildId, audit, migrationPlan: buildFtCommunityMigrationPlan(audit) });
   } catch (error) {
     console.error("FIMA Bot real audit failed", publicError(error));
     return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "real_audit_failed" });
