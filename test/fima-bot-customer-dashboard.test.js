@@ -115,7 +115,7 @@ test("dashboard replaces native channel menus in dynamically rendered operation 
   assert.match(controlsScript, /setAttribute\('role', 'combobox'\)/);
   assert.match(controlsScript, /setAttribute\('role', 'listbox'\)/);
   assert.match(controlsScript, /classList\.add\('fima-select-source'\)/);
-  assert.match(html, /fima-bot-dashboard\.js\?v=20261006-1/);
+  assert.match(html, /fima-bot-dashboard\.js\?v=20261007-1/);
 });
 
 test("dashboard shares language preferences and translates dynamic browser UI without resetting the editor", () => {

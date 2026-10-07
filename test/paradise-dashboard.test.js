@@ -40,7 +40,8 @@ test('logs actions dispatch to the selected guild and restore buttons after fail
 });
 
 test('owner shell supports API-host sessions without exposing owner API data', () => {
-  assert.match(serverSource, /app\.get\(\["\/fima-bot\/owner", "\/fima-bot\/owner\/dashboard"\], renderFimaBotOwnerDashboard\)/);
+  assert.match(serverSource, /app\.get\(\["\/fima-bot\/owner", "\/fima-bot\/owner\/dashboard"\], \(req, res\) => redirectLegacyFimaBotRoute\(req, res, "\/fima-bot\/dashboard"\)\)/);
+  assert.match(serverSource, /app\.get\("\/api\/fima-bot\/owner-tools", requireUser, requireParadiseOwner/);
   assert.match(serverSource, /app\.get\("\/api\/fima-bot\/config", requireUser, requireParadiseOwner/);
   assert.match(serverSource, /app\.post\("\/api\/fima-bot\/actions\/ft-community-production", requireUser, requireParadiseOwner/);
   assert.match(htmlSource, /next=%2Ffima-bot%2Fowner/);
@@ -520,4 +521,12 @@ test("destructive Paradise setup requires a typed final confirmation", () => {
   assert.match(paradiseSource, /paradise_setup_final/);
   assert.match(paradiseSource, /REBUILD TEST \$\{mode\.toUpperCase\(\)\}/);
   assert.match(paradiseSource, /destructive \? "rebuild" : "repair"/);
+});
+
+
+test('embedded owner workflow modules import without browser globals', async () => {
+  for (const [file, factory] of [['fima-owner-tools', 'initializeOwnerTools'], ['fima-owner-workspace', 'initializeWorkspace'], ['fima-owner-community', 'initializeCommunity']]) {
+    const module = await import('../public/assets/js/' + file + '.js');
+    assert.equal(typeof module[factory], 'function');
+  }
 });

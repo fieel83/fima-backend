@@ -1,3 +1,4 @@
+import { OWNER_ROUTES, ownerPage, renderOwnerTools, disposeOwnerTools } from "./fima-owner-integration.js?v=20261007-1";
 import { renderFimaOperations } from './fima-guild-operations.js?v=20261006-1';
 import { observeFimaControls } from './fima-controls.js?v=20261006-1';
 const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
@@ -160,8 +161,8 @@ export function parseDashboardRoute(url = globalThis.location?.href || `http://l
   const pathMatch = parsed.pathname.match(/^\/fima-bot\/dashboard\/(?:servers\/)?(\d{16,22})(?:\/([a-z][a-z0-9-]{0,39}))?\/?$/i);
   if (pathMatch) return { guildId: safeGuildId(pathMatch[1]), route: safeModuleId(pathMatch[2] || DEFAULT_ROUTE), legacy: !parsed.pathname.includes('/servers/') };
   return {
-    guildId: safeGuildId(parsed.searchParams.get("guild")),
-    route: safeModuleId(parsed.searchParams.get("module") || DEFAULT_ROUTE),
+    guildId: safeGuildId(parsed.searchParams.get("guild") || new URLSearchParams(parsed.hash.slice(1)).get("guild")),
+    route: safeModuleId(parsed.searchParams.get("module") || ({ setup: "owner-setup", logs: "owner-logs", advanced: "owner-runtime", branding: "owner-bot", xp: "levels", guides: "content", roster: "profiles", leaderboard: "leaderboards", operations: "sessions", blacklist: "security" })[new URLSearchParams(parsed.hash.slice(1)).get("page")] || new URLSearchParams(parsed.hash.slice(1)).get("page") || DEFAULT_ROUTE),
     legacy: parsed.searchParams.has("guild") || parsed.searchParams.has("module")
   };
 }
@@ -182,7 +183,9 @@ const state = {
   payload: null,
   savedValue: null,
   dirty: false,
-  saving: false
+  saving: false,
+  ownerAuthorized: false,
+  ownerDirty: false
 };
 let csrfTokenPromise = null;
 
@@ -358,6 +361,8 @@ function showDirectory({ urlMode = "push", skipConfirm = false } = {}) {
     return false;
   }
   ++state.request;
+  disposeOwnerTools(el("[data-owner-tools]"));
+  state.ownerDirty = false;
   resetEditorState();
   state.selected = null;
   state.route = DEFAULT_ROUTE;
@@ -417,7 +422,10 @@ function groupedRoutes(routes) {
   const groupedIds = new Set(MODULE_GROUPS.flatMap(([, ids]) => ids));
   const groups = MODULE_GROUPS.map(([label, ids]) => [label, ids.map(id => byId.get(id)).filter(Boolean)]).filter(([, items]) => items.length);
   const remaining = routes.filter(route => !groupedIds.has(route.id));
-  if (remaining.length) groups.push(["Diğer", remaining]);
+  const ownerRoutes = remaining.filter(route => route.id.startsWith("owner-"));
+  const otherRoutes = remaining.filter(route => !route.id.startsWith("owner-"));
+  if (otherRoutes.length) groups.push(["Diğer", otherRoutes]);
+  if (ownerRoutes.length) groups.push(["Owner", ownerRoutes]);
   return groups;
 }
 
@@ -726,9 +734,9 @@ function bindEditor(payload, definition) {
 }
 
 function confirmUnsavedNavigation() {
-  if (!state.dirty) return true;
+  if (!state.dirty && !state.ownerDirty) return true;
   const proceed = window.confirm(localizedCopy("Kaydedilmemiş değişikliklerin var. Bu sayfadan ayrılırsan değişiklikler kaybolacak. Devam edilsin mi?"));
-  if (proceed) state.dirty = false;
+  if (proceed) { state.dirty = false; state.ownerDirty = false; }
   return proceed;
 }
 
@@ -796,13 +804,15 @@ async function openWorkspace(guildId, route = DEFAULT_ROUTE, { urlMode = "push",
   const requestedGuildId = safeGuildId(guildId);
   const requestedRoute = safeModuleId(route);
   const destinationChanged = Boolean(state.selected && (state.selected.guildId !== requestedGuildId || state.route !== requestedRoute));
-  if (!destinationChanged && state.dirty) return true;
+  if (!destinationChanged && (state.dirty || state.ownerDirty)) return true;
   if (!skipConfirm && destinationChanged && !confirmUnsavedNavigation()) {
     restoreCurrentLocation();
     return false;
   }
   const card = state.workspaces.find(item => item.guildId === requestedGuildId);
   if (!card) return showDirectory({ urlMode: urlMode === "none" ? "none" : "replace", skipConfirm: true });
+  disposeOwnerTools(el("[data-owner-tools]"));
+  state.ownerDirty = false;
   resetEditorState();
   state.selected = card;
   el("[data-server-directory]").hidden = true;
@@ -816,7 +826,7 @@ async function openWorkspace(guildId, route = DEFAULT_ROUTE, { urlMode = "push",
   actionState(target, { title: "Çalışma alanı açılıyor", message: "Seçili sunucunun modülleri hazırlanıyor.", loading: true });
   const requestId = ++state.request;
   try {
-    const payload = await request(`${LIST_ENDPOINT}/${encodeURIComponent(card.guildId)}?route=${encodeURIComponent(requestedRoute)}`);
+    const payload = await request(`${LIST_ENDPOINT}/${encodeURIComponent(card.guildId)}?route=${encodeURIComponent(requestedRoute.startsWith("owner-") ? DEFAULT_ROUTE : requestedRoute)}`);
     if (requestId !== state.request) return;
     if (payload.workspace?.guildId !== card.guildId) throw new Error("workspace_route_unavailable");
     if (payload.inviteRequired) {
@@ -826,6 +836,7 @@ async function openWorkspace(guildId, route = DEFAULT_ROUTE, { urlMode = "push",
       return true;
     }
     const routes = normalizedRoutes(payload.routes);
+    if (state.ownerAuthorized) routes.push(...OWNER_ROUTES);
     if (!routes.length) {
       state.routes = [];
       renderModules([], "");
@@ -833,7 +844,7 @@ async function openWorkspace(guildId, route = DEFAULT_ROUTE, { urlMode = "push",
       updateUrl(card.guildId, DEFAULT_ROUTE, urlMode);
       return true;
     }
-    const payloadRoute = String(payload.route || "").trim().toLowerCase();
+    const payloadRoute = state.ownerAuthorized && OWNER_ROUTES.some(item => item.id === requestedRoute) ? requestedRoute : String(payload.route || "").trim().toLowerCase();
     if (!routes.some(item => item.id === payloadRoute)) throw new Error("workspace_route_unavailable");
     target.hidden = true;
     state.routes = routes;
@@ -842,8 +853,23 @@ async function openWorkspace(guildId, route = DEFAULT_ROUTE, { urlMode = "push",
     payload.route = payloadRoute;
     renderModules(state.routes, state.route);
     renderWorkspaceFacts(payload);
-    renderModule(payload);
-    focusModulePanel();
+    if (payloadRoute.startsWith("owner-")) {
+      state.payload = payload;
+      el("[data-module-panel]").hidden = true;
+    } else renderModule(payload);
+    const tools = el("[data-owner-tools]");
+    if (state.ownerAuthorized && ownerPage(payloadRoute)) {
+      try {
+        await renderOwnerTools(tools, { apiBase: API_BASE, guildId: card.guildId, page: ownerPage(payloadRoute), language: dashboardLanguage(), onNavigate: page => { const destination = state.routes.find(item => ownerPage(item.id) === page); if (!destination) return false; void openWorkspace(card.guildId, destination.id); return true; }, onDirty: value => { if (requestId === state.request) state.ownerDirty = value; } });
+      } catch (error) {
+        if (requestId !== state.request) return;
+        tools.hidden = false;
+        showError(tools, errorCode(error), () => openWorkspace(card.guildId, route, { urlMode: "replace", skipConfirm: true }));
+      }
+      if (requestId !== state.request) return;
+    }
+    if (payloadRoute.startsWith("owner-")) tools.scrollIntoView({ block: "start" });
+    else focusModulePanel();
     updateUrl(card.guildId, state.route, urlMode);
     updateDocumentTitle();
     return true;
@@ -859,7 +885,10 @@ async function openWorkspace(guildId, route = DEFAULT_ROUTE, { urlMode = "push",
 async function boot() {
   const target = el("[data-directory-state]");
   try {
-    const payload = await request(LIST_ENDPOINT);
+    const [payload, session] = await Promise.all([
+      request(LIST_ENDPOINT), request("/api/fima-bot/session-status").catch(() => ({ ownerAuthorized: false }))
+    ]);
+    state.ownerAuthorized = session.ownerAuthorized === true;
     state.workspaces = Array.isArray(payload.workspaces) ? payload.workspaces.filter(card => safeGuildId(card.guildId) && card.canManage === true) : [];
     renderDirectory();
     const requested = parseDashboardRoute();
@@ -883,12 +912,13 @@ window.addEventListener("popstate", () => {
   else showDirectory({ urlMode: "none" });
 });
 window.addEventListener("beforeunload", event => {
-  if (!state.dirty) return;
+  if (!state.dirty && !state.ownerDirty) return;
   event.preventDefault();
   event.returnValue = "";
 });
 document.addEventListener("fima:language-change", () => {
   updateDocumentTitle();
+  el("[data-owner-tools]")?.ownerContext?.setLanguage(dashboardLanguage());
   if (state.payload?.workspace && state.selected) renderWorkspaceFacts(state.payload);
 });
 

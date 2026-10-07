@@ -13,12 +13,17 @@ function deferred() {
 function harness() {
   const elements = new Map();
   const element = key => {
-    if (!elements.has(key)) elements.set(key, { hidden: false, textContent: '', classList: { toggle() {} }, setAttribute() {}, removeAttribute() {}, addEventListener() {}, querySelectorAll: () => [] });
+    if (!elements.has(key)) elements.set(key, { hidden: false, textContent: '', classList: { toggle() {}, add() {} }, replaceChildren() {}, scrollIntoView() {}, setAttribute() {}, removeAttribute() {}, addEventListener() {}, querySelectorAll: () => [] });
     return elements.get(key);
   };
-  const context = vm.createContext({ URL, Intl, console, document: { querySelector: element, addEventListener() {} }, window: { addEventListener() {}, confirm: () => true }, fetch: () => new Promise(() => {}) });
+  const context = vm.createContext({ URL, URLSearchParams, Intl, console, document: { querySelector: element, addEventListener() {} }, window: { addEventListener() {}, confirm: () => true }, fetch: () => new Promise(() => {}) });
   // Isolate the existing editor race tests from the separately loaded operations UI.
   context.renderFimaOperations = () => {};
+  context.OWNER_ROUTES = [{ id: 'owner-setup', title: 'Owner tools' }];
+  context.ownerPage = route => route === 'owner-setup' ? 'setup' : null;
+  context.disposeOwnerTools = root => { root?.ownerAbort?.abort(); if (root) root.hidden = true; };
+  context.renderOwnerTools = async () => {};
+
   vm.runInContext(source.replace(/^import .*;\s*$/gm, '').replaceAll('export function ', 'function ').replace(/\nboot\(\);\s*$/, ''), context);
   vm.runInContext(`
     globalThis.rendered = [];
@@ -128,3 +133,35 @@ for (const outcome of ['success', 'failure']) {
     assert.equal(controls[0].disabled, true);
   });
 }
+
+test('only an authorized owner receives owner routes and mounts owner tools', async () => {
+  for (const authorized of [false, true]) {
+    const h = harness(); let mounts = 0;
+    h.context.renderOwnerTools = async (_root, options) => { mounts++; assert.equal(options.guildId, guildId); assert.equal(options.page, 'setup'); };
+    h.context.response = { workspace: { guildId }, routes: [{ id: 'overview', title: 'Overview' }], route: 'overview' };
+    h.run('request = async () => response'); h.context.dashboardState.ownerAuthorized = authorized;
+    await h.run(`openWorkspace('${guildId}', 'owner-setup')`);
+    assert.equal(h.context.dashboardState.routes.some(route => route.id === 'owner-setup'), authorized);
+    assert.equal(mounts, authorized ? 1 : 0);
+    assert.equal(h.context.dashboardState.route, authorized ? 'owner-setup' : 'overview');
+  }
+});
+test('unsaved owner edits prevent navigation and survive a repeat route request', async () => {
+  const h = harness();
+  h.run(`state.selected = state.workspaces[0]; state.route = 'owner-setup'; state.ownerDirty = true; window.confirm = () => false;`);
+  assert.equal(await h.run(`openWorkspace('${guildId}', 'channels')`), false);
+  assert.equal(h.context.dashboardState.ownerDirty, true);
+  assert.equal(await h.run(`openWorkspace('${guildId}', 'owner-setup')`), true);
+  assert.equal(h.context.dashboardState.ownerDirty, true);
+});
+test('leaving a workspace aborts a pending owner mount and ignores its result', async () => {
+  const h = harness(); const pending = deferred(); const controller = new AbortController();
+  h.context.response = { workspace: { guildId }, routes: [{ id: 'overview', title: 'Overview' }], route: 'overview' };
+  h.run('request = async () => response; state.ownerAuthorized = true');
+  h.context.renderOwnerTools = async root => { root.ownerAbort = controller; await pending.promise; };
+  const opening = h.run(`openWorkspace('${guildId}', 'owner-setup')`);
+  await new Promise(resolve => setImmediate(resolve)); h.run('showDirectory()');
+  assert.equal(controller.signal.aborted, true); pending.resolve(); await opening;
+  assert.equal(h.context.dashboardState.selected, null);
+  assert.equal(h.element('[data-owner-tools]').hidden, true);
+});

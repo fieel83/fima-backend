@@ -45,7 +45,7 @@ import {
   normalizeLicenseKey
 } from "./license.js";
 import { adminPage, loginPage } from "./adminHtml.js";
-import { paradiseDashboardHtml } from "./paradiseDashboardHtml.js";
+import { fimaOwnerToolsFragment } from "./fimaOwnerToolsFragment.js";
 import { buildParadiseConfigRollbackPreview, createParadiseConfigVersion, summarizeParadiseConfigVersion } from "./paradiseConfigVersioning.js";
 import {
   loadParadiseContentDocument,
@@ -882,26 +882,9 @@ app.get("/api/fima-bot/identity", (_req, res) => {
   return res.json(publicFimaBotIdentity());
 });
 
-function renderFimaBotOwnerDashboard(req, res) {
-  const frontendRedirect = paradiseFrontendRedirectUrl({
-    requestHostname: req.hostname,
-    requestHost: req.get("host"),
-    frontendBaseUrl: frontendUrl(),
-    apiBaseUrl: apiBaseUrl(),
-    dashboardPath: req.path
-  });
-  if (frontendRedirect) return res.redirect(302, frontendRedirect);
-  res.set("Cache-Control", "no-store");
-  res.set("X-Robots-Tag", "noindex, nofollow, noarchive");
-  return res.type("html").send(paradiseDashboardHtml({
-    clientId: env("DISCORD_CLIENT_ID", ""),
-    apiBaseUrl: apiBaseUrl(),
-    frontendUrl: frontendUrl()
-  }));
-}
 
 const FIMA_BOT_CUSTOMER_DASHBOARD_MODULES = new Set(
-  PARADISE_CUSTOMER_WORKSPACE_ROUTES.map(route => route.id)
+  [...PARADISE_CUSTOMER_WORKSPACE_ROUTES.map(route => route.id), "owner-setup", "owner-logs", "owner-runtime", "owner-bot"]
 );
 
 function sendFimaBotCustomerDashboard(req, res) {
@@ -945,7 +928,11 @@ app.get("/fima-bot/dashboard/:guildId", sendFimaBotCustomerDashboard);
 app.get("/fima-bot/dashboard/:guildId/:module", sendFimaBotCustomerDashboard);
 // Public UI shell checks the API-host session before loading any owner data.
 // Owner API routes remain protected by requireUser and requireParadiseOwner.
-app.get(["/fima-bot/owner", "/fima-bot/owner/dashboard"], renderFimaBotOwnerDashboard);
+app.get(["/fima-bot/owner", "/fima-bot/owner/dashboard"], (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/dashboard"));
+app.get("/api/fima-bot/owner-tools", requireUser, requireParadiseOwner, (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  return res.type("html").send(fimaOwnerToolsFragment({ clientId: env("DISCORD_CLIENT_ID", ""), apiBaseUrl: apiBaseUrl(), frontendUrl: frontendUrl() }));
+});
 app.get("/dashboard/fima-bot", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/dashboard"));
 app.get(["/paradise-bot", "/paradise-bot.html"], (_req, res) => res.redirect(301, "/fima-bot"));
 
