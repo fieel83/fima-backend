@@ -372,6 +372,7 @@
         saleCountdown: "Updated",
         offBadge: "Deal",
         fixedPrice: "Fixed price",
+        cancelAnytime: "Subscription - cancel anytime",
         oldPrice: "Base price",
         salePrice: "Current price",
         robuxPremium: "Robux with Premium/Plus",
@@ -692,6 +693,7 @@
         saleCountdown: "Guncel",
         offBadge: "%25 \u0130ndirim",
         fixedPrice: "Sabit fiyat",
+        cancelAnytime: "Abonelik - istediğin zaman iptal et",
         oldPrice: "Normal fiyat",
         salePrice: "Guncel fiyat",
         robuxPremium: "Premium/Plus ile Robux",
@@ -1748,8 +1750,9 @@
           if (token === tourImageSwitchToken) image.classList.remove("is-switching");
         }, 140);
       };
-      loader.onload = () => window.setTimeout(swap, 380);
-      loader.onerror = () => window.setTimeout(swap, 380);
+      const switchDelay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 120;
+      loader.onload = () => window.setTimeout(swap, switchDelay);
+      loader.onerror = () => window.setTimeout(swap, switchDelay);
       loader.src = active.image;
     } else {
       image.alt = `${data.title} screenshot`;
@@ -1823,7 +1826,7 @@
         const discountBadge = saleIsActive ? `<span class="price-discount-badge">${pricingCopy.offBadge || fallbackPricing.offBadge}</span>` : "";
         const fixedLine = plan.id === "lifetime"
           ? `<span class="price-fixed">${pricingCopy.fixedPrice || fallbackPricing.fixedPrice}</span>`
-          : (plan.subscription ? `<span class="price-fixed">Subscription - cancel anytime</span>` : "");
+          : (plan.subscription ? `<span class="price-fixed">${pricingCopy.cancelAnytime || fallbackPricing.cancelAnytime || "Subscription - cancel anytime"}</span>` : "");
         const saleLine = saleIsActive ? `<span class="price-sale">${pricingCopy.saleEnds || fallbackPricing.saleEnds} - <b data-pricing-countdown>${formatCountdown(saleEndsAt)}</b></span>` : "";
         const planCode = {
           "3days": "FIMA-3D",
