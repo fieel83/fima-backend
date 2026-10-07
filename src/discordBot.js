@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { migrateFtChannels } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
 import fs from "node:fs/promises";
@@ -3502,6 +3503,22 @@ export function paradiseDiscordAuditJobStatus() {
     targetGuildCount: 1,
     lastError: lastDeepAuditError
   };
+}
+
+export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedDigest, actorUserId) {
+  const previous = await prisma.setting.findMany({ where: { key: { startsWith: `ft_channel_migration_${guildId}_` } } });
+  if (previous.some(row => ["applying", "rolling_back", "rollback_incomplete"].includes(row.value?.status))) {
+    throw Object.assign(new Error("migration_recovery_required"), { code: "migration_recovery_required" });
+  }
+  const guild = await getGuild(guildId);
+  if (!guild) throw Object.assign(new Error("paradise_guild_unavailable"), { code: "paradise_guild_unavailable" });
+  await guild.members.fetchMe();
+  return migrateFtChannels({ guild, expectedDigest, actorUserId,
+    saveJournal: async journal => {
+      const key = `ft_channel_migration_${guild.id}_${journal.id}`;
+      await prisma.setting.upsert({ where: { key }, update: { value: journal }, create: { key, value: journal } });
+    }
+  });
 }
 
 export async function paradiseDiscordStructureBackup(guildId = null) {

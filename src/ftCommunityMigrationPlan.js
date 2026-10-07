@@ -12,10 +12,10 @@ const groups = [
   ['COMPETITION', ['glads', 'eu-glads', 'asia-glads', 'na-glads', 'anti-teamers', 'leaderboard', 'tournaments']],
   ['EVENTS', ['announcements', 'updates', 'uploads', 'polls', 'events', 'giveaways', 'turkce-duyurular', 'fima-updates']],
   ['HELP', ['support', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless']],
-  ['STAFF', ['staff-hub', 'staff-chat', 'staff-guides', 'staff-application-reviews', 'application-reviews']],
+  ['STAFF', ['staff-hub', 'staff-chat', 'staff-guides', 'staff-application-reviews', 'application-reviews', 'moderator-only', 'steps', 'macro-steps']],
   ['MANAGEMENT', ['management', 'management-chat', 'admin-chat', 'video-hub', 'video-ideas', 'video-scripts', 'video-assets', 'video-review', 'video-upload-schedule']],
   ['RECORDS', ['logs', 'wick-logs', 'message-logs', 'un-bl-logs', 'join-logs', 'fima-logs', 'staff-logs', 'security-logs', 'ticket-transcripts', 'transcripts']],
-  ['ARCHIVE', ['openclaw-private']]
+  ['ARCHIVE', ['openclaw-private', 'old-things']]
 ];
 const destination = new Map(groups.flatMap(([group, names]) => names.map(name => [name, group])));
 const normalize = name => String(name || '').normalize('NFKC').toLowerCase()
@@ -27,7 +27,9 @@ export function buildFtCommunityMigrationPlan(audit) {
   if (audit?.guild?.id !== FT_MIGRATION_GUILD_ID) {
     return { status: 'unavailable', reason: 'ft_community_guild_required', readOnly: true };
   }
-  const types = { GuildCategory: 4, GuildVoice: 2, GuildStageVoice: 13 };
+  const types = { GuildText: 0, GuildVoice: 2, GuildCategory: 4, GuildAnnouncement: 5,
+    AnnouncementThread: 10, PublicThread: 11, PrivateThread: 12, GuildStageVoice: 13,
+    GuildDirectory: 14, GuildForum: 15, GuildMedia: 16 };
   const channels = [...new Map([
     ...(audit.categories || []).map(category => ({ ...category, type: 4 })),
     ...(audit.channels || []).map(channel => ({ ...channel, type: types[channel.type] ?? channel.type }))
@@ -43,9 +45,11 @@ export function buildFtCommunityMigrationPlan(audit) {
   });
   const matrix = channels.filter(channel => !categories.includes(channel)).map(channel => {
     const key = normalize(channel.name);
-    const group = [2, 13].includes(channel.type) ? 'VOICE' : destination.get(key);
-    const target = targetCategories.find(category => category.key === group);
     const currentCategory = categoryNames.get(channel.parentId) || null;
+    // The staff rules channel is separate from the public onboarding rules.
+    const staffRules = key === 'rules' && normalize(currentCategory) === 'staff';
+    const group = staffRules ? 'STAFF' : [2, 13].includes(channel.type) ? 'VOICE' : destination.get(key);
+    const target = targetCategories.find(category => category.key === group);
     const decision = !target ? 'review' : group === 'ARCHIVE' ? 'archive'
       : target.existingId && channel.parentId === target.existingId ? 'keep' : 'move';
     return { id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId,

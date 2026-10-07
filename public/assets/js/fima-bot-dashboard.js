@@ -1,6 +1,6 @@
-import { OWNER_ROUTES, ownerPage, renderOwnerTools, disposeOwnerTools } from "./fima-owner-integration.js?v=20261007-4";
+import { OWNER_ROUTES, ownerPage, renderOwnerTools, disposeOwnerTools } from "./fima-owner-integration.js?v=20261007-5";
 import { renderFimaOperations } from './fima-guild-operations.js?v=20261006-1';
-import { observeFimaControls } from './fima-controls.js?v=20261007-4';
+import { observeFimaControls } from './fima-controls.js?v=20261007-5';
 const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
 function apiUrl(path) { return API_BASE + path; }
 const LIST_ENDPOINT = "/api/fima-bot/customer/workspaces";

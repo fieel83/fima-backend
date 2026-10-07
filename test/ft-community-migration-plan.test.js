@@ -47,3 +47,21 @@ test('other guilds and missing snapshots cannot generate an FT migration plan', 
   assert.equal(buildFtCommunityMigrationPlan(null).status, 'unavailable');
   assert.equal(buildFtCommunityMigrationPlan({ guild: { id: 'other' } }).status, 'unavailable');
 });
+
+test('private staff rules and procedures keep their purpose while old material is archived', () => {
+  const input = audit();
+  input.categories.push({ id: 'staff', name: 'STAFF' });
+  input.channels.push(...[
+    ['staff-rules', 'rules', 'GuildText'], ['mods', 'moderator-only', 'GuildText'],
+    ['steps', 'steps', 'GuildText'], ['forum', 'macro-steps', 'GuildForum'],
+    ['old-material', 'old-things', 'GuildText']
+  ].map(([id, name, type]) => ({ id, name, type, parentId: 'staff' })));
+  const plan = buildFtCommunityMigrationPlan(input);
+  for (const id of ['staff-rules', 'mods', 'steps', 'forum']) {
+    assert.equal(plan.matrix.find(row => row.id === id).targetCategory, '□ STAFF');
+  }
+  assert.equal(plan.matrix.find(row => row.id === 'rules').targetCategory, '⌂ START');
+  assert.equal(plan.matrix.find(row => row.id === 'forum').type, 15);
+  assert.equal(plan.matrix.find(row => row.id === 'old-material').decision, 'archive');
+  assert.deepEqual(plan.unresolvedChannelIds, ['unknown']);
+});

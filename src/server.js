@@ -117,6 +117,7 @@ import {
   paradiseDiscordRuntimeSnapshot,
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
+  migrateFtCommunityChannelsFromDashboard,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
@@ -2214,6 +2215,34 @@ app.post("/api/fima-bot/actions/audit", requireUser, requireParadiseOwner, async
   } catch (error) {
     console.error("FIMA Bot real audit failed", publicError(error));
     return res.status(error.code === "paradise_bot_not_ready" ? 503 : 500).json({ error: error.code || "real_audit_failed" });
+  }
+});
+
+app.post("/api/fima-bot/actions/migrate-channels", requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  if (guildId !== "1419335632324657306") return res.status(400).json({ error: "ft_community_guild_required" });
+  const expectedDigest = String(req.body?.expectedDigest || "");
+  if (!/^[a-f0-9]{64}$/.test(expectedDigest)) return res.status(400).json({ error: "migration_plan_required" });
+  try {
+    const migration = await withParadiseGuildMutationLease(guildId, "ft_channel_migration", async () => {
+      const backup = await paradiseDiscordStructureBackup(guildId);
+      const key = `ft_channel_migration_backup_${guildId}_${Date.now()}`;
+      await prisma.setting.upsert({ where: { key }, update: { value: backup }, create: { key, value: backup } });
+      const journal = await migrateFtCommunityChannelsFromDashboard(guildId, expectedDigest, req.user.id);
+      return { status: journal.status, journalId: journal.id, backupKey: key,
+        movedChannels: journal.operations.filter(row => row.kind === "move").length,
+        renamedCategories: journal.operations.filter(row => row.kind === "rename").length,
+        createdCategories: journal.createdCategoryIds.length, remaining: journal.remaining };
+    }, { purposeKey: "ft_community_channel_migration" });
+    return res.json({ success: true, guildId, migration });
+  } catch (error) {
+    return res.status(error.code === "migration_stale_plan" ? 409 : 500).json({
+      error: error.code || "migration_failed", journalId: error.journal?.id || null,
+      rollbackStatus: error.journal?.status || null
+    });
   }
 });
 
