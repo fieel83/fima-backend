@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
 import { migrateFtChannels, addFtMissingChannels } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
@@ -226,6 +227,8 @@ const COMMUNITY_CHANNEL_BLUEPRINT = [
 ];
 
 const TICKET_CATEGORIES = [
+  { id: "product_support", label: "Product support", description: "Product setup, usage or troubleshooting." },
+  { id: "fake_headless", label: "Fake Headless", description: "R6 tutorial or original file restoration." },
   { id: "payment_help", label: "Payment help", description: "Card checkout, invoice or payment question." },
   { id: "license_hwid_help", label: "License / HWID help", description: "Key, device lock or reset help." },
   { id: "trial_help", label: "Trial help", description: "Trial claim, expiry or setup help." },
@@ -233,7 +236,7 @@ const TICKET_CATEGORIES = [
   { id: "old_tgmacro_buyer", label: "Old TGMacro buyer proof", description: "Send proof for staff review." },
   { id: "app_bug", label: "App bug", description: "App crash, UI issue or launcher problem." },
   { id: "macro_timing_problem", label: "Macro timing problem", description: "Ping, FPS, MS or macro timing help." },
-  { id: "security_report", label: "Security report", description: "Suspicious file, fake build or abuse report." },
+  { id: "security_report", label: "Report / Scam / Security", description: "Suspicious file, fake build or abuse report." },
   { id: "creator_partnership", label: "Creator / partnership", description: "Creator, macro or partnership request." },
   { id: "other", label: "Other", description: "Anything else." }
 ];
@@ -985,6 +988,9 @@ async function handleCommunityActivityCommand(interaction) {
 
 async function handleDiscordInteraction(interaction) {
   if (await handleParadiseInteraction(interaction)) return;
+  if (interaction?.isModalSubmit?.() && String(interaction.customId || "").startsWith("fima_ticket_intake:")) {
+    return handleTicketIntakeSubmit(interaction);
+  }
   if (interaction?.isStringSelectMenu?.() && interaction.customId === "fima_ticket_category") {
     return handleTicketCategorySelect(interaction);
   }
@@ -2185,7 +2191,7 @@ function fimaTicketPanelPayload() {
     .setColor(0x9b5cff)
     .setTitle("Fima Support")
     .setDescription([
-      "Need help? Pick a category and we will open a private ticket.",
+      "Need help? Pick a category, complete the short form, then FIMA opens your private ticket.",
       "Do not post full license keys, passwords, cookies, tokens or payment details in public.",
       "Old TGMacro buyer? Choose that category and send proof after staff opens the ticket."
     ].join("\n"))
@@ -2199,7 +2205,7 @@ function fimaTicketMenuPayload() {
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
     .setTitle("Open a Fima ticket")
-    .setDescription("Choose the closest category. A private ticket opens for you and staff.");
+    .setDescription("Choose a category and complete the short form before your private ticket opens.");
   return { embeds: [embed], components: [ticketCategoryRow()] };
 }
 
@@ -2296,24 +2302,51 @@ function fimaBuyPanelPayload() {
 async function handleTicketCategorySelect(interaction) {
   const categoryId = interaction.values?.[0] || "other";
   const category = TICKET_CATEGORIES.find((item) => item.id === categoryId) || TICKET_CATEGORIES.at(-1);
+  return interaction.showModal(buildTicketIntakeModal(category));
+}
+
+const ticketCreationInFlight = new Set();
+const ticketCreationCooldown = new Map();
+
+async function handleTicketIntakeSubmit(interaction) {
+  const categoryId = String(interaction.customId).split(":")[1];
+  const category = TICKET_CATEGORIES.find((item) => item.id === categoryId);
+  if (!category) return interaction.reply({ content: "Choose a current ticket category.", ephemeral: true });
+  await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild || await getGuild();
-  const ticketChannel = await createTicketChannel(guild, interaction.user, category);
-  await ticketChannel.send({
-    content: `<@${interaction.user.id}>`,
-    embeds: [ticketCreatedEmbed(category, interaction.user.id)],
-    components: ticketActionRows()
-  });
-  await auditDiscordBotAction("discord_ticket_created", "discord_channel", ticketChannel.id, {
-    guildId: guild.id,
-    category: category.id,
-    userId: interaction.user.id,
-    fullKeysMasked: true,
-    fullEmailsMasked: true
-  });
-  await fimaAiSupportBridge?.opened({ channelId: ticketChannel.id, guildId: guild.id }).catch(() => {
-    console.warn("FIMA support shadow queue unavailable; ticket reminder not accepted");
-  });
-  return interaction.reply({ content: `Ticket opened: ${ticketChannel}`, ephemeral: true });
+  const creationKey = `${guild.id}:${interaction.user.id}`;
+  if (ticketCreationInFlight.has(creationKey)) return interaction.editReply("Your ticket is being opened. Please wait.");
+  ticketCreationInFlight.add(creationKey);
+  try {
+    const channels = await guild.channels.fetch();
+    const existing = channels.find((channel) => channel?.type === ChannelType.GuildText && !channel.name.startsWith("closed-") && String(channel.topic || "").includes(`openedBy:${interaction.user.id}.`));
+    if (existing) return interaction.editReply(`Your open ticket: ${existing}`);
+    if (Date.now() - (ticketCreationCooldown.get(creationKey) || 0) < 300000) return interaction.editReply("Please wait five minutes before opening another ticket.");
+    const intake = ticketIntakeFields(category.id).map((field) => ({ name: field.label, value: maskTicketTranscriptText(interaction.fields.getTextInputValue(field.id)).slice(0, 1000) || "—" }));
+    if (intake[0].value.trim().length < 10) return interaction.editReply("Please describe the issue in at least ten characters.");
+    const ticketChannel = await createTicketChannel(guild, interaction.user, category);
+    ticketCreationCooldown.set(creationKey, Date.now());
+    setTimeout(() => ticketCreationCooldown.delete(creationKey), 300000).unref();
+    await ticketChannel.send({
+      content: `<@${interaction.user.id}>`,
+      allowedMentions: { users: [interaction.user.id], roles: [], parse: [] },
+      embeds: [ticketCreatedEmbed(category, interaction.user.id).addFields(intake)],
+      components: ticketActionRows()
+    });
+    await auditDiscordBotAction("discord_ticket_created", "discord_channel", ticketChannel.id, {
+      guildId: guild.id,
+      category: category.id,
+      userId: interaction.user.id,
+      fullKeysMasked: true,
+      fullEmailsMasked: true
+    });
+    await fimaAiSupportBridge?.opened({ channelId: ticketChannel.id, guildId: guild.id }).catch(() => {
+      console.warn("FIMA support shadow queue unavailable; ticket reminder not accepted");
+    });
+    return interaction.editReply({ content: `Ticket opened: ${ticketChannel}` });
+  } finally {
+    ticketCreationInFlight.delete(creationKey);
+  }
 }
 
 async function createTicketChannel(guild, user, category) {
@@ -2336,7 +2369,7 @@ async function createTicketChannel(guild, user, category) {
     const role = await guild.roles.fetch(supportRoleId).catch(() => null);
     if (role) overwrites.push({ id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
   }
-  const parent = env("DISCORD_TICKET_CATEGORY_ID") || null;
+  const parent = env("DISCORD_TICKET_CATEGORY_ID") || (guild.id === "1419335632324657306" ? "1557526017378091110" : null);
   return guild.channels.create({
     name,
     type: ChannelType.GuildText,
