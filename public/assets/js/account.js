@@ -20,14 +20,12 @@
   };
   const dashboardRoute = (name) => dashboardRoutes[name] || dashboardRoutes.overview;
   const dashboardSectionFromLocation = () => {
+    const hash = location.hash.replace(/^#/, "").trim().toLowerCase();
+    const legacySection = ({ "gift-access": "redeem", "purchased-gifts": "gifts", "monthly-trial": "redeem" }[hash] || hash);
+    if (Object.hasOwn(dashboardRoutes, legacySection)) return legacySection;
     const pathMatch = location.pathname.match(/^\/dashboard\/([^/]+)\/?$/i);
     if (pathMatch) return pathMatch[1].toLowerCase();
-    const hash = location.hash.replace(/^#/, "").trim().toLowerCase();
-    return ({
-      "gift-access": "redeem",
-      "purchased-gifts": "gifts",
-      "monthly-trial": "redeem"
-    }[hash] || hash || "overview");
+    return "overview";
   };
 
   const copy = {
@@ -1602,7 +1600,7 @@
       setText("#products .section-heading h2", t("myProductsTitle"));
       setText("#billing .section-heading h2", language() === "tr" ? "Faturalama ve abonelik" : "Billing and subscription");
       setText("#billing .section-heading p:not(.eyebrow)", language() === "tr"
-        ? "Uzatma, yenileme ve abonelik iptali burada yonetilir. Lisans kartlari My Products bolumunde kalir."
+        ? "Erişimini uzat, aboneliğini yenile veya ödeme desteği al. Lisanslarını Ürünler bölümünde görebilirsin."
         : "Renewals, extensions and cancellation help are handled here. License cards stay in My Products.");
       setText("#security .section-heading .eyebrow", t("emailVerificationEyebrow"));
       const accountLinksEyebrow = $("#security > div:not(.section-heading) .eyebrow");
@@ -3682,7 +3680,18 @@
     if (page === "forgot") initForgotPassword();
     if (page === "reset") initResetPassword();
     if (page === "store") initStore();
-    if (page === "dashboard") initDashboard();
+    if (page === "dashboard") {
+      applyDashboardSectionRoute();
+      window.addEventListener("hashchange", applyDashboardSectionRoute);
+      initDashboard().catch((error) => {
+        const target = document.querySelector('.is-route-active .message') || document.querySelector('.account-dashboard-content');
+        const message = document.createElement("p");
+        message.className = "message is-error";
+        message.setAttribute("role", "alert");
+        message.textContent = error.message || (language() === "tr" ? "Hesap bilgileri yüklenemedi. Lütfen yeniden dene." : "Account details could not be loaded. Please try again.");
+        target?.appendChild(message);
+      });
+    }
     if (page === "my-products") initMyProducts();
     if (page === "payment-success") initPaymentSuccess();
   });
