@@ -8,6 +8,14 @@ export const COMMUNITY_LEVEL_ROLES = Object.freeze([
   { name: "Level 50", xp: 125000 }
 ]);
 
+// Shared by the server installer and the live recognition worker.
+export const COMMUNITY_ACTIVITY_ROLE_STYLE = Object.freeze(Object.fromEntries([
+  ...["Text", "Voice"].flatMap(board => [1, 2, 3].map(rank => [
+    `${board} Top ${rank}`, Object.freeze({ unicodeEmoji: ["🥇", "🥈", "🥉"][rank - 1] })
+  ])),
+  ...COMMUNITY_LEVEL_ROLES.map(tier => [tier.name, Object.freeze({ unicodeEmoji: "⭐" })])
+]));
+
 export function communityActivityRoleTargets(boards, totals) {
   const targets = new Map();
   for (const board of ["text", "voice"]) {
@@ -29,8 +37,7 @@ export function communityActivityRoleTargets(boards, totals) {
 // Fully fetch members before changing holders so departed winners and stale
 // level memberships are reconciled without relying on the gateway cache.
 export async function reconcileCommunityActivityRoles(guild, targets) {
-  const allowed = new Set([...COMMUNITY_LEVEL_ROLES.map(tier => tier.name),
-    ...["Text", "Voice"].flatMap(board => [1, 2, 3].map(rank => `${board} Top ${rank}`))]);
+  const allowed = new Set(Object.keys(COMMUNITY_ACTIVITY_ROLE_STYLE));
   if ([...targets.keys()].some(name => !allowed.has(name))) throw new Error("activity_roles_unknown_target");
   const me = guild.members.me || await guild.members.fetchMe();
   if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) throw new Error("activity_roles_manage_roles_missing");
@@ -50,8 +57,17 @@ export async function reconcileCommunityActivityRoles(guild, targets) {
   }
   for (const [name, holders] of targets) {
     let role = existing.get(name);
-    if (!role) role = await guild.roles.create({ name, permissions: [], hoist: true, mentionable: false, reason: "FIMA activity recognition" });
-    else if (!role.hoist) await role.setHoist(true, "FIMA activity recognition");
+    const supportsIcons = guild.features?.includes("ROLE_ICONS") || Number(guild.premiumTier) >= 2;
+    const style = supportsIcons ? COMMUNITY_ACTIVITY_ROLE_STYLE[name] : {};
+    if (!role) role = await guild.roles.create({ name, permissions: [], hoist: true, mentionable: false, ...style, reason: "FIMA activity recognition" });
+    else {
+      const changes = {};
+      if (!role.hoist) changes.hoist = true;
+      if (role.mentionable) changes.mentionable = false;
+      // Preserve custom image icons installed by the community visual system.
+      if (supportsIcons && !role.icon && role.unicodeEmoji !== style.unicodeEmoji) changes.unicodeEmoji = style.unicodeEmoji;
+      if (Object.keys(changes).length) await role.edit({ ...changes, reason: "FIMA activity recognition" });
+    }
     for (const member of members.values()) {
       const wants = !member.user.bot && holders.has(member.id);
       const has = member.roles.cache.has(role.id);

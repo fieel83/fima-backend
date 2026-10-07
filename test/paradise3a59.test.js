@@ -2508,7 +2508,7 @@ test("canonical templates keep their required public and private surfaces", () =
   assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "VIDEO TEAM"));
   assert.ok(PARADISE_SETUP_SCHEMAS.community.schema.some(([name]) => name === "PERSONNEL"));
   assert.equal(PARADISE_SETUP_SCHEMAS.community.schema.flatMap(([, channels]) => channels).includes("roles"), true);
-  for (const role of ["Manager", "Glads", "Top 1", "Top 2", "Top 3", "Level 25", "Level 100"]) {
+  for (const role of ["Manager", "Glads", "Text Top 1", "Text Top 2", "Text Top 3", "Voice Top 1", "Voice Top 2", "Voice Top 3", "Level 5", "Level 50"]) {
     assert.ok(PARADISE_SETUP_SCHEMAS.community.roles.includes(role));
   }
   assert.equal(PARADISE_SETUP_SCHEMAS.clan.schema.flatMap(([, channels]) => channels).includes("〢・personel-rehberleri"), true);

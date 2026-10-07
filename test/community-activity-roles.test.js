@@ -41,3 +41,35 @@ test("a privileged existing role is never self-assigned as recognition", async (
   await assert.rejects(reconcileCommunityActivityRoles(guild, new Map([["Text Top 1", new Set(["new"])]])), /unsafe_existing_role/);
   assert.deepEqual(mutations, []);
 });
+
+
+test("existing recognition presentation is repaired without replacing a custom bitmap icon", async () => {
+  const { guild } = fixture();
+  guild.features = ["ROLE_ICONS"];
+  const role = guild.roles.cache.get("r");
+  role.hoist = false;
+  role.mentionable = true;
+  role.icon = "existing-bitmap";
+  const edits = [];
+  role.edit = async changes => edits.push(changes);
+  await reconcileCommunityActivityRoles(guild, new Map([["Text Top 1", new Set()]]));
+  assert.deepEqual(edits, [{ hoist: true, mentionable: false, reason: "FIMA activity recognition" }]);
+});
+
+test("new recognition roles receive icons only when the guild supports them", async () => {
+  for (const supported of [false, true]) {
+    const { guild } = fixture();
+    guild.roles.cache.clear();
+    guild.features = supported ? ["ROLE_ICONS"] : [];
+    const created = [];
+    guild.roles.create = async options => {
+      created.push(options);
+      return { id: "new-recognition" };
+    };
+    await reconcileCommunityActivityRoles(guild, new Map([["Voice Top 2", new Set()]]));
+    assert.equal(created[0].hoist, true);
+    assert.equal(created[0].mentionable, false);
+    assert.deepEqual(created[0].permissions, []);
+    assert.equal(created[0].unicodeEmoji, supported ? "🥈" : undefined);
+  }
+});

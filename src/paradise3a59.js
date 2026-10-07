@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
 import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
 import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings } from './fimaGuildArchitecture.js';
 import path from "node:path";
@@ -1112,14 +1113,15 @@ export const PARADISE_COMMUNITY_ROLES = [
   "━━━━━ PRODUCT ACCESS ━━━━━", "FIMA", "FIMA Customer", "FIMA Macro Customer", "FIMA AI Customer", "Lifetime Customer",
   "━━━━━ NOTIFICATIONS ━━━━━", "Glads", "Announcements Ping", "Events Ping", "Giveaway Ping", "Product Notifications", "FIMA Updates", "FIMA Macro Updates", "FIMA AI Updates",
   "Fieel Content Notifications", "Tatu Content Notifications", "Event Notifications", "Security Alerts",
-  "━━━━━ RANKING ━━━━━", "Top 1", "Top 2", "Top 3",
-  "━━━━━ LEVELS ━━━━━", "Level 25", "Level 50", "Level 75", "Level 100",
+  "━━━━━ RANKING ━━━━━", ...Object.keys(COMMUNITY_ACTIVITY_ROLE_STYLE).filter(name => name.includes(" Top ")),
+  "━━━━━ LEVELS ━━━━━", ...COMMUNITY_LEVEL_ROLES.map(tier => tier.name),
   "━━━━━ TEXT ACTIVITY ━━━━━", "Text Level 5", "Text Level 10", "Text Level 20", "Text Level 35", "Text Level 50",
   "━━━━━ VOICE ACTIVITY ━━━━━", "Voice Level 5", "Voice Level 10", "Voice Level 20", "Voice Level 35", "Voice Level 50",
   "━━━━━ BOOSTERS ━━━━━", "Booster"
 ];
 
 export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
+  ...COMMUNITY_ACTIVITY_ROLE_STYLE,
   Owner: Object.freeze({ unicodeEmoji: "👑" }),
   Administrator: Object.freeze({ unicodeEmoji: "🛡️" }),
   Manager: Object.freeze({ unicodeEmoji: "🛡️" }),
@@ -1166,13 +1168,6 @@ export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
   "Tatu Content Notifications": Object.freeze({ unicodeEmoji: "🎬" }),
   "Event Notifications": Object.freeze({ unicodeEmoji: "📅" }),
   "Security Alerts": Object.freeze({ unicodeEmoji: "🚨" }),
-  "Top 1": Object.freeze({ unicodeEmoji: "🥇" }),
-  "Top 2": Object.freeze({ unicodeEmoji: "🥈" }),
-  "Top 3": Object.freeze({ unicodeEmoji: "🥉" }),
-  "Level 25": Object.freeze({ unicodeEmoji: "⭐" }),
-  "Level 50": Object.freeze({ unicodeEmoji: "⭐" }),
-  "Level 75": Object.freeze({ unicodeEmoji: "⭐" }),
-  "Level 100": Object.freeze({ unicodeEmoji: "🌟" }),
   "Text Level 5": Object.freeze({ unicodeEmoji: "💬" }),
   "Text Level 10": Object.freeze({ unicodeEmoji: "💬" }),
   "Text Level 20": Object.freeze({ unicodeEmoji: "💬" }),
@@ -1187,6 +1182,7 @@ export const PARADISE_COMMUNITY_ROLE_ICONS = Object.freeze({
 });
 
 const PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS = Object.freeze({
+  ...Object.fromEntries(Object.keys(COMMUNITY_ACTIVITY_ROLE_STYLE).map(name => [name, name.includes(" Top ") ? "booster" : "member"])),
   Owner: "owner",
   Administrator: "administrator",
   Manager: "administrator",
@@ -1233,13 +1229,6 @@ const PARADISE_COMMUNITY_EXTENDED_ROLE_ASSET_KEYS = Object.freeze({
   "Tatu Content Notifications": "creative",
   "Event Notifications": "notifications",
   "Security Alerts": "safety",
-  "Top 1": "booster",
-  "Top 2": "booster",
-  "Top 3": "booster",
-  "Level 25": "member",
-  "Level 50": "member",
-  "Level 75": "member",
-  "Level 100": "verified",
   "Text Level 5": "member",
   "Text Level 10": "member",
   "Text Level 20": "member",
@@ -2562,15 +2551,9 @@ const ROLE_PERMISSION_NAMES = Object.freeze({
 });
 
 const COMMUNITY_ROLE_PRESENTATION = Object.freeze({
+  ...Object.fromEntries(Object.keys(COMMUNITY_ACTIVITY_ROLE_STYLE).map(name => [name, Object.freeze({ hoist: true, mentionable: false })])),
   Administrator: Object.freeze({ hoist: true, mentionable: false }),
   Manager: Object.freeze({ hoist: true, mentionable: false }),
-  "Top 1": Object.freeze({ hoist: true, mentionable: false }),
-  "Top 2": Object.freeze({ hoist: true, mentionable: false }),
-  "Top 3": Object.freeze({ hoist: true, mentionable: false }),
-  "Level 25": Object.freeze({ hoist: true, mentionable: false }),
-  "Level 50": Object.freeze({ hoist: true, mentionable: false }),
-  "Level 75": Object.freeze({ hoist: true, mentionable: false }),
-  "Level 100": Object.freeze({ hoist: true, mentionable: false }),
   Glads: Object.freeze({ hoist: false, mentionable: true }),
   "Announcements Ping": Object.freeze({ hoist: false, mentionable: true }),
   "Events Ping": Object.freeze({ hoist: false, mentionable: true }),
