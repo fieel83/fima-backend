@@ -9,6 +9,7 @@ const options = {maxWait:5000, timeout:15000};
 // No password hash, bearer token or generation proof is stored in the grant row.
 const lookup = (grant,user) => createHash('sha256').update(JSON.stringify(['fima-macro-grant-generation:v1',grant,entitlementCredentialGeneration(user)])).digest('hex');
 export const runtimeContracts = new Map([
+  ['fima-stream-manager',{contract:createRuntimeHandoffContract({productId:'fima-stream-manager',executableName:'FIMA Live Manager.exe',executableSha256:'1fb82b010737853b3f7760d908f62ef67f5320afb1d2ef5ebc33ff9998b0c634',feature:'owner_admin',ownerOnly:true}),version:'1.0.0'}],
   [runtimeHandoffDefaultContract.executableSha256, {contract:runtimeHandoffDefaultContract, version:'1.0.131'}],
   ['47187016ac88327fd2450bb084c242797c449b32cccf9944754613c3b6a1b278', {contract:createRuntimeHandoffContract({productId:'fima-macro',executableName:'FimaMacroStudio.exe',executableSha256:'47187016ac88327fd2450bb084c242797c449b32cccf9944754613c3b6a1b278',feature:'macro_runtime'}),version:'1.0.130'}],
   ...[

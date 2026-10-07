@@ -55,8 +55,9 @@ export function minimumAppVersionStatus(appVersion, minimumVersion) {
 // Application identity must come from a verified entitlement, never request data.
 export function entitlementVersionStatus(appVersion, verifiedPayload, { macroMinimum, hubMinimum = "0.2.0" }) {
   const application = verifiedPayload?.clientApplication;
-  const minimums = { "fima-hub": hubMinimum, "fima-mail": "0.1.0", "fima-cloud-pc": "0.1.0" };
+  const minimums = { "fima-hub": hubMinimum, "fima-mail": "0.1.0", "fima-cloud-pc": "0.1.0", "fima-stream-manager": "1.0.0" };
   const known = Object.hasOwn(minimums, application);
   const version = known ? String(appVersion || "").replace(/-(?:[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)$/, "") : appVersion;
   return { ...minimumAppVersionStatus(version, known ? minimums[application] : macroMinimum), clientApplication: known ? application : "fima-macro" };
 }
+

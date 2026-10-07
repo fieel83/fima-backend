@@ -30,10 +30,11 @@ for(const {contract,version} of runtimeContracts.values()) {
 }
 test('owner runtime versions use signed product identity',()=>{
  for(const id of ['fima-mail','fima-cloud-pc']) assert.equal(entitlementVersionStatus('0.1.0-owner-preview',{clientApplication:id},{macroMinimum:'1.0.128'}).updateRequired,false);
+ assert.equal(entitlementVersionStatus('1.0.0',{clientApplication:'fima-stream-manager'},{macroMinimum:'1.0.128'}).updateRequired,false);
  assert.equal(entitlementVersionStatus('0.1.0-owner-preview',{},{macroMinimum:'1.0.128'}).updateRequired,true);
 });
 
-for(const id of ['fima-mail','fima-cloud-pc']) test(`${id} exchanges flat owner identity`,async()=>{
+for(const id of ['fima-mail','fima-cloud-pc','fima-stream-manager']) test(`${id} exchanges flat owner identity`,async()=>{
  const {contract,version}=runtimeContracts.get(id);
  const f=fixture();const binding={...contract,hwid:('FIMA-DEVICE-'+'A'.repeat(64)),appVersion:version};
  const grant=await f.candidate.issue({identity:f.identity,binding},f.token);

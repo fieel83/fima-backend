@@ -163,7 +163,7 @@ export function issueAppEntitlement({
     issuedAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     appVersion: appVersion || null,
-    clientApplication: ["fima-hub", "fima-mail", "fima-cloud-pc"].includes(clientApplication) ? clientApplication : "fima-macro",
+    clientApplication: ["fima-hub", "fima-mail", "fima-cloud-pc", "fima-stream-manager"].includes(clientApplication) ? clientApplication : "fima-macro",
     minSupportedAppVersion: minSupportedAppVersion || "",
     hwidHash: hashDeviceId(hwid),
     deviceIdHash: hashDeviceId(hwid),
