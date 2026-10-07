@@ -11,6 +11,68 @@ const canonicalPermissions = rows => JSON.stringify((rows || []).map(row => ({
   id: row.id, type: row.type, allow: [...row.allow].sort(), deny: [...row.deny].sort()
 })).sort((a, b) => a.id.localeCompare(b.id)));
 
+export async function addFtMissingChannels({ guild, expectedDigest, saveJournal, actorUserId }) {
+  if (guild?.id !== FT_MIGRATION_GUILD_ID) throw fail('ft_community_guild_required');
+  if (typeof saveJournal !== 'function') throw fail('migration_journal_required');
+  if (running.has(guild.id)) throw fail('migration_already_running');
+  running.add(guild.id);
+  let journal;
+  const persist = () => saveJournal(structuredClone(journal));
+  try {
+    const before = await captureFtChannelInventory(guild);
+    const plan = buildFtCommunityMigrationPlan(before);
+    if (expectedDigest !== plan.sourceDigest) throw fail('migration_stale_plan');
+    const specs = [
+      { name: 'general', category: 'COMMUNITY', topic: 'FT Community — chat, share and meet the community. / Topluluk sohbeti.' },
+      { name: 'media', category: 'COMMUNITY', topic: 'Share your clips, edits and creations. / Kliplerini ve çalışmalarını paylaş.' },
+      { name: 'polls', category: 'EVENTS', topic: 'Community polls and votes. / Topluluk anketleri ve oylamaları.' }
+    ];
+    const targets = new Map(plan.targetCategories.map(row => [row.key, row.existingId]));
+    if (specs.some(spec => !targets.get(spec.category))) throw fail('migration_categories_required');
+    journal = { id: randomUUID(), guildId: guild.id, actorUserId, phase: 'missing_channels',
+      status: 'applying', startedAt: new Date().toISOString(), before, operations: [], createdCategoryIds: [] };
+    await persist();
+    for (const spec of specs) {
+      if (before.channels.some(row => row.name === spec.name)) continue;
+      const parent = await guild.channels.fetch(targets.get(spec.category));
+      journal.operations.push({ kind: 'create_channel', name: spec.name, parentId: parent.id, status: 'pending' });
+      await persist();
+      const channel = await guild.channels.create({ name: spec.name, type: 0, parent: parent.id,
+        topic: spec.topic, rateLimitPerUser: 5, permissionOverwrites: overwrites(parent),
+        reason: 'FT Community: add missing channels without changing existing channels' });
+      Object.assign(journal.operations.at(-1), { id: channel.id, status: 'applied' });
+      await persist();
+    }
+    const after = await captureFtChannelInventory(guild);
+    for (const original of before.channels) {
+      const actual = after.channels.find(row => row.id === original.id);
+      if (!actual || actual.name !== original.name || actual.type !== original.type || actual.parentId !== original.parentId ||
+          canonicalPermissions(actual.permissionOverwrites) !== canonicalPermissions(original.permissionOverwrites)) {
+        throw fail('migration_final_verification_failed');
+      }
+    }
+    for (const spec of specs) {
+      if (!after.channels.some(row => row.name === spec.name && row.type === 0 && row.parentId === targets.get(spec.category))) {
+        throw fail('migration_created_channel_verification_failed');
+      }
+    }
+    journal.after = after;
+    journal.status = 'missing_channels_added';
+    journal.completedAt = new Date().toISOString();
+    await persist();
+    return journal;
+  } catch (error) {
+    if (journal) {
+      // Preserve any created channels and their history; recovery requires a fresh inventory.
+      journal.status = 'additive_review_required';
+      journal.error = error.code || error.message;
+      await persist().catch(() => {});
+      error.journal = journal;
+    }
+    throw error;
+  } finally { running.delete(guild.id); }
+}
+
 export async function captureFtChannelInventory(guild) {
   const fetched = await guild.channels.fetch();
   const inventory = [...fetched.values()].filter(channel => channel && !channel.isThread());

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFtCommunityMigrationPlan, FT_MIGRATION_GUILD_ID } from '../src/ftCommunityMigrationPlan.js';
-import { captureFtChannelInventory, migrateFtChannels } from '../src/ftCommunityChannelMigration.js';
+import { captureFtChannelInventory, migrateFtChannels, addFtMissingChannels } from '../src/ftCommunityChannelMigration.js';
 
 function fixture() {
   const channels = new Map(), writes = [], saved = [];
@@ -41,7 +41,7 @@ function fixture() {
     async fetch(id) { return id ? channels.get(id) : channels; },
     async create(options) {
       writes.push(['create', options.name]);
-      return make(`new-${sequence}`, options.name, options.type, null, options.permissionOverwrites);
+      return make(`new-${sequence}`, options.name, options.type, options.parent || null, options.permissionOverwrites);
     }
   } };
   return { guild, channels, writes, saved,
@@ -52,6 +52,39 @@ async function request(f) {
   return { guild: f.guild, expectedDigest: buildFtCommunityMigrationPlan(await captureFtChannelInventory(f.guild)).sourceDigest,
     saveJournal: f.saveJournal, actorUserId: 'owner' };
 }
+
+test('additive phase preserves originals, inherits access, and is idempotent', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const before = await captureFtChannelInventory(f.guild);
+  const result = await addFtMissingChannels(await request(f));
+  assert.equal(result.status, 'missing_channels_added');
+  assert.deepEqual(result.operations.map(row => row.name), ['general', 'media', 'polls']);
+  for (const original of before.channels) {
+    assert.deepEqual(result.after.channels.find(row => row.id === original.id), original);
+  }
+  for (const created of result.operations) {
+    const actual = f.channels.get(created.id);
+    assert.deepEqual(actual.permissionOverwrites.cache, f.channels.get(actual.parentId).permissionOverwrites.cache);
+  }
+  const again = await addFtMissingChannels(await request(f));
+  assert.deepEqual(again.operations, []);
+});
+
+test('additive phase refuses stale plans and absent destination categories', async () => {
+  const f = fixture();
+  await assert.rejects(addFtMissingChannels({ ...await request(f), expectedDigest: 'stale' }), { code: 'migration_stale_plan' });
+  await assert.rejects(addFtMissingChannels(await request(f)), { code: 'migration_categories_required' });
+  assert.deepEqual(f.writes, []);
+});
+
+test('additive phase stops before mutation when durable journal cannot be written', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  f.writes.length = 0;
+  await assert.rejects(addFtMissingChannels({ ...await request(f), saveJournal: async () => { throw new Error('database_down'); } }), /database_down/);
+  assert.deepEqual(f.writes, []);
+});
 
 test('stale inventory is rejected before any Discord mutation', async () => {
   const f = fixture(), args = await request(f);

@@ -539,6 +539,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
           <button class="audit-action" data-managed-operation="audit">Refresh audit</button>
           <button class="backup-action" data-managed-operation="backup">Create backup</button>
           <button class="audit-action" data-managed-operation="migrate-channels">Move FT channels in place</button>
+          <button class="audit-action" data-managed-operation="add-missing-channels">Add missing FT channels</button>
           <button class="preview-action" data-managed-operation="preview">Preview selected template</button>
         </div>
         <pre id="managedOperationStatus" aria-live="polite"></pre>
@@ -1541,7 +1542,7 @@ async function runManagedOperation(kind){
   buttons.filter(Boolean).forEach(item=>item.disabled=true);setLoading(true);
   try{
     const body={guildId:selectedGuildId};if(kind==='preview')body.mode=byId('template').value;
-    if(kind==='migrate-channels'){
+    if(kind==='migrate-channels'||kind==='add-missing-channels'){
       const auditResponse=await fetch(API_BASE+'/api/fima-bot/real-audit?guildId='+encodeURIComponent(selectedGuildId),{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
       const auditResult=await auditResponse.json();
       if(!auditResponse.ok||!auditResult.migrationPlan?.sourceDigest)return show('Run an FT audit first.',false);
@@ -1554,7 +1555,7 @@ async function runManagedOperation(kind){
       ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6),botRolePosition:value.guild.botRolePosition,capabilities:value.guild.capabilities}:null,counts:value.counts,coverage:value.coverage,discoveryFailures:value.discoveryFailures,categories:value.categories,channels:value.channels,roles:value.roles,autoModRules:value.autoModRules,webhooks:value.webhooks,migrationPlan:result.migrationPlan,readableChannels:(value.sampledChannels||[]).filter(channel=>channel.readable).map(channel=>channel.name),blockedChannels:(value.sampledChannels||[]).filter(channel=>!channel.readable||channel.messagesFetchFailed||channel.pinsFetchFailed).map(channel=>({name:channel.name,reason:channel.missingPermission,messagesFetchFailed:channel.messagesFetchFailed,pinsFetchFailed:channel.pinsFetchFailed})),sampledChannels:value.sampledChannels}
       :kind==='backup'
         ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6)}:null,categories:(value.categories||[]).length,channels:(value.channels||[]).length,roles:(value.roles||[]).length}
-        :kind==='migrate-channels'?value:{status:value.status,generatedAt:value.generatedAt,template:value.templateLabel,createResources:(value.createResources||[]).length,keepResources:(value.keepResources||[]).length,extraResources:(value.extraResources||[]).length,createRoles:(value.createRoles||[]).length,warning:value.warning};
+        :kind==='migrate-channels'||kind==='add-missing-channels'?value:{status:value.status,generatedAt:value.generatedAt,template:value.templateLabel,createResources:(value.createResources||[]).length,keepResources:(value.keepResources||[]).length,extraResources:(value.extraResources||[]).length,createRoles:(value.createRoles||[]).length,warning:value.warning};
     byId('realAuditStatus').textContent=JSON.stringify(safe,null,2);byId('managedOperationStatus').textContent=JSON.stringify(safe,null,2);show(kind+' completed for the selected server');
   }catch{byId('managedOperationStatus').textContent=JSON.stringify({status:'failed',operation:kind,error:'operation_response_unavailable'},null,2);show(kind+' failed safely.',false)}finally{buttons.filter(Boolean).forEach(item=>item.disabled=false);setLoading(false)}
 }
