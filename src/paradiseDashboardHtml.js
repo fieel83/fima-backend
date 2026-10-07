@@ -1548,7 +1548,7 @@ async function runManagedOperation(kind){
       body.expectedDigest=auditResult.migrationPlan.sourceDigest;
     }
     const{response,result}=await mutate('/api/fima-bot/actions/'+kind,body);
-    if(!response.ok){show(result.error||kind+' failed',false);return}
+    if(!response.ok){byId('managedOperationStatus').textContent=JSON.stringify({status:'failed',operation:kind,error:result.error||'operation_failed',journalId:result.journalId||null,rollbackStatus:result.rollbackStatus||null},null,2);show(result.error||kind+' failed',false);return}
     const value=result.audit||result.backup||result.preview||result.migration||{};
     const safe=kind==='audit'
       ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6),botRolePosition:value.guild.botRolePosition,capabilities:value.guild.capabilities}:null,counts:value.counts,coverage:value.coverage,discoveryFailures:value.discoveryFailures,categories:value.categories,channels:value.channels,roles:value.roles,autoModRules:value.autoModRules,webhooks:value.webhooks,migrationPlan:result.migrationPlan,readableChannels:(value.sampledChannels||[]).filter(channel=>channel.readable).map(channel=>channel.name),blockedChannels:(value.sampledChannels||[]).filter(channel=>!channel.readable||channel.messagesFetchFailed||channel.pinsFetchFailed).map(channel=>({name:channel.name,reason:channel.missingPermission,messagesFetchFailed:channel.messagesFetchFailed,pinsFetchFailed:channel.pinsFetchFailed})),sampledChannels:value.sampledChannels}
@@ -1556,7 +1556,7 @@ async function runManagedOperation(kind){
         ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6)}:null,categories:(value.categories||[]).length,channels:(value.channels||[]).length,roles:(value.roles||[]).length}
         :kind==='migrate-channels'?value:{status:value.status,generatedAt:value.generatedAt,template:value.templateLabel,createResources:(value.createResources||[]).length,keepResources:(value.keepResources||[]).length,extraResources:(value.extraResources||[]).length,createRoles:(value.createRoles||[]).length,warning:value.warning};
     byId('realAuditStatus').textContent=JSON.stringify(safe,null,2);byId('managedOperationStatus').textContent=JSON.stringify(safe,null,2);show(kind+' completed for the selected server');
-  }catch{show(kind+' failed safely.',false)}finally{buttons.filter(Boolean).forEach(item=>item.disabled=false);setLoading(false)}
+  }catch{byId('managedOperationStatus').textContent=JSON.stringify({status:'failed',operation:kind,error:'operation_response_unavailable'},null,2);show(kind+' failed safely.',false)}finally{buttons.filter(Boolean).forEach(item=>item.disabled=false);setLoading(false)}
 }
 document.querySelectorAll('[data-managed-operation]').forEach(button=>button.addEventListener('click',()=>runManagedOperation(button.dataset.managedOperation)));
 byId('brandPicker').oninput=e=>{const v=e.target.value.toUpperCase();byId('brandHex').value=v;applyBrand(v);markDirty()};byId('brandHex').oninput=e=>{if(/^#[0-9a-f]{6}$/i.test(e.target.value)){byId('brandPicker').value=e.target.value;applyBrand(e.target.value);markDirty()}};

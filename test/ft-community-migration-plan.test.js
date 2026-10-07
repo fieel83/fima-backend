@@ -48,6 +48,20 @@ test('other guilds and missing snapshots cannot generate an FT migration plan', 
   assert.equal(buildFtCommunityMigrationPlan({ guild: { id: 'other' } }).status, 'unavailable');
 });
 
+test('digest ignores overwrite and permission ordering but detects actual access changes', () => {
+  const input = audit();
+  input.channels[0].permissionOverwrites = [
+    { id: 'b', type: 0, allow: ['ViewChannel', 'SendMessages'], deny: ['ManageChannels', 'ManageMessages'] },
+    { id: 'a', type: 1, allow: [], deny: ['ViewChannel'] }
+  ];
+  const first = buildFtCommunityMigrationPlan(input).sourceDigest;
+  input.channels[0].permissionOverwrites.reverse();
+  for (const row of input.channels[0].permissionOverwrites) { row.allow.reverse(); row.deny.reverse(); }
+  assert.equal(buildFtCommunityMigrationPlan(input).sourceDigest, first);
+  input.channels[0].permissionOverwrites[0].deny = [];
+  assert.notEqual(buildFtCommunityMigrationPlan(input).sourceDigest, first);
+});
+
 test('private staff rules and procedures keep their purpose while old material is archived', () => {
   const input = audit();
   input.categories.push({ id: 'staff', name: 'STAFF' });

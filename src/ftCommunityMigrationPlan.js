@@ -69,7 +69,10 @@ export function buildFtCommunityMigrationPlan(audit) {
   const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name));
   const sourceDigest = createHash('sha256').update(JSON.stringify(channels.map(channel => ({
     id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId,
-    permissionOverwrites: channel.permissionOverwrites
+    permissionOverwrites: (channel.permissionOverwrites || []).map(row => ({
+      id: row.id, type: Number(row.type), allow: [...(row.allow || [])].sort(),
+      deny: [...(row.deny || [])].sort()
+    })).sort((a, b) => a.id.localeCompare(b.id))
   })).sort((a, b) => a.id.localeCompare(b.id)))).digest('hex');
   return { schemaVersion: 1, status: 'review_required', readOnly: true, productionMutationAllowed: false,
     guildId: audit.guild.id, capturedAt: audit.capturedAt, sourceDigest,
