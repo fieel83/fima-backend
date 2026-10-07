@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
 import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
 import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings } from './fimaGuildArchitecture.js';
@@ -11190,7 +11191,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (!fimaRuntimeModuleAllowed(guildConfig, 'voice')) return false;
   if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
-  const isJoinToCreate = joined?.type === ChannelType.GuildVoice
+  const isJoinToCreate = oldState.channelId !== newState.channelId && joined?.type === ChannelType.GuildVoice
     && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : ["⌁・join-to-create", "◜・oda-oluştur", "Join to Create"].includes(joined.name));
   if (isJoinToCreate) {
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
@@ -11201,10 +11202,8 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
       type: ChannelType.GuildVoice,
       parent: privateCategory?.id || joined.parentId,
       userLimit: Math.min(99, Math.max(0, Number(voiceConfig.defaultLimit) || 0)),
-      permissionOverwrites: [
-        { id: guild.roles.everyone.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect] },
-        { id: newState.member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.MoveMembers] }
-      ],
+      permissionOverwrites: temporaryVoiceOverwrites(
+        (privateCategory || joined.parent)?.permissionOverwrites?.cache?.values(), newState.member.id),
       reason: "FIMA Bot Join to Create"
     });
     await saveState(state => {
@@ -11231,7 +11230,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (oldChannel && oldChannel.id !== newState.channelId) {
     const record = (await loadState()).temporaryVoices?.[oldChannel.id];
     if (record && oldChannel.members.size === 0 && voiceConfig.autoDelete !== false) {
-      await oldChannel.delete("FIMA Bot empty temporary voice cleanup").catch(() => {});
+      await oldChannel.delete("FIMA Bot empty temporary voice cleanup");
       await saveState(state => { delete state.temporaryVoices[oldChannel.id]; return state; });
       return true;
     }
