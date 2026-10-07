@@ -11,6 +11,63 @@ const canonicalPermissions = rows => JSON.stringify((rows || []).map(row => ({
   id: row.id, type: row.type, allow: [...row.allow].sort(), deny: [...row.deny].sort()
 })).sort((a, b) => a.id.localeCompare(b.id)));
 
+const legacyCategoryIds = new Set(['1421240822866645113', '1557009769083047936',
+  '1420401498332074018', '1420401497115459667', '1420401495471558769']);
+
+export async function cleanupFtEmptyCategories({ guild, expectedDigest, saveJournal, actorUserId }) {
+  if (guild?.id !== FT_MIGRATION_GUILD_ID) throw fail('ft_community_guild_required');
+  if (typeof saveJournal !== 'function') throw fail('migration_journal_required');
+  if (running.has(guild.id)) throw fail('migration_already_running');
+  running.add(guild.id);
+  let journal;
+  const persist = () => saveJournal(structuredClone(journal));
+  try {
+    const before = await captureFtChannelInventory(guild);
+    const plan = buildFtCommunityMigrationPlan(before);
+    if (expectedDigest !== plan.sourceDigest) throw fail('migration_stale_plan');
+    if (plan.targetCategories.some(row => !row.existingId || row.decision !== 'keep')) throw fail('migration_categories_required');
+    const targets = new Set(plan.targetCategories.map(row => row.existingId));
+    const candidates = before.categories.filter(row => legacyCategoryIds.has(row.id) && !targets.has(row.id));
+    if (candidates.some(row => before.channels.some(channel => channel.parentId === row.id))) throw fail('migration_category_not_empty');
+    journal = { id: randomUUID(), guildId: guild.id, actorUserId, phase: 'empty_categories',
+      status: 'applying', startedAt: new Date().toISOString(), before, operations: [], createdCategoryIds: [] };
+    await persist();
+    for (const candidate of candidates) {
+      // Refetch all children immediately before deletion; never rely only on the audit snapshot.
+      const fresh = await guild.channels.fetch();
+      if ([...fresh.values()].some(row => row?.parentId === candidate.id)) throw fail('migration_category_not_empty');
+      const category = fresh.get(candidate.id);
+      if (!category || category.type !== 4 || category.name !== candidate.name ||
+          canonicalPermissions(overwrites(category)) !== canonicalPermissions(candidate.permissionOverwrites)) throw fail('migration_stale_plan');
+      journal.operations.push({ kind: 'delete_empty_category', id: candidate.id, name: candidate.name, status: 'pending' });
+      await persist();
+      await category.delete('FT Community: remove verified empty legacy category');
+      journal.operations.at(-1).status = 'applied';
+      await persist();
+    }
+    const after = await captureFtChannelInventory(guild);
+    for (const original of before.channels) {
+      const actual = after.channels.find(row => row.id === original.id);
+      if (!actual || actual.name !== original.name || actual.type !== original.type || actual.parentId !== original.parentId ||
+          canonicalPermissions(actual.permissionOverwrites) !== canonicalPermissions(original.permissionOverwrites)) throw fail('migration_final_verification_failed');
+    }
+    if ([...targets].some(id => !after.categories.some(row => row.id === id))) throw fail('migration_final_verification_failed');
+    journal.after = after;
+    journal.status = 'empty_categories_removed';
+    journal.completedAt = new Date().toISOString();
+    await persist();
+    return journal;
+  } catch (error) {
+    if (journal) {
+      journal.status = 'cleanup_review_required';
+      journal.error = error.code || error.message;
+      await persist().catch(() => {});
+      error.journal = journal;
+    }
+    throw error;
+  } finally { running.delete(guild.id); }
+}
+
 export async function addFtMissingChannels({ guild, expectedDigest, saveJournal, actorUserId }) {
   if (guild?.id !== FT_MIGRATION_GUILD_ID) throw fail('ft_community_guild_required');
   if (typeof saveJournal !== 'function') throw fail('migration_journal_required');

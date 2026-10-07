@@ -2218,7 +2218,7 @@ app.post("/api/fima-bot/actions/audit", requireUser, requireParadiseOwner, async
   }
 });
 
-app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-missing-channels"], requireUser, requireParadiseOwner, async (req, res) => {
+app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-missing-channels", "/api/fima-bot/actions/cleanup-empty-categories"], requireUser, requireParadiseOwner, async (req, res) => {
   if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
   const origin = String(req.get("origin") || "");
   if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
@@ -2232,9 +2232,10 @@ app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-m
       const key = `ft_channel_migration_backup_${guildId}_${Date.now()}`;
       await prisma.setting.upsert({ where: { key }, update: { value: backup }, create: { key, value: backup } });
       const journal = await migrateFtCommunityChannelsFromDashboard(guildId, expectedDigest, req.user.id,
-        req.path.endsWith('/add-missing-channels') ? 'add' : 'move');
+        req.path.endsWith('/cleanup-empty-categories') ? 'cleanup' : req.path.endsWith('/add-missing-channels') ? 'add' : 'move');
       return { status: journal.status, journalId: journal.id, backupKey: key,
         movedChannels: journal.operations.filter(row => row.kind === "move").length,
+        removedEmptyCategories: journal.operations.filter(row => row.kind === "delete_empty_category" && row.status === "applied").map(row => ({ id: row.id, name: row.name })),
         createdChannels: journal.operations.filter(row => row.kind === "create_channel" && row.status === "applied").map(row => ({ id: row.id, name: row.name })),
         renamedCategories: journal.operations.filter(row => row.kind === "rename").length,
         createdCategories: journal.createdCategoryIds.length, remaining: journal.remaining };

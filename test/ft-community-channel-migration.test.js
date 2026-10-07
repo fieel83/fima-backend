@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFtCommunityMigrationPlan, FT_MIGRATION_GUILD_ID } from '../src/ftCommunityMigrationPlan.js';
-import { captureFtChannelInventory, migrateFtChannels, addFtMissingChannels } from '../src/ftCommunityChannelMigration.js';
+import { captureFtChannelInventory, migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from '../src/ftCommunityChannelMigration.js';
 
 function fixture() {
   const channels = new Map(), writes = [], saved = [];
@@ -10,6 +10,7 @@ function fixture() {
     const channel = { id, name, type, parentId, rawPosition: sequence++, isThread: () => false,
       permissionOverwrites: { cache: new Map(), async set(rows) { setPermissions(rows); } },
       async setName(value) { writes.push(['rename', id]); channel.name = value; return channel; },
+      async delete() { writes.push(['delete', id]); channels.delete(id); },
       async setParent(value, options) {
         assert.equal(options.lockPermissions, false);
         writes.push(['move', id]);
@@ -153,4 +154,35 @@ test('simultaneous requests cannot interleave mutations in the same guild', asyn
   await barrier;
   await assert.rejects(migrateFtChannels(args), { code: 'migration_already_running' });
   release(); await active;
+});
+
+test('cleanup deletes only known empty legacy categories and preserves all channels', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const legacy = f.channels.get('legacy');
+  f.channels.delete('legacy');
+  legacy.id = '1421240822866645113';
+  legacy.delete = async () => { f.writes.push(['delete', legacy.id]); f.channels.delete(legacy.id); };
+  f.channels.set(legacy.id, legacy);
+  const before = await captureFtChannelInventory(f.guild);
+  const result = await cleanupFtEmptyCategories(await request(f));
+  assert.equal(result.status, 'empty_categories_removed');
+  assert.deepEqual(result.after.channels, before.channels);
+  assert.deepEqual(result.operations.map(row => row.id), [legacy.id]);
+  assert.deepEqual((await cleanupFtEmptyCategories(await request(f))).operations, []);
+});
+
+test('cleanup refuses populated legacy categories and journal failure before deletion', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const legacy = f.channels.get('legacy');
+  f.channels.delete('legacy');
+  legacy.id = '1421240822866645113';
+  f.channels.set(legacy.id, legacy);
+  f.channels.get('support').parentId = legacy.id;
+  f.writes.length = 0;
+  await assert.rejects(cleanupFtEmptyCategories(await request(f)), { code: 'migration_category_not_empty' });
+  f.channels.get('support').parentId = null;
+  await assert.rejects(cleanupFtEmptyCategories({ ...await request(f), saveJournal: async () => { throw new Error('database_down'); } }), /database_down/);
+  assert.deepEqual(f.writes, []);
 });

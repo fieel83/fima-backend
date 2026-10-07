@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
-import { migrateFtChannels, addFtMissingChannels } from "./ftCommunityChannelMigration.js";
+import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
 import fs from "node:fs/promises";
@@ -3546,7 +3546,7 @@ export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedD
   const guild = await getGuild(guildId);
   if (!guild) throw Object.assign(new Error("paradise_guild_unavailable"), { code: "paradise_guild_unavailable" });
   await guild.members.fetchMe();
-  const executor = phase === 'add' ? addFtMissingChannels : migrateFtChannels;
+  const executor = phase === 'cleanup' ? cleanupFtEmptyCategories : phase === 'add' ? addFtMissingChannels : migrateFtChannels;
   return executor({ guild, expectedDigest, actorUserId,
     saveJournal: async journal => {
       const key = `ft_channel_migration_${guild.id}_${journal.id}`;
