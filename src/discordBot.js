@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
+import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
 import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
@@ -2364,7 +2365,7 @@ async function createTicketChannel(guild, user, category) {
     { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
     { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory, PermissionsBitField.Flags.ManageChannels] }
   ];
-  const supportRoleId = env("DISCORD_SUPPORT_ROLE_ID");
+  const supportRoleId = env("DISCORD_FIMA_SUPPORT_ROLE_ID") || env("DISCORD_SUPPORT_ROLE_ID");
   if (supportRoleId) {
     const role = await guild.roles.fetch(supportRoleId).catch(() => null);
     if (role) overwrites.push({ id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
@@ -2447,11 +2448,10 @@ async function createFimaTicketTranscript(interaction, trigger = "manual") {
     error.code = "ticket_channel_unavailable";
     throw error;
   }
-  const fetched = await channel.messages.fetch({ limit: 100 });
-  const rows = [...fetched.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+  const rows = await collectTicketMessages(channel.messages);
   const lines = rows.map((message) => {
     const author = `${message.author?.username || "unknown"} (${maskDiscordId(message.author?.id) || "no-id"})`;
-    const text = maskTicketTranscriptText(message.content || "");
+    const text = ticketMessageText(message, maskTicketTranscriptText);
     const attachmentNote = message.attachments?.size ? ` [attachments:${message.attachments.size}]` : "";
     const componentNote = message.components?.length ? " [components]" : "";
     return `[${new Date(message.createdTimestamp).toISOString()}] ${author}: ${text || "(no text)"}${attachmentNote}${componentNote}`;
@@ -2465,7 +2465,12 @@ async function createFimaTicketTranscript(interaction, trigger = "manual") {
     `Messages: ${rows.length}`,
     "",
     ...lines
-  ].join("\n").slice(0, 900000);
+  ].join("\n");
+  if (Buffer.byteLength(body, "utf8") > 7_500_000) {
+    const error = new Error("transcript_too_large");
+    error.code = "transcript_too_large";
+    throw error;
+  }
   const attachment = new AttachmentBuilder(Buffer.from(body, "utf8"), {
     name: `ticket-${String(channel.id).slice(-8)}-${Date.now()}.txt`
   });
@@ -2541,13 +2546,13 @@ async function handleTicketButton(interaction) {
     return interaction.reply({ content: `Claimed by ${interaction.user}.`, ephemeral: false });
   }
   if (action === "close") {
+    await interaction.deferReply({ ephemeral: true });
     let transcript;
     try {
       transcript = await createFimaTicketTranscript(interaction, "close");
     } catch (error) {
-      return interaction.reply({
+      return interaction.editReply({
         content: `Transcript could not be saved, so the ticket was not closed. Reason: ${sanitizeDiscordText(error?.code || error?.message || "unknown", 120)}`,
-        ephemeral: true
       });
     }
     await setClosedTicketParticipantAccess(interaction, true);
@@ -2560,7 +2565,7 @@ async function handleTicketButton(interaction) {
     await fimaAiSupportBridge?.closed({ channelId: interaction.channelId, guildId: interaction.guildId, eventId: interaction.id }).catch(() => {
       console.warn("FIMA support shadow queue unavailable; closure candidate not accepted");
     });
-    return interaction.reply({ content: `Ticket closed. Transcript saved (${transcript.messageCount} messages).`, ephemeral: false });
+    return interaction.editReply({ content: `Ticket closed. Transcript saved (${transcript.messageCount} messages).` });
   }
   if (action === "reopen") {
     await setClosedTicketParticipantAccess(interaction, false);
@@ -2576,11 +2581,12 @@ async function handleTicketButton(interaction) {
     return interaction.reply({ content: "Automatic senior staff escalation is not configured. Ask a staff member in this ticket; no escalation was sent.", ephemeral: true });
   }
   if (action === "transcript") {
+    await interaction.deferReply({ ephemeral: true });
     try {
       const transcript = await createFimaTicketTranscript(interaction, "manual");
-      return interaction.reply({ content: `Transcript saved (${transcript.messageCount} messages).`, ephemeral: true });
+      return interaction.editReply({ content: `Transcript saved (${transcript.messageCount} messages).` });
     } catch (error) {
-      return interaction.reply({ content: `Transcript failed: ${sanitizeDiscordText(error?.code || error?.message || "unknown", 120)}`, ephemeral: true });
+      return interaction.editReply({ content: `Transcript failed: ${sanitizeDiscordText(error?.code || error?.message || "unknown", 120)}` });
     }
   }
   return interaction.reply({ content: "Ticket action saved.", ephemeral: true });
