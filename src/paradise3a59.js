@@ -3623,7 +3623,8 @@ export async function applyParadiseTemplateMissingOnly(guild, mode, options = {}
 
 async function applyParadiseTemplateMissingOnlyUnlocked(guild, mode, {
   repairPermissions = true,
-  mutationPolicy = PARADISE_TEST_REBUILD_POLICY
+  mutationPolicy = PARADISE_TEST_REBUILD_POLICY,
+  allowExtras = false
 } = {}) {
   assertParadiseMutationPolicy(guild, mode, null, mutationPolicy, { confirmationRequired: false });
   const selected = PARADISE_SETUP_SCHEMAS[mode];
@@ -3735,7 +3736,7 @@ async function applyParadiseTemplateMissingOnlyUnlocked(guild, mode, {
   await configureParadiseAfkChannel(guild, voiceIds);
   await guild.channels.fetch?.();
   await guild.roles.fetch?.();
-  const structureVerification = verifyParadiseTemplateStructure(guild, selected);
+  const structureVerification = verifyParadiseTemplateStructure(guild, selected, { allowExtras });
   const liveReady = structureVerification.ready && guideResult.ready && staffResult.ready;
 
   const createdChannels = [...guild.channels.cache.keys()].filter(id => !beforeChannelIds.has(id)).length;
@@ -4852,6 +4853,266 @@ export async function rebuildFimaCommunityProduction(guild, mode, confirmation, 
   );
 }
 
+function ftCommunityMigrationKey(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, " ")
+    .trim();
+}
+
+const FT_COMMUNITY_CATEGORY_ALIASES = Object.freeze({
+  START: ["start", "baslangic", "welcome"],
+  COMMUNITY: ["community", "topluluk"],
+  "FIEEL STYLE": ["fieel style", "outfits", "style"],
+  TURKISH: ["turkish", "turkce", "turkish community"],
+  SUPPORT: ["support", "destek"],
+  PERSONNEL: ["personnel", "staff", "personel"],
+  "VIDEO TEAM": ["video team"],
+  VOICE: ["voice", "sesler"]
+});
+
+const FT_COMMUNITY_CHANNEL_ALIASES = Object.freeze({
+  "start-here": ["start", "baslangic", "welcome", "start here"],
+  rules: ["rules", "kurallar"],
+  announcements: ["announcements", "duyurular"],
+  roles: ["roles", "reaction roles", "roller", "rol secimi"],
+  "fieel-info": ["fieel info", "info"],
+  "joins-leaves": ["joins leaves", "welcome", "hos geldin", "member log", "giris cikis"],
+  general: ["general", "genel", "sohbet"],
+  media: ["media", "medya"],
+  events: ["events", "etkinlikler"],
+  levels: ["levels", "seviyeler"],
+  "fake-headless": ["fake headless"],
+  outfits: ["outfits"],
+  capes: ["capes"],
+  "turkce-sohbet": ["turkce sohbet"],
+  "turkce-medya": ["turkce medya"],
+  "turkce-duyurular": ["turkce duyurular"],
+  support: ["support", "destek"],
+  applications: ["applications", "basvurular"],
+  "Create Room": ["join to create", "oda olustur", "create room"],
+  "Community Lounge": ["community voice", "topluluk sesi", "community lounge"],
+  "Focus Room": ["focus room"]
+});
+
+async function migrateFtCommunityAliasesInPlace(guild, selected, mutationPolicy) {
+  const renamed = { categories: [], channels: [], roles: [] };
+  const renameUnique = async ({ desired, aliases, resources, predicate, bucket }) => {
+    const exact = resources.filter(item => predicate(item) && item.name === desired);
+    if (exact.length) return;
+    const aliasKeys = new Set((aliases || []).map(ftCommunityMigrationKey));
+    const matches = resources.filter(item => predicate(item)
+      && aliasKeys.has(ftCommunityMigrationKey(item.name)));
+    if (matches.length !== 1) return;
+    const resource = matches[0];
+    const previousName = resource.name;
+    await resource.edit({ name: desired, reason: `${mutationPolicy.auditReason} ID-preserving migration` });
+    renamed[bucket].push({ id: resource.id, from: previousName, to: desired });
+  };
+
+  const channelResources = [...guild.channels.cache.values()].filter(channel => !channel.isThread?.());
+  for (const [desired, aliases] of Object.entries(FT_COMMUNITY_CATEGORY_ALIASES)) {
+    await renameUnique({
+      desired,
+      aliases,
+      resources: channelResources,
+      predicate: item => item.type === ChannelType.GuildCategory,
+      bucket: "categories"
+    });
+  }
+  for (const [, channelNames] of selected.schema) {
+    for (const desired of channelNames) {
+      const aliases = FT_COMMUNITY_CHANNEL_ALIASES[desired];
+      if (!aliases) continue;
+      const expectedTypes = new Set([ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice]);
+      await renameUnique({
+        desired,
+        aliases,
+        resources: channelResources,
+        predicate: item => expectedTypes.has(item.type),
+        bucket: "channels"
+      });
+    }
+  }
+  const roleResources = [...guild.roles.cache.values()].filter(role => role.id !== guild.id && !role.managed);
+  for (const [desired, aliases] of Object.entries({ Administrator: ["admin"], Moderator: ["mod"] })) {
+    await renameUnique({ desired, aliases, resources: roleResources, predicate: () => true, bucket: "roles" });
+  }
+  return renamed;
+}
+
+/**
+ * Applies the production FT Community design without deleting Discord objects.
+ * Existing channels and roles are renamed in place where a unique legacy alias
+ * is found, preserving IDs, messages, memberships and external integrations.
+ */
+export async function applyFimaCommunityProductionIdPreserving(guild, mode, confirmation, {
+  expectedBackupDigest,
+  executionProof,
+  planId,
+  executionProofSecret,
+  testGuildRehearsalEvidenceSecret
+} = {}) {
+  const policy = Object.freeze({
+    ...FIMA_COMMUNITY_PRODUCTION_REBUILD_POLICY,
+    expectedBackupDigest: String(expectedBackupDigest || "").trim().toLowerCase(),
+    executionProof,
+    planId: String(planId || "").trim(),
+    executionProofSecret,
+    testGuildRehearsalEvidenceSecret,
+    operationLabel: "id_preserving_production_ft_community_migration"
+  });
+  const { selected } = assertParadiseMutationPolicy(guild, mode, confirmation, policy);
+  const encoding = inspectParadiseCanonicalTextEncoding(mode);
+  if (!encoding.ready) throw Object.assign(new Error(encoding.code), { code: encoding.code });
+  assertParadiseProductionExecutionCapability(guild, mode, policy);
+  const inheritedLease = paradiseCurrentMutationLease();
+  await requireParadiseRebuildPreflight(guild,
+    inheritedLease?.guildId === String(guild?.id || "") ? inheritedLease.correlationId : null,
+    policy);
+
+  return withParadiseGuildMutationLock(guild, "id_preserving_migration", async () => {
+    const ownedLease = paradiseCurrentMutationLease();
+    await requireParadiseRebuildPreflight(guild, ownedLease?.correlationId || null, policy);
+    await assertNoUnresolvedParadiseRollback(guild.id);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const state = await loadState();
+    const snapshot = await captureParadiseGuildBackupSnapshot(guild, { state });
+    const backup = createParadiseBackupEnvelope(snapshot);
+    const backupValidation = validateParadiseBackupEnvelope(backup);
+    if (!backupValidation.valid) throw Object.assign(new Error("backup_envelope_validation_failed"), { code: "backup_envelope_validation_failed" });
+    if (paradiseBackupStateDigest(backup).toLowerCase() !== policy.expectedBackupDigest) {
+      throw Object.assign(new Error("production_preflight_backup_digest_mismatch"), { code: "production_preflight_backup_digest_mismatch" });
+    }
+    const restoreDryRun = buildParadiseRestoreDryRun({
+      backup,
+      currentSnapshot: snapshot,
+      expectedGuildId: guild.id,
+      allowedGuildId: policy.allowedGuildId
+    });
+    if (!restoreDryRun.canRestore) throw Object.assign(new Error("backup_restore_dry_run_failed"), { code: "backup_restore_dry_run_failed" });
+
+    const timestampedBackupPath = await writeArtifact(`${policy.artifactPrefix}-backup-${mode}-${stamp}.json`, backup);
+    const canonicalBackupPath = await writeArtifact(`${policy.artifactPrefix}-pre-rebuild-backup.json`, backup);
+    await writeArtifact(`${policy.restoreArtifactPrefix}-restore-dry-run.json`, restoreDryRun);
+    const [diskBackup, canonicalDiskBackup] = await Promise.all([
+      fs.readFile(timestampedBackupPath, "utf8").then(JSON.parse),
+      fs.readFile(canonicalBackupPath, "utf8").then(JSON.parse)
+    ]);
+    const copies = validateParadiseBackupArtifactCopies({
+      timestampedBackup: diskBackup,
+      canonicalBackup: canonicalDiskBackup,
+      expectedBackup: backup,
+      expectedGuildId: guild.id
+    });
+    if (!copies.valid) throw Object.assign(new Error("persisted_backup_validation_failed"), { code: "persisted_backup_validation_failed" });
+
+    const lease = await paradisePersistentMutationLockStatus(guild.id).catch(() => null);
+    let marker = await armParadiseRollbackMarker({
+      guildId: guild.id,
+      backupArtifact: timestampedBackupPath,
+      backupDigest: diskBackup.integrity.digest,
+      mode: `production_ft_community_id_preserving:${mode}`,
+      confirmation: paradiseProductionRestoreConfirmation(diskBackup),
+      correlationId: lease?.correlationId || crypto.randomUUID()
+    });
+    try {
+      marker = await updateParadiseRollbackMarker(guild.id, marker.markerId, { status: "rebuild_in_progress" });
+      const renamed = await migrateFtCommunityAliasesInPlace(guild, selected, policy);
+      const installed = await applyParadiseTemplateMissingOnlyUnlocked(guild, mode, {
+        repairPermissions: true,
+        mutationPolicy: policy,
+        allowExtras: true
+      });
+      if (installed.status !== "LIVE DISCORD VERIFIED") {
+        throw Object.assign(new Error("production_migration_installation_not_verified"), {
+          code: "production_migration_installation_not_verified",
+          installed
+        });
+      }
+      await guild.channels.fetch?.();
+      await guild.roles.fetch?.();
+      const structureVerification = verifyParadiseTemplateStructure(guild, selected, { allowExtras: true });
+      if (!structureVerification.ready) {
+        throw Object.assign(new Error("production_migration_structure_not_verified"), {
+          code: "production_migration_structure_not_verified",
+          structureVerification
+        });
+      }
+      const postState = await loadState();
+      const postSnapshot = await captureParadiseGuildBackupSnapshot(guild, { state: postState });
+      const postBackup = createParadiseBackupEnvelope(postSnapshot);
+      const reconciliation = buildParadiseRestoreDryRun({
+        backup: postBackup,
+        currentSnapshot: postSnapshot,
+        expectedGuildId: guild.id,
+        allowedGuildId: policy.allowedGuildId
+      });
+      if (!reconciliation.canRestore || reconciliation.mutationsPlanned !== 0) {
+        throw Object.assign(new Error("post_rebuild_reconciliation_failed"), { code: "post_rebuild_reconciliation_failed", reconciliation });
+      }
+      const postPath = await writeArtifact(`${policy.artifactPrefix}-post-rebuild-${mode}-${stamp}.json`, postBackup);
+      const reconciliationEvidence = {
+        ...reconciliation,
+        verifiedAt: new Date().toISOString(),
+        backupArtifact: postPath,
+        source: "fresh_post_id_preserving_migration_snapshot"
+      };
+      const reconciliationPath = await writeArtifact(`${policy.artifactPrefix}-reconciliation-${mode}-${stamp}.json`, reconciliationEvidence);
+      marker = await updateParadiseRollbackMarker(guild.id, marker.markerId, {
+        status: "rollback_required",
+        pendingFinalization: true,
+        phase: "orchestrator_verification_pending",
+        reconciliation: { ...reconciliationEvidence, artifact: reconciliationPath }
+      });
+      const guideReadiness = installed.guideReadback;
+      const staffTeam = { ...installed.staffReadback, verified: installed.staffReadback?.ready === true };
+      const communityLiveEvidence = {
+        ready: structureVerification.ready
+          && guideReadiness?.ready === true
+          && staffTeam.verified
+          && installed.roleIcons?.status === "verified"
+          && installed.roleIcons?.readiness?.ready === true
+          && installed.autoMod?.status === "configured"
+          && Array.isArray(installed.autoMod?.errors)
+          && installed.autoMod.errors.length === 0,
+        source: "fresh_id_preserving_migration_readback"
+      };
+      return {
+        ...installed,
+        status: communityLiveEvidence.ready ? "LIVE DISCORD VERIFIED" : "LIVE DISCORD FAILED",
+        migration: { idPreserving: true, deletedChannels: 0, deletedRoles: 0, renamed },
+        structureVerification,
+        reconciliation,
+        guideReadiness,
+        staffTeam,
+        communityLiveEvidence,
+        rollback: {
+          required: true,
+          markerId: marker.markerId,
+          markerStatus: marker.status,
+          pendingFinalization: marker.pendingFinalization === true
+        }
+      };
+    } catch (error) {
+      marker = await updateParadiseRollbackMarker(guild.id, marker.markerId, {
+        status: "rollback_required",
+        pendingFinalization: true,
+        failure: sanitizeParadiseMutationFailure(error, "production_id_preserving_migration_failed")
+      }).catch(() => marker);
+      error.rollbackMarker = marker;
+      throw error;
+    }
+  }, {
+    purposeKey: "discord_id_preserving_production_migration",
+    idempotencyKey: `${guild?.id}:${mode}:${policy.planId}:id-preserving`,
+    phase: "request_validated",
+    expectedGuildId: policy.allowedGuildId
+  });
+}
+
 function assertParadiseProductionExecutionCapability(guild, mode, policy) {
   if (!policy?.isProduction) return;
   const verification = verifyParadiseProductionRebuildExecutionProof(policy.executionProof, {
@@ -5080,6 +5341,7 @@ export async function cleanupParadiseDesiredChannelDuplicates(guild, selected, {
 }
 
 export function verifyParadiseTemplateStructure(guild, selected, roleIconOptions = {}) {
+  const allowExtras = roleIconOptions?.allowExtras === true;
   const missingDesiredRoles = [];
   const duplicateDesiredRoles = [];
   const rolePermissionMismatches = [];
@@ -5257,9 +5519,10 @@ export function verifyParadiseTemplateStructure(guild, selected, roleIconOptions
       && duplicateDesiredChannels.length === 0
       && categoryPermissionMismatches.length === 0
       && channelPermissionMismatches.length === 0
-      && extraChannels.length === 0
-      && extraRoles.length === 0
+      && (allowExtras || extraChannels.length === 0)
+      && (allowExtras || extraRoles.length === 0)
       && (!roleIconReadiness || roleIconReadiness.ready),
+    allowExtras,
     missingDesiredRoles,
     duplicateDesiredRoles,
     rolePermissionMismatches,

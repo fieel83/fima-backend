@@ -11,7 +11,7 @@ import {
   inspectParadiseCanonicalTextEncoding,
   inspectFimaCommunityProductionRebuildPreflight,
   recoverFimaCommunityProductionRollback,
-  rebuildFimaCommunityProduction
+  applyFimaCommunityProductionIdPreserving
 } from "./paradise3a59.js";
 import {
   applyFtCommunityProfileSync,
@@ -45,7 +45,7 @@ const DEFAULT_DEPENDENCIES = Object.freeze({
   consumePlan: consumeParadiseProductionRebuildPlan,
   finishPlan: finishParadiseProductionRebuildPlan,
   createFinalizationReceipt: createParadiseProductionFinalizationReceipt,
-  rebuild: rebuildFimaCommunityProduction,
+  rebuild: applyFimaCommunityProductionIdPreserving,
   recoverRollback: recoverFimaCommunityProductionRollback,
   finalizeRollback: finalizeFimaCommunityProductionRollback,
   inspectCommunityProfile: inspectFtCommunityProfileSync,
@@ -315,11 +315,6 @@ export async function runFtCommunityProductionOrchestrator({
 
   try {
     phase = "deployment_readiness";
-    // Stop before creating/consuming a plan or attempting rollback. The legacy
-    // production rebuild cannot satisfy the ID-preserving migration contract.
-    if (deps.rebuild === rebuildFimaCommunityProduction) {
-      throw failure("production_destructive_rebuild_disabled");
-    }
     const deploymentReadiness = deps.inspectDeploymentReadiness(env);
     if (deploymentReadiness?.ready !== true) {
       throw failure("ft_community_deployment_not_ready");
