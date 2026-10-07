@@ -39,6 +39,24 @@
   if (language !== 'tr') return;
   const copy = {
     'Dashboard': 'Hesap paneli',
+    'FIMA ACCOUNT': 'FIMA HESABI',
+    'Manage your recovery options and community preferences.': 'Hesap kurtarma seçeneklerini ve topluluk tercihlerini yönet.',
+    'View your licenses, status and download actions without exposing full keys.': 'Lisanslarını, erişim durumunu ve indirme seçeneklerini görüntüle.',
+    'Buy another license': 'Yeni lisans al',
+    'Products': 'Ürünler',
+    'Billing': 'Ödemeler',
+    'My Products': 'Ürünlerim',
+    'Downloads': 'İndirmeler',
+    'Get Fima Macro': 'FIMA Macro indir',
+    'Download the latest FIMA Macro installer or portable ZIP.': 'Güncel FIMA Macro kurulum dosyasını veya taşınabilir ZIP paketini indir.',
+    'Download installer': 'Kurulum dosyasını indir',
+    'Download ZIP': 'ZIP indir',
+    'Support': 'Destek',
+    'Need help?': 'Yardıma mı ihtiyacın var?',
+    'Open a ticket for license, payment, HWID, account, or app problems. Do not share full keys publicly.': 'Lisans, ödeme, cihaz, hesap veya uygulama sorunları için destek talebi aç. Lisans anahtarını herkese açık paylaşma.',
+    'Open support': 'Destek talebi aç',
+    'Security and trust': 'Güvenlik ve güven',
+    'FIMA is the secure account, product and support hub for FIMA Macro, FIMA AI and FIMA Bot.': 'FIMA Macro, FIMA AI ve FIMA Bot için hesap, ürün ve destek merkezi.',
     'Kullanici adi': 'Kullanıcı adı',
     'Manage your profile, recovery, linked accounts and community reward eligibility from this overview.': 'Profilini, bağlı hesaplarını ve hesap güvenliğini buradan yönet.',
     'Security / Settings': 'Güvenlik / Ayarlar',
@@ -53,7 +71,7 @@
     'Loading...': 'Yükleniyor…'
   };
   const translate = () => {
-    const walker = document.createTreeWalker(document.querySelector('.account-shell'), NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
       if (node.parentElement.closest('script,style,input,textarea,code,[data-profile-avatar]')) continue;
