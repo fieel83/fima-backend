@@ -18,7 +18,12 @@ export function fimaOwnerToolsFragment(options) {
         : ` class="${component}"${attributes}`) + '>';
     })
     .replace(/<label for="(testRebuildConfirmation|testSmokeConfirmation|testRehearsalConfirmation|testRecoveryConfirmation)">([\s\S]*?<\/button>)/g,
-      '<div class="owner-operation"><label for="$1">$2</div>');
+      '<div class="owner-operation"><label for="$1">$2</div>')
+    .replace(/(<label for="[^"]+">(?:(?!<label)[\s\S])*?<\/label>)\s*(<input\b[^>]*>|<select\b[^>]*>[\s\S]*?<\/select>|<textarea\b[^>]*>[\s\S]*?<\/textarea>)/g,
+      '<div class="config-field">$1$2</div>')
+    .replace(/<label>(?=(?:(?!<\/label>)[\s\S])*?<(?:input|select|textarea)\b)/g, '<label class="config-field">')
+    .replace(/(?:<button\b(?![^>]*template-card)[^>]*>(?:(?!<\/button>)[\s\S])*?<\/button>\s*){2,}/g,
+      '<div class="editor-buttons owner-action-group">$&</div>');
   return `<style>@scope (.owner-tools) {
     :scope {--brand:var(--teal);--brand-soft:rgba(32,223,191,.12);--good:var(--teal);--bad:var(--danger);--warn:#ffd171;color:var(--ink);min-width:0;scroll-margin-top:100px}
     [hidden] {display:none!important}
@@ -38,11 +43,24 @@ export function fimaOwnerToolsFragment(options) {
     input:not([type=checkbox]):not([type=color]),select,textarea {display:block;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:11px;color:var(--ink);background:rgba(3,12,15,.76);font:inherit;font-size:.8rem}
     textarea {min-height:120px;resize:vertical;line-height:1.55}
     input:focus-visible,textarea:focus-visible {outline:3px solid rgba(86,217,255,.25);outline-offset:2px}
-    button {max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+    button {min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+    .config-field {display:grid;align-content:start;gap:8px;min-width:0}
+    .config-field input,.config-field select,.config-field textarea,.config-field .fima-select {margin-top:0}
+    .owner-action-group {display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-width:0}
+    .owner-action-group button {flex:0 1 auto}
     .panel>button,.grid>div>button {justify-self:start}
     .grid,.community-preview-grid,.community-detail-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
     .grid.three {grid-template-columns:repeat(3,minmax(0,1fr))}
-    .grid>div,.owner-operation {display:grid;align-content:start;gap:12px;min-width:0}
+    .grid>div,.owner-operation,.community-preview-grid>div,.community-detail-grid>div {display:grid;align-content:start;gap:12px;min-width:0}
+    .grid>.config-field {gap:8px}
+    .community-builder {display:grid;gap:20px;min-width:0;padding-top:24px;border-top:1px solid var(--line)}
+    .community-detail-grid {grid-template-columns:repeat(3,minmax(0,1fr))}
+    .community-device {max-height:420px;overflow:auto}
+    .community-detail-grid pre {max-height:330px;overflow:auto}
+    .community-tree {display:grid;gap:12px}
+    .community-category b {display:block;margin-bottom:8px}
+    .community-safety {display:flex;flex-wrap:wrap;gap:8px}
+    .community-safety span {padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.7rem}
     .owner-operation {padding:18px;border:1px solid var(--line);border-radius:15px;background:rgba(3,12,15,.42)}
     .owner-operation button {justify-self:start}
     .operation-actions,.workspace-page-actions,.theme-pills,.guide-actions,.access-actions {display:flex;flex-wrap:wrap;align-items:center;gap:12px}
@@ -93,7 +111,8 @@ export function fimaOwnerToolsFragment(options) {
     @media(max-width:900px) {.grid.three,.community-detail-grid {grid-template-columns:repeat(2,minmax(0,1fr))}.fima-profile-head {flex-wrap:wrap}}
     @media(max-width:540px) {
       .template-cards,.grid,.grid.three,.community-preview-grid,.community-detail-grid,.fima-profile-actions {grid-template-columns:minmax(0,1fr)}
-      .operation-actions,.theme-pills,.guide-actions,.workspace-page-actions {display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch}
+      .operation-actions,.theme-pills,.guide-actions,.workspace-page-actions,.owner-action-group {display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;width:100%}
+      .owner-action-group button,.operation-actions button {width:100%}
       .panel>button,.grid>div>button,.owner-operation button {justify-self:stretch;width:100%}
       .owner-operation {padding:14px}.release-chain {padding-left:20px}
     }

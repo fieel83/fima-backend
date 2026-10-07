@@ -1,6 +1,8 @@
 // Keep the native select as the form's source of truth; render an accessible,
 // searchable control above it so long channel lists never open an OS menu.
+const controlSync = new WeakMap();
 export function enhanceFimaControls(root = document) {
+  for (const select of root.querySelectorAll('select[data-fima-select]')) controlSync.get(select)?.();
   for (const select of root.querySelectorAll('select:not([data-fima-select])')) {
     select.dataset.fimaSelect = 'true';
     const wrapper = document.createElement('div');
@@ -106,6 +108,7 @@ export function enhanceFimaControls(root = document) {
     select.addEventListener('invalid', event => { event.preventDefault(); trigger.focus(); wrapper.classList.add('is-invalid'); });
     select.addEventListener('input', () => wrapper.classList.remove('is-invalid'));
     new MutationObserver(sync).observe(select, { attributes: true, childList: true, subtree: true });
+    controlSync.set(select, sync);
     sync();
   }
 }
