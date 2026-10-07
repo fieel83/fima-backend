@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const readSource = (relativePath) => readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 const currentAppCacheKey = "20261004-ft-1";
-const currentAccountCacheKey = "20261004-ft-1";
+const currentAccountCacheKey = "20261007-dashboard-routing";
 
 const publicHtmlSources = async () => {
   const root = new URL("../public/", import.meta.url);
