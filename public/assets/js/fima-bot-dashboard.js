@@ -1,4 +1,4 @@
-import { OWNER_ROUTES, ownerPage, renderOwnerTools, disposeOwnerTools } from "./fima-owner-integration.js?v=20261007-1";
+import { OWNER_ROUTES, ownerPage, renderOwnerTools, disposeOwnerTools } from "./fima-owner-integration.js?v=20261007-2";
 import { renderFimaOperations } from './fima-guild-operations.js?v=20261006-1';
 import { observeFimaControls } from './fima-controls.js?v=20261006-1';
 const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");

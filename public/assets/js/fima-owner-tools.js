@@ -391,9 +391,9 @@ function applyUiLanguage(language){
 }
 function show(message,ok=true){message=String(message);if(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(message))message='The operation could not be completed. Refresh your session and try again.';const el=byId('toast');el.className='toast '+(ok?'ok':'error');el.dataset.enText=message;el.textContent=tUi(message);setTimeout(()=>el.className='toast',4500)}
 function hexToRgb(value){const match=/^#([0-9a-f]{6})$/i.exec(value);if(!match)return'139,92,246';const n=parseInt(match[1],16);return[(n>>16)&255,(n>>8)&255,n&255].join(',')}
-function applyBrand(value){document.documentElement.style.setProperty('--brand',value);document.documentElement.style.setProperty('--brand-rgb',hexToRgb(value));document.documentElement.style.setProperty('--brand-soft','rgba('+hexToRgb(value)+',.18)')}
+function applyBrand(value){byId('brandPreview').style.setProperty('--brand',value);byId('brandPreview').style.setProperty('--brand-rgb',hexToRgb(value));byId('brandPreview').style.setProperty('--brand-soft','rgba('+hexToRgb(value)+',.18)')}
 const THEMES={paradise:{bg:'#050b0d',panel:'#0d1719',line:'#224146',accent:'#19D3C5'},charcoal:{bg:'#0b1011',panel:'#151d1f',line:'#354548',accent:'#7FD9D2'},midnight:{bg:'#051016',panel:'#0b1b24',line:'#1d4654',accent:'#35C8E0'}};
-function applyTheme(name,accent){const theme=THEMES[name]||THEMES.paradise;currentTheme=name;for(const [key,value] of Object.entries(theme)){if(key!=='accent')document.documentElement.style.setProperty('--'+key,value)}applyBrand(accent||theme.accent);document.querySelectorAll('[data-theme]').forEach(button=>button.classList.toggle('is-active',button.dataset.theme===name))}
+function applyTheme(name,accent){const theme=THEMES[name]||THEMES.paradise;currentTheme=name;for(const [key,value] of Object.entries(theme)){if(key!=='accent')byId('brandPreview').style.setProperty('--'+key,value)}applyBrand(accent||theme.accent);document.querySelectorAll('[data-theme]').forEach(button=>button.classList.toggle('is-active',button.dataset.theme===name))}
 function setLoading(active){byId('loadingState').hidden=!active}
 function markDirty(){onDirty(true);byId('saveState').textContent=byId('uiLanguage')?.value==='tr'?'Kaydedilmemiş değişiklikler':'Unsaved changes';byId('saveState').className='dirty';byId('saveState').style.color='var(--warn)'}
 async function csrfToken(force=false){

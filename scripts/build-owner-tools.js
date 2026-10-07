@@ -5,6 +5,7 @@ import { paradiseDashboardHtml } from '../src/paradiseDashboardHtml.js';
 const html = paradiseDashboardHtml({});
 let script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 script = script.replace(/const API_BASE=.*?;\n/, 'const API_BASE=apiBase;\n')
+  .replaceAll('document.documentElement.style.setProperty', "byId('brandPreview').style.setProperty")
   .replace(/const SITE_BASE=.*?;\n/, 'const SITE_BASE=globalThis.location.origin;\n')
   .replace('reload:load,markDirty,showPage}', 'reload:load,markDirty,showPage,setLanguage:applyUiLanguage}')
   .replace('function markDirty(){', 'function markDirty(){onDirty(true);')
