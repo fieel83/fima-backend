@@ -23,9 +23,30 @@ export function fimaOwnerToolsFragment(options) {
     .metric::before {display:none}
     .metric:hover {border-color:var(--teal)!important}
     input,select,textarea {background:var(--panel-strong)!important;border-color:var(--line)!important;color:var(--ink)!important}
-    button,.button,.btn-primary {background:var(--teal)!important;color:#06221c!important;box-shadow:none!important}
-    button.secondary,.button.secondary,.btn-secondary {background:var(--panel-strong)!important;border-color:var(--line)!important;color:var(--ink)!important;box-shadow:none!important}
-    button.ghost {background:transparent!important;color:var(--muted)!important}
+    /* Override the legacy workspace's important typography and interaction rules. */
+    :scope button,:scope .button {
+      min-height:42px!important;padding:9px 14px!important;border:1px solid rgba(32,223,191,.58)!important;border-radius:10px!important;
+      font:inherit!important;font-size:.68rem!important;font-weight:900!important;line-height:1.3!important;letter-spacing:normal!important;text-transform:none!important;
+      background:linear-gradient(135deg,var(--teal),var(--cyan))!important;color:#061314!important;box-shadow:none!important;filter:none!important;
+      transition:transform .18s,border-color .18s,background .18s!important;
+    }
+    :scope button:hover,:scope .button:hover {background:linear-gradient(135deg,#63eed6,#8ae7ff)!important;transform:translateY(-1px)!important;box-shadow:none!important;filter:none!important}
+    :scope button.secondary,:scope .button.secondary,:scope .btn-secondary {background:rgba(255,255,255,.025)!important;border-color:var(--line-strong)!important;color:#b9cdcf!important}
+    :scope button.secondary:hover,:scope .button.secondary:hover,:scope .btn-secondary:hover {background:rgba(32,223,191,.08)!important;border-color:rgba(32,223,191,.48)!important}
+    :scope button.ghost {background:transparent!important;border-color:transparent!important;color:var(--muted)!important}
+    :scope button.ghost:hover {background:rgba(32,223,191,.08)!important;color:var(--ink)!important}
+    :scope button:is(.danger-action,.danger-button) {background:rgba(255,130,149,.08)!important;border-color:rgba(255,130,149,.32)!important;color:var(--danger)!important}
+    :scope button:is(.danger-action,.danger-button):hover {background:rgba(255,130,149,.16)!important;border-color:var(--danger)!important}
+    :scope button:disabled,:scope .button[aria-disabled="true"] {opacity:.42!important;cursor:not-allowed!important;transform:none!important}
+    :scope button:focus-visible,:scope .button:focus-visible {outline:2px solid var(--cyan)!important;outline-offset:3px!important;box-shadow:none!important}
+    :scope button.template-card {background:var(--panel-strong)!important;color:var(--ink)!important;border-color:var(--line)!important;font-size:.8rem!important;font-weight:700!important;text-align:left!important}
+    :scope button.template-card:hover {border-color:var(--line-strong)!important}
+    :scope button.template-card.is-active {background:var(--brand-soft)!important;border-color:var(--teal)!important}
+    :scope .fima-select-trigger {background:#0a1b23!important;border-color:var(--line-strong)!important;color:var(--ink)!important;font-size:.8rem!important;font-weight:600!important;min-height:46px!important;border-radius:12px!important}
+    :scope .fima-select-trigger:hover {background:#102934!important;border-color:var(--cyan)!important;transform:none!important}
+    :scope .fima-select-option {background:transparent!important;color:var(--ink)!important;font-size:.8rem!important;font-weight:500!important;text-align:left!important;border:0!important;border-radius:8px!important}
+    :scope .fima-select-option:hover {background:rgba(32,223,191,.08)!important;transform:none!important}
+    @media(prefers-reduced-motion:reduce) { :scope button,:scope .button {transition:none!important} }
     button.template-card {background:var(--panel-strong)!important;color:var(--ink)!important;border-color:var(--line)!important}
     button.template-card.is-active {background:var(--brand-soft)!important;border-color:var(--teal)!important}
     button.template-card span {color:var(--muted)!important}
