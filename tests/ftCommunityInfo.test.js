@@ -32,7 +32,15 @@ test('publication edits the original webhook after backing it up and verifies th
   const old = { id: '100', webhookId: 'webhook', content: 'original link', embeds: [embed] };
   let payload;
   const webhook = { token: 'test', editMessage: async (id, next) => { events.push('edit'); assert.equal(id, old.id); payload = next; return { id }; } };
-  const channel = { id: 'channel', name: '⌁・fieel-info', guild: { id: '1419335632324657306' }, messages: { fetch: async argument => typeof argument === 'string' ? { id: argument, embeds: payload.embeds } : new Map([['100', old]]) }, fetchWebhooks: async () => new Map([['webhook', webhook]]), send: async () => assert.fail('must edit original') };
+  const channel = { id: 'channel', name: '⌁・fieel-info', guild: { id: '1419335632324657306' }, messages: { fetch: async argument => {
+    if (argument.message) {
+      assert.equal(argument.message, old.id);
+      assert.equal(argument.force, true, 'readback must bypass the stale pre-edit cache');
+      return { id: argument.message, embeds: payload.embeds };
+    }
+    if (typeof argument === 'string') return old;
+    return new Map([['100', old]]);
+  } }, fetchWebhooks: async () => new Map([['webhook', webhook]]), send: async () => assert.fail('must edit original') };
   const writes = [];
   const settings = { findUnique: async () => null, upsert: async args => { events.push('save'); writes.push(args.update.value); } };
   const result = await publishCommunityInfo(channel, 'bot', channels, settings);
@@ -47,7 +55,7 @@ test('blocked historical profile does not prevent FAQ publication', async () => 
   const old = { id: '100', webhookId: 'missing', embeds: [{ title: 'About Fieel' }] };
   const profile = { id: 'profile', name: '⌁・fieel-info', guild, messages: { fetch: async () => new Map([['100', old]]) }, fetchWebhooks: async () => new Map(), send: async () => assert.fail('must not duplicate profile') };
   let published;
-  const faq = { id: 'faq', name: '⌁・faq', guild, messages: { fetch: async argument => typeof argument === 'string' ? { id: argument, embeds: published.embeds } : new Map() }, send: async payload => { published = payload; return { id: '200' }; } };
+  const faq = { id: 'faq', name: '⌁・faq', guild, messages: { fetch: async argument => argument.message ? { id: argument.message, embeds: published.embeds } : new Map() }, send: async payload => { published = payload; return { id: '200' }; } };
   const destinations = new Map([...channels, ['profile', profile], ['faq', faq]]);
   destinations.find = predicate => [...destinations.values()].find(predicate);
   const writes = [];

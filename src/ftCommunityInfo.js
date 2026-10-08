@@ -65,7 +65,8 @@ export async function publishCommunityInfo(channel, botId, channels, settings = 
   const value = { ...saved?.value, channelId: channel.id, source: saved?.value?.source || (existing ? { id: existing.id, content: existing.content, webhookId: existing.webhookId, embeds: existing.embeds.map(embed => embed.toJSON()) } : null), messageId: existing?.id || null, status: 'pending' };
   await settings.upsert({ where: { key }, create: { key, value }, update: { value } });
   const message = existing ? webhook ? await webhook.editMessage(existing.id, payload) : await existing.edit(payload) : await channel.send(payload);
-  const readback = await channel.messages.fetch(message.id);
+  // Verify Discord's response rather than a pre-edit message cached by the history scan.
+  const readback = await channel.messages.fetch({ message: message.id, force: true });
   if (readback.embeds?.[0]?.title !== payload.embeds[0].title || readback.embeds?.[0]?.description !== payload.embeds[0].description) throw new Error('FT info readback mismatch');
   const completed = { ...value, messageId: message.id, status: 'verified', version: VERSION };
   await settings.upsert({ where: { key }, create: { key, value: completed }, update: { value: completed } });
