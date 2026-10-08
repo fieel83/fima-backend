@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionsBitField } from 'discord.js';
 import { prisma } from './db.js';
+import { ftChannelName } from './ftCommunityChannelNames.js';
 
 const GUILD_ID = '1419335632324657306';
 const MARKER = 'FIMA showcase v1';
@@ -44,12 +45,12 @@ export function showcasePayload(state) {
   const index = ((state.index || 0) % state.items.length + state.items.length) % state.items.length;
   const item = state.items[index];
   const embed = EmbedBuilder.from(item.embed)
-    .setFooter({ text: `${MARKER} • ${index + 1}/${state.items.length} • ${state.paused ? 'Paused / Duraklatıldı' : 'Auto / Otomatik'}` });
+    .setFooter({ text: `${MARKER} • ${index + 1}/${state.items.length} • ${state.paused ? 'Paused' : 'Auto'}` });
   const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ft_showcase:prev').setLabel('‹ Previous / Önceki').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('ft_showcase:next').setLabel('Next / Sonraki ›').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('ft_showcase:pause').setLabel(state.paused ? '▶ Auto / Otomatik' : 'Ⅱ Pause / Duraklat').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setLabel('Original / Orijinal').setStyle(ButtonStyle.Link)
+    new ButtonBuilder().setCustomId('ft_showcase:prev').setLabel('Previous').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('ft_showcase:next').setLabel('Next').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('ft_showcase:pause').setLabel(state.paused ? 'Resume' : 'Pause').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setLabel('Original').setStyle(ButtonStyle.Link)
       .setURL(`https://discord.com/channels/${GUILD_ID}/${state.channelId}/${item.sourceId}`)
   );
   return { embeds: [embed], components: [buttons], allowedMentions: { parse: [] } };
@@ -63,7 +64,16 @@ async function save(state, settings = prisma.setting) {
 export async function initializeShowcaseChannel(channel, botId, settings = prisma.setting) {
   const record = await settings.findUnique({ where: { key: `ft_showcase:${channel.id}` } });
   const history = await readShowcaseHistory(channel);
-  const items = showcaseItems(history);
+  const historicalItems = showcaseItems(history);
+  const stored = record?.value;
+  const savedItems = stored?.channelId === channel.id && Array.isArray(stored.items)
+    ? stored.items.filter(item => /^\d+$/.test(String(item?.sourceId)) && item.embed?.image?.url && (item.embed.title || item.embed.description)) : [];
+  const items = [...savedItems];
+  const keys = new Set(items.map(item => `${item.embed.title || ''}|${item.embed.image.url}`));
+  for (const item of historicalItems) {
+    const key = `${item.embed.title || ''}|${item.embed.image.url}`;
+    if (!keys.has(key)) { items.push(item); keys.add(key); }
+  }
   if (!items.length) throw new Error(`No historical showcase items in ${channel.name}`);
   const canonical = history.filter(message => message.author?.id === botId && message.embeds?.some(embed => embed.footer?.text?.startsWith(MARKER)))
     .sort((a, b) => a.id === record?.value?.messageId ? -1 : b.id === record?.value?.messageId ? 1 : Number(BigInt(b.id) - BigInt(a.id)))[0];
@@ -103,11 +113,11 @@ export async function handleFtShowcaseInteraction(interaction) {
   const state = panels.get(interaction.channelId);
   const action = interaction.customId.split(':')[1];
   if (!state || state.messageId !== interaction.message.id || !['prev', 'next', 'pause'].includes(action)) {
-    await interaction.reply({ content: 'Showcase is restarting; try again shortly. / Gösterim yeniden başlıyor; birazdan tekrar dene.', ephemeral: true });
+    await interaction.reply({ content: 'Showcase is restarting; try again shortly.', ephemeral: true });
     return true;
   }
   if (action === 'pause' && !interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageMessages)) {
-    await interaction.reply({ content: 'Only staff can pause automatic rotation. / Otomatik dönüşümü yalnızca yetkililer duraklatabilir.', ephemeral: true });
+    await interaction.reply({ content: 'Only staff can pause automatic rotation.', ephemeral: true });
     return true;
   }
   await interaction.deferUpdate();
@@ -129,7 +139,7 @@ export function startFtShowcaseWorker(client) {
     const guild = await client.guilds.fetch(GUILD_ID);
     const channels = await guild.channels.fetch();
     for (const name of ['outfits', 'capes']) {
-      const matches = [...channels.values()].filter(channel => channel?.name === name && channel.isTextBased?.() && channel.messages);
+      const matches = [...channels.values()].filter(channel => ftChannelName(channel?.name) === name && channel.isTextBased?.() && channel.messages);
       if (matches.length !== 1) { console.warn('FT showcase channel ambiguous or missing', { name, count: matches.length }); continue; }
       if (!panels.has(matches[0].id)) await initializeShowcaseChannel(matches[0], client.user.id).catch(error => console.warn('FT showcase initialization failed', { name, message: error.message }));
     }

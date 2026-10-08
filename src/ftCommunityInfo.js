@@ -1,13 +1,14 @@
 import { prisma } from './db.js';
 import { FT_COMMUNITY_GUILD_ID } from './ftCommunityWelcome.js';
 import { readShowcaseHistory } from './ftCommunityShowcase.js';
+import { ftChannelName } from './ftCommunityChannelNames.js';
 
 const VERSION = 'FT community info v1';
 const workers = new WeakSet();
 
 export function communityInfoPayload(kind, channels, original = null) {
   const mention = name => {
-    const channel = channels.find(item => item?.name === name && item.isTextBased?.());
+    const channel = channels.find(item => ftChannelName(item?.name) === name && item.isTextBased?.());
     return channel ? `<#${channel.id}>` : `\`#${name}\``;
   };
   let embed;
@@ -16,10 +17,9 @@ export function communityInfoPayload(kind, channels, original = null) {
     const data = original?.toJSON ? original.toJSON() : original || {};
     const socials = data.description?.match(/(?:\*\*|__|#{1,3}\s*)?Socials[\s\S]*$/i)?.[0]?.trim();
     embed = {
-      title: 'About Fieel · Fieel Hakkında', color: 0x7657d6,
+      title: 'About Fieel', color: 0x7657d6,
       description: 'Creator · Editor · Community owner · Project builder\n\n' +
-        '**EN** — Fieel, 20. TSB and Roblox videos, edits, FT Community and FIMA projects.\n\n' +
-        '**TR** — Fieel, 20 yaşında. TSB ve Roblox videoları, editler, FT Community ve FIMA projeleri.' +
+        'Fieel, 20. TSB and Roblox videos, edits, FT Community and FIMA projects.' +
         (socials ? `\n\n${socials}` : ''),
       ...(data.thumbnail ? { thumbnail: data.thumbnail } : {}),
       ...(data.image ? { image: data.image } : {}),
@@ -27,32 +27,33 @@ export function communityInfoPayload(kind, channels, original = null) {
     };
   } else {
     embed = {
-      title: 'Support FAQ · Destek Rehberi', color: 0x7657d6,
-      description: `Need a hand? Start here, then reach the team in ${mention('support')}.\nYardım mı gerekiyor? Önce buraya göz at, ardından ${mention('support')} kanalından ekibe ulaş.`,
+      title: 'Support FAQ', color: 0x7657d6,
+      description: `Need a hand? Start here, then reach the team in ${mention('support')}.`,
       fields: [
-        { name: 'Getting started · İlk adım', value: `Read ${mention('rules')}; choose your language, region and notifications in ${mention('roles')}.\n${mention('rules')} kanalını oku; dilini, bölgeni ve bildirimlerini ${mention('roles')} kanalından seç.` },
-        { name: 'Products & tutorials · Ürünler ve rehberler', value: `FIMA Macro: ${mention('fima-macro')} · Fake Headless: ${mention('fake-headless')}\nCheck the relevant guide before opening a ticket. / Ticket açmadan önce ilgili rehbere bak.` },
-        { name: 'What to include · Neler yazmalısın?', value: 'Choose the closest ticket topic. Explain what happened, what you tried, and any error message. Add relevant screenshots or an order reference privately.\nUygun ticket konusunu seç. Sorunu, denediklerini ve hata mesajını yaz. İlgili ekran görüntüsünü veya sipariş referansını özel ticket içinde paylaş.' },
-        { name: 'Account safety · Hesap güvenliği', value: 'Never share passwords, tokens, cookies, recovery codes or card details. Use official product links; report suspicious DMs and downloads through support.\nŞifre, token, çerez, kurtarma kodu veya kart bilgisi paylaşma. Resmî ürün bağlantılarını kullan; şüpheli DM ve indirmeleri desteğe bildir.' }
+        { name: 'Getting started', value: `Read ${mention('rules')}; choose your language, region and notifications in ${mention('roles')}.` },
+        { name: 'Products & tutorials', value: `FIMA Macro: ${mention('fima-macro')} · Fake Headless: ${mention('fake-headless')}\nCheck the relevant guide before opening a ticket.` },
+        { name: 'What to include', value: 'Choose the closest ticket topic. Explain what happened, what you tried, and any error message. Add relevant screenshots or an order reference privately.' },
+        { name: 'Account safety', value: 'Never share passwords, tokens, cookies, recovery codes or card details. Use official product links; report suspicious DMs and downloads through support.' }
       ]
     };
   }
-  embed.footer = { text: `${VERSION} · Made by Fieel` };
+  embed.footer = { text: VERSION };
   return { embeds: [embed], allowedMentions: { parse: [] } };
 }
 
 export async function publishCommunityInfo(channel, botId, channels, settings = prisma.setting) {
-  if (channel.guild.id !== FT_COMMUNITY_GUILD_ID || !['fieel-info', 'support-faq'].includes(channel.name)) throw new Error('FT info scope mismatch');
+  const kind = ftChannelName(channel.name);
+  if (channel.guild.id !== FT_COMMUNITY_GUILD_ID || !['fieel-info', 'support-faq'].includes(kind)) throw new Error('FT info scope mismatch');
   const key = `ft_info:${channel.id}`;
   const saved = await settings.findUnique({ where: { key } });
   const history = await readShowcaseHistory(channel);
   const marked = history.filter(message => message.embeds?.some(embed => embed.footer?.text?.startsWith(VERSION)));
-  const legacy = channel.name === 'fieel-info' ? history.filter(message => message.embeds?.some(embed => /about fieel/i.test(embed.title || ''))) : [];
+  const legacy = kind === 'fieel-info' ? history.filter(message => message.embeds?.some(embed => /about fieel/i.test(embed.title || ''))) : [];
   const candidates = marked.length ? marked : legacy;
   candidates.sort((a, b) => a.id === saved?.value?.messageId ? -1 : b.id === saved?.value?.messageId ? 1 : a.id > b.id ? -1 : 1);
   const existing = candidates[0];
   const originalEmbed = existing?.embeds?.find(embed => /about fieel/i.test(embed.title || '')) || existing?.embeds?.[0];
-  const payload = communityInfoPayload(channel.name, channels, originalEmbed);
+  const payload = communityInfoPayload(kind, channels, originalEmbed);
   let webhook;
   if (existing?.webhookId) {
     webhook = (await channel.fetchWebhooks()).get(existing.webhookId);
@@ -86,7 +87,7 @@ export function startFtInfoWorker(client, settings = prisma.setting) {
       for (const name of ['fieel-info', 'support-faq']) {
         if (done.has(name)) continue;
         try {
-          const matches = [...channels.values()].filter(channel => channel?.name === name && channel.messages);
+          const matches = [...channels.values()].filter(channel => ftChannelName(channel?.name) === name && channel.messages);
           if (matches.length !== 1) throw new Error(`FT info destination ${name} missing or ambiguous`);
           await publishCommunityInfo(matches[0], client.user.id, channels, settings);
           done.add(name);

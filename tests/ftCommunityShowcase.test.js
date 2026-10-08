@@ -68,3 +68,16 @@ test('navigation wraps, preserves product content and links to original without 
   assert.deepEqual(payload.allowedMentions, { parse: [] });
   assert.equal(payload.components[0].toJSON().components[3].url, 'https://discord.com/channels/1419335632324657306/55/2');
 });
+
+
+test('restart preserves saved products after original messages have been consolidated', async () => {
+  const items = [{ sourceId: '10', embed: { title: 'Outfit', description: 'Creator and original link', image: { url: 'https://example.com/outfit.png' } } }];
+  let payload;
+  const canonical = { id: '30', author: { id: 'bot' }, embeds: [{ footer: { text: 'FIMA showcase v1' } }], edit: async next => { payload = next; return canonical; } };
+  const channel = { id: 'saved-products', name: '⌁・outfits', messages: { fetch: async () => new Map([['30', canonical]]) }, send: async () => assert.fail('must recover the existing panel') };
+  const settings = { findUnique: async () => ({ value: { channelId: channel.id, messageId: '30', items, index: 0, paused: true } }), upsert: async () => {} };
+  const state = await initializeShowcaseChannel(channel, 'bot', settings);
+  assert.deepEqual(state.items, items);
+  assert.equal(payload.embeds[0].toJSON().description, items[0].embed.description);
+  assert.equal(state.messageId, '30');
+});
