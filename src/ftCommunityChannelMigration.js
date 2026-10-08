@@ -82,7 +82,8 @@ export async function addFtMissingChannels({ guild, expectedDigest, saveJournal,
     const specs = [
       { name: 'general', category: 'COMMUNITY', topic: 'FT Community — chat, share and meet the community. / Topluluk sohbeti.' },
       { name: 'media', category: 'COMMUNITY', topic: 'Share your clips, edits and creations. / Kliplerini ve çalışmalarını paylaş.' },
-      { name: 'polls', category: 'EVENTS', topic: 'Community polls and votes. / Topluluk anketleri ve oylamaları.' }
+      { name: 'polls', category: 'EVENTS', topic: 'Community polls and votes. / Topluluk anketleri ve oylamaları.' },
+      { name: 'support-faq', category: 'HELP', topic: 'Support answers and guidance. / Destek soruları ve rehberi.' }
     ];
     const targets = new Map(plan.targetCategories.map(row => [row.key, row.existingId]));
     if (specs.some(spec => !targets.get(spec.category))) throw fail('migration_categories_required');

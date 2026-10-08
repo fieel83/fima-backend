@@ -65,7 +65,7 @@ export function buildFtCommunityMigrationPlan(audit) {
       reason: 'Remove from the active structure only after all children and permissions are verified.' }));
   const requiredNames = ['rules', 'roles', 'fieel-info', 'joins-leaves', 'general', 'media',
     'turkce-sohbet', 'turkce-medya', 'vouches', 'announcements', 'updates', 'uploads', 'polls',
-    'support', 'fima-macro', 'fake-headless', 'outfits', 'capes'];
+    'support', 'support-faq', 'fima-macro', 'fake-headless', 'outfits', 'capes'];
   const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name));
   const sourceDigest = createHash('sha256').update(JSON.stringify(channels.map(channel => ({
     id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId,

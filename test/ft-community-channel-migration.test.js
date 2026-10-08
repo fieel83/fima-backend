@@ -60,7 +60,7 @@ test('additive phase preserves originals, inherits access, and is idempotent', a
   const before = await captureFtChannelInventory(f.guild);
   const result = await addFtMissingChannels(await request(f));
   assert.equal(result.status, 'missing_channels_added');
-  assert.deepEqual(result.operations.map(row => row.name), ['general', 'media', 'polls']);
+  assert.deepEqual(result.operations.map(row => row.name), ['general', 'media', 'polls', 'support-faq']);
   for (const original of before.channels) {
     assert.deepEqual(result.after.channels.find(row => row.id === original.id), original);
   }
