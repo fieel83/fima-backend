@@ -147,7 +147,7 @@ test("FIMA Bot profile dry-run reports work without mutating Discord", async () 
       required: true,
       supportedByBotTokenApi: false,
       channel: "discord_developer_portal",
-      action: "Set the verified Discord application name to FIMA Bot.",
+      action: "Set the verified Discord application name to FIMA.",
       developerPortalUrl: `https://discord.com/developers/applications/${APPLICATION_ID}/information`
     });
     assert.deepEqual(calls, []);

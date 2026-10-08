@@ -5,7 +5,7 @@ import { ticketIsClosed, queueTicketRename } from "./fimaTicketLifecycle.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields, retainedTicketIntakeFields } from "./fimaTicketIntake.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
-import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from "./ftCommunityChannelMigration.js";
+import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories, orderFtChannels } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
 import fs from "node:fs/promises";
@@ -59,6 +59,7 @@ import {
 import { assertParadiseTestGuildMutation } from "./runtimeEnvironment.js";
 import {
   applyParadiseTemplateMissingOnly,
+  fimaTicketSettingsForGuild,
   handleParadiseGuildMemberAdd,
   handleParadiseGuildMemberRemove,
   handleParadiseGuildMemberUpdate,
@@ -2616,9 +2617,10 @@ async function handleTicketButtonLocked(interaction) {
   }
   if (action === "close") {
     if (ticketIsClosed(channel)) return interaction.editReply({ content: "This ticket is already closed." });
+    const ticketSettings = await fimaTicketSettingsForGuild(interaction.guildId);
     let transcript;
     try {
-      transcript = await createFimaTicketTranscript(interaction, "close");
+      if (ticketSettings.autoTranscript !== false) transcript = await createFimaTicketTranscript(interaction, "close");
     } catch (error) {
       return interaction.editReply({
         content: `Transcript could not be saved, so the ticket was not closed. Reason: ${sanitizeDiscordText(error?.code || error?.message || "unknown", 120)}`,
@@ -2634,7 +2636,7 @@ async function handleTicketButtonLocked(interaction) {
     await fimaAiSupportBridge?.closed({ channelId: interaction.channelId, guildId: interaction.guildId, eventId: interaction.id }).catch(() => {
       console.warn("FIMA support shadow queue unavailable; closure candidate not accepted");
     });
-    return interaction.editReply({ content: `Ticket closed. Transcript saved (${transcript.messageCount} messages).` });
+    return interaction.editReply({ content: transcript ? `Ticket closed. Transcript saved (${transcript.messageCount} messages).` : "Ticket closed. Automatic transcripts are disabled; staff can save one with Transcript." });
   }
   if (action === "reopen") {
     if (!ticketIsClosed(channel)) return interaction.editReply({ content: "This ticket is already open." });
@@ -3205,9 +3207,9 @@ export async function paradiseDiscordRuntimeSnapshot(guildId = null) {
     botIdentity: {
       applicationUsername: client.user?.username || null,
       guildNickname: me?.nickname || null,
-      intendedName: "FIMA Bot",
-      usernameMatches: String(client.user?.username || "").toLowerCase() === "fima.bot",
-      nicknameMatches: (me?.nickname || client.user?.username) === "FIMA Bot"
+      intendedName: "FIMA",
+      usernameMatches: String(client.user?.username || "") === "FIMA",
+      nicknameMatches: (me?.nickname || client.user?.username) === "FIMA"
     },
     commandScope: "guild",
     commands: [...commands.values()].map(command => ({
@@ -3638,7 +3640,7 @@ export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedD
   const guild = await getGuild(guildId);
   if (!guild) throw Object.assign(new Error("paradise_guild_unavailable"), { code: "paradise_guild_unavailable" });
   await guild.members.fetchMe();
-  const executor = phase === 'cleanup' ? cleanupFtEmptyCategories : phase === 'add' ? addFtMissingChannels : migrateFtChannels;
+  const executor = phase === 'order' ? orderFtChannels : phase === 'cleanup' ? cleanupFtEmptyCategories : phase === 'add' ? addFtMissingChannels : migrateFtChannels;
   return executor({ guild, expectedDigest, actorUserId,
     saveJournal: async journal => {
       const key = `ft_channel_migration_${guild.id}_${journal.id}`;

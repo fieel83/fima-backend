@@ -68,7 +68,7 @@ export function buildFtCommunityMigrationPlan(audit) {
     'support', 'support-faq', 'fima-macro', 'fake-headless', 'outfits', 'capes'];
   const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name));
   const sourceDigest = createHash('sha256').update(JSON.stringify(channels.map(channel => ({
-    id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId,
+    id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId, position: channel.position,
     permissionOverwrites: (channel.permissionOverwrites || []).map(row => ({
       id: row.id, type: Number(row.type), allow: [...(row.allow || [])].sort(),
       deny: [...(row.deny || [])].sort()

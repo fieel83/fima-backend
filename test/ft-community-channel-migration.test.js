@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFtCommunityMigrationPlan, FT_MIGRATION_GUILD_ID } from '../src/ftCommunityMigrationPlan.js';
-import { captureFtChannelInventory, migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from '../src/ftCommunityChannelMigration.js';
+import { captureFtChannelInventory, migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories, orderFtChannels } from '../src/ftCommunityChannelMigration.js';
 
 function fixture() {
   const channels = new Map(), writes = [], saved = [];
@@ -39,6 +39,10 @@ function fixture() {
   make('support', 'support', 0, 'legacy', [{ id: 'staff-role', type: 0,
     allow: ['SendMessages', 'ViewChannel'], deny: [] }]);
   const guild = { id: FT_MIGRATION_GUILD_ID, members: { me: { id: 'bot' } }, channels: {
+    async setPositions(positions) {
+      writes.push(['order', positions]);
+      for (const row of positions) channels.get(row.channel).rawPosition = row.position;
+    },
     async fetch(id) { return id ? channels.get(id) : channels; },
     async create(options) {
       writes.push(['create', options.name]);
@@ -53,6 +57,50 @@ async function request(f) {
   return { guild: f.guild, expectedDigest: buildFtCommunityMigrationPlan(await captureFtChannelInventory(f.guild)).sourceDigest,
     saveJournal: f.saveJournal, actorUserId: 'owner' };
 }
+
+test('ordering preserves channel identity, parents and access while arranging categories and support', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  await addFtMissingChannels(await request(f));
+  const before = await captureFtChannelInventory(f.guild);
+  const result = await orderFtChannels(await request(f));
+  assert.equal(result.status, 'channels_ordered');
+  const plan = buildFtCommunityMigrationPlan(result.after);
+  assert.deepEqual(plan.targetCategories.map(row => result.after.categories.find(c => c.id === row.existingId).position), [0,1,2,3,4,5,6,7,8,9]);
+  for (const original of [...before.categories, ...before.channels]) {
+    const actual = [...result.after.categories, ...result.after.channels].find(row => row.id === original.id);
+    assert.deepEqual({ ...actual, position: original.position }, original);
+  }
+  const help = plan.targetCategories.find(row => row.key === 'HELP');
+  assert.deepEqual(result.after.channels.filter(row => row.parentId === help.existingId).sort((a,b) => a.position-b.position).map(row => row.name), ['support','support-faq']);
+});
+
+test('ordering rejects stale position snapshots and journal failures before changing Discord', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const stale = await request(f);
+  f.channels.get('rules').rawPosition += 50;
+  f.writes.length = 0;
+  await assert.rejects(orderFtChannels(stale), { code: 'migration_stale_plan' });
+  await assert.rejects(orderFtChannels({ ...await request(f), saveJournal: async () => { throw new Error('storage_down'); } }), /storage_down/);
+  assert.deepEqual(f.writes, []);
+});
+
+test('an ambiguous ordering failure restores the original positions from the durable journal', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const before = await captureFtChannelInventory(f.guild);
+  const apply = f.guild.channels.setPositions;
+  let first = true;
+  f.guild.channels.setPositions = async positions => {
+    await apply(positions);
+    if (first) { first = false; throw new Error('network_failure_after_order'); }
+  };
+  await assert.rejects(orderFtChannels(await request(f)), error => error.journal.status === 'rolled_back');
+  const restored = await captureFtChannelInventory(f.guild);
+  assert.deepEqual(restored.categories, before.categories);
+  assert.deepEqual(restored.channels, before.channels);
+});
 
 test('additive phase preserves originals, inherits access, and is idempotent', async () => {
   const f = fixture();

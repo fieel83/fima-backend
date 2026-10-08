@@ -3,11 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createFtCommunityManifestProfileAssets } from "./ftCommunityVisualAssets.js";
 
-export const FIMA_BOT_PROFILE_NAME = "FIMA Bot";
-// Discord's global username is restricted to lowercase letters, numbers,
-// underscores and periods. Keep the human-facing application/nickname label
-// above while using a valid technical username for the bot account.
-export const FIMA_BOT_PROFILE_USERNAME = "fima.bot";
+export const FIMA_BOT_PROFILE_NAME = "FIMA";
+export const FIMA_BOT_PROFILE_USERNAME = "FIMA";
 export const FIMA_BOT_PROFILE_CONFIRMATION = "APPLY FIMA BOT PROFILE";
 export const FIMA_BOT_PROFILE_ALLOWED_GUILD_IDS = Object.freeze([
   "1419335632324657306",
@@ -199,7 +196,7 @@ async function inspectFimaBotProfileSyncInternal(client, {
       action: `Set the verified Discord application name to ${FIMA_BOT_PROFILE_NAME}.`,
       developerPortalUrl
     }),
-    usernameMatches: clean(client?.user?.username).toLowerCase() === FIMA_BOT_PROFILE_USERNAME,
+    usernameMatches: clean(client?.user?.username) === FIMA_BOT_PROFILE_USERNAME,
     guildCount: guildIds.length,
     guildNicknameMismatches,
     avatar: publicAssetStatus(avatar),
@@ -260,7 +257,7 @@ async function verifyFimaBotProfileReadback(client, status, expectedProfileIdent
   const checks = {
     exactUser: clean(freshUser?.id) === botUserId
       && botUserId === clean(status._private.config.expectedApplicationId),
-    username: clean(freshUser?.username).toLowerCase() === FIMA_BOT_PROFILE_USERNAME,
+    username: clean(freshUser?.username) === FIMA_BOT_PROFILE_USERNAME,
     avatarPresent: Boolean(clean(freshUser?.avatar)),
     bannerPresent: Boolean(clean(freshUser?.banner)),
     avatarMatchesMutation: !expectedProfileIdentities.avatar

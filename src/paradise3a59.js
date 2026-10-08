@@ -653,6 +653,10 @@ function configForGuild(state, guildId) {
   return state.guildConfigs?.[String(guildId || "")] || state.config || {};
 }
 
+export async function fimaTicketSettingsForGuild(guildId) {
+  return { ...(configForGuild(await loadState(), guildId).ticketSettings || {}) };
+}
+
 function belongsToGuild(record, guildId) {
   return record?.guildId ? record.guildId === guildId : guildId === PARADISE_TEST_GUILD_ID;
 }
@@ -9484,13 +9488,15 @@ async function mutateParadiseSupportTicketLifecycle({ guild, channel, record, ti
   let transcript = null;
 
   if (normalizedAction === "close") {
-    transcript = await saveParadiseSupportTranscript(guild, channel, updated, "closed").catch(() => null);
-    if (!transcript) {
-      const error = new Error("support_ticket_transcript_required");
-      error.code = "support_ticket_transcript_required";
-      throw error;
+    if (ticketSettings.autoTranscript !== false) {
+      transcript = await saveParadiseSupportTranscript(guild, channel, updated, "closed").catch(() => null);
+      if (!transcript) {
+        const error = new Error("support_ticket_transcript_required");
+        error.code = "support_ticket_transcript_required";
+        throw error;
+      }
+      updated = { ...updated, ...transcriptMetadataFromMessage(transcript, "closed") };
     }
-    updated = { ...updated, ...transcriptMetadataFromMessage(transcript, "closed") };
     await channel.permissionOverwrites.edit(record.userId, { ViewChannel: false }).catch(() => {});
   } else if (normalizedAction === "reopen") {
     await channel.permissionOverwrites.edit(record.userId, {

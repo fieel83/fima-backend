@@ -14,6 +14,86 @@ const canonicalPermissions = rows => JSON.stringify((rows || []).map(row => ({
 const legacyCategoryIds = new Set(['1421240822866645113', '1557009769083047936',
   '1420401498332074018', '1420401497115459667', '1420401495471558769']);
 
+const channelOrder = {
+  START: ['rules', 'roles', 'fieel-info', 'joins-leaves'],
+  COMMUNITY: ['general', 'media', 'turkce-sohbet', 'turkce-medya', 'vouches', 'outfits', 'capes'],
+  EVENTS: ['announcements', 'updates', 'uploads', 'polls', 'turkce-duyurular'],
+  HELP: ['support', 'support-faq', 'fima-macro', 'fake-headless'],
+  STAFF: ['rules', 'mod-chat'],
+  RECORDS: ['ticket-transcripts', 'transcripts', 'fima-logs', 'logs', 'message-logs', 'join-logs', 'un-bl-logs', 'wick-logs']
+};
+const orderName = name => String(name).normalize('NFKC').toLowerCase().replace(/^[^\p{L}\p{N}]+/u, '').replace(/[_\s]+/g, '-');
+
+export async function orderFtChannels({ guild, expectedDigest, saveJournal, actorUserId }) {
+  if (guild?.id !== FT_MIGRATION_GUILD_ID) throw fail('ft_community_guild_required');
+  if (typeof saveJournal !== 'function') throw fail('migration_journal_required');
+  if (running.has(guild.id)) throw fail('migration_already_running');
+  running.add(guild.id);
+  let journal;
+  let mutationStarted = false;
+  const persist = () => saveJournal(structuredClone(journal));
+  try {
+    const before = await captureFtChannelInventory(guild);
+    const plan = buildFtCommunityMigrationPlan(before);
+    if (expectedDigest !== plan.sourceDigest) throw fail('migration_stale_plan');
+    if (plan.targetCategories.some(row => !row.existingId || row.decision !== 'keep')) throw fail('migration_categories_required');
+    const positions = plan.targetCategories.map(row => ({ channel: row.existingId, position: row.position }));
+    const siblingOrders = [];
+    let position = 0;
+    for (const category of plan.targetCategories) {
+      const names = channelOrder[category.key] || [];
+      const rank = row => { const index = names.indexOf(orderName(row.name)); return index < 0 ? names.length : index; };
+      const children = before.channels.filter(row => row.parentId === category.existingId)
+        .sort((a, b) => rank(a) - rank(b) || a.position - b.position || a.id.localeCompare(b.id));
+      for (const type of [...new Set(children.map(row => row.type))]) {
+        siblingOrders.push(children.filter(row => row.type === type).map(row => row.id));
+      }
+      positions.push(...children.map(row => ({ channel: row.id, position: position++ })));
+    }
+    journal = { id: randomUUID(), guildId: guild.id, actorUserId, phase: 'channel_order',
+      status: 'applying', startedAt: new Date().toISOString(), before, createdCategoryIds: [],
+      operations: [{ kind: 'order', status: 'pending', positions }] };
+    await persist();
+    mutationStarted = true;
+    await guild.channels.setPositions(positions);
+    journal.operations[0].status = 'applied';
+    await persist();
+    const after = await captureFtChannelInventory(guild);
+    const allAfter = [...after.categories, ...after.channels];
+    for (const original of [...before.categories, ...before.channels]) {
+      const actual = allAfter.find(row => row.id === original.id);
+      if (!actual || actual.name !== original.name || actual.type !== original.type || actual.parentId !== original.parentId ||
+          canonicalPermissions(actual.permissionOverwrites) !== canonicalPermissions(original.permissionOverwrites)) throw fail('migration_final_verification_failed');
+    }
+    const verifyOrder = ids => ids.every((id, index) => index === 0 ||
+      allAfter.find(row => row.id === ids[index - 1]).position < allAfter.find(row => row.id === id).position);
+    if (!verifyOrder(plan.targetCategories.map(row => row.existingId)) || siblingOrders.some(ids => !verifyOrder(ids))) throw fail('migration_order_verification_failed');
+    journal.after = after;
+    journal.status = 'channels_ordered';
+    journal.completedAt = new Date().toISOString();
+    await persist();
+    return journal;
+  } catch (error) {
+    if (journal && mutationStarted) {
+      journal.status = 'rolling_back';
+      journal.error = error.code || error.message;
+      try {
+        await persist();
+        await guild.channels.setPositions([...journal.before.categories, ...journal.before.channels].map(row => ({ channel: row.id, position: row.position })));
+        const restored = await captureFtChannelInventory(guild);
+        for (const original of [...journal.before.categories, ...journal.before.channels]) {
+          const actual = [...restored.categories, ...restored.channels].find(row => row.id === original.id);
+          if (!actual || actual.position !== original.position) throw fail('migration_rollback_verification_failed');
+        }
+        journal.status = 'rolled_back';
+        await persist();
+      } catch { journal.status = 'rollback_incomplete'; await persist().catch(() => {}); }
+      error.journal = journal;
+    }
+    throw error;
+  } finally { running.delete(guild.id); }
+}
+
 export async function cleanupFtEmptyCategories({ guild, expectedDigest, saveJournal, actorUserId }) {
   if (guild?.id !== FT_MIGRATION_GUILD_ID) throw fail('ft_community_guild_required');
   if (typeof saveJournal !== 'function') throw fail('migration_journal_required');

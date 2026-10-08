@@ -121,7 +121,7 @@ const FIELD_LABELS = Object.freeze({
   mentionMember: "Üyeden bahset",
   showMemberCount: "Üye sayısını göster",
   claimEnabled: "Talep sahiplenme",
-  autoTranscript: "Otomatik transcript",
+  autoTranscript: "Ticket kapanınca transcript kaydet",
   deleteDelayMinutes: "Silme gecikmesi (dakika)",
   trainingEnabled: "Training oturumları",
   tryoutEnabled: "Tryout oturumları",
@@ -588,7 +588,7 @@ function editorTemplate(payload, definition) {
   const value = editableValue(payload, definition);
   const fields = definition.mapKey
     ? mapEditorTemplate(payload.route, definition, value)
-    : `<div class="editor-fields">${Object.entries(definition.fields).map(([key, field]) => fieldTemplate(payload.route, key, field, value[key])).join("")}</div>`;
+    : `<div class="editor-fields">${Object.entries(definition.fields).map(([key, field]) => fieldTemplate(payload.route, key, field, key === "autoTranscript" ? value[key] !== false : value[key])).join("")}</div>`;
   const mediaNote = payload.route === "branding"
     ? '<p class="editor-note" id="branding-media-note">Güvenli medya yükleme bu çalışma alanında henüz desteklenmiyor. Görsel dosyaları bu formdan sunucuya gönderilmez.</p>'
     : "";
