@@ -2536,9 +2536,14 @@
     const target = $("#connectedAccounts");
     if (!target) return;
     const discord = integrations.discord || {};
+    const google = integrations.google || {};
     const roblox = integrations.roblox || {};
     target.innerHTML = `
       <div class="integration-grid">
+        <article class="integration-card ${google.connected ? "is-connected" : "is-missing"}">
+          <div><span class="pill">Google</span><p>${google.connected ? "Google account connected" : "Connect Google to this FIMA account"}</p><small>${escapeHtml(google.email || "")}</small></div>
+          <div class="integration-actions"><button class="button secondary" type="button" data-provider-sign-in="google" data-return-to="/dashboard/connected-accounts" disabled>${google.connected ? "Reconnect Google" : "Connect Google"}</button><small data-provider-status role="status"></small></div>
+        </article>
         <article class="integration-card ${discord.connected ? "is-connected" : "is-missing"}">
           <div>
             <span class="pill">${t("discord")}</span>
@@ -2548,8 +2553,8 @@
           <div class="integration-actions">
             <span class="status-pill">${discord.connected ? t("connected") : t("notConnected")}</span>
             ${discord.connected
-              ? `<a class="button secondary" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("reconnectDiscord")}</a><button class="button danger" type="button" data-disconnect-provider="discord">${t("disconnectDiscord")}</button>`
-              : `<a class="button" href="${apiBase}/auth/discord/start?returnTo=${encodeURIComponent(dashboardRoute("connected-accounts"))}">${t("connectDiscord")}</a>`}
+              ? `<button class="button secondary" type="button" data-provider-sign-in="discord" data-return-to="/dashboard/connected-accounts" disabled>${t("reconnectDiscord")}</button><button class="button danger" type="button" data-disconnect-provider="discord">${t("disconnectDiscord")}</button>`
+              : `<button class="button" type="button" data-provider-sign-in="discord" data-return-to="/dashboard/connected-accounts" disabled>${t("connectDiscord")}</button>`}
           </div>
         </article>
         <article class="integration-card ${roblox.connected ? "is-connected" : "is-missing"}">
@@ -2566,6 +2571,7 @@
       </div>
     `;
     wireAccountProfileAvatarFallbacks(target, "F");
+    window.fimaRefreshProviderLinks?.();
   };
 
   const renderRobloxProfileSettings = (user = {}) => {
@@ -2591,10 +2597,12 @@
     target.innerHTML = `
       <form class="verification-card roblox-profile-form ${verified ? "is-verified" : ""}" id="roblox-profile" data-roblox-profile-form>
         <div class="verification-status"><span class="status-pill">${verified ? t("robloxVerified") : t("notConnected")}</span>
-          <div><strong>Roblox</strong><small>${verified ? t("robloxProfileNote") : "Verify securely with your Roblox account."}</small></div>
+          <div><strong>Roblox</strong><small>Link Roblox to your signed-in FIMA account using a profile About / Bio code. No Roblox password is needed.</small></div>
         </div>
         ${verifiedCard}
-        <div class="verification-actions"><button class="button" type="submit">${verified ? "Verify Roblox again" : "Connect Roblox"}</button>
+        <label>Roblox username<input name="robloxUsername" autocomplete="off" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" value="${escapeHtml(pending?.username || current)}" required></label>
+        ${pending ? `<section class="verification-code"><p>Copy this code into the About / Bio of @${escapeHtml(pending.username)}. Save your profile, then verify below.</p><code>${escapeHtml(pending.code)}</code><p>Expires: ${escapeHtml(date(pending.expiresAt))}</p><a class="button secondary" href="${escapeHtml(pending.profileUrl)}" target="_blank" rel="noopener">Open Roblox profile</a><button class="button" type="submit" name="verificationAction" value="confirm">Verify profile code</button></section>` : ""}
+        <div class="verification-actions"><button class="button" type="submit">${pending ? "Generate new code" : verified ? "Verify Roblox again" : "Generate verification code"}</button>
           ${current || verified ? `<button class="button secondary" type="button" data-clear-roblox-username>${t("clearRobloxUsername")}</button>` : ""}
         </div>
       </form>
@@ -3219,18 +3227,19 @@
       const robloxProfileForm = event.target.closest("[data-roblox-profile-form]");
       if (robloxProfileForm) {
         event.preventDefault();
-        const submit = robloxProfileForm.querySelector("button[type='submit']");
-        submit.disabled = true;
+        const submits = Array.from(robloxProfileForm.querySelectorAll("button[type='submit']"));
+        if (submits.some((button) => button.disabled)) return;
+        submits.forEach((button) => { button.disabled = true; });
         setMessage(t("working"));
         try {
-          const data = await post("/api/roblox/v2/start", {});
-          const destination = new URL(data.authorizationUrl);
-          if (destination.origin !== "https://apis.roblox.com" || destination.pathname !== "/oauth/v1/authorize") throw new Error("Invalid Roblox authorization destination");
-          window.location.assign(destination.href);
+          const confirming = event.submitter?.value === "confirm";
+          await post(confirming ? "/api/me/roblox/confirm-verification" : "/api/me/roblox/start-verification", confirming ? {} : { robloxUsername: robloxProfileForm.elements.robloxUsername.value.trim() });
+          await refreshDashboardAccess();
+          setMessage(confirming ? "Roblox profile verified and linked to this FIMA account." : "Copy the code into your Roblox profile About / Bio, then verify.", "good");
         } catch (error) {
           setMessage(error.message, "error");
         } finally {
-          submit.disabled = false;
+          submits.forEach((button) => { button.disabled = false; });
         }
         return;
       }

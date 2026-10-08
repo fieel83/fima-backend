@@ -38,6 +38,19 @@
       </section>
       <section class="auth-card panel panel-pad">
         <div class="auth-tabs"><a class="is-active" href="/login">Login</a><a href="/register">Register</a></div>
+
+        <section class="provider-sign-in" aria-label="Account sign-in options">
+          <button class="button secondary" type="button" data-provider-sign-in="google" disabled>Continue with Google</button>
+          <button class="button secondary" type="button" data-provider-sign-in="discord" disabled>Continue with Discord</button>
+          <p class="field-note" data-provider-status role="status">Checking sign-in availability…</p>
+          <details class="roblox-link-help">
+            <summary class="button secondary">Continue with Roblox — profile verification</summary>
+            <p>First sign in to your FIMA account using Google, Discord or your FIMA password. Then link Roblox in your account settings.</p>
+            <ol><li>Enter your Roblox username.</li><li>Copy your unique verification code into your Roblox profile About / Bio.</li><li>Return to FIMA and select Verify profile code.</li></ol>
+            <p>No Roblox password is requested. Profile verification links Roblox to your signed-in FIMA account; it does not sign you in by itself.</p>
+          </details>
+          <p class="field-note">Already have a FIMA account? Sign in to that account first, then connect Google, Discord and Roblox from Connected accounts. Accounts are never merged automatically by email.</p>
+        </section>
         <form data-auth-form>
           <label>Username or email<input name="login" type="text" autocomplete="username" placeholder="your username or email" required></label>
           <label>Password<input name="password" type="password" autocomplete="current-password" placeholder="Your password" required></label>
@@ -49,7 +62,8 @@
       </section>
     </main>
     <script src="/assets/js/config.js?v=20260526-9"></script>
-    <script src="/assets/js/account.js?v=20261007-dashboard-routing" defer></script>
+    <script src="/assets/js/account.js?v=20261009-auth-1" defer></script>
+    <script src="/assets/js/auth-providers.js?v=20261009-auth-1" defer></script>
   <p class="account-footer">FIMA is the secure account, product and support hub for FIMA Macro, FIMA AI and FIMA Bot.</p>
 </body>
 </html>

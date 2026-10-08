@@ -29,7 +29,7 @@ const executable = [
 const hash = (token) => token ? crypto.createHash("sha256").update(token).digest("hex") : "";
 const copy = (value) => structuredClone(value);
 function deferred() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
-async function fixture(t, provider, { loggedOut = false, oldState = false, pauseReferral = false } = {}) {
+async function fixture(t, provider, { loggedOut = false, oldState = false, pauseReferral = false, returnTo } = {}) {
   const user = { id: "fima-one", email: "one@example.com", emailNormalized: "one@example.com", passwordHash: "strong-password-hash" };
   let state = {
     users: [user], sessions: [{ id: "session-one", userId: user.id, tokenHash: hash("cookie-one"), expiresAt: new Date(Date.now() + 60_000) }],
@@ -114,7 +114,7 @@ async function fixture(t, provider, { loggedOut = false, oldState = false, pause
     }
   }, { filename: "actual-oauth-session-boundary.js" });
   const initiatingSession = loggedOut || oldState ? null : await api.captureOAuthInitiatingSession({ cookies: { fima_user_session: "cookie-one" } }, user);
-  const signedState = api.createOAuthState(provider, { userId: loggedOut ? null : user.id, initiatingSession });
+  const signedState = api.createOAuthState(provider, { userId: loggedOut ? null : user.id, initiatingSession, returnTo });
   const server = await new Promise((resolve) => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });
   t.after(() => {
     // Assertion failures must not leave an exchange/referral barrier blocking teardown.
@@ -146,6 +146,30 @@ function rejected(response, provider) {
   assert.equal(response.headers.get("set-cookie"), null, "Denied callback must not issue a new login cookie");
 }
 for (const provider of ["google", "discord"]) {
+  test(`${provider}: Hub request and state survive successful OAuth and failed retry`, async (t) => {
+    const next = "/desktop-login?requestId=customer-request&state=opaque-state#approve";
+    const f = await fixture(t, provider, { returnTo: next }); f.proceed.resolve();
+    const response = await f.callback();
+    const destination = new URL(response.headers.get("location"));
+    assert.equal(destination.pathname, "/desktop-login");
+    assert.equal(destination.searchParams.get("requestId"), "customer-request");
+    assert.equal(destination.searchParams.get("state"), "opaque-state");
+    assert.equal(destination.searchParams.get(provider), "connected");
+    assert.equal(destination.hash, "#approve");
+    f.revoke();
+    const denied = await f.callback();
+    const retry = new URL(denied.headers.get("location"));
+    assert.equal(retry.pathname, "/login");
+    assert.equal(retry.searchParams.get("next"), next);
+    assert.equal(denied.headers.get("set-cookie"), null);
+  });
+  test(`${provider}: external OAuth return destinations cannot redirect customers away`, async (t) => {
+    for (const returnTo of ["//evil.invalid", "/\\evil.invalid", "https://evil.invalid", "/\r\nLocation: evil"]) {
+      const f = await fixture(t, provider, { returnTo }); f.proceed.resolve();
+      const response = await f.callback();
+      assert.equal(response.headers.get("location"), `https://local-ui.invalid/dashboard/overview?${provider}=connected`);
+    }
+  });
   test(`${provider}: same initiating session links and issues session under account/session locks`, async (t) => {
     const f = await fixture(t, provider); f.proceed.resolve();
     const payload = JSON.parse(Buffer.from(f.signedState.split(".")[0], "base64url").toString());

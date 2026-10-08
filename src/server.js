@@ -3264,9 +3264,11 @@ app.get("/auth/google/start", oauthLimiter, async (req, res) => {
 });
 
 app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
+  let verifiedReturnTo;
   try {
     const { state: stateValue, nonce } = parseGoogleOAuthCookie(req.cookies?.[OAUTH_STATE_COOKIE]);
     const state = verifyOAuthState(req.query?.state, stateValue, "google");
+    verifiedReturnTo = state.returnTo;
     await consumeOAuthState(prisma, { provider: "google", state: String(req.query?.state || ""), expiresAt: state.exp });
     const initiatingSession = await validateOAuthInitiatingSession(req, state);
     if (!nonce || nonce.length < 16) throw new Error("invalid_google_nonce");
@@ -3300,17 +3302,20 @@ app.get("/auth/google/callback", oauthLimiter, async (req, res) => {
       googleSubject: String(payload.sub), created: linked.created
     });
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard/overview"}?google=connected`);
+    return res.redirect(oauthFrontendRedirect(state.returnTo, "google"));
   } catch (error) {
     console.error("Google OAuth callback failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/login?error=google_oauth_failed`);
+    const code = ["provider_link_requires_login", "provider_already_linked"].includes(error?.code || error?.message) ? (error.code || error.message) : "google_oauth_failed";
+    return res.redirect(oauthFrontendFailure(code, verifiedReturnTo));
   }
 });
 
 app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
+  let verifiedReturnTo;
   try {
     const state = verifyOAuthState(req.query?.state, req.cookies?.[OAUTH_STATE_COOKIE], "discord");
+    verifiedReturnTo = state.returnTo;
     await consumeOAuthState(prisma, { provider: "discord", state: String(req.query?.state || ""), expiresAt: state.exp });
     const initiatingSession = await validateOAuthInitiatingSession(req, state);
     const code = String(req.query?.code || "").trim();
@@ -3333,11 +3338,12 @@ app.get("/auth/discord/callback", oauthLimiter, async (req, res) => {
       created: linked.created
     });
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}${state.returnTo || "/dashboard/overview"}?discord=connected`);
+    return res.redirect(oauthFrontendRedirect(state.returnTo, "discord"));
   } catch (error) {
     console.error("Discord OAuth callback failed", publicError(error));
     clearOAuthCookies(res);
-    return res.redirect(`${frontendUrl()}/login?error=discord_oauth_failed`);
+    const code = ["provider_link_requires_login", "provider_already_linked"].includes(error?.code || error?.message) ? (error.code || error.message) : "discord_oauth_failed";
+    return res.redirect(oauthFrontendFailure(code, verifiedReturnTo));
   }
 });
 
@@ -6747,8 +6753,24 @@ function robloxOAuthPublicError(error) {
 function safeFrontendPath(value, fallback = "/dashboard/overview") {
   const text = String(value || "").trim();
   if (!text || !text.startsWith("/") || text.startsWith("//")) return fallback;
-  if (/[\r\n]/.test(text)) return fallback;
-  return text.slice(0, 240);
+  if (/[\r\n\\]/.test(text) || text.length > 2048) return fallback;
+  try {
+    const target = new URL(text, "https://fima.invalid");
+    return target.origin === "https://fima.invalid" ? target.pathname + target.search + target.hash : fallback;
+  } catch { return fallback; }
+}
+
+function oauthFrontendRedirect(path, provider) {
+  const target = new URL(safeFrontendPath(path), frontendUrl());
+  target.searchParams.set(provider, "connected");
+  return target.href;
+}
+
+function oauthFrontendFailure(code, verifiedReturnTo) {
+  const target = new URL("/login", frontendUrl());
+  target.searchParams.set("error", code);
+  if (verifiedReturnTo && verifiedReturnTo !== "/dashboard/overview") target.searchParams.set("next", safeFrontendPath(verifiedReturnTo));
+  return target.href;
 }
 
 function createPkcePair() {
@@ -10822,7 +10844,7 @@ async function buildIntegrationSummary(user, db = prisma) {
     ? user.oauthLinks
     : user?.id
     ? await db.oAuthLink.findMany({
-        where: { userId: user.id, provider: { in: ["discord", "roblox", "roblox_profile_verify"] } },
+        where: { userId: user.id, provider: { in: ["google", "discord", "roblox", "roblox_profile_verify"] } },
         orderBy: { updatedAt: "desc" }
       }).catch(() => [])
     : [];
@@ -10832,6 +10854,7 @@ async function buildIntegrationSummary(user, db = prisma) {
   const pendingRoblox = publicRobloxPendingLink(byProvider.roblox_profile_verify);
 
   return {
+    google: { connected: Boolean(byProvider.google), email: maskEmail(byProvider.google?.metadata?.email), connectedAt: byProvider.google?.createdAt || null },
     discord: {
       connected: discordConnected,
       id: maskDiscordId(user?.discordUserId),
