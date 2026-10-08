@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
@@ -498,6 +499,7 @@ export function startDiscordBot() {
       console.warn("Discord command registration failed", { message: error.message });
     });
     const activityWorker = startCommunityActivityWorker(client);
+    startFtShowcaseWorker(client);
     console.info("FIMA community activity worker state", activityWorker);
     const boosterWorker = startCommunityBoosterWorker(client);
     console.info("FIMA community booster worker state", boosterWorker);
@@ -989,6 +991,7 @@ async function handleCommunityActivityCommand(interaction) {
 }
 
 async function handleDiscordInteraction(interaction) {
+  if (await handleFtShowcaseInteraction(interaction)) return;
   if (await handleParadiseInteraction(interaction)) return;
   if (interaction?.isUserSelectMenu?.() && String(interaction.customId || "").startsWith("fima_ticket_assign:")) {
     return handleTicketAssignment(interaction);
