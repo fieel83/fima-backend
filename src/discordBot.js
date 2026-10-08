@@ -2247,10 +2247,10 @@ function ticketCategoryRow() {
   );
 }
 
-function ticketActionRows({ claimed = false, closed = false } = {}) {
+function ticketActionRows({ claimed = false, closed = false, claimEnabled = true } = {}) {
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("fima_ticket_claim").setLabel(claimed ? "Claimed" : "Claim").setStyle(ButtonStyle.Primary).setDisabled(claimed || closed),
+      new ButtonBuilder().setCustomId("fima_ticket_claim").setLabel(claimed ? "Claimed" : "Claim").setStyle(ButtonStyle.Primary).setDisabled(claimed || closed || !claimEnabled),
       new ButtonBuilder().setCustomId("fima_ticket_close").setLabel("Close").setStyle(ButtonStyle.Danger).setDisabled(closed),
       new ButtonBuilder().setCustomId("fima_ticket_reopen").setLabel("Reopen").setStyle(ButtonStyle.Success).setDisabled(!closed),
       new ButtonBuilder().setCustomId("fima_ticket_note").setLabel("Add note").setStyle(ButtonStyle.Secondary).setDisabled(closed),
@@ -2326,6 +2326,8 @@ function fimaBuyPanelPayload() {
 }
 
 async function handleTicketCategorySelect(interaction) {
+  const settings = await fimaTicketSettingsForGuild(interaction.guildId);
+  if (settings.enabled === false) return interaction.reply({ content: "New tickets are currently paused. / Yeni destek talepleri şu anda duraklatıldı.", ephemeral: true });
   const categoryId = interaction.values?.[0] || "other";
   const category = TICKET_CATEGORIES.find((item) => item.id === categoryId) || TICKET_CATEGORIES.at(-1);
   return interaction.showModal(buildTicketIntakeModal(category));
@@ -2340,6 +2342,8 @@ async function handleTicketIntakeSubmit(interaction) {
   if (!category) return interaction.reply({ content: "Choose a current ticket category.", ephemeral: true });
   await interaction.deferReply({ ephemeral: true });
   const guild = interaction.guild || await getGuild();
+  const ticketSettings = await fimaTicketSettingsForGuild(guild.id);
+  if (ticketSettings.enabled === false) return interaction.editReply("New tickets are currently paused. / Yeni destek talepleri şu anda duraklatıldı.");
   const creationKey = `${guild.id}:${interaction.user.id}`;
   if (ticketCreationInFlight.has(creationKey)) return interaction.editReply("Your ticket is being opened. Please wait.");
   ticketCreationInFlight.add(creationKey);
@@ -2357,7 +2361,7 @@ async function handleTicketIntakeSubmit(interaction) {
       content: `<@${interaction.user.id}>`,
       allowedMentions: { users: [interaction.user.id], roles: [], parse: [] },
       embeds: [ticketCreatedEmbed(category, interaction.user.id).addFields(intake)],
-      components: ticketActionRows()
+      components: ticketActionRows({ claimEnabled: ticketSettings.claimEnabled !== false })
     });
     await auditDiscordBotAction("discord_ticket_created", "discord_channel", ticketChannel.id, {
       guildId: guild.id,
@@ -2597,6 +2601,11 @@ async function handleTicketButtonLocked(interaction) {
     return interaction.reply({ content: "Staff will handle that button.", ephemeral: true });
   }
 
+  const ticketSettings = await fimaTicketSettingsForGuild(interaction.guildId);
+  if (action === "claim" && ticketSettings.claimEnabled === false) {
+    return interaction.reply({ content: "Claiming tickets is disabled in this server. / Bu sunucuda destek talebi sahiplenme kapalı.", ephemeral: true });
+  }
+
   if (action === "assign") {
     return interaction.reply({ content: "Choose the staff member to handle this ticket.", ephemeral: true, components: [new ActionRowBuilder().addComponents(new UserSelectMenuBuilder().setCustomId(`fima_ticket_assign:${interaction.message.id}`).setPlaceholder("Select support staff").setMinValues(1).setMaxValues(1))] });
   }
@@ -2630,7 +2639,6 @@ async function handleTicketButtonLocked(interaction) {
   }
   if (action === "close") {
     if (ticketIsClosed(channel)) return interaction.editReply({ content: "This ticket is already closed." });
-    const ticketSettings = await fimaTicketSettingsForGuild(interaction.guildId);
     let transcript;
     try {
       if (ticketSettings.autoTranscript !== false) transcript = await createFimaTicketTranscript(interaction, "close");
@@ -2654,7 +2662,7 @@ async function handleTicketButtonLocked(interaction) {
   if (action === "reopen") {
     if (!ticketIsClosed(channel)) return interaction.editReply({ content: "This ticket is already open." });
     await setClosedTicketParticipantAccess(interaction, false);
-    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "OPEN", claimedBy, actorId: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: Boolean(claimedBy) }) });
+    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "OPEN", claimedBy, actorId: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: Boolean(claimedBy), claimEnabled: ticketSettings.claimEnabled !== false }) });
     void queueTicketRename(channel, false, () => console.warn("Reopened ticket name update failed; access and status remain open"));
     await auditDiscordBotAction("discord_ticket_reopen_succeeded", "discord_channel", interaction.channelId, { guildId: interaction.guildId, actorId: interaction.user.id });
     return interaction.editReply({ content: "Ticket reopened for follow-up." });
