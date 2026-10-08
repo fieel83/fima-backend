@@ -3,6 +3,7 @@ import { prisma } from './db.js';
 
 const GUILD_ID = '1419335632324657306';
 const MARKER = 'FIMA showcase v1';
+const ROTATION_MS = 10_000;
 const panels = new Map();
 const running = new WeakSet();
 
@@ -66,7 +67,7 @@ export async function initializeShowcaseChannel(channel, botId, settings = prism
   if (!items.length) throw new Error(`No historical showcase items in ${channel.name}`);
   const canonical = history.filter(message => message.author?.id === botId && message.embeds?.some(embed => embed.footer?.text?.startsWith(MARKER)))
     .sort((a, b) => a.id === record?.value?.messageId ? -1 : b.id === record?.value?.messageId ? 1 : Number(BigInt(b.id) - BigInt(a.id)))[0];
-  const state = { channelId: channel.id, items, index: Number(record?.value?.index) || 0, paused: record?.value?.paused === true, busy: false, nextAt: Date.now() + 15_000 };
+  const state = { channelId: channel.id, items, index: Number(record?.value?.index) || 0, paused: record?.value?.paused === true, busy: false, nextAt: Date.now() + ROTATION_MS };
   const payload = showcasePayload(state);
   const message = canonical ? await canonical.edit(payload) : await channel.send(payload);
   state.messageId = message.id;
@@ -85,7 +86,7 @@ async function changePanel(state, action) {
     if (action === 'pause') state.paused = !state.paused;
     else state.index = (state.index + (action === 'prev' ? -1 : 1) + state.items.length) % state.items.length;
     await state.message.edit(showcasePayload(state));
-    state.nextAt = Date.now() + 15_000;
+    state.nextAt = Date.now() + ROTATION_MS;
     await save(state);
     return true;
   } catch (error) {
@@ -142,6 +143,6 @@ export function startFtShowcaseWorker(client) {
     for (const state of panels.values()) {
       if (!state.paused && state.items.length > 1 && Date.now() >= state.nextAt) void changePanel(state, 'next').catch(() => {});
     }
-  }, 15_000);
+  }, 1_000);
   timer.unref?.();
 }

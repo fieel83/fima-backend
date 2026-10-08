@@ -72,7 +72,7 @@ export async function publishCommunityInfo(channel, botId, channels, settings = 
   return completed;
 }
 
-export function startFtInfoWorker(client) {
+export function startFtInfoWorker(client, settings = prisma.setting) {
   if (workers.has(client)) return;
   workers.add(client);
   let busy = false;
@@ -85,10 +85,12 @@ export function startFtInfoWorker(client) {
       const channels = await guild.channels.fetch();
       for (const name of ['fieel-info', 'support-faq']) {
         if (done.has(name)) continue;
-        const matches = [...channels.values()].filter(channel => channel?.name === name && channel.messages);
-        if (matches.length !== 1) throw new Error(`FT info destination ${name} missing or ambiguous`);
-        await publishCommunityInfo(matches[0], client.user.id, channels);
-        done.add(name);
+        try {
+          const matches = [...channels.values()].filter(channel => channel?.name === name && channel.messages);
+          if (matches.length !== 1) throw new Error(`FT info destination ${name} missing or ambiguous`);
+          await publishCommunityInfo(matches[0], client.user.id, channels, settings);
+          done.add(name);
+        } catch (error) { console.warn('FT info update blocked', { channel: name, message: error.message }); }
       }
     } catch (error) { console.warn('FT info update blocked', { message: error.message }); }
     finally { busy = false; }
