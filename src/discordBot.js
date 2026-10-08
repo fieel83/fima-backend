@@ -64,6 +64,7 @@ import {
   handleParadiseInteraction,
   handleParadiseMessage,
   handleParadiseVoiceStateUpdate,
+  recoverParadiseTemporaryVoices,
   FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
   initializeParadise,
   PARADISE_COMMUNITY_VISUAL_SURFACE_PLAN,
@@ -502,6 +503,9 @@ export function startDiscordBot() {
     const activityWorker = startCommunityActivityWorker(client);
     startFtShowcaseWorker(client);
     startFtInfoWorker(client);
+    recoverParadiseTemporaryVoices(client)
+      .then(results => console.info('FIMA temporary voice recovery', { results }))
+      .catch(error => console.error('FIMA temporary voice recovery failed', { message: error.message }));
     console.info("FIMA community activity worker state", activityWorker);
     const boosterWorker = startCommunityBoosterWorker(client);
     console.info("FIMA community booster worker state", boosterWorker);

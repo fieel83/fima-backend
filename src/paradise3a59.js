@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
+import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices } from './fimaTemporaryVoiceLifecycle.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
 import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
 import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings } from './fimaGuildArchitecture.js';
@@ -11183,6 +11184,21 @@ async function handleTemporaryVoiceMemberModal(interaction) {
   return interaction.reply({ content: `Voice action **${action}** applied for ${member}.`, ephemeral: true });
 }
 
+export async function recoverParadiseTemporaryVoices(client) {
+  const state = await loadState();
+  return recoverTemporaryVoices({
+    records: state.temporaryVoices,
+    getGuild: guildId => client.guilds.cache.get(guildId),
+    enabled: guildId => {
+      const config = configForGuild(state, guildId);
+      const voice = fimaVoiceSettings(config);
+      return Boolean(config.activeSetupMode) && fimaRuntimeModuleAllowed(config, 'voice')
+        && voice.enabled !== false && voice.autoDelete !== false;
+    },
+    removeRecord: channelId => saveState(next => { delete next.temporaryVoices[channelId]; return next; })
+  });
+}
+
 export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   const guild = newState.guild || oldState.guild;
   if (!guild || newState.member?.user?.bot) return false;
@@ -11193,8 +11209,22 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
   const isJoinToCreate = oldState.channelId !== newState.channelId && joined?.type === ChannelType.GuildVoice
-    && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : ["⌁・join-to-create", "◜・oda-oluştur", "Join to Create"].includes(joined.name));
+    && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : ["⌁・join-to-create", "◜・oda-oluştur", "Join to Create", "Create a Room"].includes(joined.name));
   if (isJoinToCreate) {
+    return withTemporaryVoiceJoin(`${guild.id}:${newState.member.id}`, async () => {
+    if (newState.member.voice.channelId !== joined.id) return false;
+    const removeRecord = async channelId => saveState(state => {
+      delete state.temporaryVoices[channelId];
+      return state;
+    });
+    const existing = Object.values((await loadState()).temporaryVoices || {})
+      .find(record => record.guildId === guild.id && record.ownerId === newState.member.id
+        && guild.channels.cache.get(record.channelId)?.type === ChannelType.GuildVoice);
+    if (existing) {
+      await moveToTemporaryVoice({ channel: guild.channels.cache.get(existing.channelId),
+        move: channel => newState.setChannel(channel, 'FIMA Bot existing temporary voice'), removeRecord });
+      return true;
+    }
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
     const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
       || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name));
@@ -11223,9 +11253,13 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
       };
       return state;
     });
-    await newState.setChannel(channel, "FIMA Bot Join to Create");
+    await moveToTemporaryVoice({ channel, created: true, removeRecord, move: async target => {
+      if (newState.member.voice.channelId !== joined.id) throw new Error('temporary_voice_member_left_lobby');
+      await newState.setChannel(target, 'FIMA Bot Join to Create');
+    } });
     await channel.send(temporaryVoicePanel(channel.id)).catch(() => {});
     return true;
+    });
   }
   const oldChannel = oldState.channel;
   if (oldChannel && oldChannel.id !== newState.channelId) {
