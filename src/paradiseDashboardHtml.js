@@ -1545,8 +1545,7 @@ async function runManagedOperation(kind){
   try{
     const body={guildId:selectedGuildId};if(kind==='preview')body.mode=byId('template').value;
     if(['migrate-channels','add-missing-channels','cleanup-empty-categories','order-channels'].includes(kind)){
-      const auditResponse=await fetch(API_BASE+'/api/fima-bot/real-audit?guildId='+encodeURIComponent(selectedGuildId),{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
-      const auditResult=await auditResponse.json();
+      const{response:auditResponse,result:auditResult}=await mutate('/api/fima-bot/actions/audit',{guildId:selectedGuildId});
       if(!auditResponse.ok||!auditResult.migrationPlan?.sourceDigest)return show('Run an FT audit first.',false);
       body.expectedDigest=auditResult.migrationPlan.sourceDigest;
     }

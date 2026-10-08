@@ -8,7 +8,7 @@ export const FT_MIGRATION_CATEGORIES = Object.freeze([
 
 const groups = [
   ['START', ['rules', 'roles', 'fieel-info', 'joins-leaves', 'start-here']],
-  ['COMMUNITY', ['general', 'chat', 'english-chat', 'media', 'english-media', 'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'outfits', 'capes', 'levels']],
+  ['COMMUNITY', ['general', 'chat', 'english-chat', 'media', 'english-media', 'sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'outfits', 'capes', 'levels']],
   ['EVENTS', ['announcements', 'updates', 'uploads', 'polls', 'events', 'giveaways', 'turkce-duyurular', 'fima-updates']],
   ['HELP', ['support', 'faq', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless']],
   ['STAFF', ['staff-hub', 'staff-chat', 'staff-guides', 'staff-application-reviews', 'application-reviews', 'moderator-only', 'steps', 'macro-steps']],
@@ -19,6 +19,18 @@ const groups = [
 const destination = new Map(groups.flatMap(([group, names]) => names.map(name => [name, group])));
 const normalize = name => String(name || '').normalize('NFKC').toLowerCase()
   .replace(/^[^\p{L}\p{N}]+/u, '').replace(/[_\s]+/g, '-');
+
+const chatNames = new Set(['general', 'chat', 'english-chat', 'media', 'english-media', 'sohbet', 'medya',
+  'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'staff-chat', 'mod-chat', 'management', 'management-chat', 'admin-chat', 'moderator-only']);
+const panelNames = new Set(['roles', 'support', 'fima-support', 'polls', 'events', 'giveaways', 'staff-application-reviews', 'application-reviews']);
+function styledChannelName(channel, privateTicket, group) {
+  if (!group || privateTicket) return channel.name;
+  const key = normalize(channel.name);
+  const aliases = { 'turkce-sohbet': 'sohbet', 'turkish-chat': 'sohbet', 'turkce-medya': 'medya',
+    'turkish-media': 'medya', 'support-faq': 'faq', 'create-a-room': 'create-room' };
+  const base = aliases[key] || key;
+  return `${[2, 13].includes(channel.type) ? '◦' : panelNames.has(key) ? '◇' : chatNames.has(key) ? '›' : '⌁'}・${base}`;
+}
 
 // This is deliberately a review plan, never an instruction to reconstruct a guild.
 // Unrecognised resources remain in place until their purpose has been reviewed.
@@ -58,7 +70,7 @@ export function buildFtCommunityMigrationPlan(audit) {
     const target = targetCategories.find(category => category.key === group);
     const decision = !target ? 'review' : group === 'ARCHIVE' ? 'archive'
       : target.existingId && channel.parentId === target.existingId ? 'keep' : 'move';
-    return { id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId,
+    return { id: channel.id, name: channel.name, targetName: styledChannelName(channel, privateTicket, group), type: channel.type, parentId: channel.parentId,
       currentCategory, targetCategory: target?.name || null, targetCategoryId: target?.existingId || null,
       decision, preserveId: true, preserveHistory: true, preservePermissionOverwrites: true,
       permissionReviewRequired: Boolean(target && channel.parentId !== target.existingId),
@@ -73,7 +85,9 @@ export function buildFtCommunityMigrationPlan(audit) {
     'turkce-sohbet', 'turkce-medya', 'vouches', 'announcements', 'updates', 'uploads', 'polls',
     'support', 'support-faq', 'fima-macro', 'fake-headless', 'outfits', 'capes'];
   const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name
-    || name === 'support-faq' && normalize(channel.name) === 'faq'));
+    || name === 'support-faq' && normalize(channel.name) === 'faq'
+    || name === 'turkce-sohbet' && ['sohbet', 'turkish-chat'].includes(normalize(channel.name))
+    || name === 'turkce-medya' && ['medya', 'turkish-media'].includes(normalize(channel.name))));
   const sourceDigest = createHash('sha256').update(JSON.stringify(channels.map(channel => ({
     id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId, position: channel.position,
     permissionOverwrites: (channel.permissionOverwrites || []).map(row => ({

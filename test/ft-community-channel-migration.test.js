@@ -58,6 +58,27 @@ async function request(f) {
     saveJournal: f.saveJournal, actorUserId: 'owner' };
 }
 
+test('channel styling preserves identities and access, is idempotent, and rolls back ambiguous renames', async () => {
+  const f = fixture(), before = await captureFtChannelInventory(f.guild);
+  const rename = f.channels.get('support').setName;
+  let first = true;
+  f.channels.get('support').setName = async value => {
+    await rename(value);
+    if (first) { first = false; throw new Error('lost_rename_response'); }
+  };
+  await assert.rejects(migrateFtChannels(await request(f)), error => error.journal.status === 'rolled_back');
+  assert.deepEqual((await captureFtChannelInventory(f.guild)).channels, before.channels);
+  await migrateFtChannels(await request(f));
+  assert.equal(f.channels.get('support').name, '◇・support');
+  assert.equal(f.channels.get('rules').name, '⌁・rules');
+  for (const row of before.channels) assert.deepEqual(
+    (await captureFtChannelInventory(f.guild)).channels.find(actual => actual.id === row.id).permissionOverwrites,
+    row.permissionOverwrites);
+  f.writes.length = 0;
+  await migrateFtChannels(await request(f));
+  assert.deepEqual(f.writes, []);
+});
+
 test('ordering preserves channel identity, parents and access while arranging categories and support', async () => {
   const f = fixture();
   await migrateFtChannels(await request(f));
@@ -72,7 +93,7 @@ test('ordering preserves channel identity, parents and access while arranging ca
     assert.deepEqual({ ...actual, position: original.position }, original);
   }
   const help = plan.targetCategories.find(row => row.key === 'HELP');
-  assert.deepEqual(result.after.channels.filter(row => row.parentId === help.existingId).sort((a,b) => a.position-b.position).map(row => row.name), ['support','support-faq']);
+  assert.deepEqual(result.after.channels.filter(row => row.parentId === help.existingId).sort((a,b) => a.position-b.position).map(row => row.name), ['◇・support','support-faq']);
 });
 
 test('ordering rejects stale position snapshots and journal failures before changing Discord', async () => {

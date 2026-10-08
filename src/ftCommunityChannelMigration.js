@@ -16,7 +16,7 @@ const legacyCategoryIds = new Set(['1421240822866645113', '1557009769083047936',
 
 const channelOrder = {
   START: ['rules', 'roles', 'fieel-info', 'joins-leaves'],
-  COMMUNITY: ['general', 'media', 'turkce-sohbet', 'turkce-medya', 'vouches', 'outfits', 'capes'],
+  COMMUNITY: ['general', 'media', 'sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'vouches', 'outfits', 'capes'],
   EVENTS: ['announcements', 'updates', 'uploads', 'polls', 'turkce-duyurular'],
   HELP: ['support', 'faq', 'support-faq', 'fima-macro', 'fake-headless'],
   STAFF: ['rules', 'mod-chat'],
@@ -280,6 +280,13 @@ export async function migrateFtChannels({ guild, expectedDigest, saveJournal, ac
     }
     for (const row of plan.matrix) {
       const destination = targets.get(row.targetCategory);
+      if (row.targetName !== row.name) {
+        const channel = await guild.channels.fetch(row.id);
+        const original = before.channels.find(item => item.id === row.id);
+        if (channel.name !== original.name || canonicalPermissions(overwrites(channel)) !== canonicalPermissions(original.permissionOverwrites)) throw fail('migration_channel_changed');
+        await apply({ kind: 'rename_channel', id: row.id, beforeName: row.name, afterName: row.targetName },
+          () => channel.setName(row.targetName, reason));
+      }
       if (row.parentId === destination) continue;
       const channel = await guild.channels.fetch(row.id);
       const original = before.channels.find(item => item.id === row.id);
@@ -296,7 +303,7 @@ export async function migrateFtChannels({ guild, expectedDigest, saveJournal, ac
     for (const original of before.channels) {
       const actual = after.channels.find(row => row.id === original.id);
       const target = plan.matrix.find(row => row.id === original.id);
-      if (!actual || actual.name !== original.name || actual.type !== original.type ||
+      if (!actual || actual.name !== target.targetName || actual.type !== original.type ||
           actual.parentId !== targets.get(target.targetCategory) || canonicalPermissions(actual.permissionOverwrites) !==
           canonicalPermissions(original.permissionOverwrites)) throw fail('migration_final_verification_failed');
     }
@@ -313,7 +320,7 @@ export async function migrateFtChannels({ guild, expectedDigest, saveJournal, ac
       journal.error = error.code || error.message;
       journal.rollbackErrors = [];
       for (const operation of [...journal.operations].reverse()) {
-        if (!['move', 'rename'].includes(operation.kind)) continue;
+        if (!['move', 'rename', 'rename_channel'].includes(operation.kind)) continue;
         try {
           operation.rollbackStatus = 'pending';
           await persist();
@@ -324,7 +331,10 @@ export async function migrateFtChannels({ guild, expectedDigest, saveJournal, ac
             const restored = await guild.channels.fetch(operation.id);
             if (restored.parentId !== operation.beforeParentId || canonicalPermissions(overwrites(restored)) !==
                 canonicalPermissions(operation.permissionOverwrites)) throw fail('migration_rollback_verification_failed');
-          } else await channel.setName(operation.beforeName, reason);
+          } else {
+            await channel.setName(operation.beforeName, reason);
+            if ((await guild.channels.fetch(operation.id)).name !== operation.beforeName) throw fail('migration_rollback_verification_failed');
+          }
           operation.rollbackStatus = 'restored';
           await persist();
         } catch (rollbackError) {

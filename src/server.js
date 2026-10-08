@@ -2239,6 +2239,7 @@ app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-m
         removedEmptyCategories: journal.operations.filter(row => row.kind === "delete_empty_category" && row.status === "applied").map(row => ({ id: row.id, name: row.name })),
         createdChannels: journal.operations.filter(row => row.kind === "create_channel" && row.status === "applied").map(row => ({ id: row.id, name: row.name })),
         renamedCategories: journal.operations.filter(row => row.kind === "rename").length,
+        renamedChannels: journal.operations.filter(row => row.kind === "rename_channel" && row.status === "applied").map(row => ({ id: row.id, beforeName: row.beforeName, afterName: row.afterName })),
         createdCategories: journal.createdCategoryIds.length, remaining: journal.remaining };
     }, { purposeKey: "ft_community_channel_migration" });
     return res.json({ success: true, guildId, migration });
