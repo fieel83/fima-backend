@@ -28,7 +28,7 @@ test("ticket close path is transcript-first and the public controls have no dele
   const closeStart = botSource.indexOf('if (action === "close")');
   const closeEnd = botSource.indexOf('if (action === "reopen")', closeStart);
   const closePath = botSource.slice(closeStart, closeEnd);
-  assert.ok(closePath.indexOf("createFimaTicketTranscript") < closePath.indexOf("setName"));
+  assert.ok(closePath.indexOf("createFimaTicketTranscript") < closePath.indexOf("queueTicketRename"));
   assert.match(closePath, /ticket was not closed/);
   assert.match(closePath, /status: "CLOSED"/);
 });

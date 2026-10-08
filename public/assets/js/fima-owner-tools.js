@@ -470,7 +470,7 @@ async function applyFimaBotProfile(){
     const{response,result}=await mutate('/api/fima-bot/actions/fima-bot-profile',{apply:true,confirmation});
     if(!response.ok){show(result.error||'FIMA Bot profile sync failed',false);return}
     byId('fimaBotProfileConfirmation').value='';
-    const changes=Array.isArray(result.changes)?result.changes.length:0;
+    const changes=Array.isArray(result.changes)?result.changes.length:(Array.isArray(result.result?.changes)?result.result.changes.length:0);
     show(changes?'Applied '+changes+' supported FIMA Bot profile field(s).':'Supported FIMA Bot profile fields already match.');
     await loadFimaBotProfileStatus();
   }catch{show('FIMA Bot profile sync failed safely.',false)}

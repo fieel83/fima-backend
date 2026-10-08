@@ -314,7 +314,7 @@ export async function applyFimaBotProfileSync(client, {
     // failing or misleading API call.
     for (const guildId of status._private.guildIds) {
       const member = client.guilds.cache.get(guildId)?.members?.me;
-      if (member && clean(member.nickname || client.user.username) !== FIMA_BOT_PROFILE_NAME) {
+      if (member && clean(member.nickname) !== FIMA_BOT_PROFILE_NAME) {
         mutationAttempted = true;
         await member.setNickname(FIMA_BOT_PROFILE_NAME, "Owner-approved FIMA Bot profile sync");
         changes.push("guild_nickname");
