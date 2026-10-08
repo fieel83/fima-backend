@@ -28,7 +28,13 @@ function styledChannelName(channel, privateTicket, group) {
   const key = normalize(channel.name);
   const aliases = { 'turkce-sohbet': 'sohbet', 'turkish-chat': 'sohbet', 'turkce-medya': 'medya',
     'turkish-media': 'medya', 'support-faq': 'faq', 'create-a-room': 'create-room' };
-  const base = aliases[key] || key;
+  // Only the two audited legacy rooms have this name; do not infer privacy from a label.
+  const legacyVoiceNames = {
+    '1552741177642455121': 'general-voice',
+    '1512019964192620594': 'private-voice'
+  };
+  const base = channel.type === 2 && key === 'v1'
+    ? legacyVoiceNames[channel.id] || key : aliases[key] || key;
   return `${[2, 13].includes(channel.type) ? '◦' : panelNames.has(key) ? '◇' : chatNames.has(key) ? '›' : '⌁'}・${base}`;
 }
 

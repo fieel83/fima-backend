@@ -23,6 +23,25 @@ test('live audit categories and string channel types produce an ID preserving re
   assert.deepEqual(plan.deletionOperations, []);
 });
 
+test('audited legacy voice names change without touching IDs, access or unrelated rooms', () => {
+  const input = audit();
+  input.categories.push({ id: 'voice-category', name: '◉・VOICE' });
+  input.channels = ['1552741177642455121', '1512019964192620594', 'unrelated'].map(id => ({
+    id, name: '◦・v1', type: 'GuildVoice', parentId: 'voice-category',
+    permissionOverwrites: [{ id: FT_MIGRATION_GUILD_ID, type: 0, deny: ['ViewChannel'], allow: [] }]
+  }));
+  const before = structuredClone(input);
+  const plan = buildFtCommunityMigrationPlan(input);
+  assert.equal(plan.matrix.find(row => row.id === '1552741177642455121').targetName, '◦・general-voice');
+  assert.equal(plan.matrix.find(row => row.id === '1512019964192620594').targetName, '◦・private-voice');
+  assert.equal(plan.matrix.find(row => row.id === 'unrelated').targetName, '◦・v1');
+  assert.ok(plan.matrix.every(row => row.decision === 'keep' && row.preserveId
+    && row.preservePermissionOverwrites && !row.permissionReviewRequired));
+  assert.deepEqual(input, before);
+  input.channels.forEach(channel => { channel.name = plan.matrix.find(row => row.id === channel.id).targetName; });
+  assert.ok(buildFtCommunityMigrationPlan(input).matrix.every(row => row.name === row.targetName));
+});
+
 test('a channel without a parent must move when its target category does not exist', () => {
   const input = audit(); input.channels.push({ id: 'help', name: 'support', type: 0, parentId: null });
   assert.equal(buildFtCommunityMigrationPlan(input).matrix.find(row => row.id === 'help').decision, 'move');
