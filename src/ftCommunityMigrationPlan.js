@@ -12,7 +12,7 @@ const groups = [
   ['EVENTS', ['announcements', 'updates', 'uploads', 'polls', 'events', 'giveaways', 'turkce-duyurular', 'fima-updates']],
   ['HELP', ['support', 'faq', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless']],
   ['STAFF', ['staff-hub', 'staff-chat', 'staff-guides', 'staff-application-reviews', 'application-reviews', 'moderator-only', 'steps', 'macro-steps']],
-  ['MANAGEMENT', ['management', 'management-chat', 'admin-chat', 'video-hub', 'video-ideas', 'video-scripts', 'video-assets', 'video-review', 'video-upload-schedule']],
+  ['MANAGEMENT', ['management', 'management-chat', 'admin-chat', 'staff-actions', 'video-hub', 'video-ideas', 'video-scripts', 'video-assets', 'video-review', 'video-upload-schedule']],
   ['RECORDS', ['logs', 'wick-logs', 'message-logs', 'un-bl-logs', 'join-logs', 'fima-logs', 'staff-logs', 'security-logs', 'ticket-transcripts', 'transcripts']],
   ['ARCHIVE', ['openclaw-private', 'old-things', 'glads', 'eu-glads', 'asia-glads', 'na-glads', 'anti-teamers', 'leaderboard', 'tournaments']]
 ];
@@ -83,8 +83,9 @@ export function buildFtCommunityMigrationPlan(audit) {
       reason: 'Remove from the active structure only after all children and permissions are verified.' }));
   const requiredNames = ['rules', 'roles', 'fieel-info', 'joins-leaves', 'general', 'media',
     'turkce-sohbet', 'turkce-medya', 'vouches', 'announcements', 'updates', 'uploads', 'polls',
-    'support', 'support-faq', 'fima-macro', 'fake-headless', 'outfits', 'capes'];
+    'support', 'support-faq', 'fima-macro', 'fake-headless', 'outfits', 'capes', 'management', 'staff-actions'];
   const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name
+    || name === 'management' && ['management-chat', 'admin-chat'].includes(normalize(channel.name))
     || name === 'support-faq' && normalize(channel.name) === 'faq'
     || name === 'turkce-sohbet' && ['sohbet', 'turkish-chat'].includes(normalize(channel.name))
     || name === 'turkce-medya' && ['medya', 'turkish-media'].includes(normalize(channel.name))));

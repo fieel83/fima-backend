@@ -129,13 +129,16 @@ test('additive phase preserves originals, inherits access, and is idempotent', a
   const before = await captureFtChannelInventory(f.guild);
   const result = await addFtMissingChannels(await request(f));
   assert.equal(result.status, 'missing_channels_added');
-  assert.deepEqual(result.operations.map(row => row.name), ['general', 'media', 'polls', 'support-faq']);
+  assert.deepEqual(result.operations.map(row => row.name), ['general', 'media', 'polls', 'support-faq', 'management', 'staff-actions']);
   for (const original of before.channels) {
     assert.deepEqual(result.after.channels.find(row => row.id === original.id), original);
   }
   for (const created of result.operations) {
     const actual = f.channels.get(created.id);
-    assert.deepEqual(actual.permissionOverwrites.cache, f.channels.get(actual.parentId).permissionOverwrites.cache);
+    const permissions = channel => [...channel.permissionOverwrites.cache.values()].map(row => ({
+      id: row.id, type: row.type, allow: row.allow.toArray(), deny: row.deny.toArray()
+    }));
+    assert.deepEqual(permissions(actual), permissions(f.channels.get(actual.parentId)));
   }
   const again = await addFtMissingChannels(await request(f));
   assert.deepEqual(again.operations, []);
@@ -146,6 +149,33 @@ test('additive phase refuses stale plans and absent destination categories', asy
   await assert.rejects(addFtMissingChannels({ ...await request(f), expectedDigest: 'stale' }), { code: 'migration_stale_plan' });
   await assert.rejects(addFtMissingChannels(await request(f)), { code: 'migration_categories_required' });
   assert.deepEqual(f.writes, []);
+});
+
+test('missing management channels require a private parent before any channel is created', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const parent = [...f.channels.values()].find(row => row.name === '□・MANAGEMENT');
+  await parent.permissionOverwrites.set([]);
+  f.writes.length = 0;
+  await assert.rejects(addFtMissingChannels(await request(f)), { code: 'migration_private_category_required' });
+  assert.deepEqual(f.writes, []);
+});
+
+test('creation verifies inherited private permissions and preserves evidence on mismatch', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  const create = f.guild.channels.create;
+  f.guild.channels.create = async options => {
+    const channel = await create(options);
+    if (options.name === '⌁・staff-actions') await channel.permissionOverwrites.set([]);
+    return channel;
+  };
+  await assert.rejects(addFtMissingChannels(await request(f)), error => {
+    assert.equal(error.code, 'migration_created_channel_permissions_failed');
+    assert.equal(error.journal.status, 'additive_review_required');
+    return true;
+  });
+  assert.equal(f.writes.some(row => row[0] === 'delete'), false);
 });
 
 test('additive phase stops before mutation when durable journal cannot be written', async () => {

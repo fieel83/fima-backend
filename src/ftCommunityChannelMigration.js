@@ -20,6 +20,7 @@ const channelOrder = {
   EVENTS: ['announcements', 'updates', 'uploads', 'polls', 'turkce-duyurular'],
   HELP: ['support', 'faq', 'support-faq', 'fima-macro', 'fake-headless'],
   STAFF: ['rules', 'mod-chat'],
+  MANAGEMENT: ['management', 'management-chat', 'admin-chat', 'staff-actions'],
   RECORDS: ['ticket-transcripts', 'transcripts', 'fima-logs', 'logs', 'message-logs', 'join-logs', 'un-bl-logs', 'wick-logs']
 };
 const orderName = name => String(name).normalize('NFKC').toLowerCase().replace(/^[^\p{L}\p{N}]+/u, '').replace(/[_\s]+/g, '-');
@@ -168,21 +169,35 @@ export async function addFtMissingChannels({ guild, expectedDigest, saveJournal,
       { name: 'general', category: 'COMMUNITY', topic: 'FT Community — chat, share and meet the community. / Topluluk sohbeti.' },
       { name: 'media', category: 'COMMUNITY', topic: 'Share your clips, edits and creations. / Kliplerini ve çalışmalarını paylaş.' },
       { name: 'polls', category: 'EVENTS', topic: 'Community polls and votes. / Topluluk anketleri ve oylamaları.' },
-      { name: 'support-faq', category: 'HELP', topic: 'Support answers and guidance. / Destek soruları ve rehberi.' }
+      { name: 'support-faq', category: 'HELP', topic: 'Support answers and guidance. / Destek soruları ve rehberi.' },
+      { name: 'management', displayName: '›・management', category: 'MANAGEMENT', topic: 'Private management decisions, strategy and escalations. Record the decision, responsible person and follow-up here.' },
+      { name: 'staff-actions', displayName: '⌁・staff-actions', category: 'MANAGEMENT', topic: 'Private record of staff promotions, demotions and permission changes. Include the actor, reason and result; never post credentials.' }
     ];
     const targets = new Map(plan.targetCategories.map(row => [row.key, row.existingId]));
     if (specs.some(spec => !targets.get(spec.category))) throw fail('migration_categories_required');
+    const parents = new Map();
+    for (const spec of specs) {
+      const parent = parents.get(spec.category) || await guild.channels.fetch(targets.get(spec.category));
+      parents.set(spec.category, parent);
+      if (privateGroups.has(spec.category)) {
+        const everyone = overwrites(parent).find(row => row.id === guild.id && Number(row.type) === 0);
+        if (!everyone?.deny.includes('ViewChannel') || everyone.allow.includes('ViewChannel')) {
+          throw fail('migration_private_category_required');
+        }
+      }
+    }
     journal = { id: randomUUID(), guildId: guild.id, actorUserId, phase: 'missing_channels',
       status: 'applying', startedAt: new Date().toISOString(), before, operations: [], createdCategoryIds: [] };
     await persist();
     const matchesSpec = (row, spec) => orderName(row.name) === spec.name
+      || spec.name === 'management' && ['management-chat', 'admin-chat'].includes(orderName(row.name))
       || spec.name === 'support-faq' && orderName(row.name) === 'faq';
     for (const spec of specs) {
       if (before.channels.some(row => matchesSpec(row, spec))) continue;
-      const parent = await guild.channels.fetch(targets.get(spec.category));
+      const parent = parents.get(spec.category);
       journal.operations.push({ kind: 'create_channel', name: spec.name, parentId: parent.id, status: 'pending' });
       await persist();
-      const channel = await guild.channels.create({ name: spec.name, type: 0, parent: parent.id,
+      const channel = await guild.channels.create({ name: spec.displayName || spec.name, type: 0, parent: parent.id,
         topic: spec.topic, rateLimitPerUser: 5, permissionOverwrites: overwrites(parent),
         reason: 'FT Community: add missing channels without changing existing channels' });
       Object.assign(journal.operations.at(-1), { id: channel.id, status: 'applied' });
@@ -199,6 +214,12 @@ export async function addFtMissingChannels({ guild, expectedDigest, saveJournal,
     for (const spec of specs) {
       if (!after.channels.some(row => matchesSpec(row, spec) && row.type === 0 && row.parentId === targets.get(spec.category))) {
         throw fail('migration_created_channel_verification_failed');
+      }
+    }
+    for (const operation of journal.operations) {
+      const actual = after.channels.find(row => row.id === operation.id);
+      if (!actual || canonicalPermissions(actual.permissionOverwrites) !== canonicalPermissions(overwrites(parents.get(specs.find(spec => spec.name === operation.name).category)))) {
+        throw fail('migration_created_channel_permissions_failed');
       }
     }
     journal.after = after;
