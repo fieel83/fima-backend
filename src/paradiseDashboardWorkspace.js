@@ -1,4 +1,6 @@
 import { FIMA_MODULE_CATALOG, assertFimaModuleSelection, fimaModuleStates, fimaPublicConfig, fimaSetupType, fimaWorkspaceRoutes } from './fimaGuildArchitecture.js';
+import { communityActivitySettings } from './communityActivitySettings.js';
+import { communityActivityGuildIds } from './communityGuildPolicy.js';
 const ROUTES = Object.freeze([
   ["overview", "Overview"], ["modules", "Modules"], ["setup", "Setup Wizard"],
   ["channels", "Channels"], ["roles", "Roles & Permissions"], ["welcome", "Welcome & Roles"],
@@ -171,7 +173,7 @@ export function normalizeParadiseCustomerWorkspacePatch({ route, value } = {}) {
       panelDescription: { type: "string", max: 1200 },
       panelButtonLabel: { type: "string", max: 40 }
     }],
-    levels: ["xpSettings", { enabled: { type: "boolean" }, chatXp: { type: "integer", min: 1, max: 100, fallback: 10 }, chatCooldownSeconds: { type: "integer", min: 15, max: 3600, fallback: 60 } }],
+    levels: ["xpSettings", { enabled: { type: "boolean" }, chatXp: { type: "integer", min: 1, max: 100, fallback: 10 }, chatCooldownSeconds: { type: "integer", min: 15, max: 3600, fallback: 60 }, voiceXpPerMinute: { type: "integer", min: 1, max: 100, fallback: 5 } }],
     voice: ["voiceSettings", { enabled: { type: "boolean" }, defaultLimit: { type: "integer", min: 0, max: 99, fallback: 0 }, autoDelete: { type: "boolean" }, safeNames: { type: "boolean" } }],
     security: ["automod", { enabled: { type: "boolean" }, blockInvites: { type: "boolean" }, blockScamKeywords: { type: "boolean" }, mentionSpamLimit: { type: "integer", min: 3, max: 50, fallback: 8 } }],
     social: ["socialSettings", { enabled: { type: "boolean" }, delaySeconds: { type: "integer", min: 0, max: 3600, fallback: 60 } }],
@@ -200,6 +202,7 @@ export function applyParadiseCustomerWorkspacePatch(config = {}, normalizedPatch
       next[key] = value;
     }
   }
+  if (normalizedPatch.route === "levels" && fimaSetupType(next) === "community") next.xpSettings.communityManaged = true;
   next.customerWorkspaceVersion = Math.max(0, Number(next.customerWorkspaceVersion) || 0) + 1;
   assertFimaModuleSelection(next);
   return next;
@@ -256,6 +259,11 @@ export function buildParadiseCustomerWorkspaceView({ card, config = {}, route = 
     version: paradiseCustomerWorkspaceVersion(config),
     config: card.botInstalled ? {
       ...customerWorkspaceConfigView(config, selectedRoute),
+      ...(selectedRoute === 'levels' && fimaSetupType(config, card) === 'community' && communityActivityGuildIds().includes(String(card.guildId)) ? { xpSettings: {
+        ...customerWorkspaceConfigView(config, selectedRoute).xpSettings,
+        ...communityActivitySettings(config.xpSettings),
+        chatCooldownSeconds: communityActivitySettings(config.xpSettings).chatCooldownSeconds || 15
+      } } : {}),
       ...(selectedRoute === 'modules' ? { modules: Object.fromEntries(fimaModuleStates(config, card).map(item => [item.id, item.enabled])) } : {})
     } : {},
     inviteRequired: card.botInstalled !== true

@@ -108,7 +108,7 @@ const EDITABLE_ROUTES = Object.freeze({
   tickets: { configKey: "ticketSettings", fields: { enabled: { type: "boolean" }, claimEnabled: { type: "boolean" }, autoTranscript: { type: "boolean" }, deleteDelayMinutes: { type: "integer", min: 0, max: 10080 } } },
   sessions: { configKey: "sessionSettings", fields: { trainingEnabled: { type: "boolean" }, tryoutEnabled: { type: "boolean" }, resultApprovalRequired: { type: "boolean" } } },
   applications: { configKey: "applicationSettings", fields: { enabled: { type: "boolean" }, membershipRequired: { type: "boolean" }, cooldownDays: { type: "integer", min: 0, max: 365 }, panelTitle: { type: "string", max: 80 }, panelDescription: { type: "textarea", max: 1200 }, panelButtonLabel: { type: "string", max: 40 } } },
-  levels: { configKey: "xpSettings", fields: { enabled: { type: "boolean" }, chatXp: { type: "integer", min: 1, max: 100 }, chatCooldownSeconds: { type: "integer", min: 15, max: 3600 } } },
+  levels: { configKey: "xpSettings", fields: { enabled: { type: "boolean" }, chatXp: { type: "integer", min: 1, max: 100 }, chatCooldownSeconds: { type: "integer", min: 15, max: 3600 }, voiceXpPerMinute: { type: "integer", min: 1, max: 100 } } },
   voice: { configKey: "voiceSettings", fields: { enabled: { type: "boolean" }, defaultLimit: { type: "integer", min: 0, max: 99 }, autoDelete: { type: "boolean" }, safeNames: { type: "boolean" } } },
   security: { configKey: "automod", fields: { enabled: { type: "boolean" }, blockInvites: { type: "boolean" }, blockScamKeywords: { type: "boolean" }, mentionSpamLimit: { type: "integer", min: 3, max: 50 } } },
   social: { configKey: "socialSettings", fields: { enabled: { type: "boolean" }, delaySeconds: { type: "integer", min: 0, max: 3600 } } },
@@ -117,6 +117,7 @@ const EDITABLE_ROUTES = Object.freeze({
 });
 
 const FIELD_LABELS = Object.freeze({
+  voiceXpPerMinute: "Ses XP / dakika (Community)",
   enabled: "Etkin",
   mentionMember: "Üyeden bahset",
   showMemberCount: "Üye sayısını göster",

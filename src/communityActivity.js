@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { communityActivitySettingsForGuild } from "./communityActivitySettings.js";
 import { prisma } from "./db.js";
 import { generateUniqueLicenseKey } from "./license.js";
 import { PARADISE_TEST_GUILD_ID } from "./runtimeEnvironment.js";
@@ -109,6 +110,9 @@ export async function handleCommunityTextActivity(message, { db = prisma, source
   const qualification = qualifyCommunityTextMessage(message, { source });
   if (!qualification.accepted) return qualification;
   assertActivityMutation(message.guildId, source);
+  const settings = await communityActivitySettingsForGuild(db, message.guildId, source);
+  if (!settings.enabled) return { accepted: false, reason: "activity_disabled" };
+  qualification.xp = settings.chatXp;
   const config = communityActivityConfig(source);
   const acceptedAt = now instanceof Date ? now : new Date(now);
   const minuteAgo = new Date(acceptedAt.getTime() - 60_000);
@@ -128,6 +132,10 @@ export async function handleCommunityTextActivity(message, { db = prisma, source
       ]);
       if (minuteCount >= config.textMaxPerMinute) return { accepted: false, reason: "message_rate_limited" };
       if (repeatedHash) return { accepted: false, reason: "duplicate_content_cooldown" };
+      if (settings.chatCooldownSeconds && await tx.communityTextActivity.findFirst({
+        where: { seasonId: season.id, discordUserId: message.author.id, acceptedAt: { gt: new Date(acceptedAt.getTime() - settings.chatCooldownSeconds * 1000) } },
+        select: { id: true }
+      })) return { accepted: false, reason: "message_cooldown" };
 
       const member = await ensureMember(tx, season, message.guildId, message.author.id);
       await tx.communityTextActivity.create({
@@ -227,11 +235,18 @@ async function accrueVoiceSession(db, session, { now, config, close }) {
 }
 
 export async function reconcileCommunityVoiceGuild(guild, { db = prisma, source = process.env, now = new Date() } = {}) {
-  const config = communityActivityConfig(source);
+  let config = communityActivityConfig(source);
   if (!config.enabled) return { accepted: false, reason: "activity_disabled" };
   const guildId = String(guild?.id || "");
   assertActivityMutation(guildId, source);
   const currentTime = now instanceof Date ? now : new Date(now);
+  const settings = await communityActivitySettingsForGuild(db, guildId, source);
+  if (!settings.enabled) {
+    // Close sessions without awarding time while the guild has XP paused.
+    await db.communityVoiceSession.updateMany({ where: { guildId, active: true }, data: { active: false, leftAt: currentTime, lastAccruedAt: currentTime } });
+    return { accepted: false, reason: "activity_disabled" };
+  }
+  config = { ...config, voiceXpPerMinute: settings.voiceXpPerMinute };
   const season = await ensureSeason(db, guildId, currentTime);
   const qualifying = currentQualifyingVoiceUsers(guild);
   const activeSessions = await db.communityVoiceSession.findMany({

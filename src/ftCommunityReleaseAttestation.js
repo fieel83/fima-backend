@@ -128,6 +128,7 @@ export const FT_COMMUNITY_CRITICAL_RELEASE_FILES = Object.freeze([
   "src/aiSupportDiscordBridge.js",
   "src/appVersionPolicy.js",
   "src/communityActivity.js",
+  "src/communityActivitySettings.js",
   "src/communityActivityRoles.js",
   "src/communityBooster.js",
   "src/communityGuildPolicy.js",
