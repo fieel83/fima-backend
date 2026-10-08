@@ -20,6 +20,7 @@
     <link rel="icon" href="/assets/images/fima-logo.png?v=20260526-2" type="image/png">
     <link rel="stylesheet" href="/assets/css/account.css?v=20260621-3a50">
   <link rel="stylesheet" href="/assets/css/fima-design-system.css?v=20261004-1">
+    <link rel="stylesheet" href="/assets/css/auth-experience.css?v=20261009-1">
 </head>
   <body data-fima-product="hub" data-fima-design-system="teal-obsidian" data-account-page="register">
     <header class="account-header"><div class="nav"><a class="brand" href="/"><img src="/assets/images/fima-logo.png?v=20260526-2" alt=""><strong>FIMA</strong></a><div class="links"><a href="/pricing">Pricing</a><a href="/login">Login</a></div></div></header>
@@ -40,25 +41,25 @@
         <div class="auth-tabs"><a href="/login">Login</a><a class="is-active" href="/register">Register</a></div>
 
         <section class="provider-sign-in" aria-label="Account sign-in options">
-          <button class="button secondary" type="button" data-provider-sign-in="google" disabled>Continue with Google</button>
-          <button class="button secondary" type="button" data-provider-sign-in="discord" disabled>Continue with Discord</button>
+          <button class="button secondary" type="button" data-provider-sign-in="google" disabled><svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.89-1.74 2.98-4.3 2.98-7.36Z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.13H3.06v2.59A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.41 13.91a6 6 0 0 1 0-3.82V7.5H3.06a10 10 0 0 0 0 9l3.35-2.59Z"/><path fill="#EA4335" d="M12 5.96c1.47 0 2.79.51 3.83 1.51l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.94 5.5l3.35 2.59A5.99 5.99 0 0 1 12 5.96Z"/></svg><span data-auth-copy="google">Continue with Google</span></button>
+          <button class="button secondary" type="button" data-provider-sign-in="discord" disabled><svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="#8995ff" d="M19.7 5.3A18 18 0 0 0 15.5 4l-.5 1a15 15 0 0 0-6 0l-.5-1a18 18 0 0 0-4.2 1.3C1.7 9.2 1 13 1.4 16.7a17 17 0 0 0 5.1 2.6l1-1.6-1.5-.8.4-.3a12.9 12.9 0 0 0 11.2 0l.4.3-1.5.8 1 1.6a17 17 0 0 0 5.1-2.6c.5-4.3-.8-8-2.9-11.4ZM8.5 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm7 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg><span data-auth-copy="discord">Continue with Discord</span></button>
           <p class="field-note" data-provider-status role="status">Checking sign-in availability…</p>
           <details class="roblox-link-help">
-            <summary class="button secondary">Continue with Roblox — profile verification</summary>
+            <summary class="button secondary"><svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="m5 1 18 4-4 18L1 19 5 1Zm5.1 7.4-1.7 7.5 7.5 1.7 1.7-7.5-7.5-1.7Z"/></svg><span data-auth-copy="roblox">Link your Roblox profile</span></summary>
             <p>First sign in to your FIMA account using Google, Discord or your FIMA password. Then link Roblox in your account settings.</p>
             <ol><li>Enter your Roblox username.</li><li>Copy your unique verification code into your Roblox profile About / Bio.</li><li>Return to FIMA and select Verify profile code.</li></ol>
             <p>No Roblox password is requested. Profile verification links Roblox to your signed-in FIMA account; it does not sign you in by itself.</p>
           </details>
-          <p class="field-note">Already have a FIMA account? Sign in to that account first, then connect Google, Discord and Roblox from Connected accounts. Accounts are never merged automatically by email.</p>
+          <p class="field-note" data-auth-copy="linkNote">Have an account? Sign in first, then link providers in settings. Accounts are never merged automatically.</p>
         </section>
+        <div class="auth-divider" data-auth-copy="divider">or use your FIMA account</div>
         <form data-auth-form>
           <label>Username<input name="username" type="text" autocomplete="username" minlength="3" maxlength="32" placeholder="Choose a username" required></label>
           <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Min 8 characters" required></label>
           <label>Confirm password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Repeat password" required></label>
           <p class="recovery-warning">Warning: If you do not link Discord later, password recovery may not be possible.</p>
-          <p class="field-note">Discord and Roblox are optional during registration. Link only the accounts needed for community rewards, recovery or Roblox-specific features.</p>
-          <label>Referral / invite code (optional)<input name="referralCode" type="text" autocomplete="off" maxlength="48" placeholder="Optional, e.g. FIMA-FIEELCOMPL-SMGS"></label>
-          <div class="referral-notice" id="referralNotice"></div>
+          <details class="referral-options"><summary data-auth-copy="referral">Have an invite code?</summary><label>Referral / invite code (optional)<input name="referralCode" type="text" autocomplete="off" maxlength="48" placeholder="Optional, e.g. FIMA-FIEELCOMPL-SMGS"></label>
+          <div class="referral-notice" id="referralNotice"></div></details>
           <button class="button" type="submit">Register</button>
           <p class="auth-switch">Already registered? <a href="/login">Login to your account</a></p>
           <p class="message" id="message"></p>
@@ -67,7 +68,8 @@
     </main>
     <script src="/assets/js/config.js?v=20260526-9"></script>
     <script src="/assets/js/account.js?v=20261009-auth-1" defer></script>
-    <script src="/assets/js/auth-providers.js?v=20261009-auth-1" defer></script>
+    <script src="/assets/js/auth-providers.js?v=20261009-auth-2" defer></script>
   <p class="account-footer">FIMA is the secure account, product and support hub for FIMA Macro, FIMA AI and FIMA Bot.</p>
+    <script src="/assets/js/auth-experience.js?v=20261009-1" defer></script>
 </body>
 </html>
