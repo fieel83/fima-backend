@@ -93,7 +93,9 @@ function visibleHtmlLegacyBrandMatches(source) {
   return matches;
 }
 
-test("FIMA and legacy Community guild names select the community setup", () => {
+test("FT Community, FIMA and legacy Community guild names select the community setup", () => {
+  assert.equal(inferFimaGuildSetupMode({ id: "ft", name: "FT Community" }), "community");
+  assert.equal(inferFimaGuildSetupMode({ id: "ft-case", name: " ft community " }), "community");
   assert.equal(inferFimaGuildSetupMode({ id: "fima", name: "FIMA" }), "community");
   assert.equal(inferFimaGuildSetupMode({ id: "legacy-ascii", name: "Fieel's Community" }), "community");
   assert.equal(inferFimaGuildSetupMode({ id: "legacy-smart", name: "Fieel’s Community" }), "community");

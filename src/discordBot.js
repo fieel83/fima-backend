@@ -257,7 +257,7 @@ export function inferFimaGuildSetupMode(guild, state = {}) {
   const configured = state.guildConfigs?.[guild?.id]?.activeSetupMode;
   if (["community", "clan", "tsbtr"].includes(configured)) return configured;
   const guildName = String(guild?.name || "").trim();
-  if (/^(?:fieel[’']?s community|fima)$/i.test(guildName)) return "community";
+  if (/^(?:ft community|fieel[’']?s community|fima)$/i.test(guildName)) return "community";
   if (/tsbtr|yedek/i.test(guildName)) return "tsbtr";
   return "clan";
 }
