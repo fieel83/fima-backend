@@ -3,8 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createFtCommunityManifestProfileAssets } from "./ftCommunityVisualAssets.js";
 
-export const FIMA_BOT_PROFILE_NAME = "FIMA";
-export const FIMA_BOT_PROFILE_USERNAME = "FIMA";
+export const FIMA_BOT_PROFILE_NAME = "FIMA Bot";
+export const FIMA_BOT_PROFILE_USERNAME = "FIMA.bot";
 export const FIMA_BOT_PROFILE_CONFIRMATION = "APPLY FIMA BOT PROFILE";
 export const FIMA_BOT_PROFILE_ALLOWED_GUILD_IDS = Object.freeze([
   "1419335632324657306",

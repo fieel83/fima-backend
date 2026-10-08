@@ -3207,9 +3207,9 @@ export async function paradiseDiscordRuntimeSnapshot(guildId = null) {
     botIdentity: {
       applicationUsername: client.user?.username || null,
       guildNickname: me?.nickname || null,
-      intendedName: "FIMA",
-      usernameMatches: String(client.user?.username || "") === "FIMA",
-      nicknameMatches: (me?.nickname || client.user?.username) === "FIMA"
+      intendedName: "FIMA Bot",
+      usernameMatches: String(client.user?.username || "").toLowerCase() === "fima.bot",
+      nicknameMatches: (me?.nickname || client.user?.username) === "FIMA Bot"
     },
     commandScope: "guild",
     commands: [...commands.values()].map(command => ({
