@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
 import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
@@ -11614,7 +11615,9 @@ async function sendMemberLifecycleMessage(member, kind, options = {}) {
     };
     const tr = guildLanguage(config) === "tr";
     const channelRef = (mappingKey, fallback) => mentionIfFound(mappingKey, fallback);
-    const destinations = [
+    const destinations = member.guild.id === FT_COMMUNITY_GUILD_ID ? ftWelcomeDestinations(member.guild, config, {
+      tr, tickets: fimaRuntimeModuleAllowed(rawConfig, "tickets")
+    }) : [
       channelRef("rules_channel", "rules") ? (tr ? `- Kuralları ${channelRef("rules_channel", "rules")} kanalında oku.` : `- Read the rules in ${channelRef("rules_channel", "rules")}.`) : null,
       mode === "community" && channelRef("faq_channel", "security-and-trust") ? (tr ? `- Fima ve sunucu güvenliği için ${channelRef("faq_channel", "security-and-trust")} kanalına bak.` : `- Learn how Fima and this server stay safe in ${channelRef("faq_channel", "security-and-trust")}.`) : null,
       channelRef("role_guide_channel", "role-guide") ? (tr ? `- Dilini, bildirimlerini ve rollerini ${channelRef("role_guide_channel", "role-guide")} kanalından seç.` : `- Choose your language, pings and roles in ${channelRef("role_guide_channel", "role-guide")}.`) : null,
