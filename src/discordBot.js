@@ -2175,15 +2175,15 @@ function fimaAnnouncementPayload(commandName = "fima_embed") {
   const embed = new EmbedBuilder()
     .setColor(0x9b5cff)
     .setTitle(title)
-    .setDescription("Need Fima? Start here.")
+    .setDescription("Download Fima, set up your account, and choose the macro you want to use.")
     .addFields(
-      { name: "Setup", value: "Download the app, log in, paste your key, and you are ready.", inline: false },
-      { name: "Price", value: "Use the website for the current EUR prices and available access plans.", inline: true },
+      { name: "Setup", value: "Download the app from the link below, sign in, and activate your license. Follow the setup instructions for your chosen macro.", inline: false },
+      { name: "Price", value: "Current prices in EUR are listed on the pricing page.", inline: true },
       { name: "Buy Options", value: "Card checkout, gift codes and support-assisted Robux orders.", inline: true },
-      { name: "Recommended", value: "Start with 3 Days if you need short access, or choose Monthly or Lifetime for longer use.", inline: false },
-      { name: "Tutorial", value: "Open the Macros page for setup notes and video slots.", inline: true },
+      { name: "Plans", value: "Choose 3 Days, Monthly, or Lifetime on the pricing page.", inline: false },
+      { name: "Tutorial", value: "Visit the Macros page for setup instructions.", inline: true },
       { name: "Support", value: "Stuck? Open a ticket and we will help.", inline: true },
-      { name: "Download", value: "Use the website download page so the link always follows the latest public release.", inline: false },
+      { name: "Download", value: "Get the latest release from the official download page.", inline: false },
       { name: "Old TGMacro buyer?", value: "Open a private ticket and send masked proof. Staff can review whether legacy 3-day access applies.", inline: false }
     )
     .setImage(`${siteUrl.replace(/\/+$/, "")}/assets/social-preview.png?v=20260531-1`);
@@ -2397,17 +2397,15 @@ async function createTicketChannel(guild, user, category) {
 
 function ticketCreatedEmbed(category, userId) {
   const guidance = category.id === "old_tgmacro_buyer"
-    ? "Send proof here. Staff will review and can approve 3-day access if it applies."
-    : "Tell us what happened. Staff will help from here.";
+    ? "Send your purchase proof here. Staff will check whether you qualify for 3-day access."
+    : "Your request is with the support team. Add any screenshots or details that could help.";
   return new EmbedBuilder()
     .setColor(0x9b5cff)
     .setTitle(`${category.label} · OPEN`)
     .setDescription([
       guidance,
       "",
-      "Please mask license keys, gift codes, emails and payment details unless staff asks in private.",
-      "",
-      "Close first; FIMA Bot saves a transcript before access is removed."
+      "Keep license keys, gift codes, emails and payment details covered in screenshots."
     ].join("\n"))
     .addFields(
       { name: "Opened by", value: `<@${userId}>`, inline: true },
@@ -2441,8 +2439,8 @@ function ticketLifecycleEmbed({ status = "OPEN", actorId, transcriptMessageId, c
     .setColor(color)
     .setTitle(`${sanitizeDiscordText(categoryLabel, 80)} · ${status}`)
     .setDescription(closed
-      ? "This ticket is closed. A transcript was saved before closing. Staff can reopen it if more follow-up is needed."
-      : "Staff can claim this ticket, add notes, escalate, or close it after saving a transcript.")
+      ? "This ticket is closed. If you need more help with the same issue, ask staff to reopen it."
+      : "You can add updates or screenshots here while staff reviews your request.")
     .addFields(fields)
     .setFooter({ text: "Made By Fieel" });
 }
