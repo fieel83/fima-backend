@@ -14544,11 +14544,16 @@ async function handleParadiseMessageInner(message) {
     config: guildConfig.automod || {}
   });
   if (fimaRuntimeModuleAllowed(guildConfig, "security") && safety.blocked && guildConfig.automod?.runtimeSafety !== false) {
-    await message.delete().catch(() => null);
+    let removed = false;
+    let failureCode = null;
+    try { await message.delete(); removed = true; }
+    catch (error) { failureCode = String(error?.code || "delete_failed").slice(0, 80); }
     await logParadiseAction(message.guild, "security_logs_channel", "security-logs", "Message safety action",
-      `A message was quarantined by the runtime safety policy. Reason: **${safety.reason}**.`, {
+      removed
+        ? `A message was removed. Reason: **${safety.reason}**.`
+        : `A message was flagged but could not be removed. Staff review is needed. Reason: **${safety.reason}**.`, {
         type: "security",
-        metadata: { channelId: message.channelId, authorId: message.author.id, reason: safety.reason }
+        metadata: { channelId: message.channelId, authorId: message.author.id, reason: safety.reason, removed, failureCode }
       }).catch(() => null);
     return true;
   }

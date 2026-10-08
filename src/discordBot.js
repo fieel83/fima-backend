@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { startFtInfoWorker } from "./ftCommunityInfo.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
+import { ticketIsClosed, queueTicketRename } from "./fimaTicketLifecycle.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields, retainedTicketIntakeFields } from "./fimaTicketIntake.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
@@ -2334,7 +2335,7 @@ async function handleTicketIntakeSubmit(interaction) {
   ticketCreationInFlight.add(creationKey);
   try {
     const channels = await guild.channels.fetch();
-    const existing = channels.find((channel) => channel?.type === ChannelType.GuildText && !channel.name.startsWith("closed-") && String(channel.topic || "").includes(`openedBy:${interaction.user.id}.`));
+    const existing = channels.find((channel) => channel?.type === ChannelType.GuildText && !ticketIsClosed(channel) && String(channel.topic || "").includes(`openedBy:${interaction.user.id}.`));
     if (existing) return interaction.editReply(`Your open ticket: ${existing}`);
     if (Date.now() - (ticketCreationCooldown.get(creationKey) || 0) < 300000) return interaction.editReply("Please wait five minutes before opening another ticket.");
     const intake = ticketIntakeFields(category.id).map((field) => ({ name: field.label, value: maskTicketTranscriptText(interaction.fields.getTextInputValue(field.id)).slice(0, 1000) || "—" }));
@@ -2551,7 +2552,7 @@ async function handleTicketAssignment(interaction) {
   try {
     await withTicketLock(interaction.channelId, async () => {
       const channel = await interaction.guild.channels.fetch(interaction.channelId, { force: true });
-      if (!/openedBy:\d{15,25}/.test(String(channel?.topic || "")) || String(channel.name).startsWith("closed-")) throw new Error("ticket_not_open");
+      if (!/openedBy:\d{15,25}/.test(String(channel?.topic || "")) || ticketIsClosed(channel)) throw new Error("ticket_not_open");
       const target = await interaction.guild.members.fetch(interaction.values[0]);
       if (target.user.bot || !isTicketStaff(target)) throw new Error("ticket_target_not_staff");
       const panel = await channel.messages.fetch(interaction.customId.split(":")[1]);
@@ -2603,7 +2604,7 @@ async function handleTicketButtonLocked(interaction) {
   const channel = await interaction.guild.channels.fetch(interaction.channelId, { force: true });
   const claimedBy = ticketClaimant(channel.topic);
   if (action === "claim") {
-    if (String(channel.name || "").startsWith("closed-")) return interaction.editReply({ content: "Reopen this ticket before claiming it." });
+    if (ticketIsClosed(channel)) return interaction.editReply({ content: "Reopen this ticket before claiming it." });
     if (claimedBy) return interaction.editReply({ content: `This ticket is already claimed by <@${claimedBy}>.`, allowedMentions: { parse: [] } });
     try {
       await channel.setTopic(topicWithClaim(channel.topic, interaction.user.id));
@@ -2614,7 +2615,7 @@ async function handleTicketButtonLocked(interaction) {
     return interaction.editReply({ content: `Claimed by ${interaction.user}.`, allowedMentions: { parse: [] } });
   }
   if (action === "close") {
-    if (String(channel.name || "").startsWith("closed-")) return interaction.editReply({ content: "This ticket is already closed." });
+    if (ticketIsClosed(channel)) return interaction.editReply({ content: "This ticket is already closed." });
     let transcript;
     try {
       transcript = await createFimaTicketTranscript(interaction, "close");
@@ -2624,11 +2625,11 @@ async function handleTicketButtonLocked(interaction) {
       });
     }
     await setClosedTicketParticipantAccess(interaction, true);
-    await interaction.channel.setName(`closed-${String(interaction.channel.name || "ticket").replace(/^closed-/, "").slice(0, 80)}`);
     await interaction.message.edit({
       embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "CLOSED", claimedBy, actorId: interaction.user.id, transcriptMessageId: transcript?.transcriptMessage?.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })],
       components: ticketActionRows({ closed: true })
     });
+    void queueTicketRename(channel, true, () => console.warn("Closed ticket name update failed; access and status remain closed"));
     await auditDiscordBotAction("discord_ticket_close_succeeded", "discord_channel", interaction.channelId, { guildId: interaction.guildId, actorId: interaction.user.id, transcriptMessageId: transcript?.transcriptMessage?.id });
     await fimaAiSupportBridge?.closed({ channelId: interaction.channelId, guildId: interaction.guildId, eventId: interaction.id }).catch(() => {
       console.warn("FIMA support shadow queue unavailable; closure candidate not accepted");
@@ -2636,10 +2637,10 @@ async function handleTicketButtonLocked(interaction) {
     return interaction.editReply({ content: `Ticket closed. Transcript saved (${transcript.messageCount} messages).` });
   }
   if (action === "reopen") {
-    if (!String(channel.name || "").startsWith("closed-")) return interaction.editReply({ content: "This ticket is already open." });
+    if (!ticketIsClosed(channel)) return interaction.editReply({ content: "This ticket is already open." });
     await setClosedTicketParticipantAccess(interaction, false);
-    await interaction.channel.setName(String(interaction.channel.name || "ticket").replace(/^closed-/, "").slice(0, 90));
     await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "OPEN", claimedBy, actorId: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: Boolean(claimedBy) }) });
+    void queueTicketRename(channel, false, () => console.warn("Reopened ticket name update failed; access and status remain open"));
     await auditDiscordBotAction("discord_ticket_reopen_succeeded", "discord_channel", interaction.channelId, { guildId: interaction.guildId, actorId: interaction.user.id });
     return interaction.editReply({ content: "Ticket reopened for follow-up." });
   }
@@ -2647,7 +2648,7 @@ async function handleTicketButtonLocked(interaction) {
     return interaction.reply({ content: "Add your staff note as a normal message. Keep keys and emails masked.", ephemeral: true });
   }
   if (action === "escalate") {
-    if (String(channel.name || "").startsWith("closed-")) return interaction.editReply({ content: "Reopen this ticket before escalating it." });
+    if (ticketIsClosed(channel)) return interaction.editReply({ content: "Reopen this ticket before escalating it." });
     const lastEscalation = Number(String(channel.topic || "").match(/(?:^|\s)escalatedAt:(\d+)(?=\s|$)/)?.[1] || 0);
     if (Date.now() - lastEscalation < 10 * 60 * 1000) return interaction.editReply({ content: "Senior staff were notified recently. Wait 10 minutes before escalating again." });
     const roleId = env("DISCORD_TICKET_ESCALATION_ROLE_ID");
