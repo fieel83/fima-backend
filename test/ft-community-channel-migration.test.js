@@ -66,7 +66,7 @@ test('ordering preserves channel identity, parents and access while arranging ca
   const result = await orderFtChannels(await request(f));
   assert.equal(result.status, 'channels_ordered');
   const plan = buildFtCommunityMigrationPlan(result.after);
-  assert.deepEqual(plan.targetCategories.map(row => result.after.categories.find(c => c.id === row.existingId).position), [0,1,2,3,4,5,6,7,8,9]);
+  assert.deepEqual(plan.targetCategories.map(row => result.after.categories.find(c => c.id === row.existingId).position), [0,1,2,3,4,5,6,7,9]);
   for (const original of [...before.categories, ...before.channels]) {
     const actual = [...result.after.categories, ...result.after.channels].find(row => row.id === original.id);
     assert.deepEqual({ ...actual, position: original.position }, original);
@@ -148,12 +148,12 @@ test('successful move preserves channel IDs, private staff rules and all channel
   assert.equal(result.status, 'channels_moved');
   assert.equal(f.channels.get('staff-rules').parentId, 'staff');
   assert.equal(f.channels.get('support').parentId,
-    [...f.channels.values()].find(row => row.name === '◇ HELP').id);
+    [...f.channels.values()].find(row => row.name === '◇・HELP').id);
   for (const row of before.channels) {
     assert.deepEqual(result.after.channels.find(item => item.id === row.id).permissionOverwrites, row.permissionOverwrites);
   }
   assert.equal(f.channels.get('legacy').name, 'SUPPORT');
-  for (const name of ['□ MANAGEMENT', '▤ RECORDS', '▤ ARCHIVE']) {
+  for (const name of ['□・MANAGEMENT', '▤・RECORDS', '▤・ARCHIVE']) {
     const category = [...f.channels.values()].find(row => row.name === name);
     assert.deepEqual(category.permissionOverwrites.cache.get(f.guild.id).deny.toArray(), ['ViewChannel']);
   }
@@ -233,4 +233,19 @@ test('cleanup refuses populated legacy categories and journal failure before del
   f.channels.get('support').parentId = null;
   await assert.rejects(cleanupFtEmptyCategories({ ...await request(f), saveJournal: async () => { throw new Error('database_down'); } }), /database_down/);
   assert.deepEqual(f.writes, []);
+});
+
+
+test('additive phase reuses decorated existing channels and the canonical FAQ', async () => {
+  const f = fixture();
+  await migrateFtChannels(await request(f));
+  await addFtMissingChannels(await request(f));
+  for (const channel of f.channels.values()) {
+    if (['general', 'media', 'polls'].includes(channel.name)) channel.name = '›・' + channel.name;
+    if (channel.name === 'support-faq') channel.name = '⌁・faq';
+  }
+  const before = await captureFtChannelInventory(f.guild);
+  const result = await addFtMissingChannels(await request(f));
+  assert.deepEqual(result.operations, []);
+  assert.deepEqual(result.after.channels, before.channels);
 });

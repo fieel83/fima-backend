@@ -18,7 +18,7 @@ const channelOrder = {
   START: ['rules', 'roles', 'fieel-info', 'joins-leaves'],
   COMMUNITY: ['general', 'media', 'turkce-sohbet', 'turkce-medya', 'vouches', 'outfits', 'capes'],
   EVENTS: ['announcements', 'updates', 'uploads', 'polls', 'turkce-duyurular'],
-  HELP: ['support', 'support-faq', 'fima-macro', 'fake-headless'],
+  HELP: ['support', 'faq', 'support-faq', 'fima-macro', 'fake-headless'],
   STAFF: ['rules', 'mod-chat'],
   RECORDS: ['ticket-transcripts', 'transcripts', 'fima-logs', 'logs', 'message-logs', 'join-logs', 'un-bl-logs', 'wick-logs']
 };
@@ -37,7 +37,12 @@ export async function orderFtChannels({ guild, expectedDigest, saveJournal, acto
     const plan = buildFtCommunityMigrationPlan(before);
     if (expectedDigest !== plan.sourceDigest) throw fail('migration_stale_plan');
     if (plan.targetCategories.some(row => !row.existingId || row.decision !== 'keep')) throw fail('migration_categories_required');
-    const positions = plan.targetCategories.map(row => ({ channel: row.existingId, position: row.position }));
+    // Keep reviewed legacy categories without allowing them to push ARCHIVE away from the end.
+    const categoryIds = [...plan.targetCategories.filter(row => row.key !== 'ARCHIVE').map(row => row.existingId),
+      ...before.categories.filter(row => !plan.targetCategories.some(target => target.existingId === row.id))
+        .sort((a, b) => a.position - b.position).map(row => row.id),
+      plan.targetCategories.find(row => row.key === 'ARCHIVE').existingId];
+    const positions = categoryIds.map((channel, position) => ({ channel, position }));
     const siblingOrders = [];
     let position = 0;
     for (const category of plan.targetCategories) {
@@ -67,7 +72,7 @@ export async function orderFtChannels({ guild, expectedDigest, saveJournal, acto
     }
     const verifyOrder = ids => ids.every((id, index) => index === 0 ||
       allAfter.find(row => row.id === ids[index - 1]).position < allAfter.find(row => row.id === id).position);
-    if (!verifyOrder(plan.targetCategories.map(row => row.existingId)) || siblingOrders.some(ids => !verifyOrder(ids))) throw fail('migration_order_verification_failed');
+    if (!verifyOrder(categoryIds) || siblingOrders.some(ids => !verifyOrder(ids))) throw fail('migration_order_verification_failed');
     journal.after = after;
     journal.status = 'channels_ordered';
     journal.completedAt = new Date().toISOString();
@@ -170,8 +175,10 @@ export async function addFtMissingChannels({ guild, expectedDigest, saveJournal,
     journal = { id: randomUUID(), guildId: guild.id, actorUserId, phase: 'missing_channels',
       status: 'applying', startedAt: new Date().toISOString(), before, operations: [], createdCategoryIds: [] };
     await persist();
+    const matchesSpec = (row, spec) => orderName(row.name) === spec.name
+      || spec.name === 'support-faq' && orderName(row.name) === 'faq';
     for (const spec of specs) {
-      if (before.channels.some(row => row.name === spec.name)) continue;
+      if (before.channels.some(row => matchesSpec(row, spec))) continue;
       const parent = await guild.channels.fetch(targets.get(spec.category));
       journal.operations.push({ kind: 'create_channel', name: spec.name, parentId: parent.id, status: 'pending' });
       await persist();
@@ -190,7 +197,7 @@ export async function addFtMissingChannels({ guild, expectedDigest, saveJournal,
       }
     }
     for (const spec of specs) {
-      if (!after.channels.some(row => row.name === spec.name && row.type === 0 && row.parentId === targets.get(spec.category))) {
+      if (!after.channels.some(row => matchesSpec(row, spec) && row.type === 0 && row.parentId === targets.get(spec.category))) {
         throw fail('migration_created_channel_verification_failed');
       }
     }

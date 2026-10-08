@@ -12,10 +12,10 @@ const audit = () => ({ guild: { id: FT_MIGRATION_GUILD_ID }, capturedAt: '2026-1
 test('live audit categories and string channel types produce an ID preserving review plan', () => {
   const input = audit(), before = structuredClone(input), plan = buildFtCommunityMigrationPlan(input);
   assert.deepEqual(input, before);
-  assert.equal(plan.targetCategories[0].existingId, 'cat');
-  assert.equal(plan.targetCategories[0].decision, 'rename');
+  assert.equal(plan.targetCategories.find(row => row.key === 'START').existingId, 'cat');
+  assert.equal(plan.targetCategories.find(row => row.key === 'START').decision, 'rename');
   assert.equal(plan.matrix.find(row => row.id === 'rules').decision, 'keep');
-  assert.equal(plan.matrix.find(row => row.id === 'voice').targetCategory, '◉ VOICE');
+  assert.equal(plan.matrix.find(row => row.id === 'voice').targetCategory, '◉・VOICE');
   assert.equal(plan.matrix.find(row => row.id === 'private').decision, 'archive');
   assert.deepEqual(plan.unresolvedChannelIds, ['unknown']);
   assert.ok(plan.matrix.every(row => row.preserveId && row.preserveHistory && row.preservePermissionOverwrites));
@@ -29,10 +29,10 @@ test('a channel without a parent must move when its target category does not exi
 });
 
 test('duplicate categories need review and cannot become automatic destinations', () => {
-  const input = audit(); input.categories.push({ id: 'other', name: '⌂ START' });
+  const input = audit(); input.categories.push({ id: 'other', name: '⌂・START' });
   const plan = buildFtCommunityMigrationPlan(input);
-  assert.equal(plan.targetCategories[0].decision, 'review');
-  assert.equal(plan.targetCategories[0].existingId, null);
+  assert.equal(plan.targetCategories.find(row => row.key === 'START').decision, 'review');
+  assert.equal(plan.targetCategories.find(row => row.key === 'START').existingId, null);
 });
 
 test('digest detects category permission changes and is stable across inventory order', () => {
@@ -72,10 +72,31 @@ test('private staff rules and procedures keep their purpose while old material i
   ].map(([id, name, type]) => ({ id, name, type, parentId: 'staff' })));
   const plan = buildFtCommunityMigrationPlan(input);
   for (const id of ['staff-rules', 'mods', 'steps', 'forum']) {
-    assert.equal(plan.matrix.find(row => row.id === id).targetCategory, '□ STAFF');
+    assert.equal(plan.matrix.find(row => row.id === id).targetCategory, '□・STAFF');
   }
-  assert.equal(plan.matrix.find(row => row.id === 'rules').targetCategory, '⌂ START');
+  assert.equal(plan.matrix.find(row => row.id === 'rules').targetCategory, '⌂・START');
   assert.equal(plan.matrix.find(row => row.id === 'forum').type, 15);
   assert.equal(plan.matrix.find(row => row.id === 'old-material').decision, 'archive');
   assert.deepEqual(plan.unresolvedChannelIds, ['unknown']);
+});
+
+
+test('master category order preserves archived procedures and private support conversations', () => {
+  const input = audit();
+  input.categories.push({ id: 'archive', name: '▤・ARCHIVE' }, { id: 'help', name: '◇・HELP' });
+  input.channels = [
+    { id: 'steps', name: 'steps', type: 0, parentId: 'archive' },
+    { id: 'forum', name: 'macro-steps', type: 15, parentId: 'archive' },
+    { id: 'ticket', name: 'ticket-product-support-user', type: 0, parentId: 'help',
+      permissionOverwrites: [{ id: FT_MIGRATION_GUILD_ID, type: 0, deny: ['ViewChannel'], allow: [] }] },
+    { id: 'public-ticket', name: 'ticket-public-unknown', type: 0, parentId: 'help' },
+    { id: 'faq', name: '⌁・faq', type: 0, parentId: 'help' }
+  ];
+  const plan = buildFtCommunityMigrationPlan(input);
+  assert.deepEqual(plan.targetCategories.map(row => row.key),
+    ['STAFF', 'MANAGEMENT', 'RECORDS', 'START', 'COMMUNITY', 'EVENTS', 'HELP', 'VOICE', 'ARCHIVE']);
+  for (const id of ['steps', 'forum']) assert.equal(plan.matrix.find(row => row.id === id).targetCategoryId, 'archive');
+  assert.equal(plan.matrix.find(row => row.id === 'ticket').decision, 'keep');
+  assert.deepEqual(plan.unresolvedChannelIds, ['public-ticket']);
+  assert.ok(!plan.missingChannels.includes('support-faq'));
 });

@@ -2,20 +2,19 @@ import { createHash } from 'node:crypto';
 
 export const FT_MIGRATION_GUILD_ID = '1419335632324657306';
 export const FT_MIGRATION_CATEGORIES = Object.freeze([
-  '⌂ START', '⌗ COMMUNITY', '◆ COMPETITION', '⌁ EVENTS', '◇ HELP',
-  '◉ VOICE', '□ STAFF', '□ MANAGEMENT', '▤ RECORDS', '▤ ARCHIVE'
+  '□・STAFF', '□・MANAGEMENT', '▤・RECORDS', '⌂・START', '⌗・COMMUNITY',
+  '⌁・EVENTS', '◇・HELP', '◉・VOICE', '▤・ARCHIVE'
 ]);
 
 const groups = [
   ['START', ['rules', 'roles', 'fieel-info', 'joins-leaves', 'start-here']],
   ['COMMUNITY', ['general', 'chat', 'english-chat', 'media', 'english-media', 'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'outfits', 'capes', 'levels']],
-  ['COMPETITION', ['glads', 'eu-glads', 'asia-glads', 'na-glads', 'anti-teamers', 'leaderboard', 'tournaments']],
   ['EVENTS', ['announcements', 'updates', 'uploads', 'polls', 'events', 'giveaways', 'turkce-duyurular', 'fima-updates']],
-  ['HELP', ['support', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless']],
+  ['HELP', ['support', 'faq', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless']],
   ['STAFF', ['staff-hub', 'staff-chat', 'staff-guides', 'staff-application-reviews', 'application-reviews', 'moderator-only', 'steps', 'macro-steps']],
   ['MANAGEMENT', ['management', 'management-chat', 'admin-chat', 'video-hub', 'video-ideas', 'video-scripts', 'video-assets', 'video-review', 'video-upload-schedule']],
   ['RECORDS', ['logs', 'wick-logs', 'message-logs', 'un-bl-logs', 'join-logs', 'fima-logs', 'staff-logs', 'security-logs', 'ticket-transcripts', 'transcripts']],
-  ['ARCHIVE', ['openclaw-private', 'old-things']]
+  ['ARCHIVE', ['openclaw-private', 'old-things', 'glads', 'eu-glads', 'asia-glads', 'na-glads', 'anti-teamers', 'leaderboard', 'tournaments']]
 ];
 const destination = new Map(groups.flatMap(([group, names]) => names.map(name => [name, group])));
 const normalize = name => String(name || '').normalize('NFKC').toLowerCase()
@@ -37,7 +36,7 @@ export function buildFtCommunityMigrationPlan(audit) {
   const categories = channels.filter(channel => channel.type === 4 || channel.type === '4');
   const categoryNames = new Map(categories.map(category => [category.id, category.name]));
   const targetCategories = FT_MIGRATION_CATEGORIES.map((name, position) => {
-    const key = name.split(' ').slice(1).join(' ');
+    const key = normalize(name).toUpperCase();
     const matches = categories.filter(category => normalize(category.name) === normalize(key));
     return { name, key, position, existingId: matches.length === 1 ? matches[0].id : null,
       decision: matches.length === 1 ? (matches[0].name === name ? 'keep' : 'rename') : matches.length ? 'review' : 'create',
@@ -48,7 +47,14 @@ export function buildFtCommunityMigrationPlan(audit) {
     const currentCategory = categoryNames.get(channel.parentId) || null;
     // The staff rules channel is separate from the public onboarding rules.
     const staffRules = key === 'rules' && normalize(currentCategory) === 'staff';
-    const group = staffRules ? 'STAFF' : [2, 13].includes(channel.type) ? 'VOICE' : destination.get(key);
+    // Historical procedures already archived must not be reactivated by their names.
+    const archivedProcedure = ['steps', 'macro-steps'].includes(key) && normalize(currentCategory) === 'archive';
+    // Preserve private support conversations in place; unknown/public ticket-like channels still require review.
+    const privateTicket = /^(?:closed-)?ticket-/.test(key) && normalize(currentCategory) === 'help'
+      && (channel.permissionOverwrites || []).some(row => row.id === audit.guild.id
+        && Number(row.type) === 0 && (row.deny || []).includes('ViewChannel'));
+    const group = archivedProcedure ? 'ARCHIVE' : privateTicket ? 'HELP'
+      : staffRules ? 'STAFF' : [2, 13].includes(channel.type) ? 'VOICE' : destination.get(key);
     const target = targetCategories.find(category => category.key === group);
     const decision = !target ? 'review' : group === 'ARCHIVE' ? 'archive'
       : target.existingId && channel.parentId === target.existingId ? 'keep' : 'move';
@@ -66,7 +72,8 @@ export function buildFtCommunityMigrationPlan(audit) {
   const requiredNames = ['rules', 'roles', 'fieel-info', 'joins-leaves', 'general', 'media',
     'turkce-sohbet', 'turkce-medya', 'vouches', 'announcements', 'updates', 'uploads', 'polls',
     'support', 'support-faq', 'fima-macro', 'fake-headless', 'outfits', 'capes'];
-  const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name));
+  const missingChannels = requiredNames.filter(name => !matrix.some(channel => normalize(channel.name) === name
+    || name === 'support-faq' && normalize(channel.name) === 'faq'));
   const sourceDigest = createHash('sha256').update(JSON.stringify(channels.map(channel => ({
     id: channel.id, name: channel.name, type: channel.type, parentId: channel.parentId, position: channel.position,
     permissionOverwrites: (channel.permissionOverwrites || []).map(row => ({
