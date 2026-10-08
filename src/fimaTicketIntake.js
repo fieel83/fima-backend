@@ -29,3 +29,16 @@ export function buildTicketIntakeModal(category) {
       return new ActionRowBuilder().addComponents(input);
     }));
 }
+
+// Keep the original request visible through claim, assignment, close and reopen.
+export function retainedTicketIntakeFields(embed) {
+  const labels = new Set([
+    "product_support", "payment_help", "license_hwid_help", "macro_timing_problem",
+    "fake_headless", "security_report", "creator_partnership", "app_bug", "other"
+  ].flatMap(category => ticketIntakeFields(category).map(field => field.label)));
+  return (embed?.fields || []).filter(field => labels.has(field.name)).map(field => ({
+    name: field.name,
+    value: String(field.value || "—").slice(0, 1000),
+    inline: false
+  }));
+}

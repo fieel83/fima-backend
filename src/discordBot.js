@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { startFtInfoWorker } from "./ftCommunityInfo.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
-import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
+import { buildTicketIntakeModal, ticketIntakeFields, retainedTicketIntakeFields } from "./fimaTicketIntake.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
 import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
@@ -2425,7 +2425,7 @@ function getTicketCategoryLabel(interaction) {
   return "Ticket";
 }
 
-function ticketLifecycleEmbed({ status = "OPEN", actorId, transcriptMessageId, claimedBy, categoryLabel = "Ticket", openedBy } = {}) {
+function ticketLifecycleEmbed({ status = "OPEN", actorId, transcriptMessageId, claimedBy, categoryLabel = "Ticket", openedBy, sourceEmbed } = {}) {
   const closed = status === "CLOSED";
   const color = closed ? 0xffc857 : 0x9b5cff;
   const fields = [
@@ -2435,13 +2435,14 @@ function ticketLifecycleEmbed({ status = "OPEN", actorId, transcriptMessageId, c
   ];
   if (openedBy) fields.push({ name: "Opened by", value: `<@${openedBy}>`, inline: true });
   if (claimedBy) fields.push({ name: "Claimed by", value: `<@${claimedBy}>`, inline: true });
+  fields.push(...retainedTicketIntakeFields(sourceEmbed));
   if (transcriptMessageId) fields.push({ name: "Transcript", value: `Saved · ${maskDiscordId(transcriptMessageId)}`, inline: false });
   return new EmbedBuilder()
     .setColor(color)
     .setTitle(`${sanitizeDiscordText(categoryLabel, 80)} · ${status}`)
     .setDescription(closed
       ? "This ticket is closed. A transcript was saved before closing. Staff can reopen it if more follow-up is needed."
-      : "This ticket is open again. Staff can claim it, add notes, escalate, or close it after a transcript is saved.")
+      : "Staff can claim this ticket, add notes, escalate, or close it after saving a transcript.")
     .addFields(fields)
     .setFooter({ text: "Made By Fieel" });
 }
@@ -2560,7 +2561,7 @@ async function handleTicketAssignment(interaction) {
       const topic = topicWithAssignment(channel.topic, target.id);
       await channel.permissionOverwrites.edit(target.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket assigned by staff" });
       await channel.setTopic(topic, "Ticket assigned by staff");
-      await panel.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, categoryLabel: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
+      await panel.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: panel.embeds[0], status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, categoryLabel: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
       await auditDiscordBotAction("discord_ticket_assigned", "discord_channel", channel.id, { actorId: interaction.user.id, assignedTo: target.id, contentStored: false });
       await interaction.editReply({ content: `Assigned to <@${target.id}>.`, allowedMentions: { parse: [] } });
     });
@@ -2611,7 +2612,7 @@ async function handleTicketButtonLocked(interaction) {
     } catch (error) {
       return interaction.editReply({ content: `Claim could not be saved: ${sanitizeDiscordText(error?.message || "unknown", 120)}` });
     }
-    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", actorId: interaction.user.id, claimedBy: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: true }) });
+    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "OPEN", actorId: interaction.user.id, claimedBy: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: true }) });
     return interaction.editReply({ content: `Claimed by ${interaction.user}.`, allowedMentions: { parse: [] } });
   }
   if (action === "close") {
@@ -2627,7 +2628,7 @@ async function handleTicketButtonLocked(interaction) {
     await setClosedTicketParticipantAccess(interaction, true);
     await interaction.channel.setName(`closed-${String(interaction.channel.name || "ticket").replace(/^closed-/, "").slice(0, 80)}`);
     await interaction.message.edit({
-      embeds: [ticketLifecycleEmbed({ status: "CLOSED", claimedBy, actorId: interaction.user.id, transcriptMessageId: transcript?.transcriptMessage?.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })],
+      embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "CLOSED", claimedBy, actorId: interaction.user.id, transcriptMessageId: transcript?.transcriptMessage?.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })],
       components: ticketActionRows({ closed: true })
     });
     await auditDiscordBotAction("discord_ticket_close_succeeded", "discord_channel", interaction.channelId, { guildId: interaction.guildId, actorId: interaction.user.id, transcriptMessageId: transcript?.transcriptMessage?.id });
@@ -2640,7 +2641,7 @@ async function handleTicketButtonLocked(interaction) {
     if (!String(channel.name || "").startsWith("closed-")) return interaction.editReply({ content: "This ticket is already open." });
     await setClosedTicketParticipantAccess(interaction, false);
     await interaction.channel.setName(String(interaction.channel.name || "ticket").replace(/^closed-/, "").slice(0, 90));
-    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ status: "OPEN", claimedBy, actorId: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: Boolean(claimedBy) }) });
+    await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "OPEN", claimedBy, actorId: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: Boolean(claimedBy) }) });
     await auditDiscordBotAction("discord_ticket_reopen_succeeded", "discord_channel", interaction.channelId, { guildId: interaction.guildId, actorId: interaction.user.id });
     return interaction.editReply({ content: "Ticket reopened for follow-up." });
   }
