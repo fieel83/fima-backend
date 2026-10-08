@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { startFtInfoWorker } from "./ftCommunityInfo.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields } from "./fimaTicketIntake.js";
@@ -500,6 +501,7 @@ export function startDiscordBot() {
     });
     const activityWorker = startCommunityActivityWorker(client);
     startFtShowcaseWorker(client);
+    startFtInfoWorker(client);
     console.info("FIMA community activity worker state", activityWorker);
     const boosterWorker = startCommunityBoosterWorker(client);
     console.info("FIMA community booster worker state", boosterWorker);
