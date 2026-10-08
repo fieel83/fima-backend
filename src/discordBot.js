@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker } from "./ftCommunityInfo.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
 import { ticketIsClosed, queueTicketRename } from "./fimaTicketLifecycle.js";
@@ -480,6 +481,7 @@ export function startDiscordBot() {
 
   const intents = [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates
@@ -584,6 +586,12 @@ export function startDiscordBot() {
     handleFimaSupportTicketHint(message).catch((error) => {
       lastError = error.message;
       console.warn("Fima support hint handler failed", { message: error.message, channelId: message?.channelId || null });
+    });
+  });
+
+  client.on("guildAuditLogEntryCreate", (entry, guild) => {
+    publishFtStaffAction(entry, guild, prisma.setting).catch((error) => {
+      console.warn("FT staff action delivery failed", { guildId: guild?.id, eventId: entry?.id, message: error.message });
     });
   });
 
