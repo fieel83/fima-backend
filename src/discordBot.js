@@ -1131,6 +1131,7 @@ async function handleDiscordInteraction(interaction) {
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
     await channel.send(fimaTicketPanelPayload());
     await auditDiscordBotAction("discord_ticket_panel_sent", "discord_channel", channel.id, {
+      guildId: interaction.guildId,
       actorId: interaction.user.id
     });
     return interaction.reply({ content: "Ticket panel sent.", ephemeral: true });
@@ -2512,6 +2513,7 @@ async function createFimaTicketTranscript(interaction, trigger = "manual") {
     allowedMentions: { parse: [] }
   });
   await auditDiscordBotAction("discord_ticket_transcript_saved", "discord_channel", channel.id, {
+    guildId: channel.guild.id,
     actorId: interaction.user.id,
     channelId: channel.id,
     destinationChannelId: destination.id,
@@ -2570,7 +2572,7 @@ async function handleTicketAssignment(interaction) {
       await channel.permissionOverwrites.edit(target.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket assigned by staff" });
       await channel.setTopic(topic, "Ticket assigned by staff");
       await panel.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: panel.embeds[0], status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, categoryLabel: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
-      await auditDiscordBotAction("discord_ticket_assigned", "discord_channel", channel.id, { actorId: interaction.user.id, assignedTo: target.id, contentStored: false });
+      await auditDiscordBotAction("discord_ticket_assigned", "discord_channel", channel.id, { guildId: interaction.guildId, actorId: interaction.user.id, assignedTo: target.id, contentStored: false });
       await interaction.editReply({ content: `Assigned to <@${target.id}>.`, allowedMentions: { parse: [] } });
     });
   } catch (error) {
@@ -2602,6 +2604,8 @@ async function handleTicketButtonLocked(interaction) {
   if (["claim", "close", "reopen", "transcript", "escalate"].includes(action)) await interaction.deferReply({ ephemeral: true });
 
   await auditDiscordBotAction(`discord_ticket_${action}`, "discord_channel", interaction.channelId, {
+    guildId: interaction.guildId,
+    outcome: "requested",
     actorId: interaction.user.id,
     channelId: interaction.channelId,
     contentStored: false,
@@ -2621,6 +2625,7 @@ async function handleTicketButtonLocked(interaction) {
       return interaction.editReply({ content: `Claim could not be saved: ${sanitizeDiscordText(error?.message || "unknown", 120)}` });
     }
     await interaction.message.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: interaction.message.embeds[0], status: "OPEN", actorId: interaction.user.id, claimedBy: interaction.user.id, categoryLabel: getTicketCategoryLabel(interaction), openedBy: getTicketOpenedUserId(interaction) })], components: ticketActionRows({ claimed: true }) });
+    await auditDiscordBotAction("discord_ticket_claim_succeeded", "discord_channel", channel.id, { guildId: interaction.guildId, actorId: interaction.user.id, claimedBy: interaction.user.id, contentStored: false });
     return interaction.editReply({ content: `Claimed by ${interaction.user}.`, allowedMentions: { parse: [] } });
   }
   if (action === "close") {
@@ -2671,7 +2676,7 @@ async function handleTicketButtonLocked(interaction) {
       await channel.permissionOverwrites.edit(targetId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket escalated to senior staff" });
       const notification = await channel.send({ content: `${role ? `<@&${targetId}>` : `<@${targetId}>`} — staff requested senior review of this ticket. / Personel bu destek talebi için üst yetkili incelemesi istedi.`, allowedMentions: { parse: [], roles: role ? [targetId] : [], users: role ? [] : [targetId] } });
       await channel.setTopic(nextTopic, "Record ticket escalation cooldown");
-      await auditDiscordBotAction("discord_ticket_escalation_sent", "discord_channel", channel.id, { actorId: interaction.user.id, targetId, messageId: notification.id, contentStored: false });
+      await auditDiscordBotAction("discord_ticket_escalation_sent", "discord_channel", channel.id, { guildId: interaction.guildId, actorId: interaction.user.id, targetId, messageId: notification.id, contentStored: false });
       return interaction.editReply({ content: "Senior staff notified. / Üst yetkiliye bildirim gönderildi." });
     } catch (error) {
       return interaction.editReply({ content: "Escalation could not finish. Check this ticket for a notification before retrying." });
