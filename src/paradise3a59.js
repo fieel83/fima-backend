@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
-import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices } from './fimaTemporaryVoiceLifecycle.js';
+import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
 import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
 import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings } from './fimaGuildArchitecture.js';
@@ -11225,6 +11225,11 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
         move: channel => newState.setChannel(channel, 'FIMA Bot existing temporary voice'), removeRecord });
       return true;
     }
+    if (!reserveTemporaryVoiceCreation(`${guild.id}:${newState.member.id}`)) {
+      await newState.disconnect('FIMA Bot temporary voice creation cooldown');
+      await newState.member.send('Yeni oda açmadan önce 30 saniye bekle. / Please wait 30 seconds before creating another room.').catch(() => {});
+      return true;
+    }
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
     const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
       || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name));
@@ -11237,7 +11242,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
         (privateCategory || joined.parent)?.permissionOverwrites?.cache?.values(), newState.member.id),
       reason: "FIMA Bot Join to Create"
     });
-    await saveState(state => {
+    await persistTemporaryVoice({ channel, persist: () => saveState(state => {
       state.temporaryVoices[channel.id] = {
         guildId: guild.id,
         channelId: channel.id,
@@ -11252,7 +11257,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
         rejectedUserIds: []
       };
       return state;
-    });
+    }) });
     await moveToTemporaryVoice({ channel, created: true, removeRecord, move: async target => {
       if (newState.member.voice.channelId !== joined.id) throw new Error('temporary_voice_member_left_lobby');
       await newState.setChannel(target, 'FIMA Bot Join to Create');

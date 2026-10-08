@@ -1,4 +1,30 @@
 const pending = new Map();
+const creationAttempts = new Map();
+
+export function reserveTemporaryVoiceCreation(key, now = Date.now()) {
+  for (const [member, expiresAt] of creationAttempts) {
+    if (expiresAt <= now) creationAttempts.delete(member);
+  }
+  if (creationAttempts.has(key)) return false;
+  creationAttempts.set(key, now + 30_000);
+  return true;
+}
+
+export async function persistTemporaryVoice({ channel, persist }) {
+  try {
+    await persist();
+  } catch (error) {
+    // Never move a member into a room that restart recovery cannot identify.
+    if (channel.members.size === 0) {
+      try {
+        await channel.delete('FIMA Bot temporary voice persistence failure cleanup');
+      } catch (cleanupError) {
+        error.cleanupError = cleanupError;
+      }
+    }
+    throw error;
+  }
+}
 
 // Duplicate gateway events share the same operation for this guild/member.
 export function withTemporaryVoiceJoin(key, operation) {

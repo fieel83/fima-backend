@@ -1,6 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices } from '../src/fimaTemporaryVoiceLifecycle.js';
+import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from '../src/fimaTemporaryVoiceLifecycle.js';
+
+test('creation cooldown blocks repeated attempts, expires and isolates members and guilds', () => {
+  assert.equal(reserveTemporaryVoiceCreation('cooldown-guild:a', 1000), true);
+  assert.equal(reserveTemporaryVoiceCreation('cooldown-guild:a', 30999), false);
+  assert.equal(reserveTemporaryVoiceCreation('cooldown-guild:b', 30999), true);
+  assert.equal(reserveTemporaryVoiceCreation('other-guild:a', 30999), true);
+  assert.equal(reserveTemporaryVoiceCreation('cooldown-guild:a', 31000), true);
+});
+
+test('persistence failure removes an empty new room and preserves the original error', async () => {
+  let deleted = 0;
+  const channel = { members: { size: 0 }, delete: async () => { deleted++; } };
+  const failure = new Error('storage unavailable');
+  await assert.rejects(persistTemporaryVoice({ channel, persist: async () => { throw failure; } }), error => error === failure);
+  assert.equal(deleted, 1);
+  channel.members.size = 1;
+  await assert.rejects(persistTemporaryVoice({ channel, persist: async () => { throw failure; } }), error => error === failure);
+  assert.equal(deleted, 1);
+  channel.members.size = 0;
+  channel.delete = async () => { throw new Error('delete denied'); };
+  await assert.rejects(persistTemporaryVoice({ channel, persist: async () => { throw failure; } }),
+    error => error === failure && error.cleanupError.message === 'delete denied');
+});
 
 test('concurrent events create once and release the member lock after failure', async () => {
   let calls = 0;
