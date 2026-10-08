@@ -99,3 +99,13 @@ body[data-account-page="dashboard"] :is(a, button, input, select, textarea):focu
   .experience-enter { animation: none !important; }
   body[data-page] *, body[data-account-page="dashboard"] * { scroll-behavior: auto !important; transition-duration: 0ms !important; animation-duration: 0ms !important; }
 }
+
+/* Keep localized navigation separate from account and preference controls. */
+@media (min-width: 1121px) {
+  body[data-page] .nav-shell { width: var(--container); grid-template-columns: auto minmax(0, 1fr); gap: 0 24px; padding-top: 12px; }
+  body[data-page] .nav-shell > .brand { grid-column: 1; grid-row: 1; }
+  body[data-page] .nav-controls { grid-column: 2; grid-row: 1; min-height: 48px; }
+  body[data-page] .site-menu { grid-column: 1 / -1; grid-row: 2; justify-content: center; flex-wrap: wrap; gap: 4px; padding: 10px 0 12px; }
+  body[data-page] .site-menu a { padding: 10px 13px; font-size: .88rem; }
+  body[data-page] .brand span { max-width: none; overflow: visible; }
+}
