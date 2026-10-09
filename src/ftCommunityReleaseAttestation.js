@@ -151,6 +151,7 @@ export const FT_COMMUNITY_CRITICAL_RELEASE_FILES = Object.freeze([
   "src/ftCommunityChannelNames.js",
   "src/ftCommunityMigrationPlan.js",
   "src/ftCommunityMessageSafety.js",
+  "src/ftCommunityBehaviorSafety.js",
   "src/ftCommunityMediaSafety.js",
   "src/ftCommunityMediaWorker.js",
   "src/ftCommunityShowcase.js",

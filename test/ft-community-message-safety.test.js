@@ -162,3 +162,44 @@ test("three concurrent edits serialize and logging failures do not re-enable rem
   await process({ message, safety: evaluate({ content: "Enter your seed phrase three" }), record });
   assert.equal(deletes, 3);
 });
+
+test("unchanged content is reprocessed when approval, policy, privacy or OCR verdict changes", async () => {
+  for (const [before, after] of [
+    [{ content: "discord.gg/example", roleKeys: ["invite_approved"] }, { content: "discord.gg/example" }],
+    [{ content: "discord.gg/example", config: { blockInvites: false } }, { content: "discord.gg/example" }],
+    [{ content: "Enter your seed phrase", privateTicket: true }, { content: "Enter your seed phrase" }],
+    [{ attachments: [{ id: "a", name: "photo.png" }] }, { attachments: [{ id: "a", name: "photo.png" }], extractedText: "Enter your seed phrase", mediaScan: "scanned" }]
+  ]) {
+    const process = createFtSafetyProcessor();
+    let deletes = 0;
+    let notices = 0;
+    const logs = [];
+    const message = { id: "m", guild: { id: "g" }, author: { id: "u", send: async () => { notices++; } }, delete: async () => { deletes++; } };
+    const record = async value => logs.push(value);
+    const first = evaluate(before);
+    const second = evaluate(after);
+    assert.equal(first.fingerprint, second.fingerprint);
+    assert.equal(first.blocked, false);
+    assert.equal(second.blocked, true);
+    await process({ message, safety: first, record });
+    await process({ message, safety: second, record });
+    await process({ message, safety: second, record });
+    assert.equal(deletes, 1);
+    assert.equal(notices, 1);
+    assert.equal(logs.at(-1).removed, true);
+  }
+});
+
+test("new media evidence is recorded even when the review verdict remains unchanged", async () => {
+  const process = createFtSafetyProcessor();
+  const logs = [];
+  const message = { id: "m", guild: { id: "g" }, author: { id: "u" } };
+  const record = async value => logs.push(value);
+  const before = evaluate({ content: "https://bit.ly/test", attachments: [{ name: "photo.png" }] });
+  const after = evaluate({ content: "https://bit.ly/test", attachments: [{ name: "photo.png" }], mediaScan: "scanned", attachmentHashes: ["a".repeat(64)] });
+  await process({ message, safety: before, record });
+  await process({ message, safety: after, record });
+  await process({ message, safety: after, record });
+  assert.equal(logs.length, 2);
+  assert.deepEqual(logs[1].attachmentHashes, ["a".repeat(64)]);
+});

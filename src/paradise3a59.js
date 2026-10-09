@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import { createFtSafetyProcessor } from "./ftCommunityMessageSafety.js";
 import { createFtMediaSafety } from "./ftCommunityMediaSafety.js";
+import { createFtBehaviorSafety } from "./ftCommunityBehaviorSafety.js";
 import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
@@ -14543,14 +14544,22 @@ export function evaluateParadiseContentSafety({
 
 const processFtMessageSafety = createFtSafetyProcessor();
 const evaluateFtMediaSafety = createFtMediaSafety();
+const observeFtBehaviorSafety = createFtBehaviorSafety();
 
 async function handleParadiseMessageSafetyInner(message, state, guildConfig) {
   if (!message.guild || message.author.bot) return false;
   if (!fimaRuntimeModuleAllowed(guildConfig, "security") || guildConfig.automod?.runtimeSafety === false) return false;
   if (message.guild.id === FT_COMMUNITY_GUILD_ID || guildConfig.communityManaged === true) {
+    const privateTicket = Boolean(supportTicketRecordForChannel(state, message.guild.id, message.channelId)) || /^Fima ticket:.*openedBy:\d{15,25}\./i.test(String(message.channel?.topic || ""));
+    const behavior = observeFtBehaviorSafety({ guildId: message.guild.id, authorId: message.author.id, messageId: message.id,
+      channelId: message.channelId, content: message.content, attachments: [...(message.attachments?.values?.() || [])],
+      privateTicket, authorCreatedAt: message.author.createdTimestamp });
+    if (behavior) await logParadiseAction(message.guild, "security_logs_channel", "security-logs", "Posting pattern review",
+      "Repeated guild-visible posting needs staff review. No automatic member restriction was applied.",
+      { type: "security", viewerScope: "staff", discordPrivateOnly: true, metadata: { ...behavior, authorId: message.author.id, channelId: message.channelId, messageId: message.id } }).catch(() => null);
     const safety = await evaluateFtMediaSafety({
       content: message.content, embeds: message.embeds || [], attachments: [...(message.attachments?.values?.() || [])],
-      privateTicket: Boolean(supportTicketRecordForChannel(state, message.guild.id, message.channelId)) || /^Fima ticket:.*openedBy:\d{15,25}\./i.test(String(message.channel?.topic || "")),
+      privateTicket,
       roleKeys: [...(message.member?.roles?.cache?.values?.() || [])].map(role => role.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")),
       isOwner: message.guild.ownerId === message.author.id, config: guildConfig.automod || {}
     }, { channelId: message.channelId, messageId: message.id });

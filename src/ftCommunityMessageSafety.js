@@ -88,7 +88,10 @@ export function createFtSafetyProcessor({ maxEntries = 2000, ttlMs = 300000, now
     while (pending.has(key)) await pending.get(key).catch(() => null);
     const time = now();
     for (const [id, value] of seen) if (time - value.at > ttlMs) seen.delete(id);
-    if (seen.get(key)?.fingerprint === safety.fingerprint) return safety.blocked;
+    // The same content can receive a different verdict after OCR, role or policy changes.
+    const verdictKey = hash(JSON.stringify([safety.fingerprint, safety.blocked, safety.reason, safety.risk,
+      safety.retainForReview, safety.evidence, safety.hosts, safety.mediaScan, safety.attachmentHashes]));
+    if (seen.get(key)?.verdictKey === verdictKey) return safety.blocked;
     const operation = (async () => {
       let removed = false;
       let failureCode = null;
@@ -104,7 +107,7 @@ export function createFtSafetyProcessor({ maxEntries = 2000, ttlMs = 300000, now
       if (removed) await message.author.send?.({ content: "FIMA removed a message containing unsafe content. If this was a mistake, open a support ticket for staff review. / Güvenli olmayan içerik kaldırıldı. Hata olduğunu düşünüyorsanız destek talebi açın.", allowedMentions: { parse: [] } }).catch(() => null);
       if (!safety.blocked || removed) {
         seen.delete(key);
-        seen.set(key, { fingerprint: safety.fingerprint, at: time });
+        seen.set(key, { verdictKey, at: time });
         while (seen.size > maxEntries) seen.delete(seen.keys().next().value);
       }
       return safety.blocked;
