@@ -22,7 +22,7 @@ const normalize = name => String(name || '').normalize('NFKC').toLowerCase()
   .replace(/^[^\p{L}\p{N}]+/u, '').replace(/[_\s]+/g, '-');
 
 const chatNames = new Set(['general', 'chat', 'english-chat', 'media', 'english-media', 'sohbet', 'medya',
-  'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'outfits', 'capes', 'staff-chat', 'mod-chat', 'management', 'management-chat', 'admin-chat', 'moderator-only']);
+  'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'staff-chat', 'mod-chat', 'management', 'management-chat', 'admin-chat', 'moderator-only']);
 const panelNames = new Set(['roles', 'support', 'fima-support', 'polls', 'events', 'giveaways', 'staff-application-reviews', 'application-reviews']);
 function styledChannelName(channel, privateTicket, group) {
   if (!group || privateTicket) return channel.name;

@@ -68,6 +68,19 @@ test('vouches moves to HELP with its history and buyer overrides preserved', () 
   assert.equal(after.permissionReviewRequired, true);
 });
 
+test('canonical rotating showcases retain their information prefix and channel identity', () => {
+  const input = audit();
+  input.categories = [{ id: 'community', name: '⌗・COMMUNITY' }];
+  input.channels = ['outfits', 'capes'].map(id => ({ id, name: `⌁・${id}`, type: 0, parentId: 'community' }));
+  const plan = buildFtCommunityMigrationPlan(input);
+  for (const row of plan.matrix) {
+    assert.equal(row.targetName, row.name);
+    assert.equal(row.decision, 'keep');
+    assert.equal(row.targetCategoryId, 'community');
+    assert.ok(row.preserveId && row.preserveHistory && row.preservePermissionOverwrites);
+  }
+});
+
 test('already placed restricted channels still require effective access review', () => {
   const input = audit();
   input.categories = [{ id: 'staff', name: '□・STAFF' }, { id: 'community', name: '⌗・COMMUNITY' }];
