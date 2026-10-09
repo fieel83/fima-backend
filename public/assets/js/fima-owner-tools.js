@@ -1019,13 +1019,57 @@ async function runFtRoles(apply){
 }
 byId('prepareFtRoles').onclick=()=>runFtRoles(false);
 byId('applyFtRoles').onclick=()=>runFtRoles(true);
+let reviewedFtRoleRecovery=null;
+function clearFtRoleRecovery(){
+  reviewedFtRoleRecovery=null;
+  byId('applyFtRoleRecovery').disabled=true;
+}
+byId('ftRoleRecoveryJournal').onchange=clearFtRoleRecovery;
+async function runFtRoleRecovery(apply){
+  const selector=byId('ftRoleRecoveryJournal'),review=byId('prepareFtRoleRecovery'),save=byId('applyFtRoleRecovery');
+  const guildId=selectedGuildId,journalId=selector.value;
+  if(guildId!=='1419335632324657306'||selector.dataset.guildId!==guildId||!journalId)return show('Inspect FT Community recovery evidence first.',false);
+  const plan=reviewedFtRoleRecovery;
+  if(apply&&(!plan||plan.guildId!==guildId||plan.journalId!==journalId))return show('Review the selected recovery first.',false);
+  clearFtRoleRecovery();review.disabled=true;selector.disabled=true;
+  reviewedFtRoles=null;byId('applyFtRoles').disabled=true;
+  try{
+    const body={guildId,journalId};if(apply)body.expectedDigest=plan.digest;
+    const{response,result}=await mutate('/api/fima-bot/actions/'+(apply?'reconcile-ft-roles':'prepare-ft-role-recovery'),body);
+    if(selectedGuildId!==guildId)return;
+    byId('ftRolesPlan').textContent=JSON.stringify(result.recovery||result,null,2);
+    if(!response.ok)return show('Recovery blocked. Inspect the current evidence before continuing.',false);
+    if(!apply){
+      const recovery=result.recovery;
+      if(recovery?.guildId!==guildId||recovery.journalId!==journalId||recovery.discordWrites!==0||!/^[a-f0-9]{64}$/.test(recovery.digest||''))return show('Recovery review unavailable.',false);
+      reviewedFtRoleRecovery={guildId,journalId,digest:recovery.digest};save.disabled=false;
+      show('Review the current roles and recovery disposition before saving.');
+    }else{
+      selector.replaceChildren();selector.dataset.guildId='';
+      show('Reviewed journal recovery saved. Inspect evidence and review a fresh role plan.');
+    }
+  }catch{show('Recovery response unavailable. Inspect the journal before any retry.',false);}
+  finally{const available=selector.dataset.guildId===selectedGuildId&&Boolean(selector.value);review.disabled=!available;selector.disabled=!available;}
+}
+byId('prepareFtRoleRecovery').onclick=()=>runFtRoleRecovery(false);
+byId('applyFtRoleRecovery').onclick=()=>runFtRoleRecovery(true);
 byId('inspectFtRoleRecovery').onclick=async()=>{
   if(!selectedGuildId)return show('Select FT Community first.',false);
+  const guildId=selectedGuildId,selector=byId('ftRoleRecoveryJournal');
+  clearFtRoleRecovery();selector.replaceChildren();selector.dataset.guildId='';selector.disabled=true;byId('prepareFtRoleRecovery').disabled=true;
   const button=byId('inspectFtRoleRecovery');button.disabled=true;
   try{
-    const response=await fetch(API_BASE+'/api/fima-bot/ft-role-recovery/'+encodeURIComponent(selectedGuildId),{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
+    const response=await fetch(API_BASE+'/api/fima-bot/ft-role-recovery/'+encodeURIComponent(guildId),{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
     const result=await response.json();
+    if(selectedGuildId!==guildId)return;
     byId('ftRolesPlan').textContent=JSON.stringify(result.recovery||result,null,2);
+    if(response.ok&&result.recovery?.guildId===guildId){
+      for(const journal of result.recovery.journals||[]){
+        if(journal.status!=='recovery_required')continue;
+        const option=document.createElement('option');option.value=journal.id;option.textContent='Interrupted operation · '+(journal.startedAt||journal.id);selector.append(option);
+      }
+      selector.dataset.guildId=guildId;selector.disabled=!selector.value;byId('prepareFtRoleRecovery').disabled=!selector.value;
+    }
     show(response.ok?'Read-only recovery evidence loaded. Migration remains locked.':'Recovery inspection blocked.',response.ok);
   }catch{show('Recovery inspection unavailable.',false);}
   finally{button.disabled=false;}
