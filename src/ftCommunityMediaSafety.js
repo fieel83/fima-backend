@@ -95,16 +95,18 @@ export function createFtMediaSafety({ download = downloadFtMedia, scan = scanFtM
     // Do not retain unbounded message closures when a flood saturates the queue.
     if (pending.size >= 9) { metrics.busy++; return base; }
     const operation = schedule(async () => {
-      const texts = [], destinations = [], scans = [];
+      const texts = [], destinations = [], scans = [], attachmentHashes = [];
       for (const file of input.attachments.slice(0, 2)) {
         try {
-          const result = await scan(await download(file));
+          const buffer = await download(file);
+          attachmentHashes.push(createHash("sha256").update(buffer).digest("hex"));
+          const result = await scan(buffer);
           texts.push(result.text); destinations.push(result.qr); scans.push(result.scan);
           metrics.scanned++;
         } catch { scans.push("not_scanned"); metrics.notScanned++; }
       }
       const mediaScan = scans.every(scan => scan === "scanned") && input.attachments.length <= 2 ? "scanned" : scans.some(scan => scan !== "not_scanned") ? "partially_scanned" : "not_scanned";
-      return evaluateFtMessageSafety({ ...input, extractedText: texts.join("\n"), qrDestinations: destinations.filter(Boolean), mediaScan });
+      return evaluateFtMessageSafety({ ...input, extractedText: texts.join("\n"), qrDestinations: destinations.filter(Boolean), mediaScan, attachmentHashes });
     }).catch(() => base).then(value => {
       cache.set(key, { at: now(), value });
       while (cache.size > 200) cache.delete(cache.keys().next().value);

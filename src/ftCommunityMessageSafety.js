@@ -22,17 +22,27 @@ export function ftSafetyHost(raw) {
     const host = domainToASCII(url.hostname).toLowerCase().replace(/\.$/, "");
     const official = OFFICIAL_HOSTS.some(base => host === base || host.endsWith(`.${base}`));
     const skeleton = normalize(domainToUnicode(host)).replace(/[іıι]/g, "i").replace(/[оο]/g, "o").replace(/[аα]/g, "a").replace(/[еε]/g, "e").replace(/[^a-z0-9]/g, "");
-    return { host, official, lookalike: !official && /discord|roblox|fimamacro/.test(skeleton), shortened: SHORTENERS.has(host), credentialUrl: Boolean(url.username || url.password) };
+    const redirectHosts = [];
+    for (const [key, value] of [...url.searchParams].slice(0, 30)) {
+      if (!/^(?:redirect(?:_uri|_url)?|return(?:_to|url)?|next|continue|destination|url)$/i.test(key)) continue;
+      try {
+        const target = new URL(value, url);
+        const targetHost = domainToASCII(target.hostname).toLowerCase().replace(/\.$/, "");
+        if (["http:", "https:"].includes(target.protocol) && !OFFICIAL_HOSTS.some(base => targetHost === base || targetHost.endsWith(`.${base}`))) redirectHosts.push(targetHost);
+      } catch { /* Malformed destinations are never followed. */ }
+    }
+    return { host, official, lookalike: !official && /discord|roblox|fimamacro/.test(skeleton), shortened: SHORTENERS.has(host), credentialUrl: Boolean(url.username || url.password), redirectHosts: [...new Set(redirectHosts)].slice(0, 5) };
   } catch { return null; }
 }
 
 /** No URLs are followed. Evidence contains categories, hostnames and a hash, never message bodies. */
-export function evaluateFtMessageSafety({ content = "", embeds = [], attachments = [], privateTicket = false, roleKeys = [], isOwner = false, config = {}, extractedText = "", qrDestinations = [], mediaScan = null } = {}) {
+export function evaluateFtMessageSafety({ content = "", embeds = [], attachments = [], privateTicket = false, roleKeys = [], isOwner = false, config = {}, extractedText = "", qrDestinations = [], mediaScan = null, attachmentHashes = [] } = {}) {
   const source = ftSafetyText({ content, embeds });
   const text = normalize(bounded([source, extractedText, ...qrDestinations.slice(0, 3)].join("\n")));
   const urls = [...text.matchAll(/https?:\/\/[^\s<>"`]+/g)].slice(0, 30).map(match => ftSafetyHost(match[0].replace(/[),.!?]+$/, ""))).filter(Boolean);
   const external = urls.some(url => !url.official);
   const lookalike = urls.some(url => url.lookalike || url.credentialUrl);
+  const externalRedirect = urls.some(url => url.official && url.redirectHosts.length);
   const reward = /free\s+(?:nitro|robux)|(?:nitro|robux)\s+(?:gift|giveaway)|ücretsiz\s+(?:nitro|robux)|bedava\s+(?:nitro|robux)/.test(text);
   const influencer = /mr\.?\s*beast|influencer|youtuber/.test(text) && /giveaway|çekiliş|reward|ödül/.test(text);
   const callToAction = qrDestinations.length > 0 || /claim|redeem|verify|scan|login|log\s*in|giriş|doğrula|tara|hemen|limited|only today/.test(text);
@@ -45,6 +55,7 @@ export function evaluateFtMessageSafety({ content = "", embeds = [], attachments
   const hasInvite = /discord\s*\.\s*gg\s*\/|discord(?:app)?\.com\/invite\//.test(text);
   const evidence = [];
   if (lookalike) evidence.push("lookalike_or_credential_url");
+  if (externalRedirect) evidence.push("official_url_external_redirect_not_followed");
   if (reward) evidence.push("reward_offer");
   if (influencer) evidence.push("influencer_giveaway");
   if (callToAction) evidence.push("call_to_action");
@@ -54,15 +65,16 @@ export function evaluateFtMessageSafety({ content = "", embeds = [], attachments
   if (extractedText) evidence.push("local_ocr_text");
   if (qrDestinations.length) evidence.push("qr_destination_decoded_not_followed");
   if (urls.some(url => url.shortened)) evidence.push("shortened_url_unresolved");
-  const strongScam = paymentUnlock || walletSecret || (external && callToAction && (lookalike || (influencer && (reward || /cash|money|dollars|para|nakit/.test(text)))));
-  let risk = strongScam || riskyAttachment ? "HIGH" : lookalike || (external && (reward || influencer)) || urls.some(url => url.shortened) ? "MEDIUM" : "LOW";
+  const strongScam = paymentUnlock || walletSecret || (externalRedirect && callToAction && reward) || (external && callToAction && (lookalike || (influencer && (reward || /cash|money|dollars|para|nakit/.test(text)))));
+  let risk = strongScam || riskyAttachment ? "HIGH" : lookalike || externalRedirect || (external && (reward || influencer)) || urls.some(url => url.shortened) ? "MEDIUM" : "LOW";
   const inviteBlocked = hasInvite && config.blockInvites !== false && !inviteApproved;
   if (inviteBlocked && risk === "LOW") risk = "MEDIUM";
   // Reports remain available to staff. Attachments are never executed, even inside tickets.
   const retainForReview = privateTicket || educational;
   const blocked = !retainForReview && (risk === "HIGH" || inviteBlocked);
   const reason = riskyAttachment ? "unsafe_attachment" : strongScam ? "combined_scam_evidence" : inviteBlocked ? "invite_not_approved" : risk !== "LOW" ? "staff_review" : null;
-  return Object.freeze({ blocked, reason, risk, retainForReview, evidence, hosts: [...new Set(urls.map(url => url.host))].slice(0, 10),
+  return Object.freeze({ blocked, reason, risk, retainForReview, evidence, hosts: [...new Set(urls.flatMap(url => [url.host, ...url.redirectHosts]))].slice(0, 10),
+    attachmentHashes: attachmentHashes.filter(value => /^[a-f0-9]{64}$/.test(value)).slice(0, 2),
     fingerprint: hash(source + JSON.stringify(attachments.slice(0, 10).map(file => [file.id, file.name, file.size, file.contentType]))),
     mediaScan: mediaScan || (attachments.length ? "not_scanned" : "no_attachments") });
 }
@@ -86,7 +98,9 @@ export function createFtSafetyProcessor({ maxEntries = 2000, ttlMs = 300000, now
       }
       if (safety.risk !== "LOW" || safety.blocked) await record({ channelId: message.channelId, authorId: message.author.id, messageId: message.id,
         reason: safety.reason, risk: safety.risk, evidence: safety.evidence, hosts: safety.hosts, fingerprint: safety.fingerprint,
-        mediaScan: safety.mediaScan, retainedForReview: safety.retainForReview, removed, failureCode }).catch(() => null);
+        mediaScan: safety.mediaScan, attachmentHashes: safety.attachmentHashes, detectedAt: new Date(time).toISOString(),
+        messageCreatedAt: Number.isFinite(message.createdTimestamp) ? new Date(message.createdTimestamp).toISOString() : null,
+        retainedForReview: safety.retainForReview, removed, failureCode }).catch(() => null);
       if (removed) await message.author.send?.({ content: "FIMA removed a message containing unsafe content. If this was a mistake, open a support ticket for staff review. / Güvenli olmayan içerik kaldırıldı. Hata olduğunu düşünüyorsanız destek talebi açın.", allowedMentions: { parse: [] } }).catch(() => null);
       if (!safety.blocked || removed) {
         seen.delete(key);

@@ -42,6 +42,32 @@ test("official domains use exact boundaries and credential URLs remain suspiciou
   assert.equal(ftSafetyHost("not a URL"), null);
 });
 
+test("official host cannot hide an external reward redirect; destinations remain masked", () => {
+  const content = "Claim free Nitro https://discord.com/login?redirect_uri=https%3A%2F%2Ffraud.invalid%2Fclaim%3Ftoken%3Dprivate";
+  const result = evaluate({ content });
+  assert.equal(result.blocked, true);
+  assert.equal(result.risk, "HIGH");
+  assert.deepEqual(result.hosts, ["discord.com", "fraud.invalid"]);
+  assert.ok(result.evidence.includes("official_url_external_redirect_not_followed"));
+  assert.equal(JSON.stringify(result).includes("private"), false);
+  assert.equal(evaluate({ content: "https://discord.com/login?next=/channels/@me" }).risk, "LOW");
+  assert.equal(evaluate({ content: "https://discord.com/login?redirect_uri=https%3A%2F%2Fwww.roblox.com%2F" }).risk, "LOW");
+  assert.equal(evaluate({ content: "https://discord.com/login?next=https://other.invalid/" }).risk, "MEDIUM");
+  assert.equal(evaluate({ content: `This is a scam. ${content}` }).blocked, false);
+});
+
+test("staff evidence records bounded hashes and timestamps without retaining attachments", async () => {
+  const process = createFtSafetyProcessor({ now: () => 1700000000000 });
+  const logs = [];
+  const digest = "a".repeat(64);
+  const safety = evaluate({ content: "https://bit.ly/test", attachmentHashes: [digest, "secret", "b".repeat(64), "c".repeat(64)] });
+  await process({ message: { id: "m", guild: { id: "g" }, author: { id: "u" }, createdTimestamp: 1699999999000 }, safety, record: async value => logs.push(value) });
+  assert.deepEqual(logs[0].attachmentHashes, [digest, "b".repeat(64)]);
+  assert.equal(logs[0].detectedAt, "2023-11-14T22:13:20.000Z");
+  assert.equal(logs[0].messageCreatedAt, "2023-11-14T22:13:19.000Z");
+  assert.equal(JSON.stringify(logs).includes("secret"), false);
+});
+
 test("private ticket evidence and educational warnings are retained for staff review", () => {
   const content = "Pay a deposit to unlock withdrawal https://fraud.invalid/";
   assert.equal(evaluate({ content }).blocked, true);

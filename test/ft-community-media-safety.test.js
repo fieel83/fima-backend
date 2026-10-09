@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import QRCode from "qrcode";
 import { ftMediaAttachmentUrl, downloadFtMedia, scanFtMediaBuffer, createFtMediaSafety, ftMediaSafetyMetrics } from "../src/ftCommunityMediaSafety.js";
@@ -31,6 +32,7 @@ test("real QR pixels decode locally; hidden destination produces safe evidence o
   const result = await evaluate({ attachments: [file] }, context);
   assert.equal(result.blocked, true); assert.equal(result.risk, "HIGH"); assert.equal(result.mediaScan, "scanned");
   assert.deepEqual(result.hosts, ["discord.com.attacker.test"]);
+  assert.deepEqual(result.attachmentHashes, [createHash("sha256").update(buffer).digest("hex")]);
   assert.equal(JSON.stringify(result).includes("token=private"), false);
 });
 
@@ -84,4 +86,8 @@ test("flood queue is bounded and unsupported or excess attachments report incomp
   assert.equal((await evaluate({ attachments: [file, file, file] }, { ...context, messageId: "excess" })).mediaScan, "partially_scanned");
   const failed = createFtMediaSafety({ download: async () => { throw Error("unsupported"); } });
   assert.equal((await failed({ attachments: [file] }, context)).mediaScan, "not_scanned");
+  const corrupt = createFtMediaSafety({ download: async () => Buffer.of(1, 2), scan: async () => { throw Error("corrupt"); } });
+  const verdict = await corrupt({ attachments: [file] }, context);
+  assert.equal(verdict.mediaScan, "not_scanned");
+  assert.deepEqual(verdict.attachmentHashes, [createHash("sha256").update(Buffer.of(1, 2)).digest("hex")]);
 });
