@@ -119,6 +119,7 @@ import {
   paradiseDiscordStructureBackup,
   migrateFtCommunityChannelsFromDashboard,
   fieelInfoFromDashboard,
+  ftRulesFromDashboard,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
@@ -2269,6 +2270,26 @@ app.post(["/api/fima-bot/actions/prepare-fieel-info", "/api/fima-bot/actions/rep
     return res.json({ success: true, guildId, info });
   } catch (error) {
     return res.status(409).json({ error: "ft_info_replacement_blocked", reason: publicError(error) });
+  }
+});
+
+app.post(["/api/fima-bot/actions/prepare-ft-rules", "/api/fima-bot/actions/replace-ft-rules"], requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  if (guildId !== "1419335632324657306") return res.status(400).json({ error: "ft_community_guild_required" });
+  const apply = req.path.endsWith('/replace-ft-rules');
+  const digest = String(req.body?.expectedDigest || "");
+  if (apply && !/^[a-f0-9]{64}$/.test(digest)) return res.status(400).json({ error: "reviewed_rules_plan_required" });
+  try {
+    const rules = apply
+      ? await withParadiseGuildMutationLease(guildId, "ft_rules_replacement", () => ftRulesFromDashboard(guildId, digest, req.user.id), { purposeKey: "ft_rules_replacement" })
+      : await ftRulesFromDashboard(guildId);
+    await createAuditLog(apply ? "ft_rules_canonical_replaced" : "ft_rules_replacement_prepared", "discord_guild", guildId, { actorUserId: req.user.id, channelId: rules.channelId, messageId: rules.messageId || null, originalRetained: true });
+    return res.json({ success: true, guildId, rules });
+  } catch (error) {
+    return res.status(409).json({ error: "ft_rules_replacement_blocked", reason: publicError(error) });
   }
 });
 

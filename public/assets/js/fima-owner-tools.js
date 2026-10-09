@@ -981,6 +981,25 @@ async function runFieelInfo(apply){
 }
 byId('prepareFieelInfo').onclick=()=>runFieelInfo(false);
 byId('applyFieelInfo').onclick=()=>runFieelInfo(true);
+let reviewedFtRules=null;
+async function runFtRules(apply){
+  const review=byId('prepareFtRules'),publish=byId('applyFtRules'),output=byId('ftRulesPlan');
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  if(apply&&(!reviewedFtRules||reviewedFtRules.guildId!==selectedGuildId))return show('Review the FT Rules plan first.',false);
+  const body={guildId:selectedGuildId};
+  if(apply){body.expectedDigest=reviewedFtRules.digest;reviewedFtRules=null;}
+  review.disabled=true;publish.disabled=true;
+  try{
+    const{response,result}=await mutate('/api/fima-bot/actions/'+(apply?'replace-ft-rules':'prepare-ft-rules'),body);
+    output.textContent=JSON.stringify(result.rules||{error:result.error,reason:result.reason},null,2);
+    if(!response.ok){reviewedFtRules=null;return show('FT Rules operation blocked; inspect the result.',false);}
+    if(!apply){reviewedFtRules=result.rules;publish.disabled=false;}
+    show(apply?'Canonical FT Rules verified; original retained.':'Review the source and proposed content before publishing.');
+  }catch{reviewedFtRules=null;output.textContent='Response unavailable. Inspect Discord and stored replacement state before retrying.';show('FT Rules response unavailable.',false);}
+  finally{review.disabled=false;}
+}
+byId('prepareFtRules').onclick=()=>runFtRules(false);
+byId('applyFtRules').onclick=()=>runFtRules(true);
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;

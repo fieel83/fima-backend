@@ -1,3 +1,4 @@
+import { prepareFtRulesReplacement, replaceFtRulesCanonical } from './ftCommunityRules.js';
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
 import { organizeFimaRolePositions } from "./fimaRolePositions.js";
@@ -3687,6 +3688,18 @@ export async function fieelInfoFromDashboard(guildId, expectedDigest = null, act
   return expectedDigest
     ? replaceFieelInfoCanonical(matches[0], client.user.id, channels, expectedDigest, actorUserId)
     : prepareFieelInfoReplacement(matches[0], client.user.id, channels);
+}
+
+export async function ftRulesFromDashboard(guildId, expectedDigest = null, actorUserId = null) {
+  if (guildId !== '1419335632324657306') throw new Error('FT rules scope mismatch');
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.user) throw new Error('paradise_guild_unavailable');
+  const channels = await guild.channels.fetch();
+  const channel = channels.get('1420401536571543593');
+  if (!channel?.messages) throw new Error('FT rules destination unavailable');
+  return expectedDigest
+    ? replaceFtRulesCanonical(channel, client.user.id, expectedDigest, actorUserId)
+    : prepareFtRulesReplacement(channel, client.user.id);
 }
 
 export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedDigest, actorUserId, phase = 'move') {
