@@ -47,6 +47,39 @@ test('a channel without a parent must move when its target category does not exi
   assert.equal(buildFtCommunityMigrationPlan(input).matrix.find(row => row.id === 'help').decision, 'move');
 });
 
+test('vouches moves to HELP with its history and buyer overrides preserved', () => {
+  const input = audit();
+  input.categories.push({ id: 'community', name: '⌗・COMMUNITY' }, { id: 'help', name: '◇・HELP' });
+  input.channels = [{ id: 'vouches', name: '⌁・vouches', type: 0, parentId: 'community',
+    permissionOverwrites: [{ id: 'buyer', type: 0, allow: ['SendMessages'], deny: [] }] }];
+  const before = structuredClone(input);
+  const row = buildFtCommunityMigrationPlan(input).matrix[0];
+  assert.equal(row.targetCategoryId, 'help');
+  assert.equal(row.targetName, '›・vouches');
+  assert.equal(row.decision, 'move');
+  assert.equal(row.accessRequirement, 'public_read_verified_buyers_write');
+  assert.ok(row.preserveId && row.preserveHistory && row.preservePermissionOverwrites);
+  assert.deepEqual(input, before);
+  input.channels[0].name = row.targetName;
+  input.channels[0].parentId = row.targetCategoryId;
+  const after = buildFtCommunityMigrationPlan(input).matrix[0];
+  assert.equal(after.decision, 'keep');
+  assert.equal(after.targetName, row.targetName);
+  assert.equal(after.permissionReviewRequired, true);
+});
+
+test('already placed restricted channels still require effective access review', () => {
+  const input = audit();
+  input.categories = [{ id: 'staff', name: '□・STAFF' }, { id: 'community', name: '⌗・COMMUNITY' }];
+  input.channels = [{ id: 'staff-chat', name: '›・staff-chat', type: 0, parentId: 'staff' },
+    { id: 'turkish', name: '›・sohbet', type: 0, parentId: 'community' }];
+  const plan = buildFtCommunityMigrationPlan(input);
+  assert.ok(plan.matrix.every(row => row.decision === 'keep' && row.permissionReviewRequired));
+  assert.equal(plan.matrix.find(row => row.id === 'staff-chat').accessRequirement, 'reviewed_staff_only');
+  assert.equal(plan.matrix.find(row => row.id === 'turkish').accessRequirement, 'turkish_role_and_reviewed_staff');
+  assert.equal(plan.targetCategories.find(row => row.key === 'STAFF').permissionReviewRequired, true);
+});
+
 test('duplicate categories need review and cannot become automatic destinations', () => {
   const input = audit(); input.categories.push({ id: 'other', name: '⌂・START' });
   const plan = buildFtCommunityMigrationPlan(input);

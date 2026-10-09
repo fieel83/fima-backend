@@ -4,6 +4,40 @@
   const surfaceI18n = window.FimaSurfaceI18n?.mount({
     sourceLocale: "en",
     translations: {
+      "Skip to content": "İçeriğe geç",
+      "Secure operations workspace": "Güvenli işlem çalışma alanı",
+      "Versioned Discord messages with guarded publishing": "Kontrollü yayınlama ile sürümlü Discord mesajları",
+      "Checking owner session…": "Owner oturumu kontrol ediliyor…",
+      "Content Studio security boundaries": "İçerik Stüdyosu güvenlik sınırları",
+      "Library → Editor → Publish": "Kütüphane → Düzenleyici → Yayınla",
+      "One controlled path from source to Discord.": "Kaynaktan Discord'a kontrollü bir akış.",
+      "Versioned": "Sürümlü",
+      "Every save can be rolled back.": "Her kayıt geri alınabilir.",
+      "Owner locked": "Owner erişimi gerekli",
+      "Session, Discord and CSRF checked.": "Oturum, Discord ve CSRF doğrulanır.",
+      "Compose, preview and safely test Discord embeds": "Discord embedlerini oluştur, önizle ve güvenle test et",
+      "Embed Builder security boundaries": "Embed Builder güvenlik sınırları",
+      "Library → Compose → Verify": "Kütüphane → Oluştur → Doğrula",
+      "Build and preview here; publishing remains isolated to the test guild.": "Burada oluştur ve önizle; yayınlama yalnızca test sunucusunda yapılır.",
+      "FT banner starters": "FT banner taslakları",
+      "FT Community banner starter drafts": "FT Community banner başlangıç taslakları",
+      "Open welcome banner starter draft": "Karşılama banner taslağını aç",
+      "Open leave banner starter draft": "Ayrılma banner taslağını aç",
+      "Open rules banner starter draft": "Kurallar banner taslağını aç",
+      "Open staff banner starter draft": "Ekip banner taslağını aç",
+      "Open video team banner starter draft": "Video ekibi banner taslağını aç",
+      "Open announcement banner starter draft": "Duyuru banner taslağını aç",
+      "Open leaderboard banner starter draft": "Sıralama banner taslağını aç",
+      "Open booster banner starter draft": "Takviye banner taslağını aç",
+      "Welcome": "Karşılama",
+      "Leave": "Ayrılma",
+      "Rules": "Kurallar",
+      "Staff": "Ekip",
+      "Video team": "Video ekibi",
+      "Announcement": "Duyuru",
+      "Leaderboard": "Sıralama",
+      "Booster": "Takviye",
+      "Each button opens one canonical banner as an unsaved Starter Draft. Review and save before test-guild publishing.": "Her düğme tek bir canonical bannerı kaydedilmemiş Başlangıç Taslağı olarak açar. Test sunucusunda yayınlamadan önce inceleyip kaydet.",
       "Language / Dil": "Dil / Language",
       "Interface language": "Arayüz dili",
       "FIMA Bot product navigation": "FIMA Bot ürün gezinmesi",
@@ -166,6 +200,23 @@
       "The validated backup contains no Content Studio archive.": "Doğrulanmış yedek İçerik Stüdyosu arşivi içermiyor.",
       "The server backup checksum failed. Archive import is locked.": "Sunucu yedeği sağlama toplamı başarısız. Arşiv içe aktarımı kilitlendi.",
       "The server backup schema is not supported. Archive import is locked.": "Sunucu yedeği şeması desteklenmiyor. Arşiv içe aktarımı kilitlendi.",
+      "The document identifier is invalid.": "Belge kimliği geçersiz.",
+      "The saved document no longer exists.": "Kayıtlı belge artık mevcut değil.",
+      "That saved version no longer exists.": "Bu kayıtlı sürüm artık mevcut değil.",
+      "The target text channel was not found.": "Hedef metin kanalı bulunamadı.",
+      "The target message was not found.": "Hedef mesaj bulunamadı.",
+      "Use the workflow order: Imported or Starter Draft, then Improved Draft, then Production Version.": "İş akışını sırayla uygula: İçe Aktarıldı veya Başlangıç Taslağı, ardından İyileştirilmiş Taslak ve Production Sürümü.",
+      "Only an Improved Draft or Production Version can be published to the isolated test guild.": "İzole test sunucusuna yalnızca İyileştirilmiş Taslak veya Production Sürümü yayınlanabilir.",
+      "Capture the real Discord source before publishing this pending starter or legacy import.": "Bu taslağı veya eski içe aktarımı yayınlamadan önce gerçek Discord kaynağını kaydet.",
+      "A Discord import must retain its immutable Original snapshot.": "Discord içe aktarımı değiştirilemez Orijinal anlık görüntüsünü korumalıdır.",
+      "Edited imported content must be marked as an Improved Draft; the Original stays unchanged.": "Düzenlenen içe aktarım İyileştirilmiş Taslak olarak işaretlenmelidir; Orijinal korunur.",
+      "FIMA is not connected to Discord right now.": "FIMA şu anda Discord'a bağlı değil.",
+      "This channel cannot host a managed webhook.": "Bu kanal yönetilen webhook barındıramaz.",
+      "That archived message is no longer present in the validated backup.": "Bu arşivlenmiş mesaj doğrulanmış yedekte artık mevcut değil.",
+      "The archived message identifier failed validation.": "Arşivlenmiş mesaj kimliği doğrulanamadı.",
+      "The backup belongs to a different Discord server.": "Yedek farklı bir Discord sunucusuna ait.",
+      "An archived message belongs to a different Discord server.": "Arşivlenmiş mesaj farklı bir Discord sunucusuna ait.",
+      "The archive restore safety policy failed validation.": "Arşiv geri yükleme güvenlik politikası doğrulanamadı.",
       "The request failed. Check the server connection and try again.": "İstek başarısız. Sunucu bağlantısını kontrol edip tekrar dene."
     },
     patterns: [
@@ -453,6 +504,7 @@
   function errorMessage(code) {
     const messages = {
       login_required: "Sign in with the FIMA owner account.",
+      unauthorized: "Sign in with the FIMA owner account.",
       discord_link_required: "Connect the authorized Discord owner identity.",
       paradise_owner_required: "This Discord account is not authorized as the FIMA owner.",
       owner_action_header_required: "The owner action safety header was rejected.",
@@ -493,7 +545,7 @@
       backup_schema_invalid: "The server backup schema is not supported. Archive import is locked.",
       request_failed: "The request failed. Check the server connection and try again."
     };
-    return messages[code] || `Content Studio request failed (${code || "unknown_error"}).`;
+    return messages[code] || messages.request_failed;
   }
 
   async function api(path, options = {}) {

@@ -93,7 +93,7 @@ test('ordering preserves channel identity, parents and access while arranging ca
     assert.deepEqual({ ...actual, position: original.position }, original);
   }
   const help = plan.targetCategories.find(row => row.key === 'HELP');
-  assert.deepEqual(result.after.channels.filter(row => row.parentId === help.existingId).sort((a,b) => a.position-b.position).map(row => row.name), ['◇・support','support-faq']);
+  assert.deepEqual(result.after.channels.filter(row => row.parentId === help.existingId).sort((a,b) => a.position-b.position).map(row => row.name), ['◇・support','⌁・faq']);
 });
 
 test('ordering rejects stale position snapshots and journal failures before changing Discord', async () => {
@@ -130,6 +130,8 @@ test('additive phase preserves originals, inherits access, and is idempotent', a
   const result = await addFtMissingChannels(await request(f));
   assert.equal(result.status, 'missing_channels_added');
   assert.deepEqual(result.operations.map(row => row.name), ['general', 'media', 'polls', 'support-faq', 'management', 'staff-actions']);
+  assert.deepEqual(result.operations.map(row => f.channels.get(row.id).name),
+    ['›・general', '›・media', '◇・polls', '⌁・faq', '›・management', '⌁・staff-actions']);
   for (const original of before.channels) {
     assert.deepEqual(result.after.channels.find(row => row.id === original.id), original);
   }
@@ -231,6 +233,63 @@ test('backup persistence failure prevents every Discord mutation', async () => {
   args.saveJournal = async () => { throw new Error('database_unavailable'); };
   await assert.rejects(migrateFtChannels(args), /database_unavailable/);
   assert.deepEqual(f.writes, []);
+});
+
+test('rollback preserves permission edits made after a failed move', async () => {
+  const f = fixture(), channel = f.channels.get('support'), move = channel.setParent;
+  let writes = 0;
+  channel.setParent = async (...args) => {
+    writes++;
+    await move(...args);
+    await channel.permissionOverwrites.set([{ id: 'owner-role', type: 0,
+      allow: ['ViewChannel'], deny: ['SendMessages'] }]);
+    throw new Error('lost_response_with_owner_edit');
+  };
+  await assert.rejects(migrateFtChannels(await request(f)), error => {
+    assert.equal(error.journal.status, 'rollback_incomplete');
+    assert.ok(error.journal.rollbackErrors.some(row => row.id === 'support' &&
+      row.error === 'migration_rollback_channel_changed'));
+    return true;
+  });
+  assert.equal(writes, 1);
+  assert.ok(channel.permissionOverwrites.cache.has('owner-role'));
+  assert.equal(channel.permissionOverwrites.cache.has('staff-role'), false);
+});
+
+test('rollback preserves a concurrent rename after an ambiguous rename response', async () => {
+  const f = fixture(), channel = f.channels.get('support');
+  channel.setName = async () => {
+    channel.name = 'owner-renamed-support';
+    throw new Error('lost_response_with_owner_rename');
+  };
+  await assert.rejects(migrateFtChannels(await request(f)), error => {
+    assert.equal(error.journal.status, 'rollback_incomplete');
+    assert.equal(error.journal.operations.find(row => row.id === 'support').rollbackStatus, 'review_required');
+    return true;
+  });
+  assert.equal(channel.name, 'owner-renamed-support');
+});
+
+test('rollback preserves a concurrent parent change after a failed move', async () => {
+  const f = fixture(), channel = f.channels.get('support');
+  let writes = 0;
+  channel.setParent = async () => {
+    writes++;
+    channel.parentId = 'owner-selected-category';
+    throw new Error('lost_response_with_owner_move');
+  };
+  await assert.rejects(migrateFtChannels(await request(f)), error => error.journal.status === 'rollback_incomplete');
+  assert.equal(channel.parentId, 'owner-selected-category');
+  assert.equal(writes, 1);
+});
+
+test('a move rejected before applying is reconciled without another Discord write', async () => {
+  const f = fixture(), channel = f.channels.get('support');
+  let writes = 0;
+  channel.setParent = async () => { writes++; throw new Error('move_rejected'); };
+  await assert.rejects(migrateFtChannels(await request(f)), error => error.journal.status === 'rolled_back');
+  assert.equal(channel.parentId, 'legacy');
+  assert.equal(writes, 1);
 });
 
 test('unreviewed channels block the executor', async () => {
