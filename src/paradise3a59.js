@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import { createFtSafetyProcessor } from "./ftCommunityMessageSafety.js";
+import { createFtMediaSafety } from "./ftCommunityMediaSafety.js";
 import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
@@ -13853,6 +13855,7 @@ async function logParadiseAction(guild, mappingKey, fallbackName, title, descrip
   if (!fimaRuntimeModuleAllowed(configForGuild(state, guild?.id), 'logs')) return event;
   const channel = await configuredChannel(guild, mappingKey, fallbackName);
   if (!channel?.isTextBased?.()) return null;
+  if (options.discordPrivateOnly && channel.permissionsFor?.(guild.roles?.everyone)?.has(PermissionsBitField.Flags.ViewChannel) !== false) return event;
   return channel.send({
     embeds: [new EmbedBuilder().setColor(await paradiseBrandColor()).setTitle(event.title)
       .setDescription(event.description || "—")
@@ -14538,10 +14541,24 @@ export function evaluateParadiseContentSafety({
   });
 }
 
-async function handleParadiseMessageInner(message) {
+const processFtMessageSafety = createFtSafetyProcessor();
+const evaluateFtMediaSafety = createFtMediaSafety();
+
+async function handleParadiseMessageSafetyInner(message, state, guildConfig) {
   if (!message.guild || message.author.bot) return false;
-  const state = await loadState();
-  const guildConfig = configForGuild(state, message.guild.id);
+  if (!fimaRuntimeModuleAllowed(guildConfig, "security") || guildConfig.automod?.runtimeSafety === false) return false;
+  if (message.guild.id === FT_COMMUNITY_GUILD_ID || guildConfig.communityManaged === true) {
+    const safety = await evaluateFtMediaSafety({
+      content: message.content, embeds: message.embeds || [], attachments: [...(message.attachments?.values?.() || [])],
+      privateTicket: Boolean(supportTicketRecordForChannel(state, message.guild.id, message.channelId)) || /^Fima ticket:.*openedBy:\d{15,25}\./i.test(String(message.channel?.topic || "")),
+      roleKeys: [...(message.member?.roles?.cache?.values?.() || [])].map(role => role.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")),
+      isOwner: message.guild.ownerId === message.author.id, config: guildConfig.automod || {}
+    }, { channelId: message.channelId, messageId: message.id });
+    return processFtMessageSafety({ message, safety, record: metadata => logParadiseAction(message.guild,
+      "security_logs_channel", "security-logs", "Message safety review",
+      `Risk: **${metadata.risk}** · Reason: **${metadata.reason}** · ${metadata.removed ? "Removed; staff appeal available." : "Retained for staff review."}`,
+      { type: "security", viewerScope: "staff", discordPrivateOnly: true, metadata }) });
+  }
   const safety = evaluateParadiseContentSafety({
     content: message.content,
     attachments: [...(message.attachments?.values?.() || [])],
@@ -14563,6 +14580,22 @@ async function handleParadiseMessageInner(message) {
       }).catch(() => null);
     return true;
   }
+  return false;
+}
+
+export async function handleParadiseMessageSafety(message) {
+  if (!message.guild || message.author?.bot) return false;
+  return paradiseGuildContext.run(message.guild.id, async () => {
+    const state = await loadState();
+    return handleParadiseMessageSafetyInner(message, state, configForGuild(state, message.guild.id));
+  });
+}
+
+async function handleParadiseMessageInner(message) {
+  if (!message.guild || message.author.bot) return false;
+  const state = await loadState();
+  const guildConfig = configForGuild(state, message.guild.id);
+  if (await handleParadiseMessageSafetyInner(message, state, guildConfig)) return true;
   const qotdWon = fimaRuntimeModuleAllowed(guildConfig, "events") ? await handleQotdAnswer(message, state) : false;
   await handleMemberLevelMessage(message);
   const sticky = guildConfig.stickies?.[message.channelId];

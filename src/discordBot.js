@@ -11,7 +11,7 @@ import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
 export const fimaGuildDiscordGateway = createFimaDiscordGateway(getGuild);
 import fs from "node:fs/promises";
 import path from "node:path";
-import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder, UserSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, GatewayIntentBits, Partials, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder, UserSelectMenuBuilder } from "discord.js";
 import { prisma } from "./db.js";
 import { env } from "./env.js";
 import { createAiSupportDiscordBridge } from "./aiSupportDiscordBridge.js";
@@ -66,6 +66,7 @@ import {
   handleParadiseGuildMemberUpdate,
   handleParadiseInteraction,
   handleParadiseMessage,
+  handleParadiseMessageSafety,
   handleParadiseVoiceStateUpdate,
   recoverParadiseTemporaryVoices,
   FIMA_COMMUNITY_PRODUCTION_GUILD_ID,
@@ -487,7 +488,7 @@ export function startDiscordBot() {
     GatewayIntentBits.GuildVoiceStates
   ];
   if (env("DISCORD_MESSAGE_CONTENT_INTENT", "false") === "true") intents.push(GatewayIntentBits.MessageContent);
-  client = new Client({ intents });
+  client = new Client({ intents, partials: [Partials.Message] });
 
   client.once("ready", async () => {
     readyAt = new Date();
@@ -565,7 +566,9 @@ export function startDiscordBot() {
     });
   });
 
-  client.on("messageCreate", (message) => {
+  client.on("messageCreate", async (message) => {
+    try { if (await handleParadiseMessageSafety(message)) return; }
+    catch (error) { console.warn("FIMA message safety unavailable", { code: error?.code || "safety_failed", messageId: message?.id }); }
     fimaAiSupportBridge?.message(message).catch(() => {
       console.warn("FIMA support shadow queue unavailable; event not accepted");
     });
@@ -587,6 +590,13 @@ export function startDiscordBot() {
       lastError = error.message;
       console.warn("Fima support hint handler failed", { message: error.message, channelId: message?.channelId || null });
     });
+  });
+
+  client.on("messageUpdate", (_oldMessage, newMessage) => {
+    (async () => {
+      const message = newMessage.partial ? await newMessage.fetch() : newMessage;
+      if (message.guild && !message.author?.bot) await handleParadiseMessageSafety(message);
+    })().catch(error => console.warn("FIMA edited-message safety failed", { code: error?.code || "safety_failed", messageId: newMessage?.id }));
   });
 
   client.on("guildAuditLogEntryCreate", (entry, guild) => {

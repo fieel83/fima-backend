@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/tur": "^1.0.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -24,13 +26,17 @@
     "express-rate-limit": "^8.1.0",
     "google-auth-library": "^11.1.0",
     "helmet": "^8.1.0",
+    "jsqr": "^1.4.0",
     "nodemailer": "^8.0.10",
-    "stripe": "^18.5.0"
+    "sharp": "^0.35.5",
+    "stripe": "^18.5.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
-    "prisma": "^6.16.3"
+    "prisma": "^6.16.3",
+    "qrcode": "^1.5.4"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9.0"
   }
 }
