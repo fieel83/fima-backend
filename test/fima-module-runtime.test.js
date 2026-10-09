@@ -49,18 +49,23 @@ test('canonical Unicode JTC dispatches while explicit channel bindings retain pr
   let entered = 0;
   const overrides = { ChannelType: { GuildVoice: 2 }, withTemporaryVoiceJoin: async () => { entered++; return true; } };
   const legacy = handler('handleParadiseVoiceStateUpdate', '\nfunction levelFromXp', { activeSetupMode: 'community' }, overrides);
-  assert.equal(await legacy(oldState, newState), true);
+  for (const name of ['◦・join-to-create', '◦・create-room']) {
+    newState.channel.name = name;
+    assert.equal(await legacy(oldState, newState), true);
+  }
   const bound = handler('handleParadiseVoiceStateUpdate', '\nfunction levelFromXp', { activeSetupMode: 'community', channelMappings: { join_to_create: 'explicit' } }, overrides);
   assert.equal(await bound(oldState, newState), false);
-  assert.equal(entered, 1);
+  assert.equal(entered, 2);
 });
 
 test('setup discovers canonical Unicode voice resources without channel creation', () => {
   const start = source.indexOf('function paradiseVoiceSetupIds(');
   const end = source.indexOf('\n}', start) + 2;
   const run = vm.runInNewContext(`(${source.slice(start, end)})`, { ChannelType: { GuildVoice: 2, GuildCategory: 4 }, FIMA_VOICE_NAMES });
-  const channels = [{ id: 'lobby', type: 2, name: '◦・join-to-create' }, { id: 'private', type: 4, name: '◉・VOICE' }];
-  const result = run({ channels: { cache: { find: predicate => channels.find(predicate) } } });
-  assert.equal(result.joinToCreateChannelId, 'lobby');
-  assert.equal(result.privateVoiceCategoryId, 'private');
+  for (const name of ['◦・join-to-create', '◦・create-room']) {
+    const channels = [{ id: 'lobby', type: 2, name }, { id: 'private', type: 4, name: '◉・VOICE' }];
+    const result = run({ channels: { cache: { find: predicate => channels.find(predicate) } } });
+    assert.equal(result.joinToCreateChannelId, 'lobby');
+    assert.equal(result.privateVoiceCategoryId, 'private');
+  }
 });
