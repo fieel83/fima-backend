@@ -8,20 +8,21 @@ export const FT_MIGRATION_CATEGORIES = Object.freeze([
 
 const groups = [
   ['START', ['rules', 'roles', 'fieel-info', 'joins-leaves', 'start-here']],
-  ['COMMUNITY', ['general', 'chat', 'english-chat', 'media', 'english-media', 'sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'outfits', 'capes', 'levels']],
+  ['COMMUNITY', ['general', 'chat', 'english-chat', 'media', 'english-media', 'sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'outfits', 'capes', 'levels']],
   ['EVENTS', ['announcements', 'updates', 'uploads', 'polls', 'events', 'giveaways', 'turkce-duyurular', 'fima-updates']],
-  ['HELP', ['support', 'faq', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless']],
+  ['HELP', ['support', 'faq', 'support-faq', 'fima-support', 'fima-guide', 'fima-macro', 'fake-headless', 'vouches']],
   ['STAFF', ['staff-hub', 'staff-chat', 'staff-guides', 'staff-application-reviews', 'application-reviews', 'moderator-only', 'steps', 'macro-steps']],
   ['MANAGEMENT', ['management', 'management-chat', 'admin-chat', 'staff-actions', 'video-hub', 'video-ideas', 'video-scripts', 'video-assets', 'video-review', 'video-upload-schedule']],
   ['RECORDS', ['logs', 'wick-logs', 'message-logs', 'un-bl-logs', 'join-logs', 'fima-logs', 'staff-logs', 'security-logs', 'ticket-transcripts', 'transcripts']],
   ['ARCHIVE', ['openclaw-private', 'old-things', 'glads', 'eu-glads', 'asia-glads', 'na-glads', 'anti-teamers', 'leaderboard', 'tournaments']]
 ];
 const destination = new Map(groups.flatMap(([group, names]) => names.map(name => [name, group])));
+const privateGroups = new Set(['STAFF', 'MANAGEMENT', 'RECORDS', 'ARCHIVE']);
 const normalize = name => String(name || '').normalize('NFKC').toLowerCase()
   .replace(/^[^\p{L}\p{N}]+/u, '').replace(/[_\s]+/g, '-');
 
 const chatNames = new Set(['general', 'chat', 'english-chat', 'media', 'english-media', 'sohbet', 'medya',
-  'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'staff-chat', 'mod-chat', 'management', 'management-chat', 'admin-chat', 'moderator-only']);
+  'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media', 'vouches', 'outfits', 'capes', 'staff-chat', 'mod-chat', 'management', 'management-chat', 'admin-chat', 'moderator-only']);
 const panelNames = new Set(['roles', 'support', 'fima-support', 'polls', 'events', 'giveaways', 'staff-application-reviews', 'application-reviews']);
 function styledChannelName(channel, privateTicket, group) {
   if (!group || privateTicket) return channel.name;
@@ -58,7 +59,9 @@ export function buildFtCommunityMigrationPlan(audit) {
     const matches = categories.filter(category => normalize(category.name) === normalize(key));
     return { name, key, position, existingId: matches.length === 1 ? matches[0].id : null,
       decision: matches.length === 1 ? (matches[0].name === name ? 'keep' : 'rename') : matches.length ? 'review' : 'create',
-      preserveExistingPermissions: true };
+      preserveExistingPermissions: true,
+      permissionReviewRequired: privateGroups.has(key),
+      accessRequirement: privateGroups.has(key) ? 'reviewed_staff_only' : null };
   });
   const matrix = channels.filter(channel => !categories.includes(channel)).map(channel => {
     const key = normalize(channel.name);
@@ -76,10 +79,19 @@ export function buildFtCommunityMigrationPlan(audit) {
     const target = targetCategories.find(category => category.key === group);
     const decision = !target ? 'review' : group === 'ARCHIVE' ? 'archive'
       : target.existingId && channel.parentId === target.existingId ? 'keep' : 'move';
+    // A correct parent/name is not proof of access. Moves preserve child overrides,
+    // and a role allow can override @everyone's deny. Review effective access using
+    // current role/member assignments before treating any restricted channel as live.
+    const accessRequirement = privateTicket ? 'ticket_participants_and_reviewed_staff'
+      : privateGroups.has(group) ? 'reviewed_staff_only'
+      : ['sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'turkish-chat', 'turkish-media'].includes(key)
+        ? 'turkish_role_and_reviewed_staff'
+        : key === 'vouches' ? 'public_read_verified_buyers_write' : null;
     return { id: channel.id, name: channel.name, targetName: styledChannelName(channel, privateTicket, group), type: channel.type, parentId: channel.parentId,
       currentCategory, targetCategory: target?.name || null, targetCategoryId: target?.existingId || null,
       decision, preserveId: true, preserveHistory: true, preservePermissionOverwrites: true,
-      permissionReviewRequired: Boolean(target && channel.parentId !== target.existingId),
+      permissionReviewRequired: Boolean(accessRequirement || target && channel.parentId !== target.existingId),
+      accessRequirement,
       reason: !target ? 'Purpose or active integration must be reviewed before moving.'
         : group === 'ARCHIVE' ? 'Preserve historical private channel and its access restrictions.'
         : 'Reuse the existing channel; preserve message, webhook and integration IDs.' };

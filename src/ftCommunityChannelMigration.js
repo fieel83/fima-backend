@@ -16,9 +16,9 @@ const legacyCategoryIds = new Set(['1421240822866645113', '1557009769083047936',
 
 const channelOrder = {
   START: ['rules', 'roles', 'fieel-info', 'joins-leaves'],
-  COMMUNITY: ['general', 'media', 'sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'vouches', 'outfits', 'capes'],
+  COMMUNITY: ['general', 'media', 'sohbet', 'medya', 'turkce-sohbet', 'turkce-medya', 'outfits', 'capes'],
   EVENTS: ['announcements', 'updates', 'uploads', 'polls', 'turkce-duyurular'],
-  HELP: ['support', 'faq', 'support-faq', 'fima-macro', 'fake-headless'],
+  HELP: ['support', 'faq', 'support-faq', 'fima-macro', 'fake-headless', 'vouches'],
   STAFF: ['rules', 'mod-chat'],
   MANAGEMENT: ['management', 'management-chat', 'admin-chat', 'staff-actions'],
   RECORDS: ['ticket-transcripts', 'transcripts', 'fima-logs', 'logs', 'message-logs', 'join-logs', 'un-bl-logs', 'wick-logs']
@@ -166,10 +166,10 @@ export async function addFtMissingChannels({ guild, expectedDigest, saveJournal,
     const plan = buildFtCommunityMigrationPlan(before);
     if (expectedDigest !== plan.sourceDigest) throw fail('migration_stale_plan');
     const specs = [
-      { name: 'general', category: 'COMMUNITY', topic: 'FT Community — chat, share and meet the community. / Topluluk sohbeti.' },
-      { name: 'media', category: 'COMMUNITY', topic: 'Share your clips, edits and creations. / Kliplerini ve çalışmalarını paylaş.' },
-      { name: 'polls', category: 'EVENTS', topic: 'Community polls and votes. / Topluluk anketleri ve oylamaları.' },
-      { name: 'support-faq', category: 'HELP', topic: 'Support answers and guidance. / Destek soruları ve rehberi.' },
+      { name: 'general', displayName: '›・general', category: 'COMMUNITY', topic: 'FT Community — chat, share and meet the community. / Topluluk sohbeti.' },
+      { name: 'media', displayName: '›・media', category: 'COMMUNITY', topic: 'Share your clips, edits and creations. / Kliplerini ve çalışmalarını paylaş.' },
+      { name: 'polls', displayName: '◇・polls', category: 'EVENTS', topic: 'Community polls and votes. / Topluluk anketleri ve oylamaları.' },
+      { name: 'support-faq', displayName: '⌁・faq', category: 'HELP', topic: 'Support answers and guidance. / Destek soruları ve rehberi.' },
       { name: 'management', displayName: '›・management', category: 'MANAGEMENT', topic: 'Private management decisions, strategy and escalations. Record the decision, responsible person and follow-up here.' },
       { name: 'staff-actions', displayName: '⌁・staff-actions', category: 'MANAGEMENT', topic: 'Private record of staff promotions, demotions and permission changes. Include the actor, reason and result; never post credentials.' }
     ];
@@ -346,19 +346,31 @@ export async function migrateFtChannels({ guild, expectedDigest, saveJournal, ac
           operation.rollbackStatus = 'pending';
           await persist();
           const channel = await guild.channels.fetch(operation.id);
+          if (!channel) throw fail('migration_rollback_channel_missing');
           if (operation.kind === 'move') {
-            await channel.setParent(operation.beforeParentId, { lockPermissions: false, reason });
-            await channel.permissionOverwrites.set(operation.permissionOverwrites, reason);
+            // A failed response can mean either applied or untouched. Never undo
+            // a later owner edit or restore stale permission overwrites.
+            if (canonicalPermissions(overwrites(channel)) !== canonicalPermissions(operation.permissionOverwrites) ||
+                ![operation.beforeParentId, operation.afterParentId].includes(channel.parentId)) {
+              throw fail('migration_rollback_channel_changed');
+            }
+            if (channel.parentId !== operation.beforeParentId) {
+              await channel.setParent(operation.beforeParentId, { lockPermissions: false, reason });
+            }
             const restored = await guild.channels.fetch(operation.id);
             if (restored.parentId !== operation.beforeParentId || canonicalPermissions(overwrites(restored)) !==
                 canonicalPermissions(operation.permissionOverwrites)) throw fail('migration_rollback_verification_failed');
           } else {
-            await channel.setName(operation.beforeName, reason);
+            if (![operation.beforeName, operation.afterName].includes(channel.name)) {
+              throw fail('migration_rollback_channel_changed');
+            }
+            if (channel.name !== operation.beforeName) await channel.setName(operation.beforeName, reason);
             if ((await guild.channels.fetch(operation.id)).name !== operation.beforeName) throw fail('migration_rollback_verification_failed');
           }
           operation.rollbackStatus = 'restored';
           await persist();
         } catch (rollbackError) {
+          operation.rollbackStatus = 'review_required';
           journal.rollbackErrors.push({ id: operation.id, error: rollbackError.code || rollbackError.message });
         }
       }
