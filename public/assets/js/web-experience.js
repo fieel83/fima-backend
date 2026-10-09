@@ -20,6 +20,42 @@
     path.setAttribute('d', paths[index] || paths[1]); svg.append(path); link.prepend(svg);
   });
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  let frame = 0;
+  const cancelScroll = () => { cancelAnimationFrame(frame); frame = 0; };
+  ['wheel', 'touchstart', 'keydown'].forEach(type => window.addEventListener(type, cancelScroll, { passive: true }));
+  document.addEventListener('click', event => {
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || url.pathname !== location.pathname || url.search !== location.search || !url.hash || url.hash === '#logout') return;
+    let target;
+    try { target = document.getElementById(decodeURIComponent(url.hash.slice(1))); } catch { return; }
+    if (!target || target.closest('[hidden]') || !target.getClientRects().length) return;
+    event.preventDefault(); cancelScroll();
+    const header = document.querySelector('.site-header, .bot-header, .page-header, .topbar');
+    const offset = header && ['sticky', 'fixed'].includes(getComputedStyle(header).position) ? header.getBoundingClientRect().height + 20 : 20;
+    const start = scrollY;
+    const end = Math.max(0, Math.min(start + target.getBoundingClientRect().top - offset, document.documentElement.scrollHeight - innerHeight));
+    const finish = () => {
+      history.pushState(null, '', url.hash);
+      const temporary = !target.hasAttribute('tabindex');
+      if (temporary) target.setAttribute('tabindex', '-1');
+      target.focus({ preventScroll: true });
+      if (temporary) target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true });
+    };
+    if (motion.matches) { window.scrollTo({ top: end, behavior: 'instant' }); finish(); return; }
+    const duration = Math.min(850, Math.max(480, Math.abs(end - start) * .25));
+    let began;
+    const step = time => {
+      began ??= time;
+      const progress = Math.min(1, (time - began) / duration);
+      const ease = progress < .5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+      window.scrollTo({ top: start + (end - start) * ease, behavior: 'instant' });
+      if (progress < 1) frame = requestAnimationFrame(step);
+      else { frame = 0; finish(); }
+    };
+    frame = requestAnimationFrame(step);
+  });
   if (!('IntersectionObserver' in window)) return;
   // Content is always visible; only elements reaching the viewport get an entrance.
   const observer = new IntersectionObserver(entries => {
@@ -29,8 +65,8 @@
       observer.unobserve(entry.target);
     });
   }, { threshold: .08 });
-  document.querySelectorAll('body[data-page] .section-heading, body[data-page] .hero-copy, body[data-page] .hero-visual, body[data-page] .macro-card, body[data-page] .feature-card, body[data-page] .price-card, body[data-page] .download-panel').forEach(el => observer.observe(el));
+  document.querySelectorAll('body[data-page] .section-heading, body[data-page] .hero-copy, body[data-page] .hero-visual, body[data-page] .macro-card, body[data-page] .feature-card, body[data-page] .price-card, body[data-page] .download-panel, body[data-account-page] .panel, body[data-fima-product="bot"] .section-heading, body[data-fima-product="bot"] .page-hero, body[data-fima-product="bot"] .guild-card, body[data-fima-product="bot"] .feedback-card, body[data-fima-product="bot"] .command-card, body[data-fima-product="bot"] .gate').forEach(el => observer.observe(el));
   motion.addEventListener('change', () => {
-    if (motion.matches) document.querySelectorAll('.experience-enter').forEach(el => el.classList.remove('experience-enter'));
+    if (motion.matches) { cancelScroll(); document.querySelectorAll('.experience-enter').forEach(el => el.classList.remove('experience-enter')); }
   });
 })();

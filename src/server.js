@@ -948,8 +948,8 @@ function sendFimaBotContentStudio(_req, res) {
   return res.sendFile(path.join(publicDir, "paradise-content-studio.html"));
 }
 
-app.get(["/fima-bot/content-studio", "/paradise-content-studio", "/paradise-content-studio.html"], requireUser, requireParadiseOwner, sendFimaBotContentStudio);
-app.get("/fima-bot/embed-builder", requireUser, requireParadiseOwner, sendFimaBotContentStudio);
+app.get(["/fima-bot/content-studio", "/paradise-content-studio", "/paradise-content-studio.html"], sendFimaBotContentStudio);
+app.get("/fima-bot/embed-builder", sendFimaBotContentStudio);
 app.get("/paradise/content-studio", (req, res) => redirectLegacyFimaBotRoute(req, res, "/fima-bot/content-studio"));
 
 function sendFimaBotInvitePage(_req, res) {

@@ -70,7 +70,7 @@ test("application and content workspaces retain the complete product route map",
 test("responsive product navigation retains a dashboard escape hatch", () => {
   const pageCss = publicFile("assets/css/fima-bot-pages.css");
   const dashboardCss = publicFile("assets/css/fima-bot-dashboard.css");
-  assert.match(pageCss, /@media\(max-width:900px\)\{\.page-links a:not\(\.dashboard-link\)\{display:none\}/u);
+  assert.match(pageCss, /@media\(max-width:900px\)\{\.page-links\{overflow-x:auto/u);
   assert.doesNotMatch(dashboardCss, /\.topnav a:not\(\.account-link\)\{display:none\}/u);
   assert.match(dashboardCss, /\.topnav\{[^}]*overflow-x:auto/u);
 });

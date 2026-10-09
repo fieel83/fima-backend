@@ -1813,14 +1813,10 @@
             ${profile.avatar ? `<img data-profile-avatar data-avatar-fallback="${escapeHtml(profile.label)}" src="${escapeHtml(profile.avatar)}" alt="">` : `<span>${escapeHtml(profile.fallback)}</span>`}
             <div><strong>${escapeHtml(profile.label)}</strong><small>${escapeHtml(planLabel)}</small></div>
           </div>
-          <a class="account-dropdown-link" href="${dashboardRoute("overview")}">Account</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("overview")}">${language() === "tr" ? "Hesabım" : language() === "de" ? "Mein Konto" : "Account"}</a>
           <a class="account-dropdown-link" href="${dashboardRoute("products")}">${t("myProductsNav")}</a>
           <a class="account-dropdown-link" href="${dashboardRoute("billing")}">${t("billingNav")}</a>
-          <a class="account-dropdown-link" href="${dashboardRoute("redeem")}">Redeem / Gift</a>
-          <a class="account-dropdown-link" href="${dashboardRoute("referrals")}">Invite Code / Referrals</a>
-          <a class="account-dropdown-link" href="${dashboardRoute("security")}">Security / Settings</a>
-          <a class="account-dropdown-link" href="${dashboardRoute("downloads")}">Downloads</a>
-          <a class="account-dropdown-link" href="${apiBase}/auth/discord/start">${t("linkDiscordRecovery")}</a>
+          <a class="account-dropdown-link" href="${dashboardRoute("redeem")}">${language() === "tr" ? "Kod kullan" : language() === "de" ? "Code einlösen" : "Redeem code"}</a>
           <a class="account-dropdown-link" href="${dashboardRoute("support")}">${t("supportNav")}</a>
           ${adminLink}
           <button class="account-dropdown-link" type="button" data-logout>${t("logoutNav")}</button>

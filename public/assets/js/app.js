@@ -2113,20 +2113,18 @@
     });
   };
 
-  const siteProfileMenuItems = (user) => ([
-    ["Account", "/dashboard/overview", true],
-    ["My Products", "/dashboard/products", true],
-    ["Billing", "/dashboard/billing", true],
-    ["Redeem Key", "/dashboard/redeem", true],
-    ["Gift Codes", "/dashboard/gifts", true],
-    ["Invite Code", "/dashboard/overview#referrals", true],
-    ["Connected Accounts", "/dashboard/connected-accounts", true],
-    ["Security / Password", "/dashboard/security", true],
-    ["Downloads", "/download", true],
-    ["Support", "/support", true],
-    ["Admin Panel", "/admin", Boolean(user?.role === "admin" || user?.role === "owner" || user?.role === "super_admin")],
-    ["Logout", "#logout", true]
-  ]).filter((item) => item[2]);
+  const siteProfileMenuItems = (user) => {
+    const labels = ({ tr: ['Hesabım', 'Ürünlerim', 'Ödemeler', 'Kod kullan', 'Destek', 'Yönetim paneli', 'Çıkış yap'], de: ['Mein Konto', 'Meine Produkte', 'Zahlungen', 'Code einlösen', 'Support', 'Verwaltung', 'Abmelden'] })[state.language] || ['Account', 'My products', 'Billing', 'Redeem code', 'Support', 'Admin panel', 'Logout'];
+    return [
+      [labels[0], '/dashboard/overview', true],
+      [labels[1], '/dashboard/products', true],
+      [labels[2], '/dashboard/billing', true],
+      [labels[3], '/dashboard/redeem', true],
+      [labels[4], '/support', true],
+      [labels[5], '/admin', ['admin', 'owner', 'super_admin'].includes(user?.role)],
+      [labels[6], '#logout', true]
+    ].filter(item => item[2]);
+  };
 
   const wireSiteProfileDropdown = (menu) => {
     if (!menu || menu.dataset.wired === "1") return;

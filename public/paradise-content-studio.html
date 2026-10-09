@@ -37,6 +37,7 @@
       @media(max-width:1180px){.operation-strip{grid-template-columns:1fr 1fr}body[data-fima-content-view="embed-builder"] .workspace{grid-template-columns:280px 1fr}.preview-panel{position:static;grid-column:1/-1}}@media(max-width:760px){.shell{width:min(100% - 18px,1600px)}.topbar{display:grid}.top-actions{width:100%}.top-actions .button{flex:1}.operation-strip{grid-template-columns:1fr}body[data-fima-content-view="embed-builder"] .workspace{grid-template-columns:1fr}.preview-panel{grid-column:auto}.panel-head{min-height:64px}}
     </style>
     <link rel="stylesheet" href="/assets/css/fima-design-system.css?v=20260928-2">
+  <link rel="stylesheet" href="/assets/css/web-experience.css?v=20261009-4">
   </head>
   <body data-fima-product="bot">
     <a class="skip-link" href="#main">Skip to content</a>
@@ -57,9 +58,10 @@
       </section>
 
       <section id="accessGate" class="gate hidden">
-        <h2>Owner access required</h2>
+        <h2>Owner workspace</h2>
         <p id="gateReason">Sign in with the FIMA owner account and connect the authorized Discord identity.</p>
-        <div class="toolbar"><a id="loginLink" class="button primary" href="/login?returnTo=%2Ffima-bot%2Fcontent-studio">Sign in</a><a id="discordLink" class="button" href="/auth/discord/start?returnTo=%2Ffima-bot%2Fcontent-studio">Connect Discord</a></div>
+        <p>This workspace is reserved for the authorized FIMA owner. Manage your server from the dashboard.</p>
+        <div class="toolbar"><a class="button" href="/fima-bot/dashboard">Server dashboard</a><a id="loginLink" class="button primary" href="/login?returnTo=%2Ffima-bot%2Fcontent-studio">Sign in</a><a id="discordLink" class="button" href="/auth/discord/start?returnTo=%2Ffima-bot%2Fcontent-studio">Connect Discord</a></div>
       </section>
 
       <section id="studio" class="workspace hidden">
@@ -122,6 +124,7 @@
       import { observeFimaControls } from '/assets/js/fima-controls.js?v=20261006-1';
       observeFimaControls();
     </script>
-    <script src="/assets/js/paradise-content-studio.js?v=20261006-2"></script>
+    <script src="/assets/js/paradise-content-studio.js?v=20261009-4"></script>
+  <script src="/assets/js/web-experience.js?v=20261009-4"></script>
   </body>
 </html>

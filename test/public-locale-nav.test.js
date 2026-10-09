@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const appSource = fs.readFileSync(new URL("../public/assets/js/app.js", import.meta.url), "utf8");
 const keyGuideSource = fs.readFileSync(new URL("../public/how-to-get-key.html", import.meta.url), "utf8");
 const localizedKeyGuidePages = ["index.html", "download.html", "pricing.html"];
-const expectedAppRevision = "20261007-motion";
+const expectedAppRevision = "20261009-4";
 const verifiedLocales = [["en", "tr"], ["tr", "de"], ["de", "fr"], ["fr", "bs"], ["bs", null]];
 const requiredKeyGuideFields = [
   "metaTitle",

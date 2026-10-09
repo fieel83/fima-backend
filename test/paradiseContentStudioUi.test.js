@@ -12,14 +12,18 @@ test("Content Studio client parses as standalone JavaScript", () => {
   assert.doesNotThrow(() => new Function(clientSource));
 });
 
-test("Content Studio and Embed Builder share one guarded no-store surface", () => {
+test("Content Studio and Embed Builder share a no-store shell with guarded data APIs", () => {
   const handlerStart = serverSource.indexOf("function sendFimaBotContentStudio");
   const handlerBlock = serverSource.slice(handlerStart, handlerStart + 900);
   assert.match(handlerBlock, /Cache-Control", "no-store"/);
   assert.match(handlerBlock, /X-Robots-Tag", "noindex, nofollow, noarchive"/);
   assert.match(handlerBlock, /paradise-content-studio\.html/);
-  assert.match(handlerBlock, /app\.get\(\["\/fima-bot\/content-studio", "\/paradise-content-studio", "\/paradise-content-studio\.html"\], requireUser, requireParadiseOwner, sendFimaBotContentStudio\)/);
-  assert.match(handlerBlock, /app\.get\("\/fima-bot\/embed-builder", requireUser, requireParadiseOwner, sendFimaBotContentStudio\)/);
+  const apiRoutes = serverSource.split('\n').filter(line => /app\.(get|post)\("\/api\/fima-bot\/content-studio/.test(line));
+  assert.ok(apiRoutes.length >= 10);
+  for (const route of apiRoutes) assert.match(route, /requireUser, requireParadiseOwner/);
+
+  assert.match(handlerBlock, /app\.get\(\["\/fima-bot\/content-studio", "\/paradise-content-studio", "\/paradise-content-studio\.html"\], sendFimaBotContentStudio\)/);
+  assert.match(handlerBlock, /app\.get\("\/fima-bot\/embed-builder", sendFimaBotContentStudio\)/);
 });
 
 test("shared content workspace selects one accessible page mode and safe auth return path", () => {
