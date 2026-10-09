@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
 import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker } from "./ftCommunityInfo.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
@@ -3533,9 +3534,31 @@ export async function paradiseDiscordDeepAudit(guildId = null) {
     });
   }
   const channels = [...guild.channels.cache.values()].filter(channel => !channel.isThread?.());
+  let configAvailable = true;
+  const stateRow = await prisma.setting.findUnique({ where: { key: 'paradise_3a59_state_v1' } }).catch(() => { configAvailable = false; return null; });
+  const guildConfig = stateRow?.value?.guildConfigs?.[guild.id] || stateRow?.value?.config;
+  configAvailable = configAvailable && Boolean(guildConfig && typeof guildConfig === 'object');
+  const roleDependencyAudit = auditFimaRoleDependencies({
+    guildId: guild.id, botRolePosition: me.roles.highest.position,
+    cachedMemberCount: guild.members.cache.size, guildMemberCount: guild.memberCount,
+    config: guildConfig, configAvailable,
+    autoModAvailable: !discoveryFailures.includes('autoModRules'),
+    roles: [...guild.roles.cache.values()].sort((a, b) => b.position - a.position).map(role => ({
+      id: role.id, name: role.name, position: role.position, managed: role.managed,
+      cachedMemberCount: role.members.size,
+      managedTags: { botId: role.tags?.botId || null, integrationId: role.tags?.integrationId || null,
+        subscriptionListingId: role.tags?.subscriptionListingId || null,
+        premiumSubscriberRole: Boolean(role.tags?.premiumSubscriberRole) }
+    })),
+    channels: channels.map(channel => ({ id: channel.id, name: channel.name,
+      permissionOverwrites: [...(channel.permissionOverwrites?.cache?.values?.() || [])].map(overwrite => ({ id: overwrite.id, type: overwrite.type })) })),
+    autoModRules: [...autoModRules.values()].map(rule => ({ id: rule.id, enabled: rule.enabled,
+      exemptRoleIds: [...(rule.exemptRoles?.keys?.() || [])] }))
+  });
   return {
     status: discoveryFailures.length || sampledChannels.some(channel => !channel.readable || channel.messagesFetchFailed || channel.pinsFetchFailed) ? "LIVE DISCORD PARTIAL" : "LIVE DISCORD VERIFIED",
     discoveryFailures,
+    roleDependencyAudit,
     coverage: { messageLimitPerChannel: 25, fullHistoryAudited: false, threadsAudited: false },
     capturedAt: new Date().toISOString(),
     guild: {
