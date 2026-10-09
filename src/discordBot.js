@@ -3757,7 +3757,7 @@ export async function ftRolesFromDashboard(guildId, expectedDigest, actorUserId)
     throw Object.assign(new Error('migration_recovery_required'), { code: 'migration_recovery_required' });
   }
   const guild = await getGuild(guildId);
-  return organizeFtRoles({ guild, expectedDigest, actorUserId, saveJournal: async journal => {
+  return organizeFtRoles({ guild, expectedDigest, actorUserId, singleStep: true, saveJournal: async journal => {
     const key = `ft_role_organization_${guildId}_${journal.id}`;
     await prisma.setting.upsert({ where: { key }, update: { value: journal }, create: { key, value: journal } });
   } });

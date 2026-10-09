@@ -1013,7 +1013,8 @@ async function runFtRoles(apply){
     output.textContent=JSON.stringify(result.roles||result,null,2);
     if(!response.ok){reviewedFtRoles=null;return show('Role operation blocked; inspect the result.',false);}
     if(!apply){reviewedFtRoles=result.roles;publish.disabled=false;}
-    show(apply?'FT roles organized and live hierarchy verified.':'Review the role categories and exact changes.');
+    show(apply?(result.roles?.status==='role_step_verified'?'One role move verified; review a fresh plan for the next step.':
+      'FT role plan completed and hierarchy verified.'):'Review the single role move and its adjacent role shift.');
   }catch{reviewedFtRoles=null;output.textContent='Response unavailable. Inspect the stored journal before retrying.';show('Role response unavailable.',false);}
   finally{review.disabled=false;}
 }

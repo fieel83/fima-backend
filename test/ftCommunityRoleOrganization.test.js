@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFtRoleOrganizationPlan, classifyFtRole, organizeFtRoles, inspectFtRoleOrganization, reconcileFtRoleOrganization } from '../src/ftCommunityRoleOrganization.js';
+import { buildFtRoleOrganizationPlan, buildFtRoleStepPlan, classifyFtRole, organizeFtRoles, inspectFtRoleOrganization, reconcileFtRoleOrganization } from '../src/ftCommunityRoleOrganization.js';
 
 const GUILD = '1419335632324657306';
 test('recovery inspection identifies partial writes and external edits without mutating or unlocking', async () => {
@@ -52,6 +52,99 @@ test('sorting never crosses privileged, managed or divider boundaries', () => {
   assert.equal(classifyFtRole({ id: '1420402470990905365', name: 'F T' }), 'Owner / Management');
   assert.equal(classifyFtRole({ name: 'Trial Users' }), 'Community');
   assert.equal(classifyFtRole({ name: 'FIMA Macro Updates' }), 'Notifications');
+});
+
+test('controlled step submits one role and predicts its implicit adjacent shift', async () => {
+  const f = fixture(); const journals = [];
+  f.rows.find(row => row.id === '1420402168443306126').name = '◇・SYSTEM / XP / LEVELS';
+  f.rows.find(row => row.id === 'lang').name = 'South America';
+  f.rows.find(row => row.id === 'region').name = 'English';
+  const original = structuredClone(f.rows);
+  const plan = await organizeFtRoles({ guild: f.guild, singleStep: true });
+  assert.equal(plan.moves.length, 1);
+  assert.equal(plan.implicitMoves.length, 1);
+  assert.equal(plan.renames.length, 0);
+  f.guild.roles.setPositions = async updates => {
+    assert.deepEqual(updates, [{ role: plan.moves[0].id, position: plan.moves[0].position }]);
+    assert.deepEqual(journals.at(-1).positionRequest.body, [{ id: plan.moves[0].id, position: plan.moves[0].position }]);
+    f.calls.push(['positions']);
+    for (const row of [...plan.moves, ...plan.implicitMoves]) f.rows.find(item => item.id === row.id).position = row.position;
+  };
+  const result = await organizeFtRoles({ guild: f.guild, singleStep: true, expectedDigest: plan.digest,
+    actorUserId: 'owner', saveJournal: async journal => journals.push(journal) });
+  assert.equal(f.calls.length, 1);
+  for (const row of f.rows) {
+    const prior = original.find(item => item.id === row.id);
+    assert.deepEqual(row.permissions, prior.permissions);
+    assert.equal(row.name, prior.name);
+    if (row.managed || row.permissions.length || row.id === '1420402168443306126') assert.equal(row.position, prior.position);
+  }
+  assert.equal(result.status, 'role_step_verified');
+});
+
+test('controlled plan excludes managed crossings, position gaps and bot boundaries', () => {
+  const f = fixture();
+  const rows = f.rows.filter(row => ['bot', 'admin', 'level5', 'level50', GUILD].includes(row.id));
+  rows.find(row => row.id === 'level5').managed = true;
+  assert.equal(buildFtRoleStepPlan(rows, 9).moves.length, 0);
+  rows.find(row => row.id === 'level5').managed = false;
+  rows.find(row => row.id === 'level50').position = 4;
+  assert.equal(buildFtRoleStepPlan(rows, 9).moves.length, 0);
+  rows.find(row => row.id === 'level50').position = 5;
+  assert.equal(buildFtRoleStepPlan(rows, 6).moves.length, 0);
+});
+
+test('controlled failure saves actual REST JSON without credentials and makes no second move', async () => {
+  const f = fixture(); const journals = [];
+  const payload = [{ id: '1557291939337080925', position: 5 }];
+  const plan = await organizeFtRoles({ guild: f.guild, singleStep: true });
+  f.guild.roles.setPositions = async () => {
+    f.calls.push(['positions']);
+    throw Object.assign(new Error('Missing Permissions'), { code: 50013, status: 403, method: 'PATCH',
+      requestBody: { json: payload, headers: { Authorization: 'secret-test-token' } }, rawError: { message: 'secret-test-token' } });
+  };
+  await assert.rejects(organizeFtRoles({ guild: f.guild, singleStep: true, expectedDigest: plan.digest,
+    actorUserId: 'owner', saveJournal: async journal => journals.push(journal) }), /Missing Permissions/);
+  const journal = journals.at(-1);
+  assert.equal(journal.status, 'recovery_required');
+  assert.equal(journal.failureEvidence.discordCode, 50013);
+  assert.equal(journal.failureEvidence.requestPayloadSource, 'discord_rest_error');
+  assert.deepEqual(journal.failureEvidence.requestPayload, payload);
+  assert.equal(JSON.stringify(journal).includes('secret-test-token'), false);
+  assert.equal(f.calls.length, 1);
+});
+
+test('controlled execution rejects old bulk digest and missing Owner before any mutation', async () => {
+  const f = fixture();
+  const bulk = await organizeFtRoles({ guild: f.guild });
+  const step = await organizeFtRoles({ guild: f.guild, singleStep: true });
+  await assert.rejects(organizeFtRoles({ guild: f.guild, singleStep: true, expectedDigest: bulk.digest, actorUserId: 'owner', saveJournal() {} }), /migration_stale_plan/);
+  await assert.rejects(organizeFtRoles({ guild: f.guild, singleStep: true, expectedDigest: step.digest, saveJournal() {} }), /owner_actor_required/);
+  assert.equal(f.calls.length, 0);
+});
+
+test('invalid positions and unresolved role IDs remain diagnostic evidence without arbitrary strings', async () => {
+  const f = fixture(); const journals = [];
+  const plan = await organizeFtRoles({ guild: f.guild, singleStep: true });
+  f.guild.roles.setPositions = async () => { throw Object.assign(new Error('Invalid payload'), { code: 50035, status: 400,
+    method: 'PATCH', requestBody: { json: [{ id: null, position: -1 }, { id: '1557291939337080925', position: 2.5 },
+      { id: 'secret-test-token', position: 'secret-test-token' }] } }); };
+  await assert.rejects(organizeFtRoles({ guild: f.guild, singleStep: true, expectedDigest: plan.digest,
+    actorUserId: 'owner', saveJournal: async journal => journals.push(journal) }), /Invalid payload/);
+  assert.deepEqual(journals.at(-1).failureEvidence.requestPayload, [{ id: null, position: -1 },
+    { id: '1557291939337080925', position: 2.5 }, { id: 'invalid_role_id', position: 'invalid_position_type' }]);
+  assert.equal(JSON.stringify(journals).includes('secret-test-token'), false);
+});
+
+test('fresh bot hierarchy drift aborts controlled PATCH and preserves recovery lock', async () => {
+  const f = fixture(); const journals = [];
+  const plan = await organizeFtRoles({ guild: f.guild, singleStep: true });
+  let reads = 0;
+  f.guild.members.fetchMe = async () => ({ permissions: { has: () => true }, roles: { highest: { position: ++reads === 1 ? 9 : 8 } } });
+  await assert.rejects(organizeFtRoles({ guild: f.guild, singleStep: true, expectedDigest: plan.digest,
+    actorUserId: 'owner', saveJournal: async journal => journals.push(journal) }), /bot_hierarchy_changed/);
+  assert.equal(f.calls.length, 0);
+  assert.equal(journals.at(-1).status, 'recovery_required');
 });
 
 test('fresh reviewed plan journals before writes and verifies exact readback', async () => {
