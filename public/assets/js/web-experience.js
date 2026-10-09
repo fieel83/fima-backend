@@ -56,6 +56,45 @@
     };
     frame = requestAnimationFrame(step);
   });
+  // Real document navigations need an explicit entrance: native view transitions
+  // are unavailable in some browsers and do not cover every server response.
+  const transitionKey = 'fima.page-transition';
+  const content = document.querySelector('main') || document.querySelector('.account-dashboard-content');
+  let navigating = false;
+  let pageAnimation;
+  const animatePage = (frames, options) => {
+    if (motion.matches || !content || typeof content.animate !== 'function') return null;
+    return content.animate(frames, options);
+  };
+  try {
+    const pending = JSON.parse(sessionStorage.getItem(transitionKey) || 'null');
+    sessionStorage.removeItem(transitionKey);
+    if (pending && pending.destination === location.pathname + location.search && Date.now() - pending.time < 15000) {
+      pageAnimation = animatePage([{ opacity: 0, transform: 'translateX(56px)' }, { opacity: 1, transform: 'translateX(0)' }], { duration: 580, easing: 'cubic-bezier(.16,1,.3,1)' });
+    }
+  } catch { /* Storage restrictions must never block navigation. */ }
+  window.addEventListener('pageshow', event => {
+    if (event.persisted) { navigating = false; pageAnimation?.cancel(); }
+  });
+  const pageRoute = /^\/(?:$|macros\/?$|features\/?$|pricing\/?$|how-to-get-key\/?$|download\/?$|faq\/?$|support\/?$|security\/?$|terms\/?$|privacy\/?$|legal\/?$|success\/?$|login\/?$|register\/?$|dashboard(?:\/[^.]*)?$|(?:fima|paradise)-bot(?:\/[^.]*)?$)/;
+  document.addEventListener('click', event => {
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin || !pageRoute.test(url.pathname) || (url.pathname === location.pathname && url.search === location.search) || motion.matches || !content || typeof content.animate !== 'function') return;
+    event.preventDefault();
+    if (navigating) return;
+    navigating = true;
+    cancelScroll();
+    try { sessionStorage.setItem(transitionKey, JSON.stringify({ destination: url.pathname + url.search, time: Date.now() })); } catch { }
+    pageAnimation?.cancel();
+    pageAnimation = animatePage([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: 'translateX(-40px)' }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    let assigned = false;
+    const navigate = () => { if (!assigned) { assigned = true; location.assign(url.href); } };
+    pageAnimation.finished.then(navigate, navigate);
+    setTimeout(navigate, 350);
+  });
+  motion.addEventListener('change', () => { if (motion.matches) pageAnimation?.cancel(); });
   if (!('IntersectionObserver' in window)) return;
   // Content is always visible; only elements reaching the viewport get an entrance.
   const observer = new IntersectionObserver(entries => {

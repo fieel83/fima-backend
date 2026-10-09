@@ -16,423 +16,41 @@
     <link rel="icon" href="assets/images/fima-logo.png?v=20260526-2" type="image/png">
     <link rel="stylesheet" href="assets/css/styles.css?v=20261007-motion">
     <style>
-      :root {
-        --key-bg: #070511;
-        --key-panel: rgba(15, 11, 28, 0.82);
-        --key-panel-strong: rgba(25, 16, 45, 0.9);
-        --key-border: rgba(188, 98, 255, 0.35);
-        --key-border-soft: rgba(188, 98, 255, 0.18);
-        --key-text: #fff8ff;
-        --key-muted: #cabce0;
-        --key-purple: #b55cff;
-        --key-purple-strong: #8c2cff;
-        --key-cyan: #54e4ff;
-        --key-green: #72ffba;
-      }
-
-      body.key-guide-page {
-        background:
-          radial-gradient(circle at 18% 14%, rgba(165, 75, 255, 0.26), transparent 34rem),
-          radial-gradient(circle at 84% 20%, rgba(55, 191, 255, 0.12), transparent 34rem),
-          linear-gradient(180deg, #080511 0%, #0d0718 58%, #080511 100%);
-        color: var(--key-text);
-      }
-
-      .key-guide {
-        position: relative;
-        overflow: hidden;
-      }
-
-      .key-guide::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          linear-gradient(90deg, rgba(7, 5, 17, 0.96), rgba(7, 5, 17, 0.42), rgba(7, 5, 17, 0.96)),
-          url("assets/images/fima-full-home.png?v=20260619") center/cover no-repeat;
-        opacity: 0.18;
-        filter: saturate(1.2);
-      }
-
-      .key-guide .section-shell {
-        position: relative;
-        z-index: 1;
-      }
-
-      .key-hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-        gap: 1.4rem;
-        align-items: stretch;
-        padding-top: 5.5rem;
-        padding-bottom: 2rem;
-      }
-
-      .key-hero-card,
-      .key-checklist,
-      .key-side-card,
-      .key-step,
-      .key-trouble-card {
-        border: 1px solid var(--key-border-soft);
-        background: linear-gradient(145deg, rgba(22, 15, 39, 0.88), rgba(8, 5, 16, 0.9));
-        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-        backdrop-filter: blur(18px);
-      }
-
-      .key-hero-card {
-        border-color: var(--key-border);
-        border-radius: 28px;
-        padding: clamp(1.25rem, 3vw, 2.4rem);
-        min-height: 430px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        overflow: hidden;
-        position: relative;
-      }
-
-      .key-hero-card::after {
-        content: "";
-        position: absolute;
-        inset: auto -18% -24% 20%;
-        height: 220px;
-        background: radial-gradient(circle, rgba(178, 75, 255, 0.34), transparent 62%);
-        pointer-events: none;
-      }
-
-      .key-eyebrow {
-        display: inline-flex;
-        width: fit-content;
-        align-items: center;
-        gap: 0.5rem;
-        border: 1px solid rgba(188, 98, 255, 0.28);
-        border-radius: 999px;
-        padding: 0.45rem 0.75rem;
-        color: #e5c5ff;
-        background: rgba(117, 35, 221, 0.16);
-        font-weight: 800;
-        letter-spacing: 0;
-      }
-
-      .key-hero h1 {
-        margin: 1rem 0 0.75rem;
-        max-width: 780px;
-        font-size: clamp(2.25rem, 5vw, 5rem);
-        line-height: 0.95;
-        letter-spacing: 0;
-      }
-
-      .key-hero p {
-        max-width: 720px;
-        color: var(--key-muted);
-        font-size: 1.08rem;
-        line-height: 1.7;
-      }
-
-      .key-cta-row,
-      .key-card-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        align-items: center;
-      }
-
-      .key-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.55rem;
-        min-height: 48px;
-        padding: 0.78rem 1rem;
-        border-radius: 14px;
-        border: 1px solid rgba(207, 128, 255, 0.42);
-        color: #fff;
-        text-decoration: none;
-        font-weight: 900;
-        background: linear-gradient(135deg, #bb67ff 0%, #7a22e8 58%, #5b16ca 100%);
-        box-shadow: 0 16px 36px rgba(120, 35, 225, 0.34);
-        transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-      }
-
-      .key-button:hover {
-        transform: translateY(-1px);
-        border-color: rgba(255, 255, 255, 0.6);
-        box-shadow: 0 18px 44px rgba(166, 78, 255, 0.42);
-      }
-
-      .key-button.secondary {
-        background: rgba(15, 9, 28, 0.72);
-        box-shadow: none;
-        color: #eadcff;
-      }
-
-      .key-checklist {
-        border-radius: 24px;
-        padding: 1.15rem;
-        display: grid;
-        gap: 0.8rem;
-      }
-
-      .key-checklist h2 {
-        margin: 0 0 0.25rem;
-        font-size: 1.35rem;
-      }
-
-      .key-check {
-        display: grid;
-        grid-template-columns: 44px minmax(0, 1fr);
-        gap: 0.8rem;
-        align-items: start;
-        border-radius: 18px;
-        padding: 0.85rem;
-        background: rgba(255, 255, 255, 0.035);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-      }
-
-      .key-check > span {
-        width: 44px;
-        height: 44px;
-        display: grid;
-        place-items: center;
-        border-radius: 14px;
-        color: #fff;
-        font-weight: 950;
-        background: radial-gradient(circle at 35% 30%, #d99aff, #7420df 72%);
-        box-shadow: 0 0 24px rgba(172, 78, 255, 0.36);
-      }
-
-      .key-check p {
-        min-width: 0;
-        overflow-wrap: anywhere;
-      }
-
-      .key-check strong {
-        display: block;
-        margin-bottom: 0.25rem;
-      }
-
-      .key-check p,
-      .key-step p,
-      .key-trouble-card p,
-      .key-side-card p {
-        margin: 0;
-        color: var(--key-muted);
-        line-height: 1.55;
-      }
-
-      .key-section {
-        position: relative;
-        z-index: 1;
-        padding: 1.5rem 0 4rem;
-      }
-
-      .key-section h2 {
-        margin: 0 0 0.7rem;
-        font-size: clamp(1.9rem, 3vw, 3rem);
-      }
-
-      .key-section-intro {
-        max-width: 720px;
-        color: var(--key-muted);
-        line-height: 1.65;
-      }
-
-      .key-steps-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 1rem;
-        margin-top: 1.2rem;
-      }
-
-      .key-step {
-        border-radius: 22px;
-        padding: 1.05rem;
-        min-height: 210px;
-      }
-
-      .key-step .step-number {
-        width: 42px;
-        height: 42px;
-        display: grid;
-        place-items: center;
-        border-radius: 14px;
-        color: #fff;
-        font-weight: 950;
-        background: rgba(153, 66, 255, 0.24);
-        border: 1px solid rgba(207, 128, 255, 0.34);
-        margin-bottom: 0.8rem;
-      }
-
-      .key-step h3,
-      .key-trouble-card h3,
-      .key-side-card h3 {
-        margin: 0 0 0.45rem;
-        font-size: 1.08rem;
-      }
-
-      .key-trouble-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 1rem;
-        margin-top: 1.15rem;
-      }
-
-      .key-trouble-card {
-        border-radius: 22px;
-        padding: 1.05rem;
-      }
-
-      .key-safe-strip {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 1rem;
-        align-items: center;
-        margin-top: 1.3rem;
-        border: 1px solid rgba(114, 255, 186, 0.24);
-        border-radius: 22px;
-        padding: 1rem;
-        background: linear-gradient(135deg, rgba(18, 83, 60, 0.24), rgba(15, 9, 28, 0.88));
-      }
-
-      .key-safe-strip strong {
-        color: var(--key-green);
-      }
-
-      @media (max-width: 980px) {
-        .key-hero,
-        .key-steps-grid,
-        .key-trouble-grid,
-        .key-safe-strip {
-          grid-template-columns: 1fr;
-        }
-
-        .key-hero {
-          padding-top: 4rem;
-        }
-      }
-
-      .key-guide-page {
-        overflow-x: hidden;
-      }
-
-      .key-guide {
-        position: relative;
-        min-height: calc(100vh - 76px);
-        padding: 6.4rem 1.25rem 2rem;
-      }
-
-      .key-guide::before {
-        content: "";
-        position: fixed;
-        inset: 76px 0 0;
-        z-index: -1;
-        background:
-          radial-gradient(circle at 22% 18%, rgba(164, 75, 255, .26), transparent 28%),
-          radial-gradient(circle at 78% 18%, rgba(92, 219, 255, .14), transparent 30%),
-          linear-gradient(135deg, rgba(6, 3, 15, .88), rgba(8, 5, 20, .74));
-        backdrop-filter: blur(12px);
-      }
-
-      .key-guide-modal-shell {
-        width: min(960px, calc(100vw - 2.5rem));
-        margin: 0 auto;
-        position: relative;
-      }
-
-      .key-guide-close {
-        position: absolute;
-        top: -1.15rem;
-        right: -1.15rem;
-        z-index: 4;
-        width: 46px;
-        height: 46px;
-        border: 1px solid rgba(205, 132, 255, .38);
-        border-radius: 16px;
-        background: linear-gradient(135deg, rgba(22, 12, 42, .96), rgba(9, 5, 20, .96));
-        color: #fff;
-        font-size: 1.1rem;
-        font-weight: 950;
-        cursor: pointer;
-        box-shadow: 0 18px 46px rgba(0, 0, 0, .38), 0 0 24px rgba(164, 75, 255, .12);
-      }
-
-      .key-guide-close:hover {
-        border-color: rgba(216, 127, 255, .72);
-        transform: translateY(-1px);
-      }
-
-      .key-hero,
-      .key-section {
-        width: 100%;
-        max-width: 960px;
-        margin-inline: auto;
-        border-radius: 28px;
-        background: linear-gradient(145deg, rgba(13, 7, 28, .94), rgba(8, 5, 18, .88));
-        box-shadow: 0 28px 90px rgba(0, 0, 0, .42);
-      }
-
-      .key-hero {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 1rem;
-        padding: 1.15rem;
-        animation: keyGuideIn .28s ease-out both;
-      }
-
-      .key-hero-card,
-      .key-checklist,
-      .key-step,
-      .key-safe-strip,
-      .key-trouble-card {
-        background: linear-gradient(145deg, rgba(255, 255, 255, .055), rgba(164, 75, 255, .04));
-      }
-
-      .key-hero h1 {
-        max-width: 15ch;
-        font-size: clamp(2.25rem, 4.6vw, 4.1rem);
-        line-height: 1;
-      }
-
-      .key-steps-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .key-hero p,
-      .key-check p,
-      .key-step p,
-      .key-trouble-card p {
-        line-height: 1.58;
-      }
-
-      .key-section {
-        margin-top: 1.05rem;
-        padding: 1.3rem;
-      }
-
-      .site-footer {
-        display: none;
-      }
-
-      @keyframes keyGuideIn {
-        from { opacity: 0; transform: translateY(18px) scale(.985); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-      }
-
-      @media (max-width: 900px) {
-        .key-steps-grid {
-          grid-template-columns: minmax(0, 1fr);
-        }
-
-        .key-hero {
-          grid-template-columns: 1fr;
-        }
-
-        .key-guide-close {
-          right: .35rem;
-        }
-      }
-    </style>
-    <link rel="stylesheet" href="/assets/css/web-experience.css?v=20261009-4">
+      body.key-guide-page .key-guide { padding: 72px 0 36px; }
+      .key-guide-shell { width: var(--container); margin-inline: auto; display: grid; gap: 64px; }
+      .key-hero { display: grid; gap: 48px; }
+      .key-hero-card { max-width: 850px; }
+      .key-eyebrow { color: var(--primary-strong); font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; }
+      body.key-guide-page .key-hero h1 { max-width: 18ch; margin: 20px 0 24px; font-size: clamp(2.5rem, 4.7vw, 4.8rem); line-height: 1.06; letter-spacing: -.045em; }
+      .key-hero-card p, .key-section-intro { max-width: 720px; color: var(--muted); line-height: 1.75; }
+      .key-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+      .key-button { display: inline-flex; justify-content: center; align-items: center; min-height: 48px; padding: 12px 20px; border: 1px solid var(--primary); border-radius: 12px; background: var(--primary); color: var(--text); font-weight: 800; text-decoration: none; transition: transform 200ms ease, background 200ms ease; }
+      .key-button:hover { transform: translateY(-2px); background: var(--primary-strong); color: var(--bg); }
+      .key-button.secondary { background: var(--surface); border-color: var(--line); }
+      .key-button.secondary:hover { background: var(--surface-strong); color: var(--text); }
+      .key-checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      body.key-guide-page .key-checklist h2 { grid-column: 1 / -1; font-size: 1.35rem; margin: 0 0 4px; }
+      .key-check { display: flex; align-items: flex-start; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+      .key-check > span, .step-number { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; background: var(--bg-soft); color: var(--primary-strong); border: 1px solid var(--line); font-weight: 800; }
+      .key-check p { margin: 0; color: var(--muted); line-height: 1.6; }
+      .key-check strong { display: block; color: var(--text); margin-bottom: 6px; }
+      .key-section { border-top: 1px solid var(--line); padding-top: 48px; }
+      body.key-guide-page .key-section h2 { margin: 0 0 16px; font-size: clamp(1.8rem, 3vw, 2.6rem); letter-spacing: -.03em; }
+      .key-steps-grid, .key-trouble-grid { display: grid; gap: 16px; margin-top: 28px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .key-trouble-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .key-step, .key-trouble-card { padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+      .key-step h3, .key-trouble-card h3 { font-size: 1.08rem; line-height: 1.4; margin: 18px 0 10px; }
+      .key-trouble-card h3 { margin-top: 0; }
+      .key-step p, .key-trouble-card p { color: var(--muted); line-height: 1.7; margin-bottom: 0; }
+      .key-safe-strip { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; margin-top: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+      .key-safe-strip strong, .key-safe-strip span { display: block; }
+      .key-safe-strip span { color: var(--muted); margin-top: 8px; line-height: 1.6; }
+      .key-safe-strip a { flex-shrink: 0; }
+      @media (max-width: 900px) { .key-steps-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .key-trouble-grid { grid-template-columns: 1fr; } }
+      @media (max-width: 600px) { body.key-guide-page .key-guide { padding-top: 40px; } .key-guide-shell { gap: 40px; } .key-hero { gap: 32px; } .key-checklist, .key-steps-grid { grid-template-columns: 1fr; } .key-check, .key-step, .key-trouble-card { padding: 20px; } .key-safe-strip { align-items: flex-start; flex-direction: column; } .key-section { padding-top: 32px; } }
+      @media (prefers-reduced-motion: reduce) { .key-button { transition: none; } }
+</style>
+    <link rel="stylesheet" href="/assets/css/web-experience.css?v=20261009-5">
   </head>
   <body class="key-guide-page" data-page="how-to-get-key">
     <canvas id="ambientCanvas" aria-hidden="true"></canvas>
@@ -527,8 +145,7 @@
     </header>
 
     <main id="main" class="key-guide">
-      <div class="key-guide-modal-shell">
-        <button class="key-guide-close" type="button" data-key-guide-close aria-label="Close access guide" data-i18n-aria-label="keyGuide.close">X</button>
+      <div class="key-guide-shell">
       <section class="section-shell key-hero" aria-labelledby="keyGuideTitle">
         <article class="key-hero-card">
           <div>
@@ -645,21 +262,8 @@
         </div>
       </div>
     </footer>
-
-    <script>
-      (() => {
-        const close = document.querySelector("[data-key-guide-close]");
-        close?.addEventListener("click", () => {
-          if (history.length > 1) {
-            history.back();
-            return;
-          }
-          location.href = "/";
-        });
-      })();
-    </script>
     <script src="assets/js/config.js?v=20260526-9" charset="utf-8"></script>
     <script src="assets/js/app.js?v=20261009-4" charset="utf-8" defer></script>
-    <script src="/assets/js/web-experience.js?v=20261009-4" defer></script>
+    <script src="/assets/js/web-experience.js?v=20261009-5" defer></script>
   </body>
 </html>
