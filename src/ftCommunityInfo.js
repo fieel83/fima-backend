@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { prisma } from './db.js';
 import { FT_COMMUNITY_GUILD_ID } from './ftCommunityWelcome.js';
 import { readShowcaseHistory } from './ftCommunityShowcase.js';
@@ -5,6 +6,55 @@ import { ftChannelName } from './ftCommunityChannelNames.js';
 
 const VERSION = 'FT community info v1';
 const workers = new WeakSet();
+const replacements = new Set();
+
+// Explicit Owner workflow only. The automatic worker must never replace an
+// uneditable webhook, and removal of the original remains a separate decision.
+export async function prepareFieelInfoReplacement(channel, botId, channels, settings = prisma.setting) {
+  if (channel.guild.id !== FT_COMMUNITY_GUILD_ID || ftChannelName(channel.name) !== 'fieel-info') throw new Error('FT info scope mismatch');
+  const saved = await settings.findUnique({ where: { key: `ft_info:${channel.id}` } });
+  if (saved?.value?.replacement && saved.value.status !== 'verified') throw new Error('FT info replacement requires recovery');
+  if (saved?.value?.replacement && saved.value.status === 'verified') throw new Error('FT info replacement already verified');
+  const history = await readShowcaseHistory(channel);
+  const candidates = history.filter(message => message.embeds?.some(embed => /about fieel/i.test(embed.title || '')));
+  if (candidates.length !== 1) throw new Error('FT info source missing or ambiguous');
+  const existing = candidates[0];
+  if (!existing.webhookId || existing.author?.id === botId) throw new Error('FT info source does not require webhook replacement');
+  const webhook = (await channel.fetchWebhooks()).get(existing.webhookId);
+  if (webhook?.token) throw new Error('FT info source can be edited in place');
+  const source = { id: existing.id, content: existing.content || '', webhookId: existing.webhookId,
+    embeds: existing.embeds.map(embed => embed.toJSON ? embed.toJSON() : embed) };
+  const payload = communityInfoPayload('fieel-info', channels, source.embeds.find(embed => /about fieel/i.test(embed.title || '')));
+  const plan = { guildId: channel.guild.id, channelId: channel.id, source, payload,
+    action: 'create_canonical_keep_original', removal: 'separate_owner_approval_and_manage_messages_required' };
+  return { ...plan, digest: createHash('sha256').update(JSON.stringify(plan)).digest('hex') };
+}
+
+export async function replaceFieelInfoCanonical(channel, botId, channels, expectedDigest, actorUserId, settings = prisma.setting) {
+  if (!actorUserId || !/^[a-f0-9]{64}$/.test(expectedDigest || '')) throw new Error('FT info reviewed Owner plan required');
+  if (replacements.has(channel.id)) throw new Error('FT info replacement already running');
+  replacements.add(channel.id);
+  const key = `ft_info:${channel.id}`;
+  try {
+    const plan = await prepareFieelInfoReplacement(channel, botId, channels, settings);
+    if (plan.digest !== expectedDigest) throw new Error('FT info replacement plan stale');
+    const value = { channelId: channel.id, source: plan.source, messageId: null, status: 'replacement_pending',
+      replacement: { actorUserId, digest: plan.digest, originalRetained: true, startedAt: new Date().toISOString() } };
+    // A durable pending marker prevents retries creating another message after
+    // a timeout or crash. Recovery must inspect Discord before unlocking it.
+    await settings.upsert({ where: { key }, create: { key, value }, update: { value } });
+    const message = await channel.send({ ...plan.payload, nonce: plan.digest.slice(0, 24), enforceNonce: true });
+    value.messageId = message.id;
+    await settings.upsert({ where: { key }, create: { key, value }, update: { value } });
+    const readback = await channel.messages.fetch({ message: message.id, force: true });
+    if (readback.author?.id !== botId || readback.embeds?.[0]?.title !== plan.payload.embeds[0].title ||
+        readback.embeds?.[0]?.description !== plan.payload.embeds[0].description) throw new Error('FT info replacement readback mismatch');
+    value.status = 'verified';
+    value.version = VERSION;
+    await settings.upsert({ where: { key }, create: { key, value }, update: { value } });
+    return value;
+  } finally { replacements.delete(channel.id); }
+}
 
 export function communityInfoPayload(kind, channels, original = null) {
   const mention = name => {
@@ -46,6 +96,7 @@ export async function publishCommunityInfo(channel, botId, channels, settings = 
   if (channel.guild.id !== FT_COMMUNITY_GUILD_ID || !['fieel-info', 'support-faq'].includes(kind)) throw new Error('FT info scope mismatch');
   const key = `ft_info:${channel.id}`;
   const saved = await settings.findUnique({ where: { key } });
+  if (saved?.value?.replacement && saved.value.status !== 'verified') throw new Error('FT info replacement requires recovery');
   const history = await readShowcaseHistory(channel);
   const marked = history.filter(message => message.embeds?.some(embed => embed.footer?.text?.startsWith(VERSION)));
   const legacy = kind === 'fieel-info' ? history.filter(message => message.embeds?.some(embed => /about fieel/i.test(embed.title || ''))) : [];

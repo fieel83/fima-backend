@@ -118,6 +118,7 @@ import {
   paradiseDiscordSetupPreview,
   paradiseDiscordStructureBackup,
   migrateFtCommunityChannelsFromDashboard,
+  fieelInfoFromDashboard,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
@@ -2248,6 +2249,26 @@ app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-m
       error: error.code || "migration_failed", journalId: error.journal?.id || null,
       rollbackStatus: error.journal?.status || null
     });
+  }
+});
+
+app.post(["/api/fima-bot/actions/prepare-fieel-info", "/api/fima-bot/actions/replace-fieel-info"], requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get("x-paradise-owner-action") !== "1") return res.status(403).json({ error: "owner_action_header_required" });
+  const origin = String(req.get("origin") || "");
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: "origin_mismatch" });
+  const guildId = String(req.body?.guildId || "");
+  if (guildId !== "1419335632324657306") return res.status(400).json({ error: "ft_community_guild_required" });
+  const apply = req.path.endsWith('/replace-fieel-info');
+  const digest = String(req.body?.expectedDigest || "");
+  if (apply && !/^[a-f0-9]{64}$/.test(digest)) return res.status(400).json({ error: "reviewed_info_plan_required" });
+  try {
+    const info = apply
+      ? await withParadiseGuildMutationLease(guildId, "ft_info_replacement", () => fieelInfoFromDashboard(guildId, digest, req.user.id), { purposeKey: "ft_info_replacement" })
+      : await fieelInfoFromDashboard(guildId);
+    await createAuditLog(apply ? "ft_info_canonical_replaced" : "ft_info_replacement_prepared", "discord_guild", guildId, { actorUserId: req.user.id, channelId: info.channelId, messageId: info.messageId || null, originalRetained: true });
+    return res.json({ success: true, guildId, info });
+  } catch (error) {
+    return res.status(409).json({ error: "ft_info_replacement_blocked", reason: publicError(error) });
   }
 });
 

@@ -962,6 +962,25 @@ async function executeProductionRebuild(){
   }catch{clearProductionPlan('Execution status is uncertain. The plan was disabled; inspect the audit and server state before any retry.');show('Production rebuild request failed; automatic retry is disabled.',false)}
   finally{button.textContent='Execute FT Community production rebuild once';updateProductionExecuteState()}
 }
+let reviewedFieelInfo=null;
+async function runFieelInfo(apply){
+  const review=byId('prepareFieelInfo'),publish=byId('applyFieelInfo'),output=byId('fieelInfoPlan');
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  if(apply&&(!reviewedFieelInfo||reviewedFieelInfo.guildId!==selectedGuildId))return show('Review the Fieel Info plan first.',false);
+  const body={guildId:selectedGuildId};
+  if(apply){body.expectedDigest=reviewedFieelInfo.digest;reviewedFieelInfo=null;}
+  review.disabled=true;publish.disabled=true;
+  try{
+    const{response,result}=await mutate('/api/fima-bot/actions/'+(apply?'replace-fieel-info':'prepare-fieel-info'),body);
+    output.textContent=JSON.stringify(result.info||{error:result.error,reason:result.reason},null,2);
+    if(!response.ok){reviewedFieelInfo=null;return show('Fieel Info operation blocked; inspect the result.',false);}
+    if(!apply){reviewedFieelInfo=result.info;publish.disabled=false;}
+    show(apply?'Canonical Fieel Info verified; original retained.':'Review the source and proposed content before publishing.');
+  }catch{reviewedFieelInfo=null;output.textContent='Response unavailable. Inspect Discord and stored replacement state before retrying.';show('Fieel Info response unavailable.',false);}
+  finally{review.disabled=false;}
+}
+byId('prepareFieelInfo').onclick=()=>runFieelInfo(false);
+byId('applyFieelInfo').onclick=()=>runFieelInfo(true);
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;

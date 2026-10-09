@@ -545,6 +545,11 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
           <button class="preview-action" data-managed-operation="preview">Preview selected template</button>
         </div>
         <pre id="managedOperationStatus" aria-live="polite"></pre>
+        <h3>Fieel Info canonical message</h3>
+        <p>Review the existing message and replacement below. Applying keeps the original message; deleting it requires a separate decision.</p>
+        <button id="prepareFieelInfo" class="audit-action">Review Fieel Info replacement</button>
+        <button id="applyFieelInfo" class="audit-action" disabled>Publish reviewed Fieel Info</button>
+        <pre id="fieelInfoPlan" aria-live="polite"></pre>
       </section>
 
       <section class="panel" data-page="advanced">
@@ -1537,6 +1542,25 @@ async function executeProductionRebuild(){
   }catch{clearProductionPlan('Execution status is uncertain. The plan was disabled; inspect the audit and server state before any retry.');show('Production rebuild request failed; automatic retry is disabled.',false)}
   finally{button.textContent='Execute FT Community production rebuild once';updateProductionExecuteState()}
 }
+let reviewedFieelInfo=null;
+async function runFieelInfo(apply){
+  const review=byId('prepareFieelInfo'),publish=byId('applyFieelInfo'),output=byId('fieelInfoPlan');
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  if(apply&&(!reviewedFieelInfo||reviewedFieelInfo.guildId!==selectedGuildId))return show('Review the Fieel Info plan first.',false);
+  const body={guildId:selectedGuildId};
+  if(apply){body.expectedDigest=reviewedFieelInfo.digest;reviewedFieelInfo=null;}
+  review.disabled=true;publish.disabled=true;
+  try{
+    const{response,result}=await mutate('/api/fima-bot/actions/'+(apply?'replace-fieel-info':'prepare-fieel-info'),body);
+    output.textContent=JSON.stringify(result.info||{error:result.error,reason:result.reason},null,2);
+    if(!response.ok){reviewedFieelInfo=null;return show('Fieel Info operation blocked; inspect the result.',false);}
+    if(!apply){reviewedFieelInfo=result.info;publish.disabled=false;}
+    show(apply?'Canonical Fieel Info verified; original retained.':'Review the source and proposed content before publishing.');
+  }catch{reviewedFieelInfo=null;output.textContent='Response unavailable. Inspect Discord and stored replacement state before retrying.';show('Fieel Info response unavailable.',false);}
+  finally{review.disabled=false;}
+}
+byId('prepareFieelInfo').onclick=()=>runFieelInfo(false);
+byId('applyFieelInfo').onclick=()=>runFieelInfo(true);
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;
@@ -1553,7 +1577,7 @@ async function runManagedOperation(kind){
     if(!response.ok){byId('managedOperationStatus').textContent=JSON.stringify({status:'failed',operation:kind,error:result.error||'operation_failed',journalId:result.journalId||null,rollbackStatus:result.rollbackStatus||null},null,2);show(result.error||kind+' failed',false);return}
     const value=result.audit||result.backup||result.preview||result.migration||{};
     const safe=kind==='audit'
-      ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6),botRolePosition:value.guild.botRolePosition,capabilities:value.guild.capabilities}:null,counts:value.counts,coverage:value.coverage,discoveryFailures:value.discoveryFailures,categories:value.categories,channels:value.channels,roles:value.roles,autoModRules:value.autoModRules,webhooks:value.webhooks,migrationPlan:result.migrationPlan,readableChannels:(value.sampledChannels||[]).filter(channel=>channel.readable).map(channel=>channel.name),blockedChannels:(value.sampledChannels||[]).filter(channel=>!channel.readable||channel.messagesFetchFailed||channel.pinsFetchFailed).map(channel=>({name:channel.name,reason:channel.missingPermission,messagesFetchFailed:channel.messagesFetchFailed,pinsFetchFailed:channel.pinsFetchFailed})),sampledChannels:value.sampledChannels}
+      ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6),botRolePosition:value.guild.botRolePosition,capabilities:value.guild.capabilities}:null,counts:value.counts,coverage:value.coverage,discoveryFailures:value.discoveryFailures,roleDependencyAudit:value.roleDependencyAudit,categories:value.categories,channels:value.channels,roles:value.roles,autoModRules:value.autoModRules,webhooks:value.webhooks,migrationPlan:result.migrationPlan,readableChannels:(value.sampledChannels||[]).filter(channel=>channel.readable).map(channel=>channel.name),blockedChannels:(value.sampledChannels||[]).filter(channel=>!channel.readable||channel.messagesFetchFailed||channel.pinsFetchFailed).map(channel=>({name:channel.name,reason:channel.missingPermission,messagesFetchFailed:channel.messagesFetchFailed,pinsFetchFailed:channel.pinsFetchFailed})),sampledChannels:value.sampledChannels}
       :kind==='backup'
         ?{status:value.status,capturedAt:value.capturedAt,guild:value.guild?{name:value.guild.name,id:'…'+String(value.guild.id||'').slice(-6)}:null,categories:(value.categories||[]).length,channels:(value.channels||[]).length,roles:(value.roles||[]).length}
         :['migrate-channels','add-missing-channels','cleanup-empty-categories','order-channels'].includes(kind)?value:{status:value.status,generatedAt:value.generatedAt,template:value.templateLabel,createResources:(value.createResources||[]).length,keepResources:(value.keepResources||[]).length,extraResources:(value.extraResources||[]).length,createRoles:(value.createRoles||[]).length,warning:value.warning};

@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
 import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
-import { startFtInfoWorker } from "./ftCommunityInfo.js";
+import { startFtInfoWorker, prepareFieelInfoReplacement, replaceFieelInfoCanonical } from "./ftCommunityInfo.js";
+import { ftChannelName } from "./ftCommunityChannelNames.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
 import { ticketIsClosed, queueTicketRename } from "./fimaTicketLifecycle.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
@@ -3684,6 +3685,18 @@ export function paradiseDiscordAuditJobStatus() {
     targetGuildCount: 1,
     lastError: lastDeepAuditError
   };
+}
+
+export async function fieelInfoFromDashboard(guildId, expectedDigest = null, actorUserId = null) {
+  if (guildId !== '1419335632324657306') throw new Error('FT info scope mismatch');
+  const guild = await getGuild(guildId);
+  if (!guild || !client?.user) throw new Error('paradise_guild_unavailable');
+  const channels = await guild.channels.fetch();
+  const matches = [...channels.values()].filter(channel => channel?.messages && ftChannelName(channel.name) === 'fieel-info');
+  if (matches.length !== 1) throw new Error('FT info destination missing or ambiguous');
+  return expectedDigest
+    ? replaceFieelInfoCanonical(matches[0], client.user.id, channels, expectedDigest, actorUserId)
+    : prepareFieelInfoReplacement(matches[0], client.user.id, channels);
 }
 
 export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedDigest, actorUserId, phase = 'move') {
