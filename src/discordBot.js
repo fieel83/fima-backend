@@ -4,7 +4,7 @@ import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker, prepareFieelInfoReplacement, replaceFieelInfoCanonical } from "./ftCommunityInfo.js";
 import { ftChannelName } from "./ftCommunityChannelNames.js";
 import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunityShowcase.js";
-import { ticketIsClosed, queueTicketRename } from "./fimaTicketLifecycle.js";
+import { ticketIsClosed, queueTicketRename, ticketParticipantAccess, ticketChannelOverwrites } from "./fimaTicketLifecycle.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields, retainedTicketIntakeFields } from "./fimaTicketIntake.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
@@ -2401,16 +2401,9 @@ async function createTicketChannel(guild, user, category) {
 
   const safeUser = String(user.username || user.id).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 20) || "user";
   const name = `ticket-${category.id.replace(/_/g, "-").slice(0, 18)}-${safeUser}`;
-  const overwrites = [
-    { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-    { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-    { id: me.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory, PermissionsBitField.Flags.ManageChannels] }
-  ];
   const supportRoleId = env("DISCORD_FIMA_SUPPORT_ROLE_ID") || env("DISCORD_SUPPORT_ROLE_ID");
-  if (supportRoleId) {
-    const role = await guild.roles.fetch(supportRoleId).catch(() => null);
-    if (role) overwrites.push({ id: role.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] });
-  }
+  const supportRole = supportRoleId ? await guild.roles.fetch(supportRoleId).catch(() => null) : null;
+  const overwrites = ticketChannelOverwrites({ everyoneId: guild.roles.everyone.id, openerId: user.id, botId: me.id, supportRoleId: supportRole?.id });
   const parent = env("DISCORD_TICKET_CATEGORY_ID") || (guild.id === "1419335632324657306" ? "1557526017378091110" : null);
   return guild.channels.create({
     name,
@@ -2438,8 +2431,7 @@ function ticketCreatedEmbed(category, userId) {
       { name: "Opened by", value: `<@${userId}>`, inline: true },
       { name: "Category", value: category.label, inline: true },
       { name: "Status", value: "OPEN", inline: true }
-    )
-    .setFooter({ text: "Made By Fieel" });
+    );
 }
 
 function getTicketCategoryLabel(interaction) {
@@ -2468,8 +2460,7 @@ function ticketLifecycleEmbed({ status = "OPEN", actorId, transcriptMessageId, c
     .setDescription(closed
       ? "This ticket is closed. If you need more help with the same issue, ask staff to reopen it."
       : "You can add updates or screenshots here while staff reviews your request.")
-    .addFields(fields)
-    .setFooter({ text: "Made By Fieel" });
+    .addFields(fields);
 }
 
 function maskTicketTranscriptText(value) {
@@ -2558,9 +2549,7 @@ async function setClosedTicketParticipantAccess(interaction, closed) {
     error.code = "ticket_participant_access_unavailable";
     throw error;
   }
-  const overwrite = closed
-    ? { ViewChannel: false, SendMessages: false, ReadMessageHistory: false }
-    : { ViewChannel: true, SendMessages: true, ReadMessageHistory: true };
+  const overwrite = ticketParticipantAccess(closed);
   await interaction.channel.permissionOverwrites.edit(userId, overwrite, {
     reason: closed ? "Ticket closed after transcript save" : "Ticket reopened by staff"
   });
@@ -2585,7 +2574,7 @@ async function handleTicketAssignment(interaction) {
       const panel = await channel.messages.fetch(interaction.customId.split(":")[1]);
       if (panel.author.id !== interaction.client.user.id || !panel.components.some(row => row.components.some(component => component.customId === "fima_ticket_claim"))) throw new Error("ticket_panel_invalid");
       const topic = topicWithAssignment(channel.topic, target.id);
-      await channel.permissionOverwrites.edit(target.id, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket assigned by staff" });
+      await channel.permissionOverwrites.edit(target.id, ticketParticipantAccess(), { reason: "Ticket assigned by staff" });
       await channel.setTopic(topic, "Ticket assigned by staff");
       await panel.edit({ embeds: [ticketLifecycleEmbed({ sourceEmbed: panel.embeds[0], status: "OPEN", actorId: interaction.user.id, claimedBy: target.id, categoryLabel: getTicketCategoryLabel({ message: panel, channel }), openedBy: getTicketOpenedUserId({ message: panel, channel }) })], components: ticketActionRows({ claimed: true }) });
       await auditDiscordBotAction("discord_ticket_assigned", "discord_channel", channel.id, { guildId: interaction.guildId, actorId: interaction.user.id, assignedTo: target.id, contentStored: false });
@@ -2693,7 +2682,7 @@ async function handleTicketButtonLocked(interaction) {
     const nextTopic = `${String(channel.topic || "").replace(/(?:^|\s)escalatedAt:\d+(?=\s|$)/, "").trimEnd()} escalatedAt:${Date.now()}`;
     if (nextTopic.length > 1024) return interaction.editReply({ content: "Ticket metadata is full. Ask an administrator to review this ticket." });
     try {
-      await channel.permissionOverwrites.edit(targetId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: "Ticket escalated to senior staff" });
+      await channel.permissionOverwrites.edit(targetId, ticketParticipantAccess(), { reason: "Ticket escalated to senior staff" });
       const notification = await channel.send({ content: `${role ? `<@&${targetId}>` : `<@${targetId}>`} — staff requested senior review of this ticket. / Personel bu destek talebi için üst yetkili incelemesi istedi.`, allowedMentions: { parse: [], roles: role ? [targetId] : [], users: role ? [] : [targetId] } });
       await channel.setTopic(nextTopic, "Record ticket escalation cooldown");
       await auditDiscordBotAction("discord_ticket_escalation_sent", "discord_channel", channel.id, { guildId: interaction.guildId, actorId: interaction.user.id, targetId, messageId: notification.id, contentStored: false });

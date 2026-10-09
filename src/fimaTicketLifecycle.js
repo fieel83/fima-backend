@@ -1,5 +1,28 @@
 import { PermissionFlagsBits } from "discord.js";
 
+export function ticketParticipantAccess(closed = false) {
+  return {
+    ViewChannel: !closed,
+    SendMessages: !closed,
+    ReadMessageHistory: !closed,
+    AttachFiles: !closed,
+    EmbedLinks: !closed
+  };
+}
+
+export function ticketChannelOverwrites({ everyoneId, openerId, botId, supportRoleId }) {
+  const participant = Object.keys(ticketParticipantAccess()).map(key => PermissionFlagsBits[key]);
+  const overwrites = [
+    { id: everyoneId, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: openerId, allow: [...participant] },
+    { id: botId, allow: [...participant, PermissionFlagsBits.ManageChannels] }
+  ];
+  if (supportRoleId && ![everyoneId, openerId, botId].includes(supportRoleId)) {
+    overwrites.push({ id: supportRoleId, allow: [...participant] });
+  }
+  return overwrites;
+}
+
 // Participant access survives restarts and changes immediately, even when
 // Discord queues a cosmetic channel rename behind a rate limit.
 export function ticketIsClosed(channel) {

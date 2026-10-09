@@ -1,7 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PermissionFlagsBits, PermissionsBitField } from "discord.js";
-import { ticketIsClosed, queueTicketRename } from "../src/fimaTicketLifecycle.js";
+import { ticketIsClosed, queueTicketRename, ticketParticipantAccess, ticketChannelOverwrites } from "../src/fimaTicketLifecycle.js";
+
+test("private tickets allow participant media despite denied parent permissions", () => {
+  const overwrites = ticketChannelOverwrites({ everyoneId: "everyone", openerId: "buyer", botId: "bot", supportRoleId: "staff" });
+  const baseline = new PermissionsBitField();
+  for (const id of ["buyer", "bot", "staff"]) {
+    const overwrite = overwrites.find(entry => entry.id === id);
+    const effective = new PermissionsBitField(baseline).remove(overwrite.deny || []).add(overwrite.allow);
+    assert.equal(effective.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks]), true);
+    assert.equal(effective.has(PermissionFlagsBits.ManageChannels), id === "bot");
+  }
+  assert.deepEqual(overwrites[0], { id: "everyone", deny: [PermissionFlagsBits.ViewChannel] });
+  assert.equal(ticketChannelOverwrites({ everyoneId: "everyone", openerId: "buyer", botId: "bot", supportRoleId: "everyone" }).length, 3);
+});
+
+test("closing denies media access and reopening restores it", () => {
+  for (const permission of ["ViewChannel", "SendMessages", "ReadMessageHistory", "AttachFiles", "EmbedLinks"]) {
+    assert.equal(ticketParticipantAccess(true)[permission], false);
+    assert.equal(ticketParticipantAccess(false)[permission], true);
+  }
+});
 
 test("participant access takes precedence over a delayed channel name", () => {
   const opener = "762858334440521739";
