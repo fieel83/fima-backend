@@ -81,6 +81,33 @@ async function inventory(guild) {
 }
 const invariant = rows => rows.map(({ name, position, ...rest }) => rest);
 
+// Read-only recovery evidence: never clears the journal or changes Discord roles.
+export async function inspectFtRoleOrganization({ guild, journals }) {
+  if (guild?.id !== GUILD) throw fail('ft_community_guild_required');
+  const current = await inventory(guild);
+  const compare = before => {
+    const original = new Map((before || []).map(row => [row.id, row]));
+    const present = new Set(current.map(row => row.id));
+    return {
+      added: current.filter(row => !original.has(row.id)).map(row => row.id),
+      removed: [...original.keys()].filter(id => !present.has(id)),
+      changed: current.flatMap(row => {
+        const prior = original.get(row.id);
+        if (!prior) return [];
+        const fields = Object.keys(prior).filter(key => digest(prior[key]) !== digest(row[key]));
+        return fields.length ? [{ id: row.id, fields, before: prior, current: row }] : [];
+      })
+    };
+  };
+  return { guildId: guild.id, capturedAt: new Date().toISOString(), readOnly: true, current,
+    journals: journals.filter(row => row?.guildId === guild.id).map(row => ({
+      id: row.id, status: row.status, startedAt: row.startedAt, completedAt: row.completedAt,
+      error: row.error, appliedRenames: row.appliedRenames || [], plan: row.plan,
+      comparedWithBefore: compare(row.before),
+      comparedWithFailure: row.observed ? compare(row.observed) : null
+    })) };
+}
+
 export async function organizeFtRoles({ guild, expectedDigest, actorUserId, saveJournal }) {
   if (guild?.id !== GUILD) throw fail('ft_community_guild_required');
   const me = await guild.members.fetchMe({ force: true });

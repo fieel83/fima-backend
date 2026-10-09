@@ -1,8 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFtRoleOrganizationPlan, classifyFtRole, organizeFtRoles } from '../src/ftCommunityRoleOrganization.js';
+import { buildFtRoleOrganizationPlan, classifyFtRole, organizeFtRoles, inspectFtRoleOrganization } from '../src/ftCommunityRoleOrganization.js';
 
 const GUILD = '1419335632324657306';
+test('recovery inspection identifies partial writes and external edits without mutating or unlocking', async () => {
+  const f = fixture();
+  const before = structuredClone(f.rows).sort((a, b) => a.id.localeCompare(b.id));
+  f.rows.find(row => row.id === '1420402168443306126').name = '◇・SYSTEM / XP / LEVELS';
+  const observed = structuredClone(f.rows);
+  f.rows.find(row => row.id === 'member').permissions.push('ManageMessages');
+  const journal = { id: 'failed', guildId: GUILD, status: 'recovery_required', error: 50013,
+    before, observed, appliedRenames: [], plan: { moves: [] } };
+  const original = structuredClone(journal);
+  const result = await inspectFtRoleOrganization({ guild: f.guild, journals: [journal, { guildId: 'other' }] });
+  assert.equal(result.readOnly, true);
+  assert.equal(result.journals.length, 1);
+  assert.deepEqual(result.journals[0].comparedWithBefore.changed.map(row => row.id), ['1420402168443306126', 'member']);
+  assert.deepEqual(result.journals[0].comparedWithFailure.changed[0].fields, ['permissions']);
+  assert.deepEqual(journal, original);
+  assert.equal(f.calls.length, 0);
+  await assert.rejects(inspectFtRoleOrganization({ guild: { id: 'other' }, journals: [] }), /ft_community_guild_required/);
+});
 function fixture() {
   const calls = [];
   const row = (id, name, position, permissions = [], managed = false) => ({ id, name, position,

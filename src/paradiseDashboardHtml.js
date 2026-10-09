@@ -558,6 +558,7 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         <h3>FT Community role organization</h3>
         <p>Review every role's category and exact changes. Role IDs, permissions and member assignments are retained. Managed and privileged roles stay in place. No roles are deleted.</p>
         <button id="prepareFtRoles" type="button">Review FT role organization</button>
+        <button id="inspectFtRoleRecovery" type="button">Inspect FT role recovery (read only)</button>
         <button id="applyFtRoles" type="button" disabled>Apply reviewed FT role organization</button>
         <pre id="ftRolesPlan" aria-live="polite"></pre>
       </section>
@@ -1609,6 +1610,17 @@ async function runFtRoles(apply){
 }
 byId('prepareFtRoles').onclick=()=>runFtRoles(false);
 byId('applyFtRoles').onclick=()=>runFtRoles(true);
+byId('inspectFtRoleRecovery').onclick=async()=>{
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  const button=byId('inspectFtRoleRecovery');button.disabled=true;
+  try{
+    const response=await fetch(API_BASE+'/api/fima-bot/ft-role-recovery/'+encodeURIComponent(selectedGuildId),{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
+    const result=await response.json();
+    byId('ftRolesPlan').textContent=JSON.stringify(result.recovery||result,null,2);
+    show(response.ok?'Read-only recovery evidence loaded. Migration remains locked.':'Recovery inspection blocked.',response.ok);
+  }catch{show('Recovery inspection unavailable.',false);}
+  finally{button.disabled=false;}
+};
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;

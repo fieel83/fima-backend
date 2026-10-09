@@ -2,7 +2,7 @@ import { prepareFtRulesReplacement, replaceFtRulesCanonical } from './ftCommunit
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
 import { organizeFimaRolePositions } from "./fimaRolePositions.js";
-import { organizeFtRoles } from './ftCommunityRoleOrganization.js';
+import { organizeFtRoles, inspectFtRoleOrganization } from './ftCommunityRoleOrganization.js';
 import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker, prepareFieelInfoReplacement, replaceFieelInfoCanonical } from "./ftCommunityInfo.js";
 import { ftChannelName } from "./ftCommunityChannelNames.js";
@@ -3743,6 +3743,12 @@ export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedD
       await prisma.setting.upsert({ where: { key }, update: { value: journal }, create: { key, value: journal } });
     }
   });
+}
+
+export async function ftRoleRecoveryFromDashboard(guildId) {
+  if (guildId !== '1419335632324657306') throw Object.assign(new Error('ft_community_guild_required'), { code: 'ft_community_guild_required' });
+  const rows = await prisma.setting.findMany({ where: { key: { startsWith: `ft_role_organization_${guildId}_` } } });
+  return inspectFtRoleOrganization({ guild: await getGuild(guildId), journals: rows.map(row => row.value) });
 }
 
 export async function ftRolesFromDashboard(guildId, expectedDigest, actorUserId) {

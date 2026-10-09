@@ -121,6 +121,7 @@ import {
   fieelInfoFromDashboard,
   ftRulesFromDashboard,
   ftRolesFromDashboard,
+  ftRoleRecoveryFromDashboard,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
@@ -2251,6 +2252,16 @@ app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-m
       error: error.code || "migration_failed", journalId: error.journal?.id || null,
       rollbackStatus: error.journal?.status || null
     });
+  }
+});
+
+app.get('/api/fima-bot/ft-role-recovery/:guildId', requireUser, requireParadiseOwner, async (req, res) => {
+  const guildId = String(req.params.guildId || '');
+  if (guildId !== '1419335632324657306') return res.status(400).json({ error: 'ft_community_guild_required' });
+  try {
+    return res.json({ success: true, recovery: await ftRoleRecoveryFromDashboard(guildId) });
+  } catch (error) {
+    return res.status(409).json({ error: error.code || 'role_recovery_inspection_failed' });
   }
 });
 

@@ -1019,6 +1019,17 @@ async function runFtRoles(apply){
 }
 byId('prepareFtRoles').onclick=()=>runFtRoles(false);
 byId('applyFtRoles').onclick=()=>runFtRoles(true);
+byId('inspectFtRoleRecovery').onclick=async()=>{
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  const button=byId('inspectFtRoleRecovery');button.disabled=true;
+  try{
+    const response=await fetch(API_BASE+'/api/fima-bot/ft-role-recovery/'+encodeURIComponent(selectedGuildId),{credentials:'include',headers:{accept:'application/json'},cache:'no-store'});
+    const result=await response.json();
+    byId('ftRolesPlan').textContent=JSON.stringify(result.recovery||result,null,2);
+    show(response.ok?'Read-only recovery evidence loaded. Migration remains locked.':'Recovery inspection blocked.',response.ok);
+  }catch{show('Recovery inspection unavailable.',false);}
+  finally{button.disabled=false;}
+};
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;
