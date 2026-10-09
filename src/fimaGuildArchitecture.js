@@ -10,6 +10,10 @@ const defaults = {
 };
 const dependencies = { challenge: ['profiles', 'leaderboards'], availability: ['profiles'], sessions: ['profiles'], polls: ['content'] };
 const bindings = { welcome: ['welcome'], tickets: ['tickets'], logs: ['logs'], social: ['uploads'], polls: ['content'], content: ['content'], voice: ['join_to_create'] };
+export const FIMA_VOICE_NAMES = Object.freeze({
+  joinToCreate: Object.freeze(['◦・join-to-create', 'Create Room', '⌁・join-to-create', '◜・oda-oluştur', 'Join to Create', 'Create a Room']),
+  privateCategory: Object.freeze(['◉・VOICE', 'VOICE', '⌁・VOICE', '━━ ÖZEL SESLER ━━', 'PRIVATE VOICE'])
+});
 export function fimaVoiceSettings(config = {}) {
   return { ...(config.voiceSettings || {}),
     joinToCreateChannelId: config.channelMappings?.join_to_create || config.voiceSettings?.joinToCreateChannelId || null,

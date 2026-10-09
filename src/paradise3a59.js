@@ -8,7 +8,7 @@ import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
 import { fimaGuildProfileProjection, ensureFimaGlobalProfileId } from './fimaProfileProjection.js';
-import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings } from './fimaGuildArchitecture.js';
+import { fimaInteractionModuleAllowed, fimaRuntimeModuleAllowed, fimaVoiceSettings, FIMA_VOICE_NAMES } from './fimaGuildArchitecture.js';
 import path from "node:path";
 import crypto from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -1420,11 +1420,11 @@ export function paradiseSetupChannelTypeMismatch(channel, categoryName, channelN
 function paradiseVoiceSetupIds(guild) {
   const find = names => guild.channels.cache.find(channel => names.includes(channel.name) && channel.type === ChannelType.GuildVoice)?.id || null;
   return {
-    joinToCreateChannelId: find(["Create Room", "⌁・join-to-create", "◜・oda-oluştur", "Join to Create"]),
+    joinToCreateChannelId: find(FIMA_VOICE_NAMES.joinToCreate),
     communityVoiceChannelId: find(["Community Lounge", "⌁・community-voice", "◜・topluluk-sesi", "Community Voice"]),
     warVoiceChannelId: find(["◜・savaş-odası", "War VC"]),
     afkChannelId: find(["⌁・afk", "◞・afk", "AFK"]),
-    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["VOICE", "⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name))?.id || null
+    privateVoiceCategoryId: guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && FIMA_VOICE_NAMES.privateCategory.includes(channel.name))?.id || null
   };
 }
 
@@ -11224,7 +11224,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   if (!activeMode || voiceConfig.enabled === false) return false;
   const joined = newState.channel;
   const isJoinToCreate = oldState.channelId !== newState.channelId && joined?.type === ChannelType.GuildVoice
-    && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : ["⌁・join-to-create", "◜・oda-oluştur", "Join to Create", "Create a Room"].includes(joined.name));
+    && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : FIMA_VOICE_NAMES.joinToCreate.includes(joined.name));
   if (isJoinToCreate) {
     return withTemporaryVoiceJoin(`${guild.id}:${newState.member.id}`, async () => {
     if (newState.member.voice.channelId !== joined.id) return false;
@@ -11247,7 +11247,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
     }
     const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
     const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
-      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && ["⌁・VOICE", "━━ ÖZEL SESLER ━━", "PRIVATE VOICE"].includes(channel.name));
+      || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && FIMA_VOICE_NAMES.privateCategory.includes(channel.name));
     const channel = await guild.channels.create({
       name: sanitizeTemporaryVoiceName(fallbackName, "Private Room"),
       type: ChannelType.GuildVoice,
