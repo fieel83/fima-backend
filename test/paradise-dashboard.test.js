@@ -530,3 +530,11 @@ test('embedded owner workflow modules import without browser globals', async () 
     assert.equal(typeof module[factory], 'function');
   }
 });
+
+test('embedded role workflow stays synchronized with the owner console', () => {
+  const generated = fs.readFileSync(new URL('../public/assets/js/fima-owner-tools.js', import.meta.url), 'utf8');
+  const extract = source => source.slice(source.indexOf('let reviewedFtRoles=null;'), source.indexOf('async function runManagedOperation(kind)'));
+  const workflow = extract(paradiseDashboardHtml({}));
+  assert.ok(workflow.includes("byId('prepareFtRoles').onclick"));
+  assert.equal(extract(generated).replace(/\r\n/g, '\n'), workflow.replace(/\r\n/g, '\n'));
+});

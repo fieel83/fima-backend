@@ -354,7 +354,7 @@ function applyPageButtonLabels(lang){
 }
 Object.assign(UI_TR,{'Separator style':'Ayırıcı stili','Diamond':'Elmas','Line':'Çizgi','Minimal':'Minimal','Comfortable spacing gives cards more room. Compact spacing keeps long lists easier to scan.':'Rahat aralık kartlara daha fazla alan verir. Sıkı aralık uzun listeleri taramayı kolaylaştırır.','Choose the separator used in leaderboard and guide cards.':'Sıralama ve rehber kartlarında kullanılan ayırıcıyı seçin.','Choose the signature shown below Discord messages. Compact works well for busy boards.':'Discord mesajlarının altında görünen imzayı seçin. Sıkı görünüm yoğun panolara uygundur.'});
 Object.assign(UI_TR,{'Engagement':'Etkileşim','Text':'Metin','Advanced':'Gelişmiş','Duplicate':'Çoğalt','Delete':'Sil','Helper (public staff entry)':'Topluluk yardımcısı','Advanced JSON mode':'Geliştirici araçları','Acceptance question':'Kabul sorusu','Business':'İş ortaklıkları','Clan / TSBTR templates':'Klan / TSBTR şablonları'});
-Object.assign(UI_TR,{'Application name':'Uygulama adı','Bot username':'Bot kullanıcı adı','Guild nicknames':'Sunucu takma adları','Avatar':'Avatar','Banner':'Kapak görseli'});
+Object.assign(UI_TR,{'Arrange FT channels':'FT kanallarını düzenle','Application name':'Uygulama adı','Bot username':'Bot kullanıcı adı','Guild nicknames':'Sunucu takma adları','Avatar':'Avatar','Banner':'Kapak görseli'});
 Object.assign(UI_TR,{'Verified Discord identity':'Doğrulanmış Discord kimliği','FIMA Bot profile':'FIMA Bot profili','Owner confirmation':'Owner onayı','Apply supported profile fields':'Desteklenen profil alanlarını uygula','Unavailable':'Kullanılamıyor','FIMA Bot profile field status':'FIMA Bot profil alanlarının durumu','Status is read-only until the exact confirmation is entered.':'Tam onay metni girilene kadar durum salt okunurdur.'});
 function applyUiLanguage(language){
   const lang=language==='en'?'en':'tr';document.documentElement.lang=lang;try{localStorage.setItem('paradiseUiLanguage',lang)}catch{}
@@ -1000,6 +1000,25 @@ async function runFtRules(apply){
 }
 byId('prepareFtRules').onclick=()=>runFtRules(false);
 byId('applyFtRules').onclick=()=>runFtRules(true);
+let reviewedFtRoles=null;
+async function runFtRoles(apply){
+  const review=byId('prepareFtRoles'),publish=byId('applyFtRoles'),output=byId('ftRolesPlan');
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  if(apply&&(!reviewedFtRoles||reviewedFtRoles.guildId!==selectedGuildId))return show('Review the current role plan first.',false);
+  const body={guildId:selectedGuildId};
+  if(apply){body.expectedDigest=reviewedFtRoles.digest;reviewedFtRoles=null;}
+  review.disabled=true;publish.disabled=true;
+  try{
+    const{response,result}=await mutate('/api/fima-bot/actions/'+(apply?'organize-ft-roles':'prepare-ft-roles'),body);
+    output.textContent=JSON.stringify(result.roles||result,null,2);
+    if(!response.ok){reviewedFtRoles=null;return show('Role operation blocked; inspect the result.',false);}
+    if(!apply){reviewedFtRoles=result.roles;publish.disabled=false;}
+    show(apply?'FT roles organized and live hierarchy verified.':'Review the role categories and exact changes.');
+  }catch{reviewedFtRoles=null;output.textContent='Response unavailable. Inspect the stored journal before retrying.';show('Role response unavailable.',false);}
+  finally{review.disabled=false;}
+}
+byId('prepareFtRoles').onclick=()=>runFtRoles(false);
+byId('applyFtRoles').onclick=()=>runFtRoles(true);
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;
