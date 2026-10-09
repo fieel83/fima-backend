@@ -35,7 +35,7 @@ export function classifyFtRole(role) {
   if (/text top/.test(name)) return 'Text Top 1–3';
   if (/voice top/.test(name)) return 'Voice Top 1–3';
   if (/level\s*(5|10|20|30|50)\b/.test(name)) return 'Level 5/10/20/30/50';
-  if (/notification|ping/.test(name)) return 'Notifications';
+  if (/notification|ping|^fima macro updates$/.test(name)) return 'Notifications';
   if (/turkish|english/.test(name)) return 'Language';
   if (/^(europe|asia|north america|south america)$/.test(name)) return 'Region';
   if (/glads|anti.?teamer|gif|perms|access|student/.test(name)) return 'Interests';
@@ -80,6 +80,61 @@ async function inventory(guild) {
     color: role.color, hoist: role.hoist, mentionable: role.mentionable })).sort((a, b) => a.id.localeCompare(b.id));
 }
 const invariant = rows => rows.map(({ name, position, ...rest }) => rest);
+const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
+  ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
+const evidenceDigest = value => digest(stable(value));
+
+export async function inspectFtRolePermissions(guild, rows) {
+  const me = await guild.members.fetchMe({ force: true });
+  const highest = me.roles.highest;
+  const botRole = guild.roles.botRoleFor?.(me.id);
+  return { botUserId: me.id || null, highestRoleId: highest.id || null,
+    highestRoleName: highest.name || null, highestPosition: highest.position,
+    botIntegrationRoleId: botRole?.id || null,
+    manageRoles: me.permissions.has(PermissionsBitField.Flags.ManageRoles),
+    administrator: me.permissions.has(PermissionsBitField.Flags.Administrator),
+    roles: rows.map(row => ({ id: row.id, name: row.name, position: row.position,
+      managed: row.managed, editable: row.editable,
+      belowHighestRole: row.position < highest.position,
+      movable: row.id !== GUILD && !row.managed && row.editable && row.position < highest.position })) };
+}
+
+// Reconcile only the journal. Never replay ambiguous Discord writes or roll back roles.
+export async function reconcileFtRoleOrganization({ guild, journal, expectedDigest, actorUserId, saveJournal }) {
+  if (guild?.id !== GUILD || journal?.guildId !== GUILD) throw fail('ft_community_guild_required');
+  if (journal.status !== 'recovery_required' || !journal.observed || !journal.before || !journal.plan) {
+    throw fail('role_recovery_evidence_required');
+  }
+  const current = await inventory(guild);
+  if (evidenceDigest(current) !== evidenceDigest(journal.observed)) throw fail('role_recovery_inventory_drift');
+  const before = journal.before;
+  const renames = new Map((journal.plan.renames || []).map(row => [row.id, row.afterName]));
+  if (before.length !== current.length || evidenceDigest(invariant(before)) !== evidenceDigest(invariant(current))) {
+    throw fail('role_recovery_invariant_drift');
+  }
+  const unchangedPositions = current.every(row => before.find(prior => prior.id === row.id)?.position === row.position);
+  const completedPositions = current.every(row => journal.plan.positions?.find(prior => prior.id === row.id)?.position === row.position);
+  const safeNames = current.every(row => {
+    const prior = before.find(item => item.id === row.id);
+    return row.name === prior?.name || row.name === renames.get(row.id);
+  });
+  if (!safeNames || (!unchangedPositions && !completedPositions)) throw fail('role_recovery_ambiguous_changes');
+  const permissions = await inspectFtRolePermissions(guild, current);
+  const review = { journalId: journal.id, guildId: guild.id, current, permissions,
+    disposition: completedPositions && (journal.plan.renames || []).every(row => current.find(item => item.id === row.id)?.name === row.afterName)
+      ? 'recovered_complete' : 'recovered_partial', discordWrites: 0 };
+  const reviewDigest = evidenceDigest({ review, journal });
+  if (!expectedDigest) return { ...review, digest: reviewDigest };
+  if (reviewDigest !== expectedDigest) throw fail('migration_stale_plan');
+  if (!actorUserId || typeof saveJournal !== 'function') throw fail('migration_journal_required');
+  // Final readback before committing the reviewed evidence. Guild lease is held by caller.
+  if (evidenceDigest(await inventory(guild)) !== evidenceDigest(current)) throw fail('role_recovery_inventory_drift');
+  const recovered = { ...structuredClone(journal), status: review.disposition,
+    reconciliation: { actorUserId, completedAt: new Date().toISOString(), digest: reviewDigest,
+      current, permissions, discordWrites: 0, originalError: journal.error } };
+  await saveJournal(recovered);
+  return recovered;
+}
 
 // Read-only recovery evidence: never clears the journal or changes Discord roles.
 export async function inspectFtRoleOrganization({ guild, journals }) {
@@ -100,9 +155,10 @@ export async function inspectFtRoleOrganization({ guild, journals }) {
     };
   };
   return { guildId: guild.id, capturedAt: new Date().toISOString(), readOnly: true, current,
+    permissions: await inspectFtRolePermissions(guild, current),
     journals: journals.filter(row => row?.guildId === guild.id).map(row => ({
       id: row.id, status: row.status, startedAt: row.startedAt, completedAt: row.completedAt,
-      error: row.error, appliedRenames: row.appliedRenames || [], plan: row.plan,
+      error: row.error, failureEvidence: row.failureEvidence || null, appliedRenames: row.appliedRenames || [], plan: row.plan,
       comparedWithBefore: compare(row.before),
       comparedWithFailure: row.observed ? compare(row.observed) : null
     })) };
@@ -120,6 +176,7 @@ export async function organizeFtRoles({ guild, expectedDigest, actorUserId, save
   const journal = { id: randomUUID(), guildId: guild.id, actorUserId, status: 'applying',
     startedAt: new Date().toISOString(), before, plan, appliedRenames: [] };
   let expected = structuredClone(before);
+  let stage = 'renames';
   const persist = () => saveJournal(structuredClone(journal));
   const verify = async () => {
     const actual = await inventory(guild);
@@ -137,11 +194,13 @@ export async function organizeFtRoles({ guild, expectedDigest, actorUserId, save
       await persist();
     }
     if (plan.moves.length) {
+      stage = 'positions';
       await verify();
       await guild.roles.setPositions(plan.moves
         .map(row => ({ role: row.id, position: row.position })), 'Owner reviewed FT role organization');
       for (const row of plan.positions) expected.find(role => role.id === row.id).position = row.position;
     }
+    stage = 'readback';
     journal.after = await verify();
     if (digest(invariant(before)) !== digest(invariant(journal.after))) throw fail('role_invariant_failed');
     journal.status = 'roles_organized';
@@ -153,6 +212,10 @@ export async function organizeFtRoles({ guild, expectedDigest, actorUserId, save
     journal.status = 'recovery_required';
     journal.error = error.code || 'role_organization_failed';
     journal.observed = await inventory(guild).catch(() => null);
+    journal.failureEvidence = { stage, httpStatus: Number(error.status) || null,
+      method: error.method === 'PATCH' ? 'PATCH' : null,
+      targetRoleIds: stage === 'positions' ? plan.moves.map(row => row.id) : [],
+      permissions: await inspectFtRolePermissions(guild, journal.observed || before).catch(() => null) };
     await persist().catch(() => {});
     error.journal = journal;
     throw error;

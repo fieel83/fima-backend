@@ -122,6 +122,7 @@ import {
   ftRulesFromDashboard,
   ftRolesFromDashboard,
   ftRoleRecoveryFromDashboard,
+  ftRoleReconcileFromDashboard,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
@@ -2262,6 +2263,29 @@ app.get('/api/fima-bot/ft-role-recovery/:guildId', requireUser, requireParadiseO
     return res.json({ success: true, recovery: await ftRoleRecoveryFromDashboard(guildId) });
   } catch (error) {
     return res.status(409).json({ error: error.code || 'role_recovery_inspection_failed' });
+  }
+});
+
+app.post(['/api/fima-bot/actions/prepare-ft-role-recovery', '/api/fima-bot/actions/reconcile-ft-roles'], requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get('x-paradise-owner-action') !== '1') return res.status(403).json({ error: 'owner_action_header_required' });
+  const origin = String(req.get('origin') || '');
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: 'origin_mismatch' });
+  const guildId = String(req.body?.guildId || '');
+  if (guildId !== '1419335632324657306') return res.status(400).json({ error: 'ft_community_guild_required' });
+  const journalId = String(req.body?.journalId || '');
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(journalId)) return res.status(400).json({ error: 'role_recovery_journal_required' });
+  const apply = req.path.endsWith('/reconcile-ft-roles');
+  const expectedDigest = String(req.body?.expectedDigest || '');
+  if (apply && !/^[a-f0-9]{64}$/.test(expectedDigest)) return res.status(400).json({ error: 'migration_plan_required' });
+  try {
+    const recovery = await withParadiseGuildMutationLease(guildId, 'ft_role_organization',
+      () => ftRoleReconcileFromDashboard(guildId, journalId, apply ? expectedDigest : undefined, req.user.id),
+      { purposeKey: 'ft_role_organization' });
+    if (apply) await createAuditLog('ft_role_journal_reconciled', 'discord_guild', guildId,
+      { actorUserId: req.user.id, journalId, status: recovery.status, discordWrites: 0 });
+    return res.json({ success: true, guildId, recovery });
+  } catch (error) {
+    return res.status(409).json({ error: error.code || 'role_recovery_blocked' });
   }
 });
 

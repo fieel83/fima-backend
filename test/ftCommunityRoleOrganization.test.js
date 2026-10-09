@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFtRoleOrganizationPlan, classifyFtRole, organizeFtRoles, inspectFtRoleOrganization } from '../src/ftCommunityRoleOrganization.js';
+import { buildFtRoleOrganizationPlan, classifyFtRole, organizeFtRoles, inspectFtRoleOrganization, reconcileFtRoleOrganization } from '../src/ftCommunityRoleOrganization.js';
 
 const GUILD = '1419335632324657306';
 test('recovery inspection identifies partial writes and external edits without mutating or unlocking', async () => {
@@ -51,6 +51,7 @@ test('sorting never crosses privileged, managed or divider boundaries', () => {
   assert.equal(plan.renames.length, 1);
   assert.equal(classifyFtRole({ id: '1420402470990905365', name: 'F T' }), 'Owner / Management');
   assert.equal(classifyFtRole({ name: 'Trial Users' }), 'Community');
+  assert.equal(classifyFtRole({ name: 'FIMA Macro Updates' }), 'Notifications');
 });
 
 test('fresh reviewed plan journals before writes and verifies exact readback', async () => {
@@ -98,4 +99,87 @@ test('wrong guild or missing ManageRoles fails before role inventory', async () 
   f.guild.members.fetchMe = async () => ({ permissions: { has: () => false } });
   await assert.rejects(organizeFtRoles({ guild: f.guild }), /manage_roles_required/);
   assert.equal(f.calls.length, 0);
+});
+
+async function failedPositionFixture() {
+  const f = fixture(); const journals = [];
+  const plan = await organizeFtRoles({ guild: f.guild });
+  f.guild.roles.setPositions = async () => { throw Object.assign(new Error('Missing Permissions'), { code: 50013, status: 403, method: 'PATCH' }); };
+  await assert.rejects(organizeFtRoles({ guild: f.guild, expectedDigest: plan.digest,
+    actorUserId: 'owner', saveJournal: async journal => journals.push(journal) }), /Missing Permissions/);
+  return { ...f, journal: journals.at(-1) };
+}
+
+test('50013 records exact failure stage, target roles and current hierarchy', async () => {
+  const f = await failedPositionFixture();
+  const evidence = f.journal.failureEvidence;
+  assert.equal(evidence.stage, 'positions');
+  assert.equal(evidence.httpStatus, 403);
+  assert.equal(evidence.method, 'PATCH');
+  assert.deepEqual(evidence.targetRoleIds, f.journal.plan.moves.map(row => row.id));
+  assert.equal(evidence.permissions.highestPosition, 9);
+  assert.equal(evidence.permissions.manageRoles, true);
+  assert.equal(evidence.permissions.roles.find(row => row.id === 'bot').movable, false);
+});
+
+test('reviewed partial-write recovery preserves evidence and never writes Discord', async () => {
+  const f = await failedPositionFixture(); const original = structuredClone(f.journal);
+  const initialCalls = structuredClone(f.calls); const saved = [];
+  const review = await reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal });
+  assert.equal(review.disposition, 'recovered_partial');
+  assert.equal(review.discordWrites, 0);
+  assert.deepEqual(f.journal, original);
+  await assert.rejects(reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal,
+    expectedDigest: review.digest, saveJournal: async journal => saved.push(journal) }), /migration_journal_required/);
+  const recovered = await reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal,
+    expectedDigest: review.digest, actorUserId: 'owner', saveJournal: async journal => saved.push(journal) });
+  assert.equal(recovered.status, 'recovered_partial');
+  assert.equal(saved.length, 1);
+  assert.deepEqual(recovered.before, original.before);
+  assert.deepEqual(recovered.observed, original.observed);
+  assert.equal(recovered.error, 50013);
+  assert.deepEqual(f.calls, initialCalls);
+  assert.deepEqual(f.journal, original);
+});
+
+test('recovery rejects stale digest and external inventory changes', async () => {
+  const f = await failedPositionFixture(); let saves = 0;
+  await assert.rejects(reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal,
+    expectedDigest: '0'.repeat(64), actorUserId: 'owner', saveJournal: async () => saves++ }), /migration_stale_plan/);
+  f.rows.find(row => row.id === 'member').name = 'External change';
+  await assert.rejects(reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal }), /role_recovery_inventory_drift/);
+  assert.equal(saves, 0);
+});
+
+test('recovery refuses permission changes and ambiguous partially moved roles', async () => {
+  const f = await failedPositionFixture();
+  f.rows.find(row => row.id === 'member').permissions.push('ManageMessages');
+  f.journal.observed.find(row => row.id === 'member').permissions.push('ManageMessages');
+  await assert.rejects(reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal }), /role_recovery_invariant_drift/);
+  const g = await failedPositionFixture();
+  g.rows.find(row => row.id === 'level50').position = 6;
+  g.journal.observed.find(row => row.id === 'level50').position = 6;
+  await assert.rejects(reconcileFtRoleOrganization({ guild: g.guild, journal: g.journal }), /role_recovery_ambiguous_changes/);
+});
+
+test('lost successful position response reconciles as complete without replay', async () => {
+  const f = await failedPositionFixture();
+  for (const row of f.journal.plan.positions) f.rows.find(item => item.id === row.id).position = row.position;
+  f.journal.observed = structuredClone(f.rows).sort((a, b) => a.id.localeCompare(b.id));
+  const review = await reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal });
+  assert.equal(review.disposition, 'recovered_complete');
+  assert.equal(f.calls.length, 1);
+});
+
+test('final inventory readback and journal persistence failures keep original recovery locked', async () => {
+  const f = await failedPositionFixture();
+  const review = await reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal });
+  await assert.rejects(reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal,
+    expectedDigest: review.digest, actorUserId: 'owner', saveJournal: async () => { throw new Error('db unavailable'); } }), /db unavailable/);
+  let fetches = 0; let saves = 0;
+  f.setFetchHook(() => { if (++fetches === 2) f.rows.find(row => row.id === 'member').name = 'Concurrent edit'; });
+  await assert.rejects(reconcileFtRoleOrganization({ guild: f.guild, journal: f.journal,
+    expectedDigest: review.digest, actorUserId: 'owner', saveJournal: async () => saves++ }), /role_recovery_inventory_drift/);
+  assert.equal(saves, 0);
+  assert.equal(f.journal.status, 'recovery_required');
 });

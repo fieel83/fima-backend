@@ -2,7 +2,7 @@ import { prepareFtRulesReplacement, replaceFtRulesCanonical } from './ftCommunit
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
 import { organizeFimaRolePositions } from "./fimaRolePositions.js";
-import { organizeFtRoles, inspectFtRoleOrganization } from './ftCommunityRoleOrganization.js';
+import { organizeFtRoles, inspectFtRoleOrganization, reconcileFtRoleOrganization } from './ftCommunityRoleOrganization.js';
 import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker, prepareFieelInfoReplacement, replaceFieelInfoCanonical } from "./ftCommunityInfo.js";
 import { ftChannelName } from "./ftCommunityChannelNames.js";
@@ -3761,6 +3761,19 @@ export async function ftRolesFromDashboard(guildId, expectedDigest, actorUserId)
     const key = `ft_role_organization_${guildId}_${journal.id}`;
     await prisma.setting.upsert({ where: { key }, update: { value: journal }, create: { key, value: journal } });
   } });
+}
+
+export async function ftRoleReconcileFromDashboard(guildId, journalId, expectedDigest, actorUserId) {
+  if (guildId !== '1419335632324657306') throw Object.assign(new Error('ft_community_guild_required'), { code: 'ft_community_guild_required' });
+  const key = `ft_role_organization_${guildId}_${journalId}`;
+  const row = await prisma.setting.findUnique({ where: { key } });
+  if (!row?.value || row.value.id !== journalId) throw Object.assign(new Error('role_recovery_journal_not_found'), { code: 'role_recovery_journal_not_found' });
+  return reconcileFtRoleOrganization({ guild: await getGuild(guildId), journal: row.value,
+    expectedDigest, actorUserId, saveJournal: async journal => {
+      // Compare-and-set keeps a concurrently updated journal from being overwritten.
+      const result = await prisma.setting.updateMany({ where: { key, value: { equals: row.value } }, data: { value: journal } });
+      if (result.count !== 1) throw Object.assign(new Error('role_recovery_journal_drift'), { code: 'role_recovery_journal_drift' });
+    } });
 }
 
 export async function paradiseDiscordStructureBackup(guildId = null) {
