@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { createFtSafetyProcessor } from "./ftCommunityMessageSafety.js";
 import { createFtMediaSafety } from "./ftCommunityMediaSafety.js";
 import { createFtBehaviorSafety } from "./ftCommunityBehaviorSafety.js";
+import { createPurgeConfirmations } from "./fimaPurgeConfirmation.js";
 import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
@@ -10823,11 +10824,16 @@ async function handleModCommand(interaction) {
   if (sub === "purge") {
     if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) return interaction.reply({ content: "Manage Messages permission required for purge.", ephemeral: true });
     const amount = interaction.options.getInteger("amount");
-    const deleted = await interaction.channel.bulkDelete(amount, true).catch(() => null);
-    if (!deleted) return interaction.reply({ content: "FIMA could not purge these messages. Discord only permits recent bulk deletions.", ephemeral: true });
-    await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Messages purged",
-      `${interaction.user} purged **${deleted.size}** recent message(s) in ${interaction.channel}.`, { type: "moderation", metadata: { count: deleted.size, channelId: interaction.channelId } });
-    return interaction.reply({ content: `Purged **${deleted.size}** recent message(s).`, ephemeral: true });
+    if (!Number.isInteger(amount) || amount < 1 || amount > 100) return interaction.reply({ content: "Choose 1–100 messages.", ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    const messages = await interaction.channel.messages.fetch({ limit: amount }).catch(() => null);
+    if (!messages) return interaction.editReply({ content: "FIMA could not read recent messages. Check channel permissions." });
+    const preview = purgeConfirmations.create(purgeContext(interaction), messages.values());
+    if (!preview) return interaction.editReply({ content: "No eligible recent messages. Pinned messages and messages older than 14 days are excluded." });
+    return interaction.editReply({
+      content: `Permanently delete **${preview.ids.length}** recent message(s) in ${interaction.channel}? This cannot be undone. Pinned messages are excluded. Only this preview's messages can be deleted; confirmation expires in 2 minutes.`,
+      components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`paradise_mod_purge_confirm:${preview.token}`).setLabel("Confirm deletion").setStyle(ButtonStyle.Danger))]
+    });
   }
   if (sub === "slowmode") {
     if (!canApproveModeration(interaction.member)) return interaction.reply({ content: "Senior moderation authority required.", ephemeral: true });
@@ -14907,9 +14913,54 @@ export async function handleRolePanelButton(interaction, kind, optionId, templat
   }
 }
 
+const purgeConfirmations = createPurgeConfirmations();
+const purgeContext = interaction => ({ guildId: interaction.guildId, channelId: interaction.channelId, actorId: interaction.user.id });
+
+async function handlePurgeConfirmation(interaction) {
+  const token = interaction.customId.split(':')[1];
+  const context = purgeContext(interaction);
+  if (interaction.isButton?.()) {
+    const preview = purgeConfirmations.get(token, context);
+    if (!preview) return interaction.reply({ content: "This purge preview expired or belongs to another moderator. Run /mod purge again.", ephemeral: true });
+    const phrase = `DELETE ${preview.ids.length}`;
+    return interaction.showModal(new ModalBuilder().setCustomId(`paradise_mod_purge_submit:${token}`).setTitle("Confirm permanent deletion").addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("confirmation").setLabel(`Type ${phrase} to permanently delete`).setPlaceholder(phrase).setStyle(TextInputStyle.Short).setMaxLength(10).setRequired(true))
+    ));
+  }
+  await interaction.deferReply({ ephemeral: true });
+  let result;
+  try {
+    result = await purgeConfirmations.execute(token, context, interaction.fields.getTextInputValue("confirmation").trim(), {
+      authorize: async () => {
+        const member = await interaction.guild.members.fetch({ user: interaction.user.id, force: true }).catch(() => null);
+        const bot = await interaction.guild.members.fetch({ user: interaction.client.user.id, force: true }).catch(() => null);
+        const required = [PermissionsBitField.Flags.ManageMessages, PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.ReadMessageHistory];
+        return Boolean(member && bot && canModerate(member) && interaction.channel.permissionsFor(member)?.has(required) && interaction.channel.permissionsFor(bot)?.has(required));
+      },
+      remove: async ids => {
+        // Recheck pins immediately before deletion; never select newer messages.
+        const messages = await interaction.channel.messages.fetch({ limit: 100, cache: false });
+        const selected = new Set(ids);
+        const eligible = [...messages.values()].filter(message => selected.has(message.id) && !message.pinned).map(message => message.id);
+        return eligible.length ? interaction.channel.bulkDelete(eligible, true) : new Map();
+      }
+    });
+  } catch {
+    return interaction.editReply({ content: "FIMA could not complete this purge. Run /mod purge again to create a fresh preview." });
+  }
+  if (result.status !== 'deleted') return interaction.editReply({ content: result.status === 'denied' ? "Your moderation or channel permission is no longer sufficient." : result.status === 'confirmation_required' ? "Confirmation did not match. Use the preview button and type the exact DELETE count." : "This purge preview expired or was already used. Run /mod purge again." });
+  await logParadiseAction(interaction.guild, "moderation_logs_channel", "mod-logs", "Messages purged",
+    `${interaction.user} confirmed and purged **${result.count}** recent message(s) in ${interaction.channel}.`, { type: "moderation", metadata: { count: result.count, channelId: interaction.channelId, confirmed: true } });
+  return interaction.editReply({ content: `Purged **${result.count}** confirmed message(s).` });
+}
+
 async function handleParadiseInteractionInner(interaction) {
   if (interaction.guildId && !fimaInteractionModuleAllowed(configForGuild(await loadState(), interaction.guildId), interaction)) {
     await interaction.reply({ content: 'This FIMA module is disabled for this server.', ephemeral: true });
+    return true;
+  }
+  if ((interaction.isButton?.() || interaction.isModalSubmit?.()) && /^paradise_mod_purge_(confirm|submit):/.test(interaction.customId)) {
+    await handlePurgeConfirmation(interaction);
     return true;
   }
   if (interaction.isModalSubmit?.() && interaction.customId === "paradise_verify_modal") {
