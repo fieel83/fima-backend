@@ -2,6 +2,7 @@ import { prepareFtRulesReplacement, replaceFtRulesCanonical } from './ftCommunit
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
 import { organizeFimaRolePositions } from "./fimaRolePositions.js";
+import { organizeFtRoles } from './ftCommunityRoleOrganization.js';
 import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker, prepareFieelInfoReplacement, replaceFieelInfoCanonical } from "./ftCommunityInfo.js";
 import { ftChannelName } from "./ftCommunityChannelNames.js";
@@ -3742,6 +3743,18 @@ export async function migrateFtCommunityChannelsFromDashboard(guildId, expectedD
       await prisma.setting.upsert({ where: { key }, update: { value: journal }, create: { key, value: journal } });
     }
   });
+}
+
+export async function ftRolesFromDashboard(guildId, expectedDigest, actorUserId) {
+  const previous = await prisma.setting.findMany({ where: { key: { startsWith: `ft_role_organization_${guildId}_` } } });
+  if (previous.some(row => ['applying', 'recovery_required'].includes(row.value?.status))) {
+    throw Object.assign(new Error('migration_recovery_required'), { code: 'migration_recovery_required' });
+  }
+  const guild = await getGuild(guildId);
+  return organizeFtRoles({ guild, expectedDigest, actorUserId, saveJournal: async journal => {
+    const key = `ft_role_organization_${guildId}_${journal.id}`;
+    await prisma.setting.upsert({ where: { key }, update: { value: journal }, create: { key, value: journal } });
+  } });
 }
 
 export async function paradiseDiscordStructureBackup(guildId = null) {

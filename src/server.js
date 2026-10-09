@@ -120,6 +120,7 @@ import {
   migrateFtCommunityChannelsFromDashboard,
   fieelInfoFromDashboard,
   ftRulesFromDashboard,
+  ftRolesFromDashboard,
   paradiseWebsiteApplicationFormContext,
   publishParadiseContentMessage,
   paradiseTestLabPublicStatus,
@@ -2250,6 +2251,26 @@ app.post(["/api/fima-bot/actions/migrate-channels", "/api/fima-bot/actions/add-m
       error: error.code || "migration_failed", journalId: error.journal?.id || null,
       rollbackStatus: error.journal?.status || null
     });
+  }
+});
+
+app.post(['/api/fima-bot/actions/prepare-ft-roles', '/api/fima-bot/actions/organize-ft-roles'], requireUser, requireParadiseOwner, async (req, res) => {
+  if (req.get('x-paradise-owner-action') !== '1') return res.status(403).json({ error: 'owner_action_header_required' });
+  const origin = String(req.get('origin') || '');
+  if (origin && !isTrustedParadiseOrigin(origin)) return res.status(403).json({ error: 'origin_mismatch' });
+  const guildId = String(req.body?.guildId || '');
+  if (guildId !== '1419335632324657306') return res.status(400).json({ error: 'ft_community_guild_required' });
+  const apply = req.path.endsWith('/organize-ft-roles');
+  const expectedDigest = String(req.body?.expectedDigest || '');
+  if (apply && !/^[a-f0-9]{64}$/.test(expectedDigest)) return res.status(400).json({ error: 'migration_plan_required' });
+  try {
+    const roles = await withParadiseGuildMutationLease(guildId, 'ft_role_organization',
+      () => ftRolesFromDashboard(guildId, apply ? expectedDigest : undefined, req.user.id),
+      { purposeKey: 'ft_role_organization' });
+    return res.json({ success: true, guildId, roles });
+  } catch (error) {
+    return res.status(409).json({ error: error.code || 'role_organization_failed',
+      journalId: error.journal?.id || null, recoveryStatus: error.journal?.status || null });
   }
 });
 

@@ -555,6 +555,11 @@ export function paradiseDashboardHtml({ clientId, apiBaseUrl = "https://api.fima
         <button id="prepareFtRules" class="audit-action">Review FT Rules replacement</button>
         <button id="applyFtRules" class="audit-action" disabled>Publish reviewed FT Rules</button>
         <pre id="ftRulesPlan" aria-live="polite"></pre>
+        <h3>FT Community role organization</h3>
+        <p>Review every role's category and exact changes. Role IDs, permissions and member assignments are retained. Managed and privileged roles stay in place. No roles are deleted.</p>
+        <button id="prepareFtRoles" type="button">Review FT role organization</button>
+        <button id="applyFtRoles" type="button" disabled>Apply reviewed FT role organization</button>
+        <pre id="ftRolesPlan" aria-live="polite"></pre>
       </section>
 
       <section class="panel" data-page="advanced">
@@ -1585,6 +1590,25 @@ async function runFtRules(apply){
 }
 byId('prepareFtRules').onclick=()=>runFtRules(false);
 byId('applyFtRules').onclick=()=>runFtRules(true);
+let reviewedFtRoles=null;
+async function runFtRoles(apply){
+  const review=byId('prepareFtRoles'),publish=byId('applyFtRoles'),output=byId('ftRolesPlan');
+  if(!selectedGuildId)return show('Select FT Community first.',false);
+  if(apply&&(!reviewedFtRoles||reviewedFtRoles.guildId!==selectedGuildId))return show('Review the current role plan first.',false);
+  const body={guildId:selectedGuildId};
+  if(apply){body.expectedDigest=reviewedFtRoles.digest;reviewedFtRoles=null;}
+  review.disabled=true;publish.disabled=true;
+  try{
+    const{response,result}=await mutate('/api/fima-bot/actions/'+(apply?'organize-ft-roles':'prepare-ft-roles'),body);
+    output.textContent=JSON.stringify(result.roles||result,null,2);
+    if(!response.ok){reviewedFtRoles=null;return show('Role operation blocked; inspect the result.',false);}
+    if(!apply){reviewedFtRoles=result.roles;publish.disabled=false;}
+    show(apply?'FT roles organized and live hierarchy verified.':'Review the role categories and exact changes.');
+  }catch{reviewedFtRoles=null;output.textContent='Response unavailable. Inspect the stored journal before retrying.';show('Role response unavailable.',false);}
+  finally{review.disabled=false;}
+}
+byId('prepareFtRoles').onclick=()=>runFtRoles(false);
+byId('applyFtRoles').onclick=()=>runFtRoles(true);
 async function runManagedOperation(kind){
   if(!selectedGuildId)return show('Select a managed FIMA server first.',false);
   const button=kind==='audit'?byId('runRealAudit'):kind==='backup'?byId('runStructureBackup'):kind==='preview'?byId('runSetupPreview'):null;
