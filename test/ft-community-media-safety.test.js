@@ -36,6 +36,29 @@ test("real QR pixels decode locally; hidden destination produces safe evidence o
   assert.equal(JSON.stringify(result).includes("token=private"), false);
 });
 
+test("animated GIF samples first, middle and last frames and evaluates every QR", async () => {
+  const destinations = ["https://example.com/", "https://discord.com.attacker.test/claim", "https://roblox.com.attacker.test/gift"];
+  const frames = [];
+  for (const destination of destinations) {
+    const png = await QRCode.toBuffer(destination, { width: 300, margin: 4 });
+    frames.push(await sharp(png).ensureAlpha().raw().toBuffer());
+  }
+  const gif = await sharp(Buffer.concat(frames), { raw: { width: 300, height: 900, channels: 4, pageHeight: 300 } }).gif({ delay: [100, 100, 100] }).toBuffer();
+  const result = await decodeFtMedia(gif, { ocr: false });
+  assert.equal(result.totalFrames, 3);
+  assert.deepEqual(result.sampledFrames, [0, 1, 2]);
+  assert.deepEqual(result.qrs, destinations);
+  assert.equal(result.scan, "scanned");
+  const evaluate = createFtMediaSafety({ download: async () => gif, scan: async value => decodeFtMedia(value, { ocr: false }) });
+  const verdict = await evaluate({ attachments: [{ ...file, name: "animation.gif", contentType: "image/gif" }] }, context);
+  assert.equal(verdict.blocked, true);
+  assert.ok(verdict.hosts.includes("roblox.com.attacker.test"));
+  const longer = await sharp(Buffer.concat([...frames, ...frames]), { raw: { width: 300, height: 1800, channels: 4, pageHeight: 300 } }).gif({ delay: [100, 100, 100, 100, 100, 100] }).toBuffer();
+  const sample = await decodeFtMedia(longer, { ocr: false });
+  assert.deepEqual(sample.sampledFrames, [0, 3, 5]);
+  assert.equal(sample.scan, "sampled_frames_scanned");
+});
+
 test("bounded child process performs English and Turkish OCR using bundled language data", { timeout: 25000 }, async () => {
   const svg = Buffer.from('<svg width="1100" height="240" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/><text x="35" y="80" font-family="Arial" font-size="42" fill="black">Pay deposit to unlock withdrawal</text><text x="35" y="160" font-family="Arial" font-size="42" fill="black">Aktivasyon ödemesi yatır</text></svg>');
   const png = await sharp(svg).png().toBuffer();
@@ -90,4 +113,15 @@ test("flood queue is bounded and unsupported or excess attachments report incomp
   const verdict = await corrupt({ attachments: [file] }, context);
   assert.equal(verdict.mediaScan, "not_scanned");
   assert.deepEqual(verdict.attachmentHashes, [createHash("sha256").update(Buffer.of(1, 2)).digest("hex")]);
+});
+
+ test("both attachments retain QR evidence even when visible and OCR text fill their limits", async () => {
+  let scans = 0;
+  const evaluate = createFtMediaSafety({ download: async () => Buffer.of(1), scan: async () => ({
+    text: "ordinary photo ".repeat(2000), scan: "scanned",
+    qrs: ++scans === 1 ? ["https://example.com/one", "https://example.com/two", "https://example.com/three"] : ["https://example.com/four", "https://example.com/five", "https://discord.com.attacker.test/claim"]
+  }) });
+  const result = await evaluate({ content: "ordinary message ".repeat(2000), attachments: [file, { ...file, id: "second" }] }, { ...context, messageId: "multiple-qr" });
+  assert.equal(result.blocked, true);
+  assert.ok(result.hosts.includes("discord.com.attacker.test"));
 });

@@ -38,7 +38,7 @@ export function ftSafetyHost(raw) {
 /** No URLs are followed. Evidence contains categories, hostnames and a hash, never message bodies. */
 export function evaluateFtMessageSafety({ content = "", embeds = [], attachments = [], privateTicket = false, roleKeys = [], isOwner = false, config = {}, extractedText = "", qrDestinations = [], mediaScan = null, attachmentHashes = [] } = {}) {
   const source = ftSafetyText({ content, embeds });
-  const text = normalize(bounded([source, extractedText, ...qrDestinations.slice(0, 3)].join("\n")));
+  const text = normalize([...qrDestinations.slice(0, 6).map(value => String(value || "").slice(0, 2000)), source, bounded(extractedText)].join("\n"));
   const urls = [...text.matchAll(/https?:\/\/[^\s<>"`]+/g)].slice(0, 30).map(match => ftSafetyHost(match[0].replace(/[),.!?]+$/, ""))).filter(Boolean);
   const external = urls.some(url => !url.official);
   const lookalike = urls.some(url => url.lookalike || url.credentialUrl);

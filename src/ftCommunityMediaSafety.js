@@ -101,7 +101,7 @@ export function createFtMediaSafety({ download = downloadFtMedia, scan = scanFtM
           const buffer = await download(file);
           attachmentHashes.push(createHash("sha256").update(buffer).digest("hex"));
           const result = await scan(buffer);
-          texts.push(result.text); destinations.push(result.qr); scans.push(result.scan);
+          texts.push(result.text); destinations.push(...(Array.isArray(result.qrs) ? result.qrs.slice(0, 3) : [result.qr])); scans.push(result.scan);
           metrics.scanned++;
         } catch { scans.push("not_scanned"); metrics.notScanned++; }
       }
