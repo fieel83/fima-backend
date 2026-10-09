@@ -9,6 +9,7 @@ import { startFtShowcaseWorker, handleFtShowcaseInteraction } from "./ftCommunit
 import { ticketIsClosed, queueTicketRename, ticketParticipantAccess, ticketChannelOverwrites } from "./fimaTicketLifecycle.js";
 import { ticketClaimant, topicWithClaim, topicWithAssignment, withTicketLock } from "./fimaTicketState.js";
 import { buildTicketIntakeModal, ticketIntakeFields, retainedTicketIntakeFields } from "./fimaTicketIntake.js";
+import { ticketAccountAccess, TICKET_ACCOUNT_LINK_MESSAGE } from "./fimaTicketAccount.js";
 import { collectTicketMessages, ticketMessageText } from "./fimaTicketTranscript.js";
 import { migrateFtChannels, addFtMissingChannels, cleanupFtEmptyCategories, orderFtChannels } from "./ftCommunityChannelMigration.js";
 import { createFimaDiscordGateway } from "./fimaDiscordGateway.js";
@@ -251,6 +252,7 @@ const TICKET_CATEGORIES = [
   { id: "macro_timing_problem", label: "Macro timing problem", description: "Ping, FPS, MS or macro timing help." },
   { id: "security_report", label: "Report / Scam / Security", description: "Suspicious file, fake build or abuse report." },
   { id: "creator_partnership", label: "Creator / partnership", description: "Creator, macro or partnership request." },
+  { id: "account_recovery", label: "Account recovery", description: "Cannot sign in or link your Discord account." },
   { id: "other", label: "Other", description: "Anything else." }
 ];
 
@@ -1143,12 +1145,27 @@ async function handleDiscordInteraction(interaction) {
     }
     const channel = interaction.options.getChannel("channel") || interaction.channel;
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
-    await channel.send(fimaTicketPanelPayload());
-    await auditDiscordBotAction("discord_ticket_panel_sent", "discord_channel", channel.id, {
+    await interaction.deferReply({ ephemeral: true });
+    // Preserve the established FT panel ID and history; never create a replacement silently.
+    const canonicalFtPanel = interaction.guildId === "1419335632324657306"
+      && channel.id === "1421241033693462599";
+    let panel;
+    if (canonicalFtPanel) {
+      panel = await channel.messages.fetch("1557572967267958906");
+      if (panel.author.id !== interaction.client.user.id
+        || !panel.components.some(row => row.components.some(component => component.customId === "fima_ticket_category"))) {
+        return interaction.editReply("Canonical support panel ownership could not be verified. No changes made.");
+      }
+      await panel.edit(fimaTicketPanelPayload());
+    } else {
+      panel = await channel.send(fimaTicketPanelPayload());
+    }
+    await auditDiscordBotAction(canonicalFtPanel ? "discord_ticket_panel_updated" : "discord_ticket_panel_sent", "discord_channel", channel.id, {
       guildId: interaction.guildId,
-      actorId: interaction.user.id
+      actorId: interaction.user.id,
+      messageId: panel.id
     });
-    return interaction.reply({ content: "Ticket panel sent.", ephemeral: true });
+    return interaction.editReply(canonicalFtPanel ? "Support panel updated in place." : "Ticket panel sent.");
   }
 
   if (interaction.commandName === "fima_trust_setup") {
@@ -2230,7 +2247,8 @@ function fimaTicketPanelPayload() {
     .setColor(0x9b5cff)
     .setTitle("Fima Support")
     .setDescription([
-      "Need help? Pick a category, complete the short form, then FIMA opens your private ticket.",
+      "Link your Discord account in your FIMA account settings, then pick a category and complete the short form.",
+      "Cannot sign in or link Discord? Choose Account recovery. Your private ticket supports images, videos, files and links.",
       "Do not post full license keys, passwords, cookies, tokens or payment details in public.",
       "Old TGMacro buyer? Choose that category and send proof after staff opens the ticket."
     ].join("\n"))
@@ -2344,6 +2362,8 @@ async function handleTicketCategorySelect(interaction) {
   if (settings.enabled === false) return interaction.reply({ content: "New tickets are currently paused. / Yeni destek talepleri şu anda duraklatıldı.", ephemeral: true });
   const categoryId = interaction.values?.[0] || "other";
   const category = TICKET_CATEGORIES.find((item) => item.id === categoryId) || TICKET_CATEGORIES.at(-1);
+  const access = await ticketAccountAccess(prisma, interaction.user.id, category.id);
+  if (!access.allowed) return interaction.reply({ content: TICKET_ACCOUNT_LINK_MESSAGE, ephemeral: true });
   return interaction.showModal(buildTicketIntakeModal(category));
 }
 
@@ -2358,6 +2378,9 @@ async function handleTicketIntakeSubmit(interaction) {
   const guild = interaction.guild || await getGuild();
   const ticketSettings = await fimaTicketSettingsForGuild(guild.id);
   if (ticketSettings.enabled === false) return interaction.editReply("New tickets are currently paused. / Yeni destek talepleri şu anda duraklatıldı.");
+  // Recheck after the modal: the account may have been unlinked meanwhile.
+  const accountAccess = await ticketAccountAccess(prisma, interaction.user.id, category.id);
+  if (!accountAccess.allowed) return interaction.editReply(TICKET_ACCOUNT_LINK_MESSAGE);
   const creationKey = `${guild.id}:${interaction.user.id}`;
   if (ticketCreationInFlight.has(creationKey)) return interaction.editReply("Your ticket is being opened. Please wait.");
   ticketCreationInFlight.add(creationKey);
@@ -2368,7 +2391,7 @@ async function handleTicketIntakeSubmit(interaction) {
     if (Date.now() - (ticketCreationCooldown.get(creationKey) || 0) < 300000) return interaction.editReply("Please wait five minutes before opening another ticket.");
     const intake = ticketIntakeFields(category.id).map((field) => ({ name: field.label, value: maskTicketTranscriptText(interaction.fields.getTextInputValue(field.id)).slice(0, 1000) || "—" }));
     if (intake[0].value.trim().length < 10) return interaction.editReply("Please describe the issue in at least ten characters.");
-    const ticketChannel = await createTicketChannel(guild, interaction.user, category);
+    const ticketChannel = await createTicketChannel(guild, interaction.user, category, accountAccess);
     ticketCreationCooldown.set(creationKey, Date.now());
     setTimeout(() => ticketCreationCooldown.delete(creationKey), 300000).unref();
     await ticketChannel.send({
@@ -2381,6 +2404,8 @@ async function handleTicketIntakeSubmit(interaction) {
       guildId: guild.id,
       category: category.id,
       userId: interaction.user.id,
+      fimaAccountId: accountAccess.accountId,
+      accountRecoveryException: accountAccess.recoveryException,
       fullKeysMasked: true,
       fullEmailsMasked: true
     });
@@ -2393,7 +2418,7 @@ async function handleTicketIntakeSubmit(interaction) {
   }
 }
 
-async function createTicketChannel(guild, user, category) {
+async function createTicketChannel(guild, user, category, accountAccess) {
   const me = guild.members.me || await guild.members.fetchMe();
   if (!me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
     const error = new Error("discord_bot_missing_manage_channels");
@@ -2412,7 +2437,7 @@ async function createTicketChannel(guild, user, category) {
     type: ChannelType.GuildText,
     parent,
     permissionOverwrites: overwrites,
-    topic: `Fima ticket: ${category.label}. openedBy:${user.id}. Keep keys, emails and payment details masked.`,
+    topic: `Fima ticket: ${category.label}. openedBy:${user.id}. ${accountAccess?.accountId ? `fimaAccount:${accountAccess.accountId}.` : "accountRecovery:true."} Keep keys, emails and payment details masked.`,
     reason: `Fima ticket opened: ${category.id}`
   });
 }

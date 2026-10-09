@@ -9,7 +9,8 @@ export function ticketIntakeFields(categoryId) {
     fake_headless: "Avatar type and step that failed",
     security_report: "Suspect account or URL (no credentials)",
     creator_partnership: "Your project and public profile",
-    app_bug: "App version, device and error"
+    app_bug: "App version, device and error",
+    account_recovery: "Sign-in issue (no passwords or codes)"
   };
   return [
     { id: "reason", label: "What happened? / Ne oldu?", required: true, minLength: 10 },
@@ -34,7 +35,7 @@ export function buildTicketIntakeModal(category) {
 export function retainedTicketIntakeFields(embed) {
   const labels = new Set([
     "product_support", "payment_help", "license_hwid_help", "macro_timing_problem",
-    "fake_headless", "security_report", "creator_partnership", "app_bug", "other"
+    "fake_headless", "security_report", "creator_partnership", "app_bug", "account_recovery", "other"
   ].flatMap(category => ticketIntakeFields(category).map(field => field.label)));
   return (embed?.fields || []).filter(field => labels.has(field.name)).map(field => ({
     name: field.name,
