@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
+import { organizeFimaRolePositions } from "./fimaRolePositions.js";
 import { publishFtStaffAction } from "./ftCommunityStaffActions.js";
 import { startFtInfoWorker, prepareFieelInfoReplacement, replaceFieelInfoCanonical } from "./ftCommunityInfo.js";
 import { ftChannelName } from "./ftCommunityChannelNames.js";
@@ -1113,7 +1114,7 @@ async function handleDiscordInteraction(interaction) {
     if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({ content: "Only admins can set up Fima roles.", ephemeral: true });
     }
-    const result = await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
+    const result = await ensureFimaRoles({ guildId: interaction.guildId, organize: true, actorId: interaction.user.id });
     const lines = [
       `Buyer role: ${result.roles.buyer?.name || "missing"} (${result.roles.buyer?.created ? "created" : "ready"})`,
       result.position?.attempted
@@ -1238,7 +1239,7 @@ async function handleDiscordInteraction(interaction) {
     if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({ content: "Only admins can set up role pickers.", ephemeral: true });
     }
-    await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
+    await ensureFimaRoles({ guildId: interaction.guildId, organize: true, actorId: interaction.user.id });
     const channel = interaction.options.getChannel("channel") || interaction.channel;
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
     await channel.send(fimaLanguagePanelPayload(interaction.guildId));
@@ -1272,7 +1273,7 @@ async function handleDiscordInteraction(interaction) {
     if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({ content: "Only admins can set up Fima security posts.", ephemeral: true });
     }
-    await ensureFimaRoles({ organize: true, actorId: interaction.user.id });
+    await ensureFimaRoles({ guildId: interaction.guildId, organize: true, actorId: interaction.user.id });
     const channel = interaction.options.getChannel("channel") || interaction.channel;
     if (!channel?.isTextBased?.()) return interaction.reply({ content: "Choose a text channel.", ephemeral: true });
     await channel.send(fimaSecurityPanelPayload());
@@ -1838,7 +1839,7 @@ async function applyMissingGuildSetup(guild, schema, actorId) {
   const createdCategories = [];
   const createdChannels = [];
 
-  await ensureFimaRoles({ organize: true, actorId });
+  await ensureFimaRoles({ guildId: guild.id, organize: true, actorId });
   for (const categorySchema of schema.categories) {
     let category = guild.channels.cache.find((channel) => channel.type === ChannelType.GuildCategory && channel.name === categorySchema.name);
     if (!category) {
@@ -3995,8 +3996,8 @@ async function changeDiscordRole(discordUserId, type, action) {
   };
 }
 
-async function ensureFimaRoles({ organize = false, actorId = null } = {}) {
-  const guild = await getGuild();
+async function ensureFimaRoles({ guildId = null, organize = false, actorId = null } = {}) {
+  const guild = await getGuild(guildId);
   const roles = {};
   for (const type of Object.keys(ROLE_TYPES)) {
     if (LANGUAGE_ROLE_TYPES.has(type)) continue;
@@ -4016,38 +4017,15 @@ async function ensureFimaRoles({ organize = false, actorId = null } = {}) {
     roleTypes: Object.keys(roles),
     created: Object.fromEntries(Object.entries(roles).map(([type, row]) => [type, row.created])),
     positionAttempted: Boolean(position.attempted),
-    positionSuccess: Boolean(position.success)
+    positionSuccess: Boolean(position.success),
+    positionVerified: position.verified === true,
+    positionsMoved: position.moved || 0
   });
   return { roles, position };
 }
 
 async function organizeRolePositions(guild, roleSummary) {
-  const warnings = [];
-  const me = guild.members.me || await guild.members.fetchMe();
-  if (!me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-    return { attempted: true, success: false, warnings: ["Bot is missing Manage Roles."] };
-  }
-  const highest = me.roles.highest?.position || 0;
-  let moved = 0;
-  for (const [index, type] of Object.keys(roleSummary).entries()) {
-    const role = await guild.roles.fetch(roleSummary[type]?.id).catch(() => null);
-    if (!role) {
-      warnings.push(`${ROLE_TYPES[type].fallbackName} was not found.`);
-      continue;
-    }
-    if (role.managed || role.position >= highest) {
-      warnings.push(`${role.name} cannot be moved by the bot.`);
-      continue;
-    }
-    const targetPosition = Math.max(1, highest - 1 - index);
-    if (role.position !== targetPosition) {
-      await role.setPosition(targetPosition, "Fima role setup").catch((error) => {
-        warnings.push(`${role.name} position unchanged: ${error.message}`);
-      });
-      moved += 1;
-    }
-  }
-  return { attempted: true, success: warnings.length === 0, moved, warnings };
+  return organizeFimaRolePositions(guild, roleSummary, ROLE_TYPES);
 }
 
 async function getOrCreateRole(guild, type) {
