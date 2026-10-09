@@ -28,7 +28,7 @@ export async function renderOwnerTools(root, options) {
     throw error;
   }
   const markup = await response.text();
-  const { initializeOwnerTools } = await import('./fima-owner-tools.js?v=20261009-6');
+  const { initializeOwnerTools } = await import('./fima-owner-tools.js?v=20261010-1');
   if (controller.signal.aborted) return;
   root.className = 'owner-tools';
   root.innerHTML = `<details${['setup', 'logs', 'advanced', 'branding'].includes(options.page) ? ' open' : ''}><summary class="owner-tools-label">${options.language === 'en' ? 'Owner tools' : 'Owner araçları'}</summary>${markup}</details>`;
