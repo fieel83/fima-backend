@@ -1,6 +1,33 @@
 import { ftChannelName } from './ftCommunityChannelNames.js';
 export const FT_COMMUNITY_GUILD_ID = '1419335632324657306';
 
+// Approved FT copy uses real channel/member mentions, never guessed channel IDs.
+export function ftLifecyclePresentation(member, config, { joined = true, tickets = false } = {}) {
+  const count = Math.max(0, Math.floor(Number(member.guild.memberCount) || 0));
+  if (!joined) return {
+    title: '⌂・GOODBYE FROM FT COMMUNITY',
+    description: `Goodbye, <@${member.id}>.\n\nThanks for being part of FT Community. See you around.\n\n**⌗・MEMBERS ${count}**`
+  };
+  const channels = member.guild.channels.cache;
+  const entries = [
+    ['rules_channel', ['rules'], 'Get familiar with the community.'],
+    ['role_guide_channel', ['roles', 'role-guide'], 'Pick your roles and interests.'],
+    ['general_channel', ['general', 'english-chat', 'chat'], 'Say hello and meet everyone.'],
+    ['uploads_channel', ['uploads'], 'Catch the latest content.'],
+    ['support_ticket_channel', ['support', 'open-ticket'], "Need help? We've got you."]
+  ];
+  const links = entries.flatMap(([key, names, copy]) => {
+    if (key === 'support_ticket_channel' && !tickets) return [];
+    const mapped = channels.get(config.channelMappings?.[key]);
+    const channel = mapped?.isTextBased?.() ? mapped : channels.find(item => names.includes(ftChannelName(item.name)) && item.isTextBased?.());
+    return channel ? [`›・**<#${channel.id}>** — ${copy}`] : [];
+  });
+  return {
+    title: '⌂・WELCOME TO FT COMMUNITY',
+    description: `Welcome, **<@${member.id}>**.\n\nGlad to have you here. Whether you're here to play, share, or just hang out, make yourself at home.\n\n${links.length ? `**⌁・GET STARTED**\n\n${links.join('\n\n')}\n\n` : ''}**⌗・MEMBER #${count}**\n\n*Enjoy your stay. See you around.*`
+  };
+}
+
 // Resolve actual channels so a stale mapping cannot hide a migrated destination.
 export function ftWelcomeDestinations(guild, config, { tr = false, tickets = false } = {}) {
   const channels = guild.channels.cache;

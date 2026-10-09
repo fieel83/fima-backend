@@ -3,7 +3,7 @@ import { createFtSafetyProcessor } from "./ftCommunityMessageSafety.js";
 import { createFtMediaSafety } from "./ftCommunityMediaSafety.js";
 import { createFtBehaviorSafety } from "./ftCommunityBehaviorSafety.js";
 import { createPurgeConfirmations } from "./fimaPurgeConfirmation.js";
-import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations } from './ftCommunityWelcome.js';
+import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations, ftLifecyclePresentation } from './ftCommunityWelcome.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
@@ -11688,9 +11688,12 @@ async function sendMemberLifecycleMessage(member, kind, options = {}) {
       : (tr
         ? `${member.user.username}, **${member.guild.name}** sunucusundan ayrıldı.\n\n-# Güncel üye sayısı: ${member.guild.memberCount} • Made By Fieel${preview ? " • Önizleme" : ""}`
         : `${member.user.username} is no longer in **${member.guild.name}**.\n\n-# Current member count: ${member.guild.memberCount} • Made By Fieel${preview ? " • Preview" : ""}`);
+    const presentation = member.guild.id === FT_COMMUNITY_GUILD_ID
+      ? ftLifecyclePresentation(member, config, { joined, tickets: fimaRuntimeModuleAllowed(rawConfig, "tickets") })
+      : { title, description };
     const embed = new EmbedBuilder().setColor(await paradiseBrandColor())
-      .setTitle(title)
-      .setDescription(description)
+      .setTitle(presentation.title)
+      .setDescription(presentation.description)
       .setThumbnail(member.user.displayAvatarURL())
       .setTimestamp();
     const banner = sanitizeParadiseHttpsUrl(joined ? config.welcomeSettings?.bannerUrl : config.welcomeSettings?.leaveBannerUrl);
