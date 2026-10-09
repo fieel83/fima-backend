@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const API_BASE = String(window.FIMA_API_BASE_URL || "https://api.fimamacro.com").replace(/\/+$/, "");
+
   const surfaceI18n = window.FimaSurfaceI18n?.mount({
     sourceLocale: "en",
     translations: {
@@ -549,7 +551,7 @@
   }
 
   async function api(path, options = {}) {
-    const response = await fetch(path, {
+    const response = await fetch(API_BASE + path, {
       credentials: "include",
       cache: "no-store",
       ...options

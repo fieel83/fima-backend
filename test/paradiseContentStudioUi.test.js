@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
 import { FT_COMMUNITY_VISUAL_ASSET_PATHS } from "../src/ftCommunityVisualAssets.js";
 
 const htmlSource = fs.readFileSync(new URL("../public/paradise-content-studio.html", import.meta.url), "utf8");
@@ -10,6 +11,30 @@ const botSource = fs.readFileSync(new URL("../src/discordBot.js", import.meta.ur
 
 test("Content Studio client parses as standalone JavaScript", () => {
   assert.doesNotThrow(() => new Function(clientSource));
+});
+
+test("Studio session and CSRF use the account API origin with credentials", async () => {
+  const base = clientSource.match(/  const API_BASE = [^\n]+/)[0];
+  const helper = clientSource.slice(clientSource.indexOf("  async function api("), clientSource.indexOf("  async function csrf("));
+  for (const configured of [undefined, "https://api-staging.fimamacro.test///"]) {
+    const calls = [];
+    const context = vm.createContext({
+      window: { FIMA_API_BASE_URL: configured },
+      fetch: async (url, options) => {
+        calls.push({ url, options });
+        return { ok: true, json: async () => ({ ownerAuthorized: true }) };
+      }
+    });
+    vm.runInContext(base + "\n" + helper, context);
+    await vm.runInContext('api("/api/fima-bot/session-status")', context);
+    await vm.runInContext('api("/api/csrf-token")', context);
+    const origin = configured ? "https://api-staging.fimamacro.test" : "https://api.fimamacro.com";
+    assert.deepEqual(calls.map(call => call.url), [origin + "/api/fima-bot/session-status", origin + "/api/csrf-token"]);
+    for (const call of calls) {
+      assert.equal(call.options.credentials, "include");
+      assert.equal(call.options.cache, "no-store");
+    }
+  }
 });
 
 test("Content Studio and Embed Builder share a no-store shell with guarded data APIs", () => {
