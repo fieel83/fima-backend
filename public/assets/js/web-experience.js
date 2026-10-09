@@ -70,7 +70,7 @@
     const pending = JSON.parse(sessionStorage.getItem(transitionKey) || 'null');
     sessionStorage.removeItem(transitionKey);
     if (pending && pending.destination === location.pathname + location.search && Date.now() - pending.time < 15000) {
-      pageAnimation = animatePage([{ opacity: 0, transform: 'translateX(56px)' }, { opacity: 1, transform: 'translateX(0)' }], { duration: 580, easing: 'cubic-bezier(.16,1,.3,1)' });
+      pageAnimation = animatePage([{ opacity: 0, transform: 'translateX(56px)' }, { opacity: 1, transform: 'translateX(0)' }], { duration: 280, easing: 'cubic-bezier(.16,1,.3,1)' });
     }
   } catch { /* Storage restrictions must never block navigation. */ }
   window.addEventListener('pageshow', event => {
