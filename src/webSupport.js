@@ -38,7 +38,7 @@ export function createSupportStore(db = prisma) {
           if (result === false) return ticket;
           if (!actor.noTouch) ticket.updatedAt = now();
           await tx.setting.update({ where: { key: key(id) }, data: { value: ticket } });
-          await tx.auditLog.create({ data: { action: 'support_ticket_' + (actor.action || 'update'), targetType: 'support_ticket', targetId: id, metadataJson: { actorId: actor.id, guildId: ticket.guildId, revision: ticket.events.length } } });
+          await tx.auditLog.create({ data: { action: 'support_ticket_' + (actor.action || 'update'), targetType: 'support_ticket', targetId: id, metadata: { actorId: actor.id, guildId: ticket.guildId, revision: ticket.events.length } } });
           return ticket;
         }, { isolationLevel: 'Serializable' });
       } catch (e) { if (!['P2034', 'P2002'].includes(e.code) || attempt === 4) throw e; }
@@ -61,7 +61,7 @@ export function createSupportStore(db = prisma) {
     try {
       await db.$transaction(async tx => {
         await tx.setting.create({ data: { key: key(id), value: ticket } });
-        await tx.auditLog.create({ data: { action: 'support_ticket_create', targetType: 'support_ticket', targetId: id, metadataJson: { actorId: actor.id, guildId: SUPPORT_GUILD } } });
+        await tx.auditLog.create({ data: { action: 'support_ticket_create', targetType: 'support_ticket', targetId: id, metadata: { actorId: actor.id, guildId: SUPPORT_GUILD } } });
       });
     } catch (e) { if (e.code !== 'P2002') throw e; return get(id); }
     return ticket;

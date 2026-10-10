@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import { ChannelType, PermissionsBitField } from 'discord.js';
 import { verifyTicketPrivacy } from '../src/webSupportDiscord.js';
 import { prisma } from '../src/db.js';
@@ -14,7 +15,12 @@ function database() {
     async findMany() { return [...rows.values()].map(value => ({value: structuredClone(value)})); },
     async create({data}) { if(rows.has(data.key)) throw Object.assign(new Error(), {code:'P2002'}); rows.set(data.key, structuredClone(data.value)); },
     async update({where,data}) { rows.set(where.key, structuredClone(data.value)); }
-  }, auditLog: { async create({data}) { audit.push(data); } } };
+  }, auditLog: { async create({data}) {
+    const fields = new Set(Prisma.dmmf.datamodel.models.find(model => model.name === 'AuditLog').fields.map(field => field.name));
+    for (const name of Object.keys(data)) assert.ok(fields.has(name), `Unknown AuditLog field: ${name}`);
+    assert.equal(typeof data.metadata, 'object');
+    audit.push(data);
+  } } };
   let queue = Promise.resolve();
   db.$transaction = fn => { const run = queue.then(() => fn(db)); queue = run.catch(() => {}); return run; };
   return {db, audit};

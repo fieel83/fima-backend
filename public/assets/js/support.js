@@ -256,7 +256,7 @@
     'Load earlier messages':'Önceki mesajları yükle','Your reply':'Yanıtınız','Write a reply… Shift + Enter for a new line':'Yanıt yazın… Yeni satır için Shift + Enter',
     'Message':'Mesaj','Add attachments':'Dosya ekle','Internal staff note':'Personele özel not','customer':'Müşteri','staff':'Personel',
     'Your reply is saved before Discord delivery.':'Yanıtınız Discord aktarımından önce kaydedilir.',
-    'Send reply ↗':'Yanıtı gönder ↗','Saving…':'Kaydediliyor…','Retry sending ↗':'Göndermeyi yeniden dene ↗',
+    'Send reply ↗':'Yanıtı gönder ↗','Saving…':'Kaydediliyor…','Retry sending ↗':'Göndermeyi yeniden dene ↗','Saving your ticket…':'Talebiniz kaydediliyor…','Retry sending ticket ↗':'Talebi göndermeyi yeniden dene ↗',
     'This conversation is closed. Your messages and files remain available. Use Reopen ticket to continue when you need more help.':'Bu konuşma kapalı. Mesajlarınız ve dosyalarınız erişilebilir kalır. Yardım gerektiğinde talebi yeniden açabilirsiniz.',
     'Close conversation?':'Konuşma kapatılsın mı?','Delete Discord channel?':'Discord kanalı silinsin mi?',
     'Ticket action':'Talep işlemi','Close dialog':'Pencereyi kapat','Confirm':'Onayla','Reason':'Gerekçe',
