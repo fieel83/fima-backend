@@ -2,7 +2,7 @@
 export const FIMA_SETUP_TYPES = Object.freeze(['community', 'clan', 'tsbtr']);
 const competitive = new Set(['leaderboards', 'challenge', 'availability', 'sessions', 'roster']);
 export const fimaCanonicalModule = id => ({ leaderboard: 'leaderboards', training: 'sessions', tryout: 'sessions', referee: 'sessions', lineups: 'roster', war: 'roster', fima_support: 'ai' })[id] || id;
-const commandModules = { profiles: ['profile', 'verifyroblox'], tickets: ['ticket'], challenge: ['challenge'], availability: ['availability'], sessions: ['training', 'tryout', 'referee'], roster: ['roster', 'lineup', 'spar', 'war'], leaderboards: ['leaderboard', 'rank'], moderation: ['mod', 'channel'], applications: ['application'], ai: ['fima_support_ai', 'fima_license_check', 'fima_license_repair'] };
+const commandModules = { profiles: ['profile', 'verifyroblox'], tickets: ['ticket'], challenge: ['challenge'], availability: ['availability'], sessions: ['training', 'tryout', 'referee'], roster: ['roster', 'lineup', 'spar', 'war'], leaderboards: ['leaderboard'], levels: ['rank'], moderation: ['mod', 'channel'], applications: ['application'], ai: ['fima_support_ai', 'fima_license_check', 'fima_license_repair'] };
 const defaults = {
   community: ['welcome', 'roles', 'profiles', 'security', 'moderation', 'social', 'content', 'polls', 'events', 'voice', 'logs'],
   clan: ['welcome', 'roles', 'profiles', 'security', 'moderation', 'applications', 'tickets', 'leaderboards', 'challenge', 'availability', 'sessions', 'voice', 'logs'],
@@ -61,9 +61,11 @@ export function fimaRuntimeModuleAllowed(config = {}, module) {
   return fimaModuleStates(config).some(row => row.id === fimaCanonicalModule(module) && row.enabled);
 }
 // A reviewed map is enforced for slash commands and already-posted components.
-export function fimaInteractionModuleAllowed(config, { commandName, customId = '' } = {}) {
+export function fimaInteractionModuleAllowed(config, { commandName, customId = '', options } = {}) {
   if (!config.modules || Array.isArray(config.modules)) return true;
   let module = FIMA_MODULE_CATALOG.find(row => row.commands.includes(commandName))?.id;
+  // XP standings share the leaderboard command with competitive board management.
+  if (commandName === 'leaderboard' && options?.getSubcommand?.(false) === 'show') module = 'levels';
   if (!module && customId.startsWith('pv:')) {
     const family = customId.split(':')[2];
     const canonical = fimaCanonicalModule(family);

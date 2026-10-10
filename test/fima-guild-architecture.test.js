@@ -46,6 +46,23 @@ test('disabled modules deny commands and persistent legacy/versioned components'
   for (const interaction of [{ commandName: 'challenge' }, { customId: 'challenge_accept_123' }, { customId: 'pv:v1:challenge:g:e:accept' }]) assert.equal(fimaInteractionModuleAllowed(config, interaction), false);
   assert.equal(fimaInteractionModuleAllowed(config, { commandName: 'profile' }), true);
 });
+test('community XP commands use levels without unlocking competitive board management', () => {
+  const community = { activeSetupMode: 'community', modules: { levels: true, leaderboards: false } };
+  const leaderboard = subcommand => ({ commandName: 'leaderboard', options: { getSubcommand: () => subcommand } });
+  assert.equal(fimaInteractionModuleAllowed(community, { commandName: 'rank' }), true);
+  assert.equal(fimaInteractionModuleAllowed(community, leaderboard('show')), true);
+  for (const subcommand of ['repost', 'panel', 'export', 'history', 'clear', 'import', null]) {
+    assert.equal(fimaInteractionModuleAllowed(community, leaderboard(subcommand)), false);
+  }
+  assert.equal(fimaInteractionModuleAllowed(community, { commandName: 'leaderboard' }), false);
+  const disabled = { ...community, modules: { levels: false } };
+  assert.equal(fimaInteractionModuleAllowed(disabled, { commandName: 'rank' }), false);
+  assert.equal(fimaInteractionModuleAllowed(disabled, leaderboard('show')), false);
+  const clan = { activeSetupMode: 'clan', modules: { levels: false, leaderboards: true } };
+  assert.equal(fimaInteractionModuleAllowed(clan, leaderboard('show')), false);
+  assert.equal(fimaInteractionModuleAllowed(clan, leaderboard('panel')), true);
+  assert.equal(fimaInteractionModuleAllowed({}, leaderboard('show')), true);
+});
 test('guild projection cannot override identity or disclose competitive and provider fields', () => {
   const projection = fimaGuildProfileProjection({ profileId: 123, robloxId: 'global', visibility: 'private', token: 'secret', wins: 50 }, { profileId: 999, robloxId: 'local', visibility: 'public', region: 'EU', stageRank: { stage: 2 }, wins: 7 });
   assert.deepEqual(projection, { profileId: 123, robloxId: 'global', visibility: 'private', region: 'EU', stageRank: { stage: 2 } });
