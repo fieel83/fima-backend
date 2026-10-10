@@ -4,7 +4,7 @@ import { createWorker } from "tesseract.js";
 import eng from "@tesseract.js-data/eng";
 import tur from "@tesseract.js-data/tur";
 import { copyFile, mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 sharp.cache(false);
@@ -25,7 +25,9 @@ export async function decodeFtMedia(buffer, { ocr = true } = {}) {
   try {
     if (ocr) {
       langPath = await mkdtemp(join(tmpdir(), "ft-ocr-languages-"));
-      await Promise.all([eng, tur].map(language => copyFile(join(language.langPath, `${language.code}.traineddata.gz`), join(langPath, `${language.code}.traineddata.gz`))));
+      // Bundled quantized LSTM models retain English/Turkish coverage without
+      // loading the much larger legacy-compatible models into the 512 MB service.
+      await Promise.all([eng, tur].map(language => copyFile(join(dirname(language.langPath), "4.0.0_best_int", `${language.code}.traineddata.gz`), join(langPath, `${language.code}.traineddata.gz`))));
       worker = await createWorker("eng+tur", 1, { langPath, gzip: true, cacheMethod: "none", errorHandler: () => {} });
     }
     // Decode one bounded frame at a time; never load an entire animation into RAM.
