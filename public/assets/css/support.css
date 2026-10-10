@@ -6,3 +6,23 @@
 body[data-page="support"] .support-heading h2{font-size:24px}body[data-page="support"] .support-detail-top h2{font-size:28px}@media(max-width:560px){body[data-page="support"] .support-heading h2{font-size:21px}body[data-page="support"] .support-detail-top h2{font-size:24px}}
 body.support-detail-mode .support-hero,body.support-detail-mode .support-shortcuts{display:none}@media(max-width:1000px){body.support-detail-mode .support-aside{order:0}}
 body.support-form-mode .support-hero,body.support-form-mode .support-shortcuts{display:none}@media(max-width:560px){.support-filters input{flex:1 0 100%;min-width:0}.support-filters select{flex:1 0 100%;width:100%}}
+
+/* Keep the support introduction compact and the primary action beside its content. */
+.support-shell{width:min(1240px,calc(100% - 64px));padding-top:48px}
+.support-hero{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:16px;margin-bottom:28px}
+.support-hero h1{font-size:clamp(36px,4vw,56px);margin:10px 0}
+.support-lead{margin:0;line-height:1.6;max-width:650px}
+.support-hero-actions{gap:10px}
+.support-shortcuts{margin-bottom:28px}.support-shortcuts a{padding:18px 20px}
+.support-panel{padding:28px}.support-heading{margin-bottom:20px}.support-filters{margin:20px 0}
+.support-ticket-row{grid-template-columns:minmax(0,1fr) 170px 145px 20px;padding:18px 8px;gap:16px}
+.support-ticket-meta{display:flex;gap:8px 12px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:#c1b4d2}
+.support-ticket-row small{margin-top:6px;color:#b7abc6;line-height:1.5}
+.support-ticket-response{display:flex;gap:8px;flex-wrap:wrap}.support-ticket-response>span:first-child{color:#cfc0df}
+.support-status{justify-self:start;max-width:100%;white-space:normal;line-height:1.4}
+.support-dialog{max-height:calc(100dvh - 32px);overflow-y:auto}
+.support-shell .button,.support-dialog .button{min-height:44px}.support-tab{min-height:40px}
+.support-form-actions{flex-wrap:wrap}.support-categories>*{min-width:0;overflow-wrap:anywhere}
+@media(min-width:1700px){.support-shell{padding-top:48px}.support-panel{padding:28px}.support-ticket-row{padding-top:18px;padding-bottom:18px}}
+@media(max-width:1000px){.support-shell{width:calc(100% - 48px);padding-top:36px}.support-ticket-row{grid-template-columns:minmax(0,1fr) 155px 20px}}
+@media(max-width:560px){.support-shell{width:calc(100% - 32px);padding-top:28px}.support-panel{padding:20px 16px}.support-hero{gap:16px}.support-ticket-row{grid-template-columns:minmax(0,1fr) 20px;padding:18px 0}.support-tabs{flex-wrap:wrap}.support-dialog{padding:20px;width:calc(100% - 24px)}.support-dialog-actions{flex-wrap:wrap}.support-dialog-actions .button{flex:1}.support-form-actions .button{flex:1}.support-category strong{font-size:13px}}
