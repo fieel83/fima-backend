@@ -15,6 +15,11 @@ const text = (value, max) => redact(String(value ?? '').trim()).slice(0, max);
 let gateway;
 let ownerCheck;
 export function configureSupportDiscord(value) { gateway = value; }
+const safeSyncFailures = new Set(['transcript_log_unconfigured', 'transcript_log_ambiguous', 'transcript_log_not_private', 'transcript_log_acl_unverified', 'transcript_log_readback_failed', 'ticket_channel_not_private', 'ticket_channel_acl_unverified']);
+export function supportSyncFailure(e) {
+  if (safeSyncFailures.has(e?.message)) return e.message;
+  return typeof e?.code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(e.code) ? e.code : 'discord_unavailable';
+}
 export async function verifiedSupportOwner(discordId) {
   if (!ownerCheck) return false;
   const user = await prisma.user.findFirst({ where: { discordUserId: discordId } });
@@ -206,14 +211,14 @@ export async function flushSupportOutbox() {
           await gateway.controls(t);
           await store.change(t.id, { id: 'worker', action: 'discord_controls' }, v => { if (v.syncLease?.token !== lease || v.deleting) throw error('sync_lease_lost', 409); if (v.events.length === controlRevision && v.status === controlStatus && v.assignedTo === controlAssignee) v.controlPending = false; });
         }
+        if (gateway.reconcileMessages) await gateway.reconcileMessages(t);
         for (const transcript of t.transcripts.filter(x => x.verified && !x.logMessageId)) {
           await renew();
           const logMessageId = await gateway.logTranscript(t, transcript);
           await store.change(t.id, { id: 'worker', action: 'transcript_log' }, v => { if (v.syncLease?.token !== lease || v.deleting) throw error('sync_lease_lost', 409); v.transcripts.find(x => x.id === transcript.id).logMessageId = logMessageId; });
         }
         if (t.syncError) await store.change(t.id, { id: 'worker', action: 'sync_recovered' }, v => { if (v.syncLease?.token !== lease || v.deleting) return false; v.syncError = null; v.sync = 'CONNECTED'; });
-        if (gateway.reconcileMessages) await gateway.reconcileMessages(t);
-      } catch (e) { if (acquired) await store.change(candidate.id, { id: 'worker', action: 'sync_failed' }, v => { if (v.syncLease?.token !== lease || v.deleting) return false; v.sync = 'PENDING'; v.syncError = String(e.code || 'discord_unavailable'); }).catch(() => {}); }
+      } catch (e) { if (acquired) await store.change(candidate.id, { id: 'worker', action: 'sync_failed' }, v => { if (v.syncLease?.token !== lease || v.deleting) return false; v.sync = 'PENDING'; v.syncError = supportSyncFailure(e); }).catch(() => {}); }
       finally { clearInterval(heartbeat); if (acquired) await store.change(candidate.id, { id: 'worker', action: 'sync_release', noTouch: true }, v => { if (v.syncLease?.token !== lease) return false; v.syncLease = null; }).catch(() => {}); }
     }
   } finally { working = false; }

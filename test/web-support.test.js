@@ -6,7 +6,13 @@ import { Prisma } from '@prisma/client';
 import { ChannelType, PermissionsBitField } from 'discord.js';
 import { verifyTicketPrivacy, resolveSupportArchiveChannel } from '../src/webSupportDiscord.js';
 import { prisma } from '../src/db.js';
-import { createSupportStore, store, SUPPORT_GUILD, categories, canRead, validateAttachments, publicTicket, makeTranscript, addMessage, ticketAction, configureSupportDiscord, flushSupportOutbox, supportRouter } from '../src/webSupport.js';
+import { createSupportStore, store, SUPPORT_GUILD, categories, canRead, validateAttachments, publicTicket, makeTranscript, addMessage, ticketAction, configureSupportDiscord, flushSupportOutbox, supportRouter, supportSyncFailure } from '../src/webSupport.js';
+
+test('sync diagnostics expose only safe codes', () => {
+  assert.equal(supportSyncFailure(new Error('transcript_log_acl_unverified')), 'transcript_log_acl_unverified');
+  assert.equal(supportSyncFailure(new Error('secret-token https://private.example')), 'discord_unavailable');
+  assert.equal(supportSyncFailure({ code: 'https://private.example/secret' }), 'discord_unavailable');
+});
 
 function database() {
   const rows = new Map(), audit = [];
@@ -164,6 +170,11 @@ test('durable lifecycle: deduplication, notes, concurrent claims, transcript, de
   assert.equal((await store.get(t.id)).sync,'PENDING');
   assert.equal((await store.get(t.id)).messages[0].delivery,'PENDING');
   let sends=0, controls=0;
+  let reconciled = 0;
+  configureSupportDiscord({async ensureChannel(){return '423456789012345678';},async send(){sends++;return '523456789012345678';},async controls(){controls++;},async reconcileMessages(){reconciled++;},async logTranscript(){throw new Error('transcript_log_acl_unverified');}});
+  await flushSupportOutbox();
+  assert.equal(reconciled,1);
+  assert.equal((await store.get(t.id)).syncError,'transcript_log_acl_unverified');
   configureSupportDiscord({async ensureChannel(){return '423456789012345678';},async send(){sends++;return '523456789012345678';},async controls(){controls++;},async logTranscript(){return '623456789012345678';}});
   await flushSupportOutbox(); await flushSupportOutbox();
   assert.equal(sends,1); assert.equal(controls,1);
