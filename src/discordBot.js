@@ -1,3 +1,4 @@
+import { connectWebSupport, ingestWebSupportMessage, handleWebSupportInteraction } from "./webSupportDiscord.js";
 import { prepareFtRulesReplacement, replaceFtRulesCanonical } from './ftCommunityRules.js';
 import crypto from "node:crypto";
 import { auditFimaRoleDependencies } from "./fimaRoleDependencyAudit.js";
@@ -498,6 +499,7 @@ export function startDiscordBot() {
   client = new Client({ intents, partials: [Partials.Message] });
 
   client.once("ready", async () => {
+    connectWebSupport(getGuild);
     readyAt = new Date();
     lastError = null;
     console.info("Discord client ready event fired", {
@@ -576,6 +578,8 @@ export function startDiscordBot() {
   client.on("messageCreate", async (message) => {
     try { if (await handleParadiseMessageSafety(message)) return; }
     catch (error) { console.warn("FIMA message safety unavailable", { code: error?.code || "safety_failed", messageId: message?.id }); }
+    try { if (await ingestWebSupportMessage(message)) return; }
+    catch (error) { console.warn("Website ticket ingestion failed", { code: error.code || "support_ingest_failed", messageId: message.id }); return; }
     fimaAiSupportBridge?.message(message).catch(() => {
       console.warn("FIMA support shadow queue unavailable; event not accepted");
     });
@@ -1028,6 +1032,7 @@ async function handleCommunityActivityCommand(interaction) {
 }
 
 async function handleDiscordInteraction(interaction) {
+  if (await handleWebSupportInteraction(interaction)) return;
   if (await handleFtShowcaseInteraction(interaction)) return;
   if (await handleParadiseInteraction(interaction)) return;
   if (interaction?.isUserSelectMenu?.() && String(interaction.customId || "").startsWith("fima_ticket_assign:")) {

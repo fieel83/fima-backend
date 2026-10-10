@@ -1,0 +1,18 @@
+import express from 'express';
+import { prisma } from '../../src/db.js';
+import {createSupportStore,store,supportRouter,configureSupportDiscord} from '../../src/webSupport.js';
+const rows=new Map(); let queue=Promise.resolve();
+const db={setting:{async findUnique({where}){return rows.has(where.key)?{value:structuredClone(rows.get(where.key))}:null},async findMany(){return [...rows.values()].map(value=>({value:structuredClone(value)}))},async create({data}){if(rows.has(data.key))throw Object.assign(new Error(),{code:'P2002'});rows.set(data.key,structuredClone(data.value))},async update({where,data}){rows.set(where.key,structuredClone(data.value))}},auditLog:{async create(){}}};
+db.$transaction=fn=>{const run=queue.then(()=>fn(db));queue=run.catch(()=>{});return run};
+Object.assign(store,createSupportStore(db));
+prisma.oAuthLink.findFirst=async({where})=>({providerSubject:where.userId==='staff'?'223456789012345678':'123456789012345678'});
+configureSupportDiscord({async permissions(id){return id==='223456789012345678'?{work:true,manage:true,delete:true}:{}},async ensureChannel(){return 'local-fixture-channel'},async send(t,m){return m.id},async controls(){},async logTranscript(){return 'local-fixture-log'}});
+const app=express();
+app.get('/api/csrf-token',(req,res)=>res.json({token:'fixture'}));
+app.get('/api/auth/me',(req,res)=>res.json({user:{id:'customer',username:'QA Customer'}}));
+app.use('/api/support',supportRouter({requireUser(req,res,next){const id=req.headers.cookie?.includes('fixtureStaff=1')?'staff':'customer';req.user={id,username:id==='staff'?'QA Staff':'QA Customer',discordUserId:id==='staff'?'223456789012345678':'123456789012345678'};next()},ownerAccess:async()=>false}));
+app.get('/fixture/staff',(req,res)=>{res.cookie('fixtureStaff','1');res.redirect('/support')});
+app.get('/fixture/customer',(req,res)=>{res.clearCookie('fixtureStaff');res.redirect('/support')});
+app.get('/support',(req,res)=>res.sendFile('support.html',{root:'public'}));
+app.use(express.static('public'));
+app.listen(4173,'127.0.0.1',()=>console.log('Support QA real router fixture: http://127.0.0.1:4173/support'));

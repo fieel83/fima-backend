@@ -661,6 +661,12 @@ export async function fimaTicketSettingsForGuild(guildId) {
   return { ...(configForGuild(await loadState(), guildId).ticketSettings || {}) };
 }
 
+export async function fimaSupportConfiguration(guildId) {
+  const state = await loadState();
+  const config = state.guildConfigs?.[String(guildId)] || {};
+  return { roleMappings: { ...config.roleMappings }, channelMappings: { ...config.channelMappings } };
+}
+
 function belongsToGuild(record, guildId) {
   return record?.guildId ? record.guildId === guildId : guildId === PARADISE_TEST_GUILD_ID;
 }

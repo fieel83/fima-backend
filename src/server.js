@@ -1,5 +1,6 @@
 import {prepareRobloxVerification} from "./roblox-v2/bootstrap.mjs";
 import "dotenv/config";
+import { supportRouter } from "./webSupport.js";
 import { createMacroHandoffCandidate, mountMacroHandoffCandidate } from "./macroHandoffCandidate.mjs";
 import { usernameHandler } from "./accountIdentity.js";
 import { execSync } from "node:child_process";
@@ -508,7 +509,7 @@ app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), asyn
   }
 });
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "1mb", type: req => !req.path.startsWith("/api/support/") && req.is("application/json") }));
 app.use(express.urlencoded({ extended: false }));
 app.use(emergencyAdminSecurityGate);
 app.use(siteUpdatingModeGate);
@@ -848,6 +849,12 @@ app.post("/api/auth/logout", async (req, res) => {
   clearUserCookie(res);
   return res.json({ success: true });
 });
+
+app.use("/api/support", supportRouter({ requireUser, ownerAccess: async (user, link) => {
+  const ownerId = resolvedParadiseOwnerDiscordId();
+  return Boolean(ownerId && normalizeEmail(user.emailNormalized || user.email) === normalizeEmail(FIMA_OWNER_ACCOUNT_EMAIL)
+    && user.discordUserId === ownerId && link?.providerSubject === ownerId);
+} }));
 
 app.get("/api/auth/me", requireUser, async (req, res) => {
   return res.json({ success: true, user: publicUser(req.user) });
@@ -7431,6 +7438,9 @@ app.get([
 });
 
 registerDesktopCommerceRoutes(app);
+
+app.get(["/support", "/support/tickets/:id"], (_req, res) => res.sendFile(path.join(publicDir, "support.html")));
+app.get(["/dashboard/support", "/account/support"], (_req, res) => res.redirect(302, "/support"));
 
 app.get(["/dashboard", "/dashboard/overview"], (_req, res) => {
   res.sendFile(path.join(publicDir, "dashboard.html"));
