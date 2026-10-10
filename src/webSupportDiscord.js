@@ -186,7 +186,13 @@ export function connectWebSupport(getGuild) {
       if (panel || recent.size < 100) break;
       before = recent.last().id;
     }
-    const payload = { embeds: [new EmbedBuilder().setTitle('FIMA Care · Support / Destek').setDescription('**EN** — Choose your issue, share details and follow the same conversation on the website and Discord. Never share passwords, full license keys or card details.\n\n**TR** — Sorununuzu seçin, ayrıntıları paylaşın; aynı konuşmayı website ve Discord üzerinden takip edin. Şifre, tam lisans anahtarı veya kart bilgisi paylaşmayın.').setColor(0x9b5cff).setFooter({ text: marker })], components: [new ActionRowBuilder().addComponents(...[['Open support / Destek',home() + '/support'],['My tickets / Ticketlarım',home() + '/support'],['FAQ / SSS','https://discord.com/channels/' + SUPPORT_GUILD + '/1557555440643084369/1557555461916459020'],['Account recovery / Hesap kurtarma',home() + '/forgot-password']].map(([label, href]) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(href)))], allowedMentions: { parse: [] } };
+    const tr = String(g.preferredLocale || '').toLowerCase().startsWith('tr');
+    const labels = tr ? ['Destek aç', 'Taleplerim', 'SSS', 'Hesap kurtarma'] : ['Open support', 'My tickets', 'FAQ', 'Account recovery'];
+    const description = tr
+      ? 'Sorununuzu seçin, ayrıntıları paylaşın ve aynı konuşmayı web sitesi veya Discord üzerinden takip edin. Şifre, tam lisans anahtarı veya kart bilgisi paylaşmayın.'
+      : 'Choose your issue, share details and follow the same conversation on the website and Discord. Never share passwords, full license keys or card details.';
+    const links = [home() + '/support', home() + '/support', 'https://discord.com/channels/' + SUPPORT_GUILD + '/1557555440643084369/1557555461916459020', home() + '/forgot-password'];
+    const payload = { embeds: [new EmbedBuilder().setTitle(tr ? 'FIMA Care · Destek' : 'FIMA Care · Support').setDescription(description).setColor(0x9b5cff).setFooter({ text: marker })], components: [new ActionRowBuilder().addComponents(...links.map((href, i) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(labels[i]).setURL(href)))], allowedMentions: { parse: [] } };
     if (panel) await panel.edit(payload); else panel = await c.send(payload);
     const saved = await c.messages.fetch(panel.id);
     if (saved.author.id !== g.members.me.id || !saved.embeds.some(e => e.footer?.text === marker) || saved.components[0]?.components.length !== 4) throw new Error('support_panel_readback_failed');
