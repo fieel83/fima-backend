@@ -376,8 +376,8 @@ app.use(helmet({
       "frame-ancestors": ["'none'"],
       "script-src": ["'self'", "'unsafe-inline'"],
       "style-src": ["'self'", "'unsafe-inline'"],
-      "img-src": ["'self'", "data:", "https:"],
-      "media-src": ["'self'", "https:"],
+      "img-src": ["'self'", "data:", "https:", "blob:"],
+      "media-src": ["'self'", "https:", "blob:"],
       "font-src": ["'self'", "data:"],
       "connect-src": [
         "'self'",

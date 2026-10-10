@@ -44,7 +44,8 @@ test("macro gallery performs one guarded lazy load and supports an HTTPS media C
 });
 
 test("server applies media CSP, hotlink protection, rate limiting and aggregate telemetry", () => {
-  assert.match(serverSource, /"media-src": \["'self'", "https:"\]/u);
+  assert.match(serverSource, /"media-src": \["'self'", "https:", "blob:"\]/u);
+  assert.match(serverSource, /"img-src": \["'self'", "data:", "https:", "blob:"\]/u);
   assert.match(serverSource, /const videoAssetLimiter = rateLimit\(\{[\s\S]*?limit: 300/u);
   assert.match(serverSource, /req\.get\("sec-fetch-site"\)/u);
   assert.match(serverSource, /req\.get\("referer"\)/u);
