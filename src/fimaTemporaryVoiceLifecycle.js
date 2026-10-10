@@ -65,6 +65,8 @@ export async function recoverTemporaryVoices({ records, getGuild, enabled, remov
       if (!channel) {
         await removeRecord(record.channelId);
         results.push({ channelId: record.channelId, status: 'missing' });
+      } else if (channel.guildId && channel.guildId !== record.guildId) {
+        results.push({ channelId: record.channelId, status: 'guild_mismatch' });
       } else if (channel.type === 2 && channel.members.size === 0) {
         await channel.delete('FIMA Bot temporary voice restart cleanup');
         await removeRecord(record.channelId);

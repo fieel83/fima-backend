@@ -72,6 +72,8 @@ import {
   handleParadiseGuildMemberRemove,
   handleParadiseGuildMemberUpdate,
   handleParadiseInteraction,
+  setJtcLanguagePreference,
+  getJtcGuildLanguage,
   handleParadiseMessage,
   handleParadiseMessageSafety,
   handleParadiseVoiceStateUpdate,
@@ -806,7 +808,7 @@ async function registerDiscordCommands() {
       .addStringOption((option) => option
         .setName("mode")
         .setDescription("Which setup schema to preview.")
-        .setRequired(true)
+        .setRequired(false)
         .addChoices(
           { name: "community", value: "community" },
           { name: "clan", value: "clan" },
@@ -819,8 +821,16 @@ async function registerDiscordCommands() {
         .addChoices(
           { name: "preview", value: "preview" },
           { name: "repair_existing", value: "repair" },
-          { name: "repost_handbooks", value: "guides" }
-        )),
+          { name: "repost_handbooks", value: "guides" },
+          { name: "jtc_setup", value: "setup" },
+          { name: "jtc_status", value: "status" },
+          { name: "jtc_disable", value: "disable" }
+        ))
+      .addStringOption(option => option.setName('module').setDescription('Configure an independent server module.').addChoices({ name: 'jtc', value: 'jtc' }))
+      .addChannelOption(option => option.setName('lobby').setDescription('Reuse an existing JTC lobby.').addChannelTypes(ChannelType.GuildVoice))
+      .addChannelOption(option => option.setName('category').setDescription('Category for temporary voice rooms.').addChannelTypes(ChannelType.GuildCategory))
+      .addStringOption(option => option.setName('language').setDescription('Default server language.').addChoices({ name: 'English', value: 'en' }, { name: 'Türkçe', value: 'tr' }))
+      .addIntegerOption(option => option.setName('limit').setDescription('Default room user limit (0 = unlimited).').setMinValue(0).setMaxValue(99)),
     new SlashCommandBuilder()
       .setName("fima_status")
       .setDescription("Show Fima bot and community system status."),
@@ -1255,6 +1265,7 @@ async function handleDiscordInteraction(interaction) {
         ? "community"
         : interaction.options.getString("mode");
     const action = interaction.options.getString("action") || "preview";
+    if (!mode || !["preview", "repair", "guides"].includes(action)) return interaction.reply({ content: "Choose a setup mode, or use /setup module:jtc action:status.", ephemeral: true });
     return handleGuildSetupCommand(interaction, mode, action);
   }
 
@@ -1680,7 +1691,10 @@ async function applyLanguageChoice(interaction, languageId, requestedGuildId = n
   const selected = LANGUAGE_CHOICES.find((item) => item.id === normalizedChoice);
   if (!selected) return interaction.reply({ content: "That language is not available yet.", ephemeral: true });
 
+  await interaction.deferReply({ ephemeral: true });
+  await setJtcLanguagePreference(interaction.user.id, selected.id);
   const guildId = requestedGuildId || interaction.guildId || communityGuildId();
+  const tr = (selected.id === 'later' ? await getJtcGuildLanguage(guildId) : selected.id) === 'tr';
   let syncResult = { success: true, deferred: selected.id === "later", roleId: null };
   let syncWarning = null;
   if (selected.id !== "later") {
@@ -1693,15 +1707,15 @@ async function applyLanguageChoice(interaction, languageId, requestedGuildId = n
 
   await recordCommunityLanguageChoice(interaction.user.id, selected.id, guildId);
   if (syncWarning) {
-    return interaction.reply({
-      content: `Your **${selected.label}** choice was saved, but the existing server role could not be mapped (${syncWarning}). Staff must map the current role; no replacement role was created.`,
+    return interaction.editReply({
+      content: tr ? `**${selected.label}** tercihin kaydedildi; mevcut dil rolü eşlenemedi (${syncWarning}). Yetkililer mevcut rolü eşlemeli.` : `Your **${selected.label}** choice was saved, but the existing server role could not be mapped (${syncWarning}). Staff must map the current role; no replacement role was created.`,
       ephemeral: true
     });
   }
   if (syncResult.deferred) {
-    return interaction.reply({ content: "Choice deferred. Your existing roles were not changed.", ephemeral: true });
+    return interaction.editReply({ content: tr ? "Tercih ertelendi. Sunucunun varsayılan dili kullanılacak." : "Choice deferred. The server default language will be used.", ephemeral: true });
   }
-  return interaction.reply({ content: `Language set to **${selected.label}**.`, ephemeral: true });
+  return interaction.editReply({ content: tr ? `Dil **${selected.label}** olarak ayarlandı.` : `Language set to **${selected.label}**.`, ephemeral: true });
 }
 
 function fimaPingRolePanelPayload() {

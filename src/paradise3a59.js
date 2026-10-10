@@ -4,6 +4,7 @@ import { createFtMediaSafety } from "./ftCommunityMediaSafety.js";
 import { createFtBehaviorSafety } from "./ftCommunityBehaviorSafety.js";
 import { createPurgeConfirmations } from "./fimaPurgeConfirmation.js";
 import { FT_COMMUNITY_GUILD_ID, ftWelcomeDestinations, ftLifecyclePresentation } from './ftCommunityWelcome.js';
+import { handleJtcControl, jtcRoomMatches, handleJtcSetup as setupJtc, temporaryVoicePanel, jtcGuildConfig, jtcGuildLanguage, JTC_TEXT } from './fimaJtcControls.js';
 import { temporaryVoiceOverwrites } from './fimaVoicePermissions.js';
 import { withTemporaryVoiceJoin, moveToTemporaryVoice, recoverTemporaryVoices, reserveTemporaryVoiceCreation, persistTemporaryVoice } from './fimaTemporaryVoiceLifecycle.js';
 import { COMMUNITY_LEVEL_ROLES, COMMUNITY_ACTIVITY_ROLE_STYLE } from "./communityActivityRoles.js";
@@ -614,7 +615,7 @@ const EMPTY_STATE = Object.freeze({
   config: {}, guildConfigs: {}, ticketOptOuts: {}, transcripts: {},
   rosters: {}, lineups: {}, wars: {}, blacklists: {}, appeals: {}, bails: {},
   serverBackups: {}, realAudits: {}, setupPreviews: {},
-  temporaryVoices: {}, memberLevels: {}, questionOfDay: {},
+  temporaryVoices: {}, languagePreferences: {}, memberLevels: {}, questionOfDay: {},
   applications: {}, applicationDrafts: {}, moderationCases: {}, securityState: {}, supportTickets: {}, paradiseLogs: {}, challengeAudits: {}
 });
 let lastKnownStateSnapshot = normalizeState({ config: { footerBrand: DEFAULT_FIMA_FOOTER_BRAND } });
@@ -11068,141 +11069,28 @@ async function handleSecurityCommand(interaction) {
   });
 }
 
-function temporaryVoicePanel(channelId) {
-  return {
-    embeds: [new EmbedBuilder().setColor(DEFAULT_PARADISE_BRAND_COLOR).setTitle("◆ PRIVATE VOICE CONTROL")
-      .setDescription("Bu kanalın sahibi aşağıdaki kontrolleri kullanabilir. Uygunsuz adlar reddedilir ve kanal adı Discord adına döner.\n\n- **Lock / Hide:** giriş veya görünürlüğü yönet\n- **Limit:** 0 → 2 → 4 → 6 → 8 → 10\n- **Permit / Reject:** üyeye özel erişim\n- **Transfer:** sahipliği devret\n- **Delete:** kanal boşken kaldır")
-      .setFooter({ text: "Made By Fieel" })],
-    components: [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`paradise_voice_lock:${channelId}`).setLabel("Lock / Unlock").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`paradise_voice_hide:${channelId}`).setLabel("Hide / Unhide").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId(`paradise_voice_limit:${channelId}`).setLabel("User Limit").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`paradise_voice_rename:${channelId}`).setLabel("Rename").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`paradise_voice_delete:${channelId}`).setLabel("Delete").setStyle(ButtonStyle.Danger)
-      ),
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`paradise_voice_permit:${channelId}`).setLabel("Permit User").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`paradise_voice_reject:${channelId}`).setLabel("Reject User").setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`paradise_voice_transfer:${channelId}`).setLabel("Transfer Owner").setStyle(ButtonStyle.Primary)
-      )
-    ]
-  };
+export async function getJtcGuildLanguage(guildId) {
+  return jtcGuildLanguage(jtcGuildConfig(await loadState(), guildId), guildId);
 }
 
-async function handleTemporaryVoiceButton(interaction) {
-  const [action, channelId] = interaction.customId.replace("paradise_voice_", "").split(":");
-  const state = await loadState();
-  const record = state.temporaryVoices?.[channelId];
-  const channel = interaction.guild.channels.cache.get(channelId);
-  if (!record || !channel || record.ownerId !== interaction.user.id) {
-    return interaction.reply({ content: "Bu ses kanalını yalnızca onu oluşturan kişi yönetebilir.", ephemeral: true });
-  }
-  if (["rename", "permit", "reject", "transfer"].includes(action)) {
-    const modal = new ModalBuilder().setCustomId(`paradise_voice_${action}_modal:${channelId}`)
-      .setTitle(action === "rename" ? "Ses kanalını yeniden adlandır" : "Ses kanalı üye kontrolü");
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId(action === "rename" ? "voice_name" : "target_user")
-        .setLabel(action === "rename" ? "Yeni güvenli kanal adı" : "Discord kullanıcı ID veya mention")
-        .setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(action === "rename" ? 80 : 30).setRequired(true)
-    ));
-    return interaction.showModal(modal);
-  }
-  if (action === "lock") {
-    const everyone = interaction.guild.roles.everyone;
-    const locked = Boolean(record.locked);
-    await channel.permissionOverwrites.edit(everyone, { Connect: locked ? null : false }, { reason: "FIMA Bot private voice owner control" });
-    await saveState(next => { next.temporaryVoices[channelId] = { ...record, locked: !locked }; return next; });
-    return interaction.reply({ content: locked ? "Ses kanalı açıldı." : "Ses kanalı kilitlendi.", ephemeral: true });
-  }
-  if (action === "limit") {
-    const limits = [0, 2, 4, 6, 8, 10];
-    const nextLimit = limits[(limits.indexOf(channel.userLimit) + 1) % limits.length];
-    await channel.setUserLimit(nextLimit, "FIMA Bot private voice owner control");
-    return interaction.reply({ content: `Kullanıcı limiti **${nextLimit || "sınırsız"}** olarak ayarlandı.`, ephemeral: true });
-  }
-  if (action === "hide") {
-    const everyone = interaction.guild.roles.everyone;
-    const hidden = Boolean(record.hidden);
-    await channel.permissionOverwrites.edit(everyone, { ViewChannel: hidden ? null : false }, { reason: "FIMA Bot private voice owner control" });
-    await saveState(next => { next.temporaryVoices[channelId] = { ...record, hidden: !hidden }; return next; });
-    return interaction.reply({ content: hidden ? "Ses kanalı görünür oldu." : "Ses kanalı gizlendi.", ephemeral: true });
-  }
-  if (channel.members.size > 0) return interaction.reply({ content: "Kanalı silmeden önce herkesin çıkması gerekir.", ephemeral: true });
-  await channel.delete("FIMA Bot private voice owner request");
-  await saveState(next => { delete next.temporaryVoices[channelId]; return next; });
-  return interaction.reply({ content: "Ses kanalı silindi.", ephemeral: true }).catch(() => null);
+export async function setJtcLanguagePreference(userId, choice) {
+  if (!['tr', 'en', 'later'].includes(choice)) return;
+  await saveState(next => { next.languagePreferences[userId] = choice; return next; });
 }
 
-async function handleTemporaryVoiceRenameModal(interaction) {
-  const channelId = interaction.customId.split(":")[1];
+async function loadJtcInteractionState(interaction) {
   const state = await loadState();
-  const record = state.temporaryVoices?.[channelId];
-  const channel = interaction.guild.channels.cache.get(channelId);
-  if (!record || !channel || record.ownerId !== interaction.user.id) {
-    return interaction.reply({ content: "Bu ses kanalını yeniden adlandırma yetkin yok.", ephemeral: true });
+  if (!state.languagePreferences?.[interaction.user.id]) {
+    const { prisma } = await import('./db.js');
+    const user = await prisma.user.findFirst({ where: { discordId: interaction.user.id }, select: { preferredLanguage: true, languageOnboardingStatus: true } }).catch(() => null);
+    if (user?.languageOnboardingStatus === 'deferred') state.languagePreferences[interaction.user.id] = 'later';
+    else if (['tr', 'en'].includes(user?.preferredLanguage)) state.languagePreferences[interaction.user.id] = user.preferredLanguage;
   }
-  const fallback = `${interaction.member.displayName || interaction.user.username}'s room`;
-  const requested = interaction.fields.getTextInputValue("voice_name");
-  const safeName = sanitizeTemporaryVoiceName(requested, fallback);
-  await channel.setName(safeName, "FIMA Bot private voice safe rename");
-  return interaction.reply({
-    content: safeName === requested.trim() ? `Kanal adı **${safeName}** oldu.` : `Uygunsuz ad reddedildi; kanal adı **${safeName}** olarak ayarlandı.`,
-    ephemeral: true
-  });
+  return state;
 }
 
 function discordUserId(value) {
-  const match = String(value || "").match(/\d{15,22}/);
-  return match?.[0] || null;
-}
-
-async function handleTemporaryVoiceMemberModal(interaction) {
-  const [, action, channelId] = interaction.customId.match(/^paradise_voice_(permit|reject|transfer)_modal:(\d+)$/) || [];
-  const state = await loadState();
-  const record = state.temporaryVoices?.[channelId];
-  const channel = interaction.guild.channels.cache.get(channelId);
-  if (!action || !record || !channel || record.ownerId !== interaction.user.id) {
-    return interaction.reply({ content: "Bu ses kanalını yönetme yetkin yok.", ephemeral: true });
-  }
-  const userId = discordUserId(interaction.fields.getTextInputValue("target_user"));
-  const member = userId ? await interaction.guild.members.fetch(userId).catch(() => null) : null;
-  if (!member || member.user.bot || member.id === interaction.user.id) {
-    return interaction.reply({ content: "Geçerli bir sunucu üyesi seç.", ephemeral: true });
-  }
-  if (action === "permit") {
-    await channel.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true }, { reason: "FIMA Bot private voice permit" });
-    await saveState(next => {
-      const current = next.temporaryVoices[channelId] || record;
-      next.temporaryVoices[channelId] = {
-        ...current,
-        permittedUserIds: [...new Set([...(current.permittedUserIds || []), member.id])],
-        rejectedUserIds: (current.rejectedUserIds || []).filter(id => id !== member.id)
-      };
-      return next;
-    });
-  } else if (action === "reject") {
-    if (member.voice.channelId === channel.id) await member.voice.disconnect("FIMA Bot private voice owner rejected member").catch(() => {});
-    await channel.permissionOverwrites.edit(member, { Connect: false }, { reason: "FIMA Bot private voice reject" });
-    await saveState(next => {
-      const current = next.temporaryVoices[channelId] || record;
-      next.temporaryVoices[channelId] = {
-        ...current,
-        rejectedUserIds: [...new Set([...(current.rejectedUserIds || []), member.id])],
-        permittedUserIds: (current.permittedUserIds || []).filter(id => id !== member.id)
-      };
-      return next;
-    });
-  } else {
-    await channel.permissionOverwrites.edit(interaction.user.id, { ManageChannels: null, MoveMembers: null }, { reason: "FIMA Bot voice ownership transfer" });
-    await channel.permissionOverwrites.edit(member, {
-      ViewChannel: true, Connect: true, ManageChannels: true, MoveMembers: true
-    }, { reason: "FIMA Bot voice ownership transfer" });
-    await saveState(next => { next.temporaryVoices[channelId] = { ...record, ownerId: member.id, transferredAt: new Date().toISOString() }; return next; });
-  }
-  await logParadiseAction(interaction.guild, "voice_logs_channel", "bot-logs", "Private voice control",
-    `<@${interaction.user.id}> used **${action}** for <@${member.id}> in <#${channel.id}>.`);
-  return interaction.reply({ content: `Voice action **${action}** applied for ${member}.`, ephemeral: true });
+  return String(value || '').match(/\d{15,22}/)?.[0] || null;
 }
 
 export async function recoverParadiseTemporaryVoices(client) {
@@ -11211,10 +11099,8 @@ export async function recoverParadiseTemporaryVoices(client) {
     records: state.temporaryVoices,
     getGuild: guildId => client.guilds.cache.get(guildId),
     enabled: guildId => {
-      const config = configForGuild(state, guildId);
-      const voice = fimaVoiceSettings(config);
-      return Boolean(config.activeSetupMode) && fimaRuntimeModuleAllowed(config, 'voice')
-        && voice.enabled !== false && voice.autoDelete !== false;
+      const config = jtcGuildConfig(state, guildId);
+      return fimaVoiceSettings(config).autoDelete !== false;
     },
     removeRecord: channelId => saveState(next => { delete next.temporaryVoices[channelId]; return next; })
   });
@@ -11223,13 +11109,13 @@ export async function recoverParadiseTemporaryVoices(client) {
 export async function handleParadiseVoiceStateUpdate(oldState, newState) {
   const guild = newState.guild || oldState.guild;
   if (!guild || newState.member?.user?.bot) return false;
-  const guildConfig = configForGuild(await loadState(), guild.id);
+  const guildConfig = jtcGuildConfig(await loadState(), guild.id);
+  const guildLanguage = jtcGuildLanguage(guildConfig, guild.id);
   const activeMode = guildConfig.activeSetupMode;
   const voiceConfig = fimaVoiceSettings(guildConfig);
-  if (!fimaRuntimeModuleAllowed(guildConfig, 'voice')) return false;
-  if (!activeMode || voiceConfig.enabled === false) return false;
+
   const joined = newState.channel;
-  const isJoinToCreate = oldState.channelId !== newState.channelId && joined?.type === ChannelType.GuildVoice
+  const isJoinToCreate = voiceConfig.enabled !== false && Boolean(voiceConfig.joinToCreateChannelId || activeMode) && oldState.channelId !== newState.channelId && joined?.type === ChannelType.GuildVoice
     && (voiceConfig.joinToCreateChannelId ? joined.id === voiceConfig.joinToCreateChannelId : FIMA_VOICE_NAMES.joinToCreate.includes(joined.name));
   if (isJoinToCreate) {
     return withTemporaryVoiceJoin(`${guild.id}:${newState.member.id}`, async () => {
@@ -11240,7 +11126,7 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
     });
     const existing = Object.values((await loadState()).temporaryVoices || {})
       .find(record => record.guildId === guild.id && record.ownerId === newState.member.id
-        && guild.channels.cache.get(record.channelId)?.type === ChannelType.GuildVoice);
+        && jtcRoomMatches(record, guild.channels.cache.get(record.channelId), guild.id));
     if (existing) {
       await moveToTemporaryVoice({ channel: guild.channels.cache.get(existing.channelId),
         move: channel => newState.setChannel(channel, 'FIMA Bot existing temporary voice'), removeRecord });
@@ -11248,10 +11134,10 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
     }
     if (!reserveTemporaryVoiceCreation(`${guild.id}:${newState.member.id}`)) {
       await newState.disconnect('FIMA Bot temporary voice creation cooldown');
-      await newState.member.send('Yeni oda açmadan önce 30 saniye bekle. / Please wait 30 seconds before creating another room.').catch(() => {});
+      await newState.member.send(guildLanguage === 'tr' ? 'Yeni oda açmadan önce 30 saniye bekle.' : 'Please wait 30 seconds before creating another room.').catch(() => {});
       return true;
     }
-    const fallbackName = `${newState.member.displayName || newState.member.user.username}'s room`;
+    const fallbackName = (voiceConfig.defaultRoomName || JTC_TEXT[guildLanguage].room).replace('{user}', sanitizeTemporaryVoiceName(newState.member.displayName || newState.member.user.username, guildLanguage === 'tr' ? 'Kullanıcı' : 'User'));
     const privateCategory = guild.channels.cache.get(voiceConfig.privateVoiceCategoryId)
       || guild.channels.cache.find(channel => channel.type === ChannelType.GuildCategory && FIMA_VOICE_NAMES.privateCategory.includes(channel.name));
     const channel = await guild.channels.create({
@@ -11283,14 +11169,14 @@ export async function handleParadiseVoiceStateUpdate(oldState, newState) {
       if (newState.member.voice.channelId !== joined.id) throw new Error('temporary_voice_member_left_lobby');
       await newState.setChannel(target, 'FIMA Bot Join to Create');
     } });
-    await channel.send(temporaryVoicePanel(channel.id)).catch(() => {});
+    await channel.send(temporaryVoicePanel(channel.id, guildLanguage)).catch(() => {});
     return true;
     });
   }
   const oldChannel = oldState.channel;
   if (oldChannel && oldChannel.id !== newState.channelId) {
     const record = (await loadState()).temporaryVoices?.[oldChannel.id];
-    if (record && oldChannel.members.size === 0 && voiceConfig.autoDelete !== false) {
+    if (record?.guildId === guild.id && oldChannel.guildId === guild.id && oldChannel.type === ChannelType.GuildVoice && oldChannel.members.size === 0 && voiceConfig.autoDelete !== false) {
       await oldChannel.delete("FIMA Bot empty temporary voice cleanup");
       await saveState(state => { delete state.temporaryVoices[oldChannel.id]; return state; });
       return true;
@@ -14964,6 +14850,14 @@ async function handlePurgeConfirmation(interaction) {
 }
 
 async function handleParadiseInteractionInner(interaction) {
+  if (interaction.isChatInputCommand?.() && interaction.commandName === 'setup' && interaction.options.getString('module') === 'jtc') {
+    await setupJtc(interaction, { loadState, saveState, lock: withParadiseGuildMutationLock });
+    return true;
+  }
+  if (String(interaction.customId || '').startsWith('paradise_voice_')) {
+    await handleJtcControl(interaction, { loadState: () => loadJtcInteractionState(interaction), saveState, sanitizeName: sanitizeTemporaryVoiceName });
+    return true;
+  }
   if (interaction.guildId && !fimaInteractionModuleAllowed(configForGuild(await loadState(), interaction.guildId), interaction)) {
     await interaction.reply({ content: 'This FIMA module is disabled for this server.', ephemeral: true });
     return true;
@@ -14976,14 +14870,8 @@ async function handleParadiseInteractionInner(interaction) {
     await handleVerifyModal(interaction);
     return true;
   }
-  if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_voice_rename_modal:")) {
-    await handleTemporaryVoiceRenameModal(interaction);
-    return true;
-  }
-  if (interaction.isModalSubmit?.() && /^paradise_voice_(permit|reject|transfer)_modal:/.test(interaction.customId)) {
-    await handleTemporaryVoiceMemberModal(interaction);
-    return true;
-  }
+
+
   if (interaction.isModalSubmit?.() && interaction.customId.startsWith("paradise_application_review_reason:")) {
     await handleApplicationReviewReasonModal(interaction);
     return true;
@@ -15123,7 +15011,6 @@ async function handleParadiseInteractionInner(interaction) {
     if (interaction.customId.startsWith("paradise_application_")) { await handleApplicationReview(interaction); return true; }
     if (interaction.customId.startsWith("paradise_mod_")) { await handleModerationReview(interaction); return true; }
     if (interaction.customId.startsWith("paradise_payout_")) { await handleQotdPayoutReview(interaction); return true; }
-    if (interaction.customId.startsWith("paradise_voice_")) { await handleTemporaryVoiceButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_qotd_")) { await handleQotdButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_giveaway_enter:") || interaction.customId.startsWith("paradise_rsvp_")) { await handleOptInButton(interaction); return true; }
     if (interaction.customId.startsWith("paradise_role_")) {

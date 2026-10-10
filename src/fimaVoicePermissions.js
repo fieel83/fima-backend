@@ -6,8 +6,7 @@ export function temporaryVoiceOverwrites(parentOverwrites, ownerId) {
     allow: BigInt(overwrite.allow?.bitfield ?? overwrite.allow ?? 0),
     deny: BigInt(overwrite.deny?.bitfield ?? overwrite.deny ?? 0)
   }));
-  const ownerPermissions = PermissionsBitField.Flags.ViewChannel | PermissionsBitField.Flags.Connect
-    | PermissionsBitField.Flags.ManageChannels | PermissionsBitField.Flags.MoveMembers;
+  const ownerPermissions = PermissionsBitField.Flags.ViewChannel | PermissionsBitField.Flags.Connect;
   const previous = inherited.find(overwrite => overwrite.id === ownerId);
   const owner = { id: ownerId, type: 1,
     allow: (previous?.allow || 0n) | ownerPermissions,
