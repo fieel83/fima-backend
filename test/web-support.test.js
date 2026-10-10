@@ -5,7 +5,7 @@ import express from 'express';
 import { ChannelType, PermissionsBitField } from 'discord.js';
 import { verifyTicketPrivacy } from '../src/webSupportDiscord.js';
 import { prisma } from '../src/db.js';
-import { createSupportStore, store, SUPPORT_GUILD, categories, canRead, validateAttachments, publicTicket, addMessage, ticketAction, configureSupportDiscord, flushSupportOutbox, supportRouter } from '../src/webSupport.js';
+import { createSupportStore, store, SUPPORT_GUILD, categories, canRead, validateAttachments, publicTicket, makeTranscript, addMessage, ticketAction, configureSupportDiscord, flushSupportOutbox, supportRouter } from '../src/webSupport.js';
 
 function database() {
   const rows = new Map(), audit = [];
@@ -22,6 +22,15 @@ function database() {
 const customer = {id:'customer-a', name:'A <script>alert(1)</script>', discordId:'123456789012345678', guildId:SUPPORT_GUILD};
 const staff = {id:'staff-a', name:'Staff', discordId:'223456789012345678', guildId:SUPPORT_GUILD, work:true, manage:true, delete:true};
 const input = () => ({requestId:crypto.randomUUID(), category:categories[0], title:'Timing help <script>', description:'Please help with this timing issue. <script>alert(1)</script>', attachments:[]});
+
+test('archives localize safely and preserve private-note exclusion and legacy English', () => {
+  const ticket = {id:'archive', title:'Title <script>', category:categories[0], status:'CLOSED', events:[{type:'close',actor:'Staff',at:'2026-10-10T12:00:00Z',reason:'Done <img>'}], messages:[{author:'Customer <script>',role:'customer',createdAt:'2026-10-10T12:00:00Z',text:'Public <script>',attachments:[{id:'file',name:'proof <img>.png',size:123}]},{author:'Staff',internal:true,text:'PRIVATE NOTE',attachments:[]}]};
+  const en = makeTranscript(ticket), tr = makeTranscript({...ticket,locale:'tr'});
+  assert.match(en, /lang="en"/); assert.match(en, /Participants: /); assert.match(en, /Not malware scanned/); assert.match(en, /Macro support · Closed/);
+  assert.match(tr, /lang="tr"/); assert.match(tr, /Katılımcılar: /); assert.match(tr, /Macro desteği · Kapalı/); assert.match(tr, /Kapatıldı/); assert.match(tr, /Zararlı yazılım taraması yapılmadı/);
+  for (const html of [en,tr]) { assert.doesNotMatch(html, /PRIVATE NOTE|<script>|<img>/); assert.match(html, /&lt;script&gt;/); assert.match(html, /overflow-wrap:anywhere/); assert.match(html, /UTC/); }
+  assert.match(makeTranscript({...ticket,locale:'tr',status:'FUTURE_STATUS'}), /FUTURE_STATUS/);
+});
 
 test('Discord reassignment revokes recorded former assignees and rejects unexpected grants', async () => {
   const cache = new Map(), removed = [];

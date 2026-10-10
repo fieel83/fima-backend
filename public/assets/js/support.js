@@ -93,7 +93,7 @@
       requestInFlight = true; const button = document.getElementById('nextStep'); button.disabled = true; button.textContent = 'Saving your ticket…';
       try {
         const payload = await encodeFiles(files); const progress = document.getElementById('createProgress'); progress.hidden = false;
-        const t = await api('/tickets', { method: 'POST', body: { ...draft, attachments: payload }, progress: value => { progress.value = value; } });
+        const t = await api('/tickets', { method: 'POST', body: { ...draft, locale: document.documentElement.lang === 'tr' ? 'tr' : 'en', attachments: payload }, progress: value => { progress.value = value; } });
         sessionStorage.removeItem('fimaSupportDraft'); draft = { requestId: crypto.randomUUID(), category:'', title:'', description:'', details:{} }; files = []; gotoTicket(t.id);
       } catch (err) { fail(err, document.getElementById('formError')); button.disabled = false; button.textContent = 'Retry sending ticket ↗'; } finally { requestInFlight = false; }
     };
