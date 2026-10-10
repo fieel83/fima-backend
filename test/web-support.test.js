@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { Prisma } from '@prisma/client';
 import { ChannelType, PermissionsBitField } from 'discord.js';
-import { verifyTicketPrivacy } from '../src/webSupportDiscord.js';
+import { verifyTicketPrivacy, resolveSupportArchiveChannel } from '../src/webSupportDiscord.js';
 import { prisma } from '../src/db.js';
 import { createSupportStore, store, SUPPORT_GUILD, categories, canRead, validateAttachments, publicTicket, makeTranscript, addMessage, ticketAction, configureSupportDiscord, flushSupportOutbox, supportRouter } from '../src/webSupport.js';
 
@@ -28,6 +28,19 @@ function database() {
 const customer = {id:'customer-a', name:'A <script>alert(1)</script>', discordId:'123456789012345678', guildId:SUPPORT_GUILD};
 const staff = {id:'staff-a', name:'Staff', discordId:'223456789012345678', guildId:SUPPORT_GUILD, work:true, manage:true, delete:true};
 const input = () => ({requestId:crypto.randomUUID(), category:categories[0], title:'Timing help <script>', description:'Please help with this timing issue. <script>alert(1)</script>', attachments:[]});
+
+test('archive destination honors configuration and rejects ambiguous or missing targets', () => {
+  const existing = {id:'existing',name:'⌁・ticket-transcripts'}, legacy = {id:'legacy',name:'⌁・ticket-logs'}, configured = {id:'configured',name:'private-archive'};
+  const channels = new Map([[existing.id,existing]]);
+  assert.equal(resolveSupportArchiveChannel(channels),existing);
+  channels.set(legacy.id,legacy);
+  assert.throws(() => resolveSupportArchiveChannel(channels),/transcript_log_ambiguous/);
+  channels.set(configured.id,configured);
+  assert.equal(resolveSupportArchiveChannel(channels,'configured'),configured);
+  assert.throws(() => resolveSupportArchiveChannel(channels,'missing'),/transcript_log_unconfigured/);
+  assert.throws(() => resolveSupportArchiveChannel(new Map()),/transcript_log_unconfigured/);
+  assert.equal(resolveSupportArchiveChannel(new Map([[legacy.id,legacy]])),legacy);
+});
 
 test('archives localize safely and preserve private-note exclusion and legacy English', () => {
   const ticket = {id:'archive', title:'Title <script>', category:categories[0], status:'CLOSED', events:[{type:'close',actor:'Staff',at:'2026-10-10T12:00:00Z',reason:'Done <img>'}], messages:[{author:'Customer <script>',role:'customer',createdAt:'2026-10-10T12:00:00Z',text:'Public <script>',attachments:[{id:'file',name:'proof <img>.png',size:123}]},{author:'Staff',internal:true,text:'PRIVATE NOTE',attachments:[]}]};

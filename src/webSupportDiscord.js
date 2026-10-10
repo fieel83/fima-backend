@@ -9,8 +9,6 @@ const rolesFor = key => String(env(key, '')).split(',').map(v => v.trim()).filte
 let configuredRoles = {}, configuredChannels = {};
 const mappedRoles = keys => keys.map(key => configuredRoles[key]).filter(id => /^\d{17,20}$/.test(String(id || '')));
 const managementRoles = () => [...mappedRoles(['moderator_role', 'senior_moderator_role', 'admin_role']), ...rolesFor('FIMA_TICKET_MODERATOR_ROLE_IDS'), ...rolesFor('FIMA_TICKET_SENIOR_ROLE_IDS'), ...rolesFor('FIMA_TICKET_ADMIN_ROLE_IDS')];
-let discoveredLogId;
-const logId = () => env('DISCORD_TICKET_TRANSCRIPT_CHANNEL_ID') || discoveredLogId;
 const workRoles = () => [...mappedRoles(['helper_role', 'support_role', 'fima_support_role', 'support_staff_role', 'moderator_role', 'senior_moderator_role', 'admin_role']), ...rolesFor('DISCORD_FIMA_SUPPORT_ROLE_ID'), ...rolesFor('DISCORD_SUPPORT_ROLE_ID'), ...rolesFor('FIMA_TICKET_HELPER_ROLE_IDS'), ...rolesFor('FIMA_TICKET_JUNIOR_ROLE_IDS'), ...rolesFor('FIMA_TICKET_MODERATOR_ROLE_IDS'), ...rolesFor('FIMA_TICKET_SENIOR_ROLE_IDS'), ...rolesFor('FIMA_TICKET_ADMIN_ROLE_IDS')];
 const topic = t => 'FIMA website ticket:' + t.id + '; owner:' + t.discordUserId;
 const home = () => String(frontendUrl() || 'https://fimamacro.com').replace(/\/$/, '');
@@ -18,6 +16,17 @@ const url = t => home() + '/support?ticket=' + t.id;
 const controlRow = t => new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('View ticket').setStyle(ButtonStyle.Link).setURL(url(t)), ...['claim', 'assign', 'escalate', 'close'].map(action => new ButtonBuilder().setCustomId('fima_webticket:' + action + ':' + t.id).setLabel(action[0].toUpperCase() + action.slice(1)).setStyle(action === 'close' ? ButtonStyle.Danger : ButtonStyle.Secondary)));
 let access;
 let stopWorker;
+
+export function resolveSupportArchiveChannel(channels, configuredId) {
+  if (configuredId) {
+    const selected = channels.get(String(configuredId));
+    if (!selected) throw new Error('transcript_log_unconfigured');
+    return selected;
+  }
+  const candidates = [...channels.values()].filter(c => ['⌁・ticket-transcripts', '⌁・ticket-logs'].includes(c?.name));
+  if (candidates.length !== 1) throw new Error(candidates.length ? 'transcript_log_ambiguous' : 'transcript_log_unconfigured');
+  return candidates[0];
+}
 
 export async function verifyTicketPrivacy(c, t, permittedRoles) {
   if (c.type !== ChannelType.GuildText || c.guildId !== SUPPORT_GUILD || c.topic !== topic(t) || c.permissionsFor(c.guild.roles.everyone).has(PermissionsBitField.Flags.ViewChannel)) throw new Error('ticket_channel_not_private');
@@ -57,10 +66,9 @@ export function connectWebSupport(getGuild) {
   }
   async function archiveChannel() {
     const g = await guild(), channels = await g.channels.fetch();
-    discoveredLogId = channels.find(c => c?.name === '⌁・ticket-logs')?.id;
-    if (!logId()) throw new Error('transcript_log_unconfigured');
-    const c = await g.channels.fetch(logId());
-    if (c?.name !== '⌁・ticket-logs' || !c.isTextBased() || c.guildId !== SUPPORT_GUILD || c.permissionsFor(g.roles.everyone).has(PermissionsBitField.Flags.ViewChannel)) throw new Error('transcript_log_not_private');
+    const selected = resolveSupportArchiveChannel(channels, env('DISCORD_TICKET_TRANSCRIPT_CHANNEL_ID') || configuredChannels.support_transcripts_channel);
+    const c = await g.channels.fetch(selected.id);
+    if (!c?.isTextBased() || c.guildId !== SUPPORT_GUILD || c.permissionsFor(g.roles.everyone).has(PermissionsBitField.Flags.ViewChannel)) throw new Error('transcript_log_not_private');
     for (const overwrite of c.permissionOverwrites.cache.values()) {
       if (!overwrite.allow.has(PermissionsBitField.Flags.ViewChannel) || overwrite.id === g.members.me.id) continue;
       const allowed = overwrite.type === 0 ? workRoles().filter(r => !rolesFor('FIMA_TICKET_JUNIOR_ROLE_IDS').includes(r)).includes(overwrite.id) : (await permissions(overwrite.id)).manage;
