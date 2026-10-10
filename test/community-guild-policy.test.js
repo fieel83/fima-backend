@@ -6,12 +6,43 @@ import {
   communityActivityGuildPolicy,
   communityRewardGuildIds,
   communityRewardGuildPolicy,
-  isCommunityRewardGuild
+  isCommunityRewardGuild,
+  isCommunityActivityGuild
 } from "../src/communityGuildPolicy.js";
 import { PARADISE_TEST_GUILD_ID } from "../src/runtimeEnvironment.js";
 import fs from "node:fs";
 
 const discordBotSource = fs.readFileSync(new URL("../src/discordBot.js", import.meta.url), "utf8");
+
+test("gateway events award production XP without enabling paid booster rewards", async () => {
+  const production = { PARADISE_RUNTIME_ENV: "production", COMMUNITY_ACTIVITY_ENABLED: "true" };
+  const callbacks = new Map();
+  const calls = [];
+  const noop = async () => {};
+  const parameters = {
+    client: { on: (event, callback) => callbacks.set(event, callback) },
+    handleParadiseMessageSafety: async () => false,
+    fimaAiSupportBridge: null,
+    isCommunityRewardGuild: id => isCommunityRewardGuild(id, production),
+    isCommunityActivityGuild: id => isCommunityActivityGuild(id, production),
+    observeCommunityBoostMessage: async () => calls.push("paid-boost"),
+    handleCommunityTextActivity: async () => calls.push("text-xp"),
+    handleCommunityVoiceActivity: async () => calls.push("voice-xp"),
+    handleParadiseMessage: noop,
+    handleFimaSupportTicketHint: noop,
+    handleParadiseVoiceStateUpdate: noop
+  };
+  const messageEvent = discordBotSource.slice(discordBotSource.indexOf('  client.on("messageCreate"'), discordBotSource.indexOf('  client.on("messageUpdate"'));
+  const voiceEvent = discordBotSource.slice(discordBotSource.indexOf('  client.on("voiceStateUpdate"'), discordBotSource.indexOf('  client.on("error"'));
+  new Function(...Object.keys(parameters), `let lastError; ${messageEvent}\n${voiceEvent}`)(...Object.values(parameters));
+  await callbacks.get("messageCreate")({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID });
+  callbacks.get("voiceStateUpdate")({}, { guild: { id: FIMA_COMMUNITY_PRODUCTION_GUILD_ID } });
+  assert.deepEqual(calls, ["text-xp", "voice-xp"]);
+  calls.length = 0;
+  await callbacks.get("messageCreate")({ guildId: "999999999999999999" });
+  callbacks.get("voiceStateUpdate")({}, { guild: { id: "999999999999999999" } });
+  assert.deepEqual(calls, []);
+});
 
 test("production XP and cosmetic roles run while paid rewards remain disabled", () => {
   const source = { PARADISE_RUNTIME_ENV: "production", COMMUNITY_ACTIVITY_ENABLED: "true" };

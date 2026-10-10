@@ -23,7 +23,9 @@ export function buildParadiseCustomerWorkspaceCards({ memberships = [], managedG
       memberCount: Number.isFinite(Number(managed?.memberCount)) ? Number(managed.memberCount) : null,
       activePlan: cleanText(planByGuildId[guildId], "free"),
       activeTemplate: cleanText(templateByGuildId[guildId]),
-      lastSuccessfulSyncAt: managed?.lastSuccessfulSyncAt || null
+      lastSuccessfulSyncAt: managed?.lastSuccessfulSyncAt || null,
+      botHealth: managed?.botHealth || null,
+      lastCommandSyncAt: managed?.lastCommandSyncAt || null
     }];
   });
 }

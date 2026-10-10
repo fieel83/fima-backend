@@ -67,6 +67,10 @@ export function assertCommunityActivityGuild(input = {}) {
   throw error;
 }
 
+export function isCommunityActivityGuild(guildId, source = process.env) {
+  return communityActivityGuildPolicy({ guildId, source }).allowed;
+}
+
 export function communityActivityGuildIds(source = process.env) {
   const ids = [PARADISE_TEST_GUILD_ID];
   if (communityActivityGuildPolicy({ guildId: FIMA_COMMUNITY_PRODUCTION_GUILD_ID, source }).allowed) ids.push(FIMA_COMMUNITY_PRODUCTION_GUILD_ID);

@@ -40,7 +40,7 @@ import {
   reconcileCommunityBoosterMember,
   startCommunityBoosterWorker
 } from "./communityBooster.js";
-import { isCommunityRewardGuild } from "./communityGuildPolicy.js";
+import { isCommunityActivityGuild, isCommunityRewardGuild } from "./communityGuildPolicy.js";
 import { answerFimaSupportQuestion, fimaAiHealth } from "./fimaAiAdapter.js";
 import {
   applyFimaBotProfileSync,
@@ -584,6 +584,8 @@ export function startDiscordBot() {
         lastError = error.message;
         console.warn("FIMA booster observation failed", { message: error.message, code: error.code || null, messageId: message?.id || null });
       });
+    }
+    if (isCommunityActivityGuild(message.guildId)) {
       handleCommunityTextActivity(message).catch((error) => {
         lastError = error.message;
         console.warn("FIMA text activity handler failed", { message: error.message, code: error.code || null, channelId: message?.channelId || null });
@@ -650,7 +652,7 @@ export function startDiscordBot() {
   });
 
   client.on("voiceStateUpdate", (oldState, newState) => {
-    if (isCommunityRewardGuild(newState?.guild?.id || oldState?.guild?.id)) {
+    if (isCommunityActivityGuild(newState?.guild?.id || oldState?.guild?.id)) {
       handleCommunityVoiceActivity(oldState, newState).catch((error) => {
         lastError = error.message;
         console.warn("FIMA voice activity handler failed", { message: error.message, code: error.code || null });
@@ -951,14 +953,16 @@ function activityPrizeLabel(rank) {
 }
 
 async function handleCommunityActivityCommand(interaction) {
-  if (!isCommunityRewardGuild(interaction.guildId)) {
+  const subcommand = interaction.options.getSubcommand();
+  const rewardsEnabled = isCommunityRewardGuild(interaction.guildId);
+  const activityCommand = subcommand === "rank" || subcommand === "leaderboard";
+  if (activityCommand ? !isCommunityActivityGuild(interaction.guildId) : !rewardsEnabled) {
     return interaction.reply({
       content: "FIMA activity sistemi production sunucusunda henuz etkin degil. Sonuclari dogrulanana kadar yalniz test sunucusunda calisir.",
       ephemeral: true
     });
   }
 
-  const subcommand = interaction.options.getSubcommand();
   await interaction.deferReply({ ephemeral: subcommand !== "leaderboard" });
   try {
     if (subcommand === "leaderboard") {
@@ -969,19 +973,19 @@ async function handleCommunityActivityCommand(interaction) {
         const activity = board === "voice"
           ? `${activityVoiceDuration(entry.voiceSeconds)} • ${entry.xp} XP`
           : `${entry.textMessages} mesaj • ${entry.xp} XP`;
-        const prize = activityPrizeLabel(entry.rank);
+        const prize = rewardsEnabled ? activityPrizeLabel(entry.rank) : "";
         return `**#${entry.rank}** <@${entry.discordUserId}> • ${activity}${prize ? ` • **${prize} FIMA Macro**` : ""}`;
       });
       const embed = new EmbedBuilder()
         .setColor(board === "voice" ? 0x40d6ff : 0x9b5cff)
         .setTitle(`FIMA ${boardName} Leaderboard`)
         .setDescription(lines.length ? lines.join("\n") : "Bu sezonda henuz uygun aktivite kaydi yok.")
-        .addFields(
-          { name: "Sezon", value: activitySeasonLabel(result.season), inline: false },
-          { name: "Oduller", value: "1. 15 gun • 2. 10 gun • 3. 7 gun FIMA Macro. Text ve ses odulleri ayri kazanilir ve ust uste eklenir.", inline: false },
-          { name: "Booster Odulleri", value: "Her ay dogrulanan aktif boost basina +3 gun FIMA Macro verilir. Booster, text ve ses odulleri ust uste eklenir.", inline: false }
-        )
+        .addFields({ name: "Sezon", value: activitySeasonLabel(result.season), inline: false })
         .setFooter({ text: "Leaderboard siralamalari her ay UTC saatine gore sifirlanir." });
+      if (rewardsEnabled) embed.addFields(
+        { name: "Oduller", value: "1. 15 gun • 2. 10 gun • 3. 7 gun FIMA Macro. Text ve ses odulleri ayri kazanilir ve ust uste eklenir.", inline: false },
+        { name: "Booster Odulleri", value: "Her ay dogrulanan aktif boost basina +3 gun FIMA Macro verilir. Booster, text ve ses odulleri ust uste eklenir.", inline: false }
+      );
       return interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
 
@@ -1001,7 +1005,7 @@ async function handleCommunityActivityCommand(interaction) {
           { name: "Ses", value: voiceRank, inline: false },
           { name: "Sezon", value: activitySeasonLabel(result.season), inline: false }
         )
-        .setFooter({ text: "Odul alabilmek icin Discord hesabin FIMA hesabina bagli olmalidir." });
+        .setFooter({ text: rewardsEnabled ? "Odul alabilmek icin Discord hesabin FIMA hesabina bagli olmalidir." : "XP ve seviye ilerlemen korunur; ucretli oduller etkin degil." });
       return interaction.editReply({ embeds: [embed] });
     }
 
@@ -3322,7 +3326,12 @@ export async function paradiseDiscordGuildsSnapshot() {
       memberCount: guild.memberCount,
       botRolePosition: me?.roles?.highest?.position ?? null,
       botPermissions: me?.permissions?.toArray?.() || [],
-      available: guild.available !== false
+      available: guild.available !== false,
+      botHealth: {
+        connected: client.isReady() && guild.available !== false && Boolean(me),
+        observedAt: new Date().toISOString()
+      },
+      lastCommandSyncAt: lastCommandSyncAt?.toISOString() || null
     });
   }
   return guilds.sort((a, b) => a.name.localeCompare(b.name));

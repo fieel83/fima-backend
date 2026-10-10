@@ -250,7 +250,9 @@ export function buildParadiseCustomerWorkspaceView({ card, config = {}, route = 
       canManage: card.canManage === true,
       activePlan: String(card.activePlan || "free"),
       activeTemplate: card.activeTemplate || null,
-      lastSuccessfulSyncAt: card.lastSuccessfulSyncAt || null
+      lastSuccessfulSyncAt: card.lastSuccessfulSyncAt || null,
+      botHealth: card.botHealth || null,
+      lastCommandSyncAt: card.lastCommandSyncAt || null
     },
     route: selectedRoute,
     routes: availableRoutes,

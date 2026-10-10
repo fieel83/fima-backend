@@ -1,6 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { buildParadiseCustomerWorkspaceCards } from "../src/paradiseCustomerWorkspaces.js";
+
+test("workspace health preserves live observations and labels command sync honestly", () => {
+  const membership = { id: "1419335632324657306", owner: true, name: "FT Community" };
+  const observation = { connected: true, observedAt: "2026-10-10T01:00:00.000Z" };
+  const [card] = buildParadiseCustomerWorkspaceCards({
+    memberships: [membership],
+    managedGuilds: [{ id: membership.id, botHealth: observation, lastCommandSyncAt: "2026-10-10T00:59:00.000Z" }]
+  });
+  assert.deepEqual(card.botHealth, observation);
+  assert.equal(card.lastCommandSyncAt, "2026-10-10T00:59:00.000Z");
+  assert.equal(card.lastSuccessfulSyncAt, null);
+  const [unobserved] = buildParadiseCustomerWorkspaceCards({ memberships: [membership] });
+  assert.equal(unobserved.botHealth, null);
+  assert.equal(unobserved.lastCommandSyncAt, null);
+});
 
 const html = fs.readFileSync(new URL("../public/fima-bot-dashboard.html", import.meta.url), "utf8");
 const script = fs.readFileSync(new URL("../public/assets/js/fima-bot-dashboard.js", import.meta.url), "utf8");

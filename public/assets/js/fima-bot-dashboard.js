@@ -744,11 +744,15 @@ function confirmUnsavedNavigation() {
 function renderWorkspaceFacts(payload) {
   const facts = el("[data-workspace-facts]");
   const card = state.selected;
-  const synced = formatDate(payload.workspace.lastSuccessfulSyncAt);
-  facts.innerHTML = `<article><span>Bot kurulumu</span><strong class="${card.botInstalled ? "is-positive" : "is-warning"}">${card.botInstalled ? "Kurulu · Sağlık gözlemlenmedi" : "Kurulum gerekli"}</strong></article>
+  const synced = formatDate(payload.workspace.lastCommandSyncAt);
+  const health = payload.workspace.botHealth;
+  const observed = Boolean(health?.observedAt);
+  const connected = observed && health.connected === true;
+  const healthLabel = !card.botInstalled ? "Kurulum gerekli" : !observed ? "Kurulu · Sağlık gözlemlenmedi" : connected ? "Kurulu · Discord bağlantısı sağlıklı" : "Kurulu · Discord bağlantısı hazır değil";
+  facts.innerHTML = `<article><span>Bot kurulumu</span><strong class="${connected ? "is-positive" : "is-warning"}" title="${escapeHtml(observed ? formatDate(health.observedAt) : '')}">${healthLabel}</strong></article>
     <article><span>Etkin plan</span><strong>${escapeHtml(String(card.activePlan || "free").toUpperCase())}</strong></article>
     <article><span>Kurulum türü</span><strong>${escapeHtml(payload.setupType || card.activeTemplate || "Bilinmiyor")}</strong></article>
-    <article><span>Son başarılı senkronizasyon</span><strong>${escapeHtml(synced)}</strong></article>`;
+    <article><span>Komut senkronizasyonu</span><strong>${escapeHtml(synced)}</strong></article>`;
   facts.hidden = false;
 }
 
